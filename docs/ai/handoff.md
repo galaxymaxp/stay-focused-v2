@@ -3860,3 +3860,72 @@ Failed attempts: deliberate red reproduction at 239a0ab had 7 failed/80 passed i
 UNVERIFIED (owner to confirm): deployed revisions, actual stored visual rows, applied migrations, database/Scheduler state, provider/image egress and physical-device root cause. The offline code evidence proves display/parser failures; it cannot establish which occurred on Realme. No deployment, remote service/SQL call, migration application, environment-file edit, Scheduler action, email, fetch or push occurred.
 
 **Owner steps remaining:** Rollout and Device checks were skipped entirely (NOT RUN). Publish the reviewed mobile fix through the owner's normal release flow. RB5 on Realme: open a reviewer section without a course image and with a found Commons visual; verify the image, exact external label and attribution, then confirm source-image precedence and offline behavior. Confirm actual deployed versions and the live state listed above. No unanswered owner question or approval request blocks this completed code-only slice. Stop at EV1; IM2 and later work remain untouched.
+
+## RX1 unattended reviewer header - PASS (2026-10-17)
+
+Status: PASS for RX1/N3 STEP 0-2, fresh serial gates, documentation and local
+commits. Baseline 7d503dd after INT1 and EV1, branch
+overnight/2026-10-15_feedback. Initial tracked tree was clean; expected untracked
+UI/, apps/mobile/.gitignore and supabase/.temp/ remain untouched. This run ends
+at RX1; no later roadmap slice was started.
+
+Commits: 0ce5db6 feat(mobile): put reviewer Export and Share in one row;
+docs: close RX1 is the closing commit containing this footer (final hash in Git
+and ignored tmp/overnight/RX1.status). Both use the required author
+galaxymaxp <omgraythekid@gmail.com>. No push.
+
+Chosen layout is the explicit prompt order: title -> equal-width secondary
+Export/Share row -> review-time/topics metadata -> Generate Quiz hero -> hint.
+Generate Quiz retains its primary styling. ReviewerHeader is used by the live
+reader and tested with the actual Action/Copy/Share trigger against inert native
+hosts. Optional Action wrapper style and ShareReviewerMenu triggerStyle preserve
+the menu, owner key, offline state, clipboard fallback and sharing behavior.
+Export fills the row for non-artifact IDs. Both targets stay at least 48 points;
+font scale below 2 keeps one row, 2+ stacks full-width buttons. Labels have no
+line limit or fixed height. Source text and accessibility defaults are unchanged;
+focus order is Export then Share. No dependency, native module or migration added.
+Website already places Share, Save to file and Generate Quiz in div.row with
+display:flex, so STEP 2 requires no website change or web test.
+
+FRESH serial gate counts:
+
+- npm run typecheck -- --force: 8/8 tasks, zero cached on retry.
+- npm run lint -- --force: 8/8 tasks, zero cached; zero errors, six existing
+  warnings (five mobile import-order warnings, one web unused useMemo).
+- npm run test --workspace @stay-focused/mobile: 1,216/1,216 tests, 131/131 files.
+  Header/Share/missing-clipboard suites have 14 tests, including seven new header
+  cases; the initial focused run also passed 14/14 in 3 files.
+- npm run build --workspace @stay-focused/api: PASS, 35/35 pages.
+- npm run build --workspace @stay-focused/mobile -- --platform android: PASS,
+  one Android bundle and 35 assets.
+- npm run build -- --force (AUTOPILOT.md): 8/8 tasks, zero cached; API/web pages
+  35/35 and 19/19, Android/iOS/web exports with 68 assets.
+- git diff --check and git diff --cached --check: PASS. Generated API/web
+  next-env.d.ts changes inspected and restored. No CACHED acceptance claim.
+
+First failed gate attempt is retained: forced typecheck exited 2 with 7/8 tasks
+successful, zero cached, one mobile test-only TS2322. The test fixture inferred
+string metadata and rejected null; ComponentProps<typeof ReviewerHeader> fixes
+the fixture without weakening production types. Fresh retry passed. All later
+gates passed on their first attempts. No nondeterministic flake observed. Existing
+Vite configLoader/CommonJS and Expo color-environment warnings remain. Web/API/
+shared tests are NOT APPLICABLE because those workspaces did not change. Final
+gates tested the exact code tree committed at 0ce5db6; later edits are docs only.
+Full acceptance: [RX1 report](acceptance/rx1-reviewer-header.md). Planning files
+are reconciled; logs/progress/status remain ignored under tmp/overnight/RX1*.
+
+UNVERIFIED (owner to confirm): deployed revisions and physical narrow-screen,
+large-font and screen-reader behavior. Native-host render assertions establish
+the layout contract, not measured Yoga/device acceptance. No deployment, remote
+service/SQL call, migration application, environment-file edit, Scheduler action,
+email, fetch or push occurred.
+
+### Owner steps remaining
+
+Rollout and Device checks were skipped entirely (NOT RUN). Release the reviewed
+mobile change through the normal owner flow. RB5 on Realme: open a reviewer and
+confirm Export/Share are equal buttons directly under the title, metadata follows
+the row and Generate Quiz remains primary. Verify narrow/320 dp and large-font
+layout, Export-before-Share focus order, existing export/share behavior, offline
+Share disabling and full-width Export for non-artifact reviewers. Confirm the
+actual deployed revision. No unanswered owner question blocks local closure.

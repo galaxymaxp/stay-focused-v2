@@ -1,5 +1,34 @@
 # Roadmap
 
+## RX1 reviewer header complete locally - PASS (2026-10-17)
+
+**PASS for unattended RX1/N3 STEP 0-2, fresh serial gates, documentation and local
+commits.** Mobile now renders title, equal-width secondary Export/Share row,
+review-time/topics metadata, Generate Quiz hero and hint in that order. Export
+fills the row for non-artifact reviewers. At font scale 2 and above the buttons
+stack with complete labels; existing 48-point targets, accessibility defaults,
+Share/offline behavior and source content remain. Website actions already use
+one row and are unchanged. No dependency, native module or migration is added.
+Implementation/tests: **0ce5db6**.
+
+**FRESH PASS:** forced root typecheck/lint/build **8/8 each, zero cached**; mobile
+**1,216/1,216** tests (131 files); focused header/Share suites **14/14** (3 files);
+standalone API and Android builds **1/1 each**, API/web pages **35/35** and
+**19/19**, Android one bundle/35 assets, root Android/iOS/web exports with 68
+assets; diff/staged-diff checks PASS. Zero lint errors, six existing warnings.
+First typecheck failed **7/8 tasks** on a test fixture's too-narrow metadata
+type, corrected with the component prop type; the fresh retry passed. No flake
+observed. Web/API/shared tests NOT APPLICABLE (unchanged). Generated Next
+declarations restored. [RX1 acceptance](ai/acceptance/rx1-reviewer-header.md).
+
+**Owner steps remaining:** Rollout and Device checks skipped entirely (NOT RUN).
+Owner releases the mobile change and performs RB5 on Realme, including narrow
+and large-font layout, focus order, offline Share and Export-only fallback.
+Deployed revisions and physical behavior are **UNVERIFIED (owner to confirm)**.
+No remote service call, deployment, SQL/migration application, environment-file
+edit, Scheduler action, email, fetch or push occurred. Expected unrelated
+untracked paths are preserved. This finite run ends at RX1; no later item started.
+
 ## EV1 external references complete locally - PASS (2026-10-17)
 
 **PASS for unattended EV1/N2 STEP 0-2, fresh serial gates, documentation and local commits.** Root cause in code: mobile coupled external visibility to source discovery and snapshot eligibility instead of displayed source URLs, with a batch-wide parser failure capable of hiding every valid reference. Snapshot/figure components now report displayed source images; found Commons references can render during pending, absent or failed discovery. Malformed sections are omitted individually while strict visual validation remains.
