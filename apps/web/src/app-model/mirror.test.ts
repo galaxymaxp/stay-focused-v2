@@ -25,3 +25,8 @@ it.each(mirrors)("%s matches the app's %s", (web, mobile, rewrites = []) => {
   for (const [from, to] of rewrites) copy = copy.replaceAll(from, to);
   expect(copy).toBe(read(`../../../mobile/src/${mobile}`));
 });
+
+it("Library sort options match PR #12 mobile values, labels and ordering", () => {
+  const options = (source: string) => source.slice(source.indexOf("export const LIBRARY_SORT_OPTIONS"), source.indexOf("];", source.indexOf("export const LIBRARY_SORT_OPTIONS")) + 2);
+  expect(options(read("./librarySortOptions.ts"))).toBe(options(read("../../../mobile/src/features/redesign/LibrarySortControl.tsx")));
+});

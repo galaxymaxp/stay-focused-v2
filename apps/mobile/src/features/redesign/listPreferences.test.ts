@@ -13,6 +13,12 @@ it("labels automatic estimates in Today tasks and sessions", () => {
 });
 
 describe("pin and hide preferences", () => {
+  it("reads LS1 storage without losing pins and defaults obsolete or unknown sorts", () => {
+    const old = { sort: { library: "opened", libraryCourse: "canvas" }, opened: { r: "2026-01-01" }, pinned: { course: ["c"] } };
+    const parsed = parseListPreferences(JSON.stringify(old));
+    expect(parsed).toEqual({ ...EMPTY_LIST_PREFERENCES, pinned: { ...EMPTY_LIST_PREFERENCES.pinned, course: ["c"] } });
+    expect(parseListPreferences('{"librarySort":{"c":"opened","d":"course","e":7}}').librarySort).toEqual({ d: "course" });
+  });
   it("surfaces the newest pin first and keeps hidden items recoverable, never deleted", () => {
     let prefs = setPinned(EMPTY_LIST_PREFERENCES, "course", "a", true);
     prefs = setPinned(prefs, "course", "c", true);
