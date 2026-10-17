@@ -1,10 +1,18 @@
-## INT1 local integration in progress (2026-10-17)
+# INT1 finite unattended scope complete locally
 
-Finite unattended scope: combine the 35 local 10-16 commits through a967460 with PR #12 at 8fcdf16, cherry-pick f3dd833, prove Study Assist/image Ask and sorting parity, run fresh serial gates, reconcile docs and commit locally. Rollout and Device checks are owner-only and NOT RUN. PR #12 CI green at 8fcdf16 (run 39035996757) is owner-provided historical evidence, UNVERIFIED (owner to confirm). Nothing beyond the reported Realme OTA is deployed; live state is UNVERIFIED (owner to confirm). No push, environment edits or remote service operations.
+## INT1 combined locally - PASS (2026-10-17)
 
-Library decision: PR #12 mobile behavior and DTO win; website mirrors its six options and owner/course preferences. LS1 sort/open controls and sourcePosition projection are removed because both platforms use the complete Canvas material sequence, retaining a saved sequence on failed refresh. Historical reports below remain evidence of their original branches. Gates pending.
+**PASS for the finite unattended INT1 code scope, fresh serial gates, documentation and local commits.** Merge efad5c9 combines the 35 local 10-16 commits through a967460 with PR #12 at 8fcdf16; 979f120 cherry-picks only f3dd833 with provenance. Test commits 2ddb9a8 and 21e685a prove the combination and restore PR #12's grouping contract. MR1/SA1/SA2/MR2/IM1b/RT1 remain, with PR #12 offline auth, silent idempotent Reviewer submission, organization and sorting. What is this? renders first, and inline/zoom image Ask callbacks pass for snapshots, extracted figures and external visuals on both platforms.
 
-# LS1 finite unattended scope complete locally
+PR #12 mobile sorting wins: pill beside update status, compact highlighted 48-point rows, disabled during selection, displayed-title alphabetization, owner/course-scoped preferences and offline Canvas sequence cache. Website has one contextual select with identical options/values/labels and preference DTO. Both clients use complete material sequences for Canvas order; unlinked work follows. Obsolete LS1 sorting/open tracking and unused sourcePosition projection/tests are removed. Both preference versions parse safely. ADR-040 records the supersession; original branch histories below are retained as historical evidence.
+
+**FRESH PASS:** forced root typecheck/lint/build **8/8 each, zero cached**; shared **350/350** (40 files), API **2,268 passed / 3 existing live skips** (199 files), mobile **1,202/1,202** (130 files), web **203/203** (35 files), Canvas **75/75**, OCR **27/27**, engine **606 evaluations / zero failures**. Lint has zero errors and six existing warnings. API/web build 35/35 and 19/19 pages; mobile exports Android, iOS and web (68 assets). Generated Next.js declarations were restored. Root gates ran on production code at 2ddb9a8; the only subsequent code-tree change restores a PR #12 test, verified by fresh mobile typecheck/lint and the full suite. First failures and repairs are recorded in acceptance; no nondeterministic flake was observed.
+
+PR #12 CI was green at 8fcdf16 (run 39035996757), according to owner-provided history; live CI was not queried. Nothing beyond the reported Realme OTA is deployed. Deployed revisions, database rows/applied migrations, provider behavior, Scheduler and physical acceptance are **UNVERIFIED (owner to confirm)**.
+
+**Owner steps remaining:** Rollout and Device checks were skipped entirely and remain RB5 owner work after the later roadmap slices. No push, deployment, remote database/service call, migration application, environment-file edit, Scheduler action or email occurred; git fetch was the sole authorized remote operation. No changes to codex-fullsend-20261016.md. This run ends at INT1; EV1 and all later items were not started.
+
+[INT1 acceptance](acceptance/int1-local-integration.md).
 
 ## LS1 Library sorting complete locally (2026-10-16)
 

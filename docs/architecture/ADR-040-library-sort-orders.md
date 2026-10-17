@@ -1,6 +1,10 @@
 # ADR-040: Library sort orders and per-device choices
 
-Status: Accepted for LS1 local code scope, 2026-10-16. Rollout and physical checks remain owner steps.
+Status: Superseded locally by INT1, 2026-10-17. The original LS1 decision below is historical.
+
+INT1 retains PR #12 mobile sorting: My order, Updated: newest first, Updated: oldest first, Course order, Alphabetical: A to Z, Alphabetical: Z to A, with context-inapplicable options hidden. Website values, labels, ordering and preference DTO mirror mobile. Owner/course-scoped librarySort and libraryOrder replace LS1 sort/opened fields; obsolete or unknown stored values default safely. Canvas order uses the complete material sequence (including linked Reviewers and quizzes), cached per owner/course; failed partial inventories never replace it. The unused sourcePosition server enrichment and LS1 sorting/open tracking are removed. PR #12 pin/custom-order behavior is retained. Mobile Sort stays beside update status, with selected 48-point rows and disabled selection state. No remote rollout or device acceptance is claimed.
+
+Historical LS1 decision:
 
 Both clients use the same pure shared comparators. Top-level labels map to:
 Recently added = each course's newest createdAt descending (not updatedAt);
