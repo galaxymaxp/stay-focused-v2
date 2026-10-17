@@ -1,5 +1,17 @@
 # Current State
 
+## EV1 external references complete locally - PASS (2026-10-17)
+
+**PASS for unattended EV1/N2 STEP 0-2, fresh serial gates, documentation and local commits.** Root cause in code: mobile coupled external visibility to source discovery and snapshot eligibility instead of displayed source URLs, with a batch-wide parser failure capable of hiding every valid reference. Snapshot/figure components now report displayed source images; found Commons references can render during pending, absent or failed discovery. Malformed sections are omitted individually while strict visual validation remains.
+
+The exact external label, attribution, Wikimedia headers, source precedence, offline/auth/reachability guards, bounded batch polling and explicit replacement flow remain. Temporary reviewer.* diagnostics are removed. Captions and image viewer behavior are preserved. No API/web/shared serializer, migration, dependency or native module changed. Code commits: **239a0ab** (reproduction), **a9c1d7f** (fix).
+
+**FRESH PASS:** forced root typecheck/lint/build **8/8 each, zero cached**; mobile **1,209/1,209** (130 files); focused regressions **87/87** (5 files); standalone API and Android builds **1/1 each**, API/web pages **35/35** and **19/19**, Android one bundle / 35 assets, root mobile Android/iOS/web exports with 68 assets; diff/staged-diff hygiene PASS. Zero lint errors, six existing warnings. Deliberate red reproduction **7 failed / 80 passed** is retained in acceptance; every gate passed on its first gate attempt and no nondeterministic flake was observed. API/web/shared tests are NOT APPLICABLE because those workspaces did not change. Generated Next declarations were restored.
+
+**Owner steps remaining:** Rollout and Device checks were skipped entirely (NOT RUN). Publish the reviewed mobile fix through the normal owner release flow; RB5 on Realme must confirm a found external image, exact label and attribution for a section without a course image, source precedence and offline behavior. Deployed revisions, actual stored visuals, applied migrations, database/Scheduler state, provider/image egress and physical-device root cause remain **UNVERIFIED (owner to confirm)**. No deploy, push, fetch, remote service/SQL call, migration application, environment-file edit, Scheduler action or email occurred. Unrelated UI/, apps/mobile/.gitignore and supabase/.temp/ remain untouched. This finite run ends at EV1; IM2 and later items are not started.
+
+[EV1 acceptance](ai/acceptance/ev1-mobile-external-references.md).
+
 ## INT1 combined locally - PASS (2026-10-17)
 
 **PASS for the finite unattended INT1 code scope, fresh serial gates, documentation and local commits.** Merge efad5c9 combines the 35 local 10-16 commits through a967460 with PR #12 at 8fcdf16; 979f120 cherry-picks only f3dd833 with provenance. Test commits 2ddb9a8 and 21e685a prove the combination and restore PR #12's grouping contract. MR1/SA1/SA2/MR2/IM1b/RT1 remain, with PR #12 offline auth, silent idempotent Reviewer submission, organization and sorting. What is this? renders first, and inline/zoom image Ask callbacks pass for snapshots, extracted figures and external visuals on both platforms.
