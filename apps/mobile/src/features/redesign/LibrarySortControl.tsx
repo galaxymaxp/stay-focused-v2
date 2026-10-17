@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Pressable, View } from "react-native";
 import { Copy, Sheet } from "../../design/primitives";
 import { useTheme } from "../../design/theme";
-import { spacing } from "../../design/tokens";
+import { hitTarget, radius, spacing } from "../../design/tokens";
 import type { LibrarySort } from "./listPreferences";
 
 export const LIBRARY_SORT_OPTIONS: readonly { value: LibrarySort; label: string }[] = [
@@ -22,19 +22,22 @@ export function LibrarySortControl({ value, onChange, course = false, grid = fal
   const selected = LIBRARY_SORT_OPTIONS.find(option => option.value === value)!;
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel={`Sort Library: ${selected.label}`} accessibilityState={{ disabled }} disabled={disabled}
-      onPress={() => setOpen(true)} style={{ minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center", opacity: disabled ? 0.35 : 1 }}>
-      <ArrowDownWideNarrow size={20} color={colors.textPrimary} />
-      <Copy size="caption">Sort</Copy>
+      onPress={() => setOpen(true)} style={{ minHeight: hitTarget.min, flexShrink: 0, justifyContent: "center", opacity: disabled ? 0.35 : 1 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[2], paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: radius.pill, backgroundColor: colors.surfaceSecondary }}>
+        <ArrowDownWideNarrow size={16} color={colors.textSecondary} />
+        <Copy size="caption" style={{ fontWeight: "600" }}>Sort</Copy>
+      </View>
     </Pressable>
     {open ? <Sheet title={grid ? "Sort courses" : "Sort saved work"} onClose={() => setOpen(false)}>
+      <View>
       {LIBRARY_SORT_OPTIONS.filter(option => (option.value !== "course" || course) && (option.value !== "custom" || !grid)).map(option =>
         <Pressable key={option.value} accessibilityRole="radio" accessibilityLabel={option.label} accessibilityState={{ checked: value === option.value }}
-          onPress={() => { onChange(option.value); setOpen(false); }} style={{ minHeight: 48, paddingVertical: spacing[3], flexDirection: "row", alignItems: "center", gap: spacing[3] }}>
+          onPress={() => { onChange(option.value); setOpen(false); }} style={{ minHeight: hitTarget.min, paddingVertical: spacing[3], paddingHorizontal: spacing[3], borderRadius: radius.control, backgroundColor: value === option.value ? colors.surfaceSecondary : undefined, flexDirection: "row", alignItems: "center", gap: spacing[3] }}>
           <View style={{ flex: 1 }}><Copy>{option.label}</Copy></View>
           {value === option.value ? <Check size={20} color={colors.accent} /> : null}
         </Pressable>)}
-      {course ? <Copy muted size="caption">Course order follows Canvas modules and materials. Work without a linked material appears last.</Copy> : null}
-      {!grid ? <Copy muted size="caption">Drag an item to save a new My order. Your saved manual order is kept when using another sort.</Copy> : null}
+      </View>
+      {course && value === "course" ? <Copy muted size="caption">Follows Canvas modules and materials. Unlinked work appears last.</Copy> : !grid && value === "custom" ? <Copy muted size="caption">Hold and drag to change My order. Other sorts keep your manual order saved.</Copy> : null}
     </Sheet> : null}
   </>;
 }

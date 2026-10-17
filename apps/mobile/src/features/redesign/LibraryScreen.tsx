@@ -226,8 +226,10 @@ export function LibraryScreen() {
   const loading = !library.localReady || (!hasLocal && !library.savedAt && library.refreshing);
   return (
     <Page title="Library" subtitle="Your saved study tools, by course." onRefresh={library.refresh}
-      headerAction={<LibrarySortControl value={sort} grid onChange={value => sortLibrary(LIBRARY_GRID_SORT_KEY, value)} />}
-      headerBelow={<SnapshotStatus {...library} />}>
+      headerBelow={<View style={{ flexDirection: "row", alignItems: "center", gap: spacing[3], paddingHorizontal: spacing[5] }}>
+        <View style={{ flex: 1, minWidth: 0 }}><SnapshotStatus {...library} inset={false} /></View>
+        <LibrarySortControl value={sort} grid onChange={value => sortLibrary(LIBRARY_GRID_SORT_KEY, value)} />
+      </View>}>
       {offline ? <Notice>{OFFLINE_LIBRARY_NOTICE}</Notice> : null}
       {offlineCaption ? <Copy muted size="caption">{offlineCaption}</Copy> : null}
       {loading ? <LibrarySkeleton /> : null}
@@ -302,11 +304,13 @@ export function LibraryCourseScreen() {
       scrollEnabled={!organizer.dragging}
       refreshEnabled={!organizer.editing}
       headerLeading={identity ? <CourseMark identity={identity} size={34} /> : undefined}
-      headerAction={<LibrarySortControl value={sort} course={courseKey !== PERSONAL_LIBRARY_KEY} disabled={organizer.editing}
-        onChange={value => { sortLibrary(courseKey, value); setVisible(LOCAL_PAGE_SIZE); }} />}
       headerBelow={
         <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
-          <SnapshotStatus {...library} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}>
+            <View style={{ flex: 1, minWidth: 0 }}><SnapshotStatus {...library} inset={false} /></View>
+            <LibrarySortControl value={sort} course={courseKey !== PERSONAL_LIBRARY_KEY} disabled={organizer.editing}
+              onChange={value => { sortLibrary(courseKey, value); setVisible(LOCAL_PAGE_SIZE); }} />
+          </View>
           <View style={{ height: 48, justifyContent: 'center' }}>
             {organizer.editing ? <LibrarySelectionToolbar
               allSelected={organizer.allSelected} allInCourse={allInCourse}

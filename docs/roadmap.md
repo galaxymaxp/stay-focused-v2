@@ -1,5 +1,13 @@
 # Roadmap
 
+## Library Sort layout follow-up (2026-10-17)
+
+Owner feedback: Sort crowds the title and looks out of place. Finite scope:
+move it beside update status on both Library pages, use a compact horizontal
+pill, remove duplicate status inset, tighten the option sheet and retain all
+presets, touch targets and drag selection. Mobile tests FRESH PASS: 1,135 / 121.
+Repository gates, preview publication and Realme layout verification pending.
+
 ## Library sort presets (2026-10-17)
 
 Owner-approved finite scope: visible Library sorting by updated date, Canvas

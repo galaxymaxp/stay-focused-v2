@@ -7,9 +7,15 @@ course grid and saved work inside a course. No backend/schema or paid generation
 
 ## Acceptance matrix
 
+Layout follow-up scope (2026-10-17): move Sort out of both page title rows,
+align it with update status, retain 48-point touch targets, compact the choice
+sheet and verify the long-title course, grid, selection and all six choices
+on Realme. Sorting, saved preferences and drag behavior remain in scope.
+Implementation and physical verification are in progress.
+
 | Requirement | Implementation | Evidence |
 | --- | --- | --- |
-| Discoverable Sort control | Header control on course grid and saved-work pages; accessible radio choices | FRESH screen/menu tests PASS; physical PASS |
+| Discoverable Sort control | Status-row control on course grid and saved-work pages; accessible radio choices | Original feature FRESH screen/menu tests PASS; layout verification pending |
 | Date in both directions | Updated newest/oldest; invalid dates last, stable ties | FRESH sorting regressions PASS |
 | Alphabet in both directions | Natural, case-insensitive A-Z/Z-A including numbered units | FRESH sorting regressions PASS |
 | Original Canvas course sequence | Complete paginated existing material inventory; direct source and related Reviewer/Quiz matching | FRESH rank/pagination regressions PASS; native complete-sequence read PASS |
