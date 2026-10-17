@@ -11,6 +11,8 @@ export interface SnapshotStatusProps {
   refresh: () => void;
   updateAvailable?: boolean;
   applyUpdate?: () => void;
+  /** For status rows that already supply their own screen inset. */
+  inset?: boolean;
 }
 export function SnapshotStatus(props: SnapshotStatusProps) {
   const [, tick] = useState(0);
@@ -23,7 +25,7 @@ export function SnapshotStatus(props: SnapshotStatusProps) {
     `Couldn't refresh · Retry${updated ? ` · ${updated}` : ""}` : props.refreshing ? "Syncing…" : updated;
   if (!label) return null;
   return <Pressable accessibilityRole="button" accessibilityLabel={label}
-    onPress={props.updateAvailable ? props.applyUpdate : props.refresh} style={{ minHeight: hitTarget.min, paddingHorizontal: spacing[5], justifyContent: "center" }}>
+    onPress={props.updateAvailable ? props.applyUpdate : props.refresh} style={{ minHeight: hitTarget.min, paddingHorizontal: props.inset === false ? 0 : spacing[5], justifyContent: "center" }}>
     <Copy muted size="caption">{label}</Copy>
   </Pressable>;
 }

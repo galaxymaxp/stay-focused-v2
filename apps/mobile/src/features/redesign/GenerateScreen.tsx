@@ -26,7 +26,8 @@ import { spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
 import { readCourseIdParam } from "../../navigation/appRoutes";
 import { ExperienceApiError, experienceRequest } from "../../services/experienceApi";
-import { createGenerationIntent } from "../../services/generationRecovery";
+import { acceptGeneration, createGenerationIntent } from "../../services/generationRecovery";
+import { useQueueItems } from "../queue/useQueueItems";
 import { GenerationCore } from "./GenerationCore";
 import { SyncStatus } from "../sync/SyncStatus";
 import { useCanvasSync } from "../sync/CanvasSyncProvider";
@@ -343,6 +344,13 @@ export function GenerateMaterialScreen() {
   const setPrepared = useCallback((data: LearningMaterial) => setPreparedState({ identity: preparedIdentity, data }), [preparedIdentity]);
   const [busy, setBusy] = useState(false);
   const [activeAction, setActiveAction] = useState<"submitting" | null>(null);
+  const [generationNote, setGenerationNote] = useState<string | null>(null);
+  const [reviewerSubmitted, setReviewerSubmitted] = useState(false);
+  const queue = useQueueItems();
+  useEffect(() => {
+    setReviewerSubmitted(false);
+    setGenerationNote(null);
+  }, [preparedIdentity]);
   const [error, setError] = useState<string | null>(null);
   const submitting = useRef(false);
   const retrying = useRef(false);
@@ -425,16 +433,24 @@ export function GenerateMaterialScreen() {
 
     submitting.current = true;
     setBusy(true);
-    setActiveAction("submitting");
+    if (type !== "reviewer") setActiveAction("submitting");
     setError(null);
     try {
       const intent = await createGenerationIntent(
         session.user.id,
         type === "reviewer"
-          ? { courseId: material.courseId, title: material.title, type, path: "/api/experience/generations", body: { courseId: material.courseId, materialId: material.id } }
+          ? { autoSubmit: true, courseId: material.courseId, title: material.title, type, path: "/api/experience/generations", body: { courseId: material.courseId, materialId: material.id } }
           : { ...quizIntentInput({ title: material.title, reviewerArtifactId: material.reviewerArtifactId! }), courseId: material.courseId },
       );
-      router.push({ pathname: "/generation", params: { intent: intent.key, start: "1" } });
+      if (type === "reviewer") {
+        setReviewerSubmitted(true);
+        setGenerationNote("Request saved. Follow progress in Queue; you can leave this page.");
+        queue.refresh();
+        // The promise belongs to the admission service and survives navigation.
+        void acceptGeneration(session.user.id, client, intent).then(queue.refresh, queue.refresh);
+      } else {
+        router.push({ pathname: "/generation", params: { intent: intent.key, start: "1" } });
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not save your generation request.");
     } finally {
@@ -480,9 +496,10 @@ export function GenerateMaterialScreen() {
             <Copy muted size="bodySmall">A structured study guide written from this material.</Copy>
             <Copy muted size="bodySmall">{preparationPresentation(materialStatus(material)).message}</Copy>
             {materialStatus(material).status === "failed" && workspace.errorCode !== "connection" && materialPage.errorCode !== 'connection' && !retryOffline ? <Action disabled={busy} onPress={() => void retry()}>{busy ? "Retrying…" : "Retry"}</Action> : null}
-            <Action disabled={busy || materialStatus(material).status !== "ready" || !available(material.generation.reviewer) || !available(workspace.data?.capabilities.reviewerGeneration)} onPress={() => void generate("reviewer")}>
-              Generate Reviewer
+            <Action disabled={busy || reviewerSubmitted || materialStatus(material).status !== "ready" || !available(material.generation.reviewer) || !available(workspace.data?.capabilities.reviewerGeneration)} onPress={() => void generate("reviewer")}>
+              {material.reviewerArtifactId ? 'Remake Reviewer' : 'Generate Reviewer'}
             </Action>
+            {material.reviewerArtifactId ? <Action secondary onPress={() => router.push({ pathname: '/artifact', params: { id: `artifact:${material.reviewerArtifactId}` } })}>Open saved Reviewer</Action> : null}
             {!available(material.generation.reviewer) ? <Copy muted size="caption">{capabilityNote(material.generation.reviewer)}</Copy> : null}
           </Surface>
           <Surface style={{ gap: spacing[3] }}>
@@ -499,6 +516,7 @@ export function GenerateMaterialScreen() {
           </Action>
         </>
       ) : null}
+      {generationNote ? <Notice>{generationNote}</Notice> : null}
       {error ? <Notice>{error}</Notice> : null}
     </Page>
   );
@@ -534,11 +552,12 @@ function ModuleGroup({ title, items, onSelect }: {
         </Pressable>
       ) : null}
       {open ? items.map((item) => (
-        <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Open material: ${item.title}`} onPress={() => onSelect(item)} style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 10, minHeight: 60, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: pressed ? colors.surfaceSecondary : undefined, borderTopWidth: 1, borderColor: colors.separator })}>
+        <Pressable key={item.id} accessibilityRole="button" accessibilityLabel={`Open material: ${item.title}${item.reviewerArtifactId ? ', Reviewer already generated' : ''}`} onPress={() => onSelect(item)} style={({ pressed }) => ({ paddingHorizontal: 12, paddingVertical: 10, minHeight: 60, flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: pressed || item.reviewerArtifactId ? colors.blueSoft : undefined, borderTopWidth: 1, borderColor: colors.separator })}>
           <ContentIcon kind={item.kind} small />
           <View style={{ flex: 1 }}>
             <Copy size="bodySmall" style={{ fontWeight: "600" }}>{item.title}</Copy>
             <Copy muted size="caption">{materialTypes[item.kind]} · {preparationPresentation(materialStatus(item)).label}</Copy>
+            {item.reviewerArtifactId ? <Copy size="caption" color={colors.textSecondary}>Reviewer already generated</Copy> : null}
           </View>
           <ChevronRight color={colors.textMuted} size={18} />
         </Pressable>
@@ -546,6 +565,7 @@ function ModuleGroup({ title, items, onSelect }: {
     </Surface>
   );
 }
+
 function materialStatus(material: LearningMaterial): import('@stay-focused/shared').MaterialPreparation {
   return material.preparation ?? { status: material.readiness === 'needs_preparation' ? 'preparing' : material.readiness, reasonCode: null };
 }

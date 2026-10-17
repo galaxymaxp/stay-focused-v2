@@ -238,6 +238,7 @@ export function Page({
   scrollTouch?: Pick<React.ComponentProps<typeof ScrollView>, "onTouchStart" | "onTouchMove" | "onTouchEnd" | "onTouchCancel">;
 }) {
   const { colors, mode } = useTheme();
+  const auth = useAuth();
   const [pulling, setPulling] = useState(false);
   // Screens nested inside a tab already sit above the tab bar.
   const insideTabs = useContext(BottomTabBarHeightContext) !== undefined;
@@ -292,6 +293,9 @@ export function Page({
         {!back && <QueueButton />}
         {!back && <ProfileButton />}
       </View>
+      {auth?.session?.offline ? <View accessibilityRole="text" style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[2] }}>
+        <Copy muted size="caption">Offline access · Saved work is available. Online features reconnect automatically.</Copy>
+      </View> : null}
       {headerBelow}
       <View style={{ flex: 1 }}>
       {scroll ? (
@@ -376,6 +380,7 @@ export function RowLink({
   accessibilityActions,
   onAccessibilityAction,
   onLongPress,
+  selected,
 }: {
   children: ReactNode;
   label: string;
@@ -388,6 +393,7 @@ export function RowLink({
   onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
   /** Additional options, e.g. a quick-actions sheet. */
   onLongPress?: () => void;
+  selected?: boolean;
 }) {
   const { colors } = useTheme();
   const press = usePressMotion(disabled);
@@ -405,7 +411,7 @@ export function RowLink({
       } : undefined}
       delayLongPress={onLongPress ? 380 : undefined}
       disabled={disabled}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, selected }}
       onPressIn={press.onPressIn}
       onPressOut={press.onPressOut}
       style={({ pressed }) => ({

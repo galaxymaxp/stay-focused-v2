@@ -6,6 +6,8 @@ import { expect, it } from "vitest";
 // tests cover their behavior; this keeps the copies from drifting.
 const mirrors: [web: string, mobile: string, rewrites?: [string, string][]][] = [
   ["./presentation.ts", "features/redesign/presentation.ts", [["../features/knowledge-core/coreModel", "../generation-core/coreModel"]]],
+  ["./libraryOrder.ts", "features/redesign/libraryOrder.ts"],
+  ["./librarySorting.ts", "features/redesign/librarySorting.ts", [["./courseIdentity", "../../design/courseIdentity"]]],
   ["./listPreferences.ts", "features/redesign/listPreferences.ts"],
   ["./courseIdentity.ts", "design/courseIdentity.ts"],
   ["./calendarPresentation.ts", "features/redesign/calendarPresentation.ts"],

@@ -8,7 +8,8 @@ import {
   setPinned,
   setRead,
   setLibrarySort,
-  setLibraryOpened,
+  setLibraryOrder,
+  type LibrarySort,
   type HideSurface,
   type ListPreferences,
   type PinKind,
@@ -34,6 +35,7 @@ function load(owner: string) {
   cache.set(owner, parseListPreferences(raw));
 }
 function update(owner: string, change: (prefs: ListPreferences) => ListPreferences) {
+  load(owner);
   const next = change(cache.get(owner) ?? EMPTY_LIST_PREFERENCES);
   cache.set(owner, next);
   emit();
@@ -87,11 +89,11 @@ export function useListPreferences() {
     (id: string, isRead: boolean) => owner && update(owner, (p) => setRead(p, id, isRead)),
     [owner],
   );
-  const setSort = useCallback(<K extends keyof ListPreferences['sort']>(surface: K, sort: ListPreferences['sort'][K]) => {
-    if (owner) update(owner, current => setLibrarySort(current, surface, sort));
+  const sortLibrary = useCallback((scope: string, sort: LibrarySort) => {
+    if (owner) update(owner, current => setLibrarySort(current, scope, sort));
   }, [owner]);
-  const markOpened = useCallback((id: string) => {
-    if (owner) update(owner, current => setLibraryOpened(current, id));
+  const reorderLibrary = useCallback((scope: string, ids: readonly string[]) => {
+    if (owner) update(owner, current => setLibrarySort(setLibraryOrder(current, scope, ids), scope, "custom"));
   }, [owner]);
-  return { prefs, pin, hide, read, setSort, markOpened };
+  return { prefs, pin, hide, read, sortLibrary, reorderLibrary };
 }

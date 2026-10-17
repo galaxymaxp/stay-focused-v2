@@ -1,4 +1,4 @@
-import type { AuthError } from "@supabase/supabase-js";
+import { isAuthRetryableFetchError, type AuthError } from "@supabase/supabase-js";
 
 import type {
   AuthErrorCode,
@@ -19,7 +19,8 @@ import type {
 import { classifySignUpResult } from "./signUpOutcome";
 import { AUTH_CALLBACK_URL } from "./authCallback";
 import { ensureSecurePkceCrypto } from "./pkceCrypto";
-import { getSupabaseClientResult } from "./supabaseClient";
+import { getSupabaseClientResult, SUPABASE_AUTH_STORAGE_KEY } from "./supabaseClient";
+import { sessionStore } from "./sessionStore";
 
 interface OAuthProviderConfig {
   readonly provider: OAuthProvider;
@@ -165,6 +166,26 @@ export async function signOut(): Promise<AuthResult<void>> {
   }
 }
 
+/** Read the SDK's secure saved session without refreshing an expired JWT.
+ * This identity unlocks only owner-scoped device data; APIs still verify JWTs.
+ * There is no second identity cache to survive an explicit/revoked sign-out.
+ */
+export async function getSavedSession(): Promise<MobileAuthSession | null> {
+  try {
+    const raw = await sessionStore.getItem(SUPABASE_AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const value: unknown = JSON.parse(raw);
+    const stored = asRecord(value);
+    const user = asRecord(stored.user);
+    if (!isNonEmptyString(stored.access_token) || !isNonEmptyString(stored.refresh_token) ||
+        !isNonEmptyString(user.id) || typeof stored.expires_at !== "number" || !Number.isFinite(stored.expires_at) ||
+        !Array.isArray(user.identities ?? [])) return null;
+    return { ...toMobileAuthSession(stored as unknown as SupabaseSession), offline: true };
+  } catch {
+    return null;
+  }
+}
+
 export async function getCurrentSession(): Promise<
   AuthResult<MobileAuthSession | null>
 > {
@@ -176,6 +197,10 @@ export async function getCurrentSession(): Promise<
   try {
     const { data, error } = await client.data.auth.getSession();
     if (error) {
+      if (isAuthRetryableFetchError(error)) {
+        const saved = await getSavedSession();
+        if (saved) return { ok: true, data: saved };
+      }
       return authFailureFromSupabaseError(
         error,
         undefined,

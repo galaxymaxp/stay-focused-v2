@@ -1,6 +1,9 @@
 "use client";
-import { useLibraryOpened } from '../lib/use-library-opened';
-import { TOP_LEVEL_SORTS, COURSE_SORTS, sortLibraryGroups, sortCourseLibrary } from "@stay-focused/shared";
+import { LIBRARY_GRID_SORT_KEY, sortLibraryGroups, sortLibraryItems } from "../app-model/librarySorting";
+import { orderedLibrary } from "../app-model/libraryOrder";
+import { useLibraryCourseSequence } from "../lib/use-library-course-sequence";
+import type { LibrarySort } from "../app-model/listPreferences";
+import { LIBRARY_SORT_OPTIONS } from "../app-model/librarySortOptions";
 import { SnapshotStatus } from "../components/snapshot-status";
 import { useStableSnapshotGroups } from "../lib/use-stable-snapshot-groups";
 import type {
@@ -128,10 +131,11 @@ function LibraryCard({
 /** Level 1: courses that have saved study work, as in the app. */
 export function LibraryScreen() {
   const library = useSavedLibrary();
-  const { prefs, pin, setSort } = useListPreferences();
+  const { prefs, pin, sortLibrary } = useListPreferences();
   const [search, setSearch] = useState("");
-  const groups = useStableSnapshotGroups(groupLibraryByCourse(library.items, prefs.opened));
-  const arranged = arrangeList(groups, (group) => group.key, prefs.pinned.course, []);
+  const groups = useStableSnapshotGroups(groupLibraryByCourse(library.items));
+  const sort = prefs.librarySort?.[LIBRARY_GRID_SORT_KEY] ?? "updated_desc";
+  const arranged = arrangeList(sortLibraryGroups(groups, sort), (group) => group.key, prefs.pinned.course, []);
   const query = search.trim().toLowerCase();
   const found = query
     ? library.items.filter((item) => `${item.title} ${item.course?.name ?? ""} ${item.sourceTitle ?? ""}`.toLowerCase().includes(query))
@@ -153,7 +157,7 @@ export function LibraryScreen() {
         }
       />
       <div className="stack">
-        <LibrarySortControl options={TOP_LEVEL_SORTS} value={prefs.sort.library} onChange={value => setSort('library', value)} />
+        <LibrarySortControl grid value={sort} onChange={value => sortLibrary(LIBRARY_GRID_SORT_KEY, value)} />
         <input
           type="search"
           aria-label="Search your Library"
@@ -181,7 +185,7 @@ export function LibraryScreen() {
           </>
         ) : (
           <div className="course-grid library-courses">
-            {[...sortLibraryGroups(arranged.pinned, prefs.sort.library), ...sortLibraryGroups(arranged.rest, prefs.sort.library)].map((group) => {
+            {[...arranged.pinned, ...arranged.rest].map((group) => {
               const identity = libraryIdentity(group.key, group.course);
               const pinned = prefs.pinned.course.includes(group.key);
               return (
@@ -220,15 +224,14 @@ export function LibraryScreen() {
   );
 }
 
-function LibrarySortControl<T extends string>({ value, options, onChange }: { value: T; options: readonly { value: T; label: string }[]; onChange: (value: T) => void }) {
-  return <label className="row muted library-sort">Sort:
-    <select aria-label="Sort Library" value={value} onChange={event => {
-      const option = options.find(item => item.value === event.target.value);
-      if (option) onChange(option.value);
-    }}>
-      {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-    </select>
-  </label>;
+function LibrarySortControl({ value, onChange, course = false, grid = false }: {
+  value: LibrarySort; onChange: (value: LibrarySort) => void; course?: boolean; grid?: boolean;
+}) {
+  const options = LIBRARY_SORT_OPTIONS.filter(option => (option.value !== "course" || course) && (option.value !== "custom" || !grid));
+  return <label className="library-sort">Sort <select aria-label="Sort Library" value={value} onChange={event => {
+    const option = options.find(item => item.value === event.target.value);
+    if (option) onChange(option.value);
+  }}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
 }
 
 type Pending = { kind: "rename" | "delete" | "remove" | "remake"; item: LibraryArtifactSummary } | null;
@@ -238,7 +241,9 @@ export function LibraryCourseScreen({ courseKey }: { courseKey: string }) {
   const { api, session } = useAuth();
   const router = useRouter();
   const library = useSavedLibrary();
-  const { prefs, pin, setSort } = useListPreferences();
+  const { prefs, pin, sortLibrary } = useListPreferences();
+  const sort = prefs.librarySort?.[courseKey] ?? "custom";
+  const sequence = useLibraryCourseSequence(courseKey, sort === "course" && courseKey !== PERSONAL_LIBRARY_KEY);
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [pending, setPending] = useState<Pending>(null);
   const [renameTitle, setRenameTitle] = useState("");
@@ -247,7 +252,7 @@ export function LibraryCourseScreen({ courseKey }: { courseKey: string }) {
   const courseItems = filterCourseLibrary(library.items, courseKey, "all").filter((item) => !removed.has(item.id));
   const filtered = courseItems.filter((item) => filter === "all" || item.type === filter);
   const arranged = arrangeList(filtered, (item) => item.id, prefs.pinned.artifact, []);
-  const items = [...sortCourseLibrary(arranged.pinned, prefs.sort.libraryCourse), ...sortCourseLibrary(arranged.rest, prefs.sort.libraryCourse)];
+  const items = sortLibraryItems(orderedLibrary([...arranged.pinned, ...arranged.rest], prefs.libraryOrder[courseKey]), sort, sequence.data);
   const identity = libraryIdentity(courseKey, courseItems[0]?.course ?? null);
   const counts = (type: LibraryFilter) =>
     type === "all" ? courseItems.length : courseItems.filter((item) => item.type === type).length;
@@ -323,7 +328,8 @@ export function LibraryCourseScreen({ courseKey }: { courseKey: string }) {
         </div>
       </header>
       <div className="stack">
-        <LibrarySortControl options={COURSE_SORTS} value={prefs.sort.libraryCourse} onChange={value => setSort('libraryCourse', value)} />
+        <LibrarySortControl course={courseKey !== PERSONAL_LIBRARY_KEY} value={sort} onChange={value => sortLibrary(courseKey, value)} />
+        {sort === "course" && sequence.error ? <Notice>{sequence.data ? "Using the saved course order. Connect to refresh it." : "Course order is not saved yet. Connect once to load it."}</Notice> : null}
         <div className="segments task-groups" aria-label="Library categories">
           {librarySegments.map((segment) => (
             <button
@@ -447,7 +453,6 @@ export function ArtifactScreen({ id }: { id: string }) {
     `/api/experience/library/${encodeURIComponent(id)}`, 0, "data", true,
   );
   const data = artifact.data;
-  useLibraryOpened(data && !data.reviewer ? data.artifact.id : null);
   if (data?.reviewer)
     return <ReviewerReader artifact={data.artifact} reviewer={data.reviewer} snapshotStatus={<SnapshotStatus {...artifact} />} />;
   return (

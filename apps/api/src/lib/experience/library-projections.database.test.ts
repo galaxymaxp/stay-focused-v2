@@ -57,11 +57,6 @@ beforeAll(async () => {
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     grant usage on schema public,auth to anon,authenticated,service_role;
     create table canvas_courses(id uuid primary key,user_id uuid,canvas_connection_id uuid,canvas_course_id text,name text,course_code text,workflow_state text,last_synced_at timestamptz,course_state_override text);
-    create table canvas_modules(id uuid primary key,user_id uuid,course_id uuid,canvas_connection_id uuid,position integer);
-    create table canvas_module_items(id uuid primary key,user_id uuid,course_id uuid,canvas_connection_id uuid,module_id uuid,position integer,item_type text,canvas_content_id text,page_url text);
-    create table canvas_files(id uuid primary key,user_id uuid,course_id uuid,canvas_connection_id uuid,canvas_file_id text);
-    create table canvas_pages(id uuid primary key,user_id uuid,course_id uuid,canvas_connection_id uuid,canvas_page_id text,canvas_page_url text);
-    create table canvas_assignments(id uuid primary key,user_id uuid,course_id uuid,canvas_connection_id uuid,canvas_assignment_id text);
     create table generated_artifacts(id uuid primary key,user_id uuid,artifact_type text,safe_title text,latest_version_id uuid,created_at timestamptz,updated_at timestamptz,deleted_at timestamptz);
     create table generated_artifact_versions(id uuid primary key,user_id uuid,artifact_id uuid,artifact_type text,source_version_id uuid,generation_job_id uuid,payload jsonb);
     create table source_versions(id uuid primary key,user_id uuid,metadata jsonb,source_text text);
@@ -73,7 +68,7 @@ beforeAll(async () => {
     create table quiz_attempts(id uuid primary key,user_id uuid,quiz_id uuid,status text,started_at timestamptz,completed_at timestamptz,percentage numeric,answers jsonb,study_state jsonb);
     create table activity_drafts(id uuid primary key,user_id uuid,course_id uuid,activity_id uuid,generation_id uuid,activity_type text,content jsonb,sources jsonb,warnings jsonb,revision integer,status text,created_at timestamptz,updated_at timestamptz);
   `);
-  for (const table of ['canvas_modules','canvas_module_items','canvas_files','canvas_pages','canvas_assignments','canvas_courses','generated_artifacts','generated_artifact_versions','source_versions','reviewer_source_snapshots','reviewer_source_snapshot_items','canvas_auto_reviewer_candidates','processing_jobs','quizzes','quiz_attempts','activity_drafts']) {
+  for (const table of ['canvas_courses','generated_artifacts','generated_artifact_versions','source_versions','reviewer_source_snapshots','reviewer_source_snapshot_items','canvas_auto_reviewer_candidates','processing_jobs','quizzes','quiz_attempts','activity_drafts']) {
     await db.exec(`alter table ${table} enable row level security; create policy own on ${table} for select to authenticated using(user_id = (select auth.uid())); grant select on ${table} to authenticated,service_role;`);
   }
   await db.exec(readFileSync(resolve('../../packages/db/migrations/20261015040000_experience_library_projections.sql'), 'utf8'));
@@ -173,16 +168,4 @@ describe('SP2 Library SQL projections', () => {
     try { expect((await db.query('select id from experience_library_v1 limit 1')).rows).toHaveLength(1); }
     finally { await db.exec('rollback'); }
   });
-});
-
-it('LS1 resolves stored Canvas module metadata through actual local SQL without changing projections',async()=>{
-  await db.query('insert into canvas_files values ($1,$2,$3,$4,$5)',[id(4002),owner,id(1),id(2),'canvas-file']);
-  await db.query('insert into canvas_modules values ($1,$2,$3,$4,$5)',[id(8000),owner,id(1),id(2),3]);
-  await db.query('insert into canvas_module_items values ($1,$2,$3,$4,$5,$6,$7,$8,null)',[id(8001),owner,id(1),id(2),id(8000),4,'File','canvas-file']);
-  const repo=trustedExperienceReadRepository(localClient().client,owner);
-  expect((await repo.libraryPage!('other',{courseId:id(1)})).items.find(item=>item.type==='reviewer')?.sourcePosition).toEqual({moduleIndex:3,itemIndex:4});
-  expect((await repo.librarySummary!('other','artifact:'+id(1000)))?.sourcePosition).toEqual({moduleIndex:3,itemIndex:4});
-  expect((await repo.reviewerDetail!('other','artifact:'+id(1000)))?.summary.sourcePosition).toEqual({moduleIndex:3,itemIndex:4});
-  await db.query('update canvas_modules set canvas_connection_id=$1 where id=$2',[id(9999),id(8000)]);
-  expect((await repo.libraryPage!(owner,{courseId:id(1)})).items.find(item=>item.type==='reviewer')?.sourcePosition).toBeNull();
 });

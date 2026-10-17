@@ -232,8 +232,6 @@ export interface LibraryArtifactSummary {
   readonly sourceType?: 'canvas_file' | 'canvas_page' | 'canvas_mixed' | 'text' | 'camera' | 'local_file' | null;
   /** Original Canvas material when a Reviewer was generated from one item. */
   readonly sourceMaterialId?: string | null;
-  /** Earliest valid placement in owner-scoped synced Canvas modules; no private source data. */
-  readonly sourcePosition?: { readonly moduleIndex: number; readonly itemIndex: number } | null;
   readonly sourceTitle: string | null;
   readonly activityId: string | null;
   readonly createdAt: string;

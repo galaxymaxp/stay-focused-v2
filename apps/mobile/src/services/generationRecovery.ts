@@ -5,12 +5,15 @@ import type {
 
 import { sessionStore } from "../auth/sessionStore";
 import {
+  ExperienceApiError,
   experienceRequest,
   newRequestKey,
   type ExperienceClient,
 } from "./experienceApi";
 
 export interface GenerationIntent {
+  /** The owner pressed Generate; replay admission after an interrupted exit. */
+  autoSubmit?: boolean;
   /** Local display attribution only; never sent as generation input. */
   courseId?: string;
   key: string;
@@ -21,6 +24,7 @@ export interface GenerationIntent {
   generationId?: string;
 }
 const inFlight = new Map<string, Promise<GenerationIntent>>();
+const automaticCreates = new Map<string, Promise<GenerationIntent>>();
 const writes = new Map<string, Promise<unknown>>();
 const storageKey = (owner: string) => `sf.generation.v1.${owner}`;
 export async function readGenerationIntents(
@@ -88,13 +92,44 @@ export async function discardGenerationIntents(owner: string, keys: readonly str
   await operation;
 }
 
-export async function createGenerationIntent(
+export function createGenerationIntent(
   owner: string,
   input: Omit<GenerationIntent, "key">,
-) {
-  const intent = { ...input, key: newRequestKey() };
-  await save(owner, intent);
-  return intent;
+): Promise<GenerationIntent> {
+  const identity = JSON.stringify([owner, input.path, input.body]);
+  const existing = input.autoSubmit ? automaticCreates.get(identity) : null;
+  if (existing) return existing;
+  const operation = (async () => {
+    if (input.autoSubmit) {
+      const pending = (await readGenerationIntents(owner)).find(item => item.autoSubmit && !item.generationId &&
+        item.path === input.path && JSON.stringify(item.body) === JSON.stringify(input.body));
+      if (pending) return pending;
+    }
+    const intent = { ...input, key: newRequestKey() };
+    await save(owner, intent);
+    return intent;
+  })();
+  if (input.autoSubmit) {
+    automaticCreates.set(identity, operation);
+    void operation.finally(() => automaticCreates.delete(identity)).catch(() => {});
+  }
+  return operation;
+}
+
+/** Only explicit one-tap requests opt into unattended admission. Older requests
+ * and confirmation-based Quiz/draft flows keep their existing semantics. */
+export async function resumeAutomaticGenerations(owner: string, client: ExperienceClient, isCurrent: () => boolean) {
+  const pending = await readGenerationIntents(owner);
+  for (const intent of pending) {
+    if (!isCurrent()) return;
+    if (!intent.autoSubmit || intent.generationId) continue;
+    try { await acceptGeneration(owner, client, intent); }
+    catch (cause) {
+      if (cause instanceof ExperienceApiError && cause.retryable) return;
+      // Permanent rejection requires a deliberate Queue retry, not a loop.
+      await save(owner, { ...intent, autoSubmit: false });
+    }
+  }
 }
 
 /** Attribute older saved requests using existing owner-authenticated projections.

@@ -15,6 +15,7 @@ import {
 import { readCanvasReviewerRecovery } from "../services/canvasReviewerRecoveryStore";
 import { subscribeToProcessingNotificationResponses } from "../services/completionNotifications";
 import { reconcileReviewerProcessingOutbox } from "../services/processingOutboxReconciliation";
+import { resumeAutomaticGenerations } from "../services/generationRecovery";
 
 const OUTBOX_RECONCILIATION_INTERVAL_MS = 10_000;
 
@@ -46,16 +47,23 @@ export function AppLifecycle() {
   }, [ownerUserId]);
   const routedRecoveryKeyRef = useRef<string | null>(null);
 
+  const admissionOwner = useRef<string | null>(null);
+  admissionOwner.current = session?.offline ? null : ownerUserId ?? null;
   const reconcileOutbox = useCallback(async () => {
     const apiBaseUrl = getApiBaseUrl();
     const token = accessToken?.trim();
     if (!apiBaseUrl || !token || !ownerUserId) return;
-    await reconcileReviewerProcessingOutbox({
+    const automatic = admissionOwner.current === ownerUserId
+      ? resumeAutomaticGenerations(ownerUserId, { baseUrl: apiBaseUrl, accessToken: token }, () => admissionOwner.current === ownerUserId)
+      : Promise.resolve();
+    await Promise.all([automatic, reconcileReviewerProcessingOutbox({
       accessToken: token,
       apiBaseUrl,
       ownerUserId,
-    });
+    })]);
   }, [accessToken, ownerUserId]);
+
+  useEffect(() => () => { admissionOwner.current = null; }, []);
 
   useEffect(() => {
     if (!ownerUserId) return;

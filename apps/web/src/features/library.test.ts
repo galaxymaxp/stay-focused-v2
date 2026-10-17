@@ -6,6 +6,7 @@ import { LibraryScreen, LibraryCourseScreen } from './library';
 const mocks=vi.hoisted(()=>({owner:'',items:[] as LibraryArtifactSummary[],api:vi.fn(),refresh:vi.fn(),get:vi.fn(),set:vi.fn()}));
 vi.mock('../components/providers',()=>({useAuth:()=>({session:{user:{id:mocks.owner}},api:mocks.api})}));
 vi.mock('../lib/use-saved-library',()=>({useSavedLibrary:()=>({items:mocks.items,data:{},categories:{},refresh:mocks.refresh})}));
+vi.mock('../lib/use-library-course-sequence',()=>({useLibraryCourseSequence:()=>({data:{materials:[{id:'file:a',reviewerArtifactId:'Alpha'},{id:'file:z',reviewerArtifactId:'Zulu'}]},error:false})}));
 vi.mock('../lib/hooks',()=>({useAction:()=>({run:vi.fn()}),useResource:()=>({})}));
 vi.mock('../components/ui',()=>({Heading:'Heading',Icon:'Icon',ContentIcon:'ContentIcon',Empty:'Empty',State:'State',Notice:'Notice',contentTone:()=>''}));
 vi.mock('../components/crumbs',()=>({PageCrumb:'Crumb'}));
@@ -25,27 +26,29 @@ afterEach(async()=>{await act(async()=>tree?.unmount());tree=undefined;vi.unstub
 const select=()=>tree!.root.findByType('select');
 const courses=()=>tree!.root.findAllByType('a').filter(node=>String(node.props.href).startsWith('/library/course/')).map(node=>decodeURIComponent(node.props.href.split('/').pop()));
 const titles=()=>tree!.root.findAllByType('a').filter(node=>node.props.className==='library-card-open').map(node=>node.props['aria-label']);
-it('changes top-level order without a refetch, persists and reopens the chosen browser sort',async()=>{
-  await act(async()=>{tree=create(createElement(LibraryScreen));}); expect(courses()).toEqual(['z','a']);expect(select().props.value).toBe('recent');
-  await act(async()=>select().props.onChange({target:{value:'course'}}));expect(courses()).toEqual(['a','z']);
-  expect(JSON.parse(mocks.set.mock.lastCall![1]).sort.library).toBe('course');expect(mocks.api).not.toHaveBeenCalled();expect(mocks.refresh).not.toHaveBeenCalled();
-  await act(async()=>tree!.unmount());await act(async()=>{tree=create(createElement(LibraryScreen));});expect(select().props.value).toBe('course');expect(courses()).toEqual(['a','z']);
+it('persists each PR #12 top-level option without refetching',async()=>{
+  await act(async()=>{tree=create(createElement(LibraryScreen));});expect(select().props.value).toBe('updated_desc');expect(courses()).toEqual(['z','a']);
+  expect(select().findAllByType('option').map(node=>node.props.value)).toEqual(['updated_desc','updated_asc','title_asc','title_desc']);
+  await act(async()=>select().props.onChange({target:{value:'title_asc'}}));expect(courses()).toEqual(['z','a']);
+  expect(JSON.parse(mocks.set.mock.lastCall![1]).librarySort.__courses__).toBe('title_asc');expect(mocks.api).not.toHaveBeenCalled();
+  await act(async()=>tree!.unmount());await act(async()=>{tree=create(createElement(LibraryScreen));});expect(select().props.value).toBe('title_asc');
 });
-it('loads stored opened ordering and uses timestamps on this device',async()=>{
+it('defaults LS1 storage while preserving pins',async()=>{
   mocks.get.mockReturnValue(JSON.stringify({sort:{library:'opened'},opened:{Alpha:'2026-03-01'}}));
-  await act(async()=>{tree=create(createElement(LibraryScreen));});expect(courses()).toEqual(['a','z']);expect(select().props.value).toBe('opened');
+  await act(async()=>{tree=create(createElement(LibraryScreen));});expect(select().props.value).toBe('updated_desc');expect(courses()).toEqual(['z','a']);
 });
-it('defaults course contents to Canvas order, changes title/recent order and keeps pins first',async()=>{
-  mocks.items=[{...mocks.items[0]!,sourcePosition:{moduleIndex:2,itemIndex:1}}, {...mocks.items[1]!,course:mocks.items[0]!.course,sourcePosition:{moduleIndex:1,itemIndex:9}},card('Pinned',mocks.items[0]!.course,'2025-01-01')];
-  mocks.get.mockReturnValue(JSON.stringify({pinned:{artifact:['Pinned']}}));
+it('supports My order, dates, alphabetic directions and complete Canvas order',async()=>{
+  mocks.items=[{...mocks.items[0]!,id:'artifact:Zulu'}, {...mocks.items[1]!,id:'artifact:Alpha',course:mocks.items[0]!.course},card('Pinned',mocks.items[0]!.course,'2025-01-01')];
+  mocks.get.mockReturnValue(JSON.stringify({pinned:{artifact:['Pinned']},libraryOrder:{z:['artifact:Zulu','artifact:Alpha','Pinned']}}));
   await act(async()=>{tree=create(createElement(LibraryCourseScreen,{courseKey:'z'}));});
-  expect(select().props.value).toBe('canvas');expect(titles()).toEqual(['Reviewer: Pinned, pinned','Reviewer: Alpha','Reviewer: Zulu']);
-  await act(async()=>select().props.onChange({target:{value:'recent'}}));expect(titles()).toEqual(['Reviewer: Pinned, pinned','Reviewer: Zulu','Reviewer: Alpha']);
-  await act(async()=>select().props.onChange({target:{value:'title'}}));expect(titles()).toEqual(['Reviewer: Pinned, pinned','Reviewer: Alpha','Reviewer: Zulu']);
-  expect(JSON.parse(mocks.set.mock.lastCall![1]).sort.libraryCourse).toBe('title');expect(mocks.api).not.toHaveBeenCalled();
+  expect(select().props.value).toBe('custom');expect(titles()).toEqual(['Reviewer: Zulu','Reviewer: Alpha','Reviewer: Pinned, pinned']);
+  expect(select().findAllByType('option').map(node=>node.props.value)).toEqual(['custom','updated_desc','updated_asc','course','title_asc','title_desc']);
+  await act(async()=>select().props.onChange({target:{value:'course'}}));expect(titles()).toEqual(['Reviewer: Alpha','Reviewer: Zulu','Reviewer: Pinned, pinned']);
+  await act(async()=>select().props.onChange({target:{value:'title_desc'}}));expect(titles()).toEqual(['Reviewer: Zulu','Reviewer: Pinned, pinned','Reviewer: Alpha']);
+  expect(JSON.parse(mocks.set.mock.lastCall![1]).librarySort.z).toBe('title_desc');expect(mocks.api).not.toHaveBeenCalled();
 });
-it('storage reads and writes may throw: defaults render, choices still work for the visit',async()=>{
+it('storage failure leaves defaults and in-memory choices usable',async()=>{
   mocks.get.mockImplementation(()=>{throw Error('disabled');});mocks.set.mockImplementation(()=>{throw Error('disabled');});
-  await act(async()=>{tree=create(createElement(LibraryScreen));});expect(select().props.value).toBe('recent');
-  await act(async()=>select().props.onChange({target:{value:'course'}}));expect(courses()).toEqual(['a','z']);expect(mocks.api).not.toHaveBeenCalled();
+  await act(async()=>{tree=create(createElement(LibraryScreen));});expect(select().props.value).toBe('updated_desc');
+  await act(async()=>select().props.onChange({target:{value:'title_desc'}}));expect(courses()).toEqual(['a','z']);expect(mocks.api).not.toHaveBeenCalled();
 });
