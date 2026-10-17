@@ -2,8 +2,8 @@ import type { StudyImageTarget } from '@stay-focused/shared';
 import { AskImageButton } from './AskImageButton';
 import { SaveImageButton } from './SaveImageButton';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Image, Modal, Pressable, Text, View, type GestureResponderEvent } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, AppState, Image, Pressable, Text, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
+import { ImageViewer } from './ImageViewer';
 import { useTheme } from '../../design/theme';
 import { hitTarget, radius, spacing } from '../../design/tokens';
 import { clampPagePan, clampPageZoom, readPageSnapshot, type PageSnapshot } from '../../services/sourcePageSnapshots';
@@ -18,7 +18,8 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
   onAvailability?: (available: boolean | null) => void;
 }) {
   const availabilityRef = useRef(onAvailability); availabilityRef.current = onAvailability;
-  const { colors, reducedMotion } = useTheme();
+  const { colors } = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const [snapshot, setSnapshot] = useState<PageSnapshot | null>(null);
   const [open, setOpen] = useState(false);
   const [waiting, setWaiting] = useState(false);
@@ -114,29 +115,32 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
     </Pressable>
     {ready ? <AskImageButton image={image} offline={offline} onAsk={onAsk} /> : null}
     </View>
-    <Modal visible={open} animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={() => setOpen(false)}>
-      {open ? <SafeAreaView style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Close source page" onPress={() => setOpen(false)}
-          style={{ minHeight: hitTarget.min, padding: spacing[4], alignSelf: 'flex-end' }}><Text style={{ color: colors.accent }}>Close</Text></Pressable>
-        {ready ? <ZoomablePage key={ready.page} url={ready.url} width={ready.width} height={ready.height} onError={() => { setSnapshot(null); setOpen(false); }} />
+    <ImageViewer key={`${sectionId}-${open}`} visible={open} title="Source page" closeLabel="Close source page" onClose={() => setOpen(false)}>
+      {onZoomChange => <>
+        <Text style={{ color: colors.textMuted }}>From {unit} {snapshot.page} {'\u00b7'} your course material</Text>
+        <View style={{ height: windowHeight * 0.6 }}>
+        {ready ? <ZoomablePage key={ready.page} url={ready.url} width={ready.width} height={ready.height} onZoomChange={onZoomChange} onError={() => { setSnapshot(null); setOpen(false); }} />
           : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[3] }}>
             {!exhausted ? <ActivityIndicator color={colors.accent} /> : null}
             <Text style={{ color: colors.textMuted }}>{exhausted ? 'The page is still preparing. Close and open it again in a moment.' : 'Preparing source page'}</Text>
           </View>}
+        </View>
         {ready ? <AskImageButton image={image} offline={offline} onAsk={target => {setOpen(false);onAsk?.(target);}} /> : null}
         {ready ? <SaveImageButton offline={offline} image={{ uri: ready.url, reviewerTitle, sectionTitle, kind: 'page_snapshot' }} /> : null}
         <Text style={{ color: colors.textPrimary, textAlign: 'center', padding: spacing[4] }}>
           {ready ? `${ready.sourceLabel} · ${captionUnit} ${ready.page}` : `${captionUnit} ${snapshot.page}`}
         </Text>
-      </SafeAreaView> : null}
-    </Modal>
+      </>}
+    </ImageViewer>
   </>;
 }
 
-export function ZoomablePage({ url, headers, width, height, onError, label = 'Source page' }: { url: string; headers?: Readonly<Record<string,string>>; width: number; height: number; onError: () => void; label?: string }) {
+export function ZoomablePage({ url, headers, width, height, onError, label = 'Source page', onZoomChange }: { url: string; headers?: Readonly<Record<string,string>>; width: number; height: number; onError: () => void; label?: string; onZoomChange?: (scale: number) => void }) {
   const [frame, setFrame] = useState({ width: 1, height: 1 });
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 });
   const current = useRef(transform); current.current = transform;
+  const zoomCallback = useRef(onZoomChange); zoomCallback.current = onZoomChange;
+  useEffect(() => { zoomCallback.current?.(transform.scale); }, [transform.scale]);
   const start = useRef({ distance: 0, scale: 1, x: 0, y: 0, touchX: 0, touchY: 0 });
   const lastTap = useRef(0);
   const moved = useRef(false);
@@ -165,7 +169,7 @@ export function ZoomablePage({ url, headers, width, height, onError, label = 'So
   const ratio = Math.min(frame.width / width, frame.height / height);
   return <View accessibilityLabel={`${label}. Pinch or double tap to zoom.`} style={{ flex: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}
     onLayout={event => setFrame(event.nativeEvent.layout)} onStartShouldSetResponder={() => true}
-    onMoveShouldSetResponder={() => true} onResponderTerminationRequest={() => false} onResponderGrant={capture} onResponderMove={move} onResponderRelease={release}>
+    onMoveShouldSetResponder={() => true} onResponderTerminationRequest={() => current.current.scale === 1 && !start.current.distance} onResponderTerminate={() => { lastTap.current = 0; }} onResponderGrant={capture} onResponderMove={move} onResponderRelease={release}>
     <Image source={{ uri: url, ...(headers ? {headers} : {}) }} resizeMode="contain" accessibilityIgnoresInvertColors onError={onError}
       style={{ width: width * ratio, height: height * ratio, transform: [{ translateX: transform.x }, { translateY: transform.y }, { scale: transform.scale }] }} />
   </View>;

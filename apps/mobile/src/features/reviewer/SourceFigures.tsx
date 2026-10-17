@@ -3,7 +3,7 @@ import { AskImageButton } from './AskImageButton';
 import { SaveImageButton } from './SaveImageButton';
 import { useEffect, useRef, useState } from 'react';
 import { Image, AppState, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import { Sheet } from '../../design/primitives';
+import { ImageViewer } from './ImageViewer';
 import { useTheme } from '../../design/theme';
 import { hitTarget, radius, spacing } from '../../design/tokens';
 import type { ExperienceClient } from '../../services/experienceApi';
@@ -82,11 +82,13 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
         </Pressable><AskImageButton offline={offline} onAsk={onAsk} image={{reference:{kind:'figure',id:item.id},thumbnail:item.url,label:caption}} /></View>;
       })}
     </View>:null}
-    {open?<Sheet title="Source figures" onClose={close}>
+    {open?<ImageViewer key={figure?.id} visible title="Source figures" onClose={close}>
+      {onZoomChange => <>
+      <Text style={{color:colors.textMuted}}>From your course material</Text>
       {figure?<>
         <Text style={{color:colors.textPrimary}}>{label}</Text>
-        <View style={{height:Math.min(height*0.5,spacing[12]*8)}} onTouchStart={event=>event.stopPropagation()} onTouchMove={event=>event.stopPropagation()}>
-          <ZoomablePage key={figure.id} url={figure.url} width={figure.width} height={figure.height} label="Source figure"
+        <View style={{height:Math.min(height*0.5,spacing[12]*8)}}>
+          <ZoomablePage key={figure.id} url={figure.url} width={figure.width} height={figure.height} label="Source figure" onZoomChange={onZoomChange}
             onError={()=>{setHidden(true);close();}}/>
         </View>
         <AskImageButton offline={offline} onAsk={target=>{close();onAsk?.(target);}} image={{reference:{kind:'figure',id:figure.id},thumbnail:figure.url,label}} />
@@ -99,6 +101,7 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
             onPress={()=>setIndex(n=>Math.min(figures.length-1,n+1))} style={{minHeight:hitTarget.min,padding:spacing[2]}}><Text style={{color:index===figures.length-1?colors.textMuted:colors.accent}}>Next</Text></Pressable>
         </View>:null}
       </>:null}
-    </Sheet>:null}
+      </>}
+    </ImageViewer>:null}
   </>;
 }

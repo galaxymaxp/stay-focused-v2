@@ -2,14 +2,15 @@ import { createElement } from 'react';
 import { act,create,type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach,describe,expect,it,vi } from 'vitest';
 import { Image,Pressable,Text } from 'react-native';
-import { Sheet } from '../../design/primitives';
+import { ImageViewer } from './ImageViewer';
 import { ExternalVisual } from './ExternalVisual';
 import { SaveImageButton } from './SaveImageButton';
 import { EXTERNAL_IMAGE_HEADERS, EXTERNAL_VISUAL_LABEL, type ExternalReferenceVisual } from '../../services/externalVisuals';
 import { apiFoundVisual } from '../../services/externalVisuals.testSupport';
 vi.mock('lucide-react-native', () => ({ Download: 'Download' }));
 const mocks=vi.hoisted(()=>({find:vi.fn(),link:vi.fn(async()=>{})}));
-vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',Linking:{openURL:mocks.link},useWindowDimensions:()=>({width:360,height:800})}));
+vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',Modal:'Modal',ScrollView:'ScrollView',Animated:{View:'AnimatedView',Value:class {setValue(){} stopAnimation(){}},spring:()=>({start(){}})},Linking:{openURL:mocks.link},useWindowDimensions:()=>({width:360,height:800})}));
+vi.mock('react-native-safe-area-context',()=>({SafeAreaView:'SafeAreaView'}));
 vi.mock('../../design/primitives',()=>({Sheet:({children,...props}:{children:unknown})=>createElement('Sheet',props,children as never)}));
 vi.mock('../../design/theme',async()=>{const tokens=await import('../../design/themeTokens');return {useTheme:()=>({colors:tokens.palettes.light,reducedMotion:true})};});
 vi.mock('./SourcePageSnapshot',()=>({ZoomablePage:({url,label,headers}:{url:string;label:string;headers?:Readonly<Record<string,string>>})=>createElement('ZoomablePage',{url,label,headers})}));
@@ -50,14 +51,14 @@ describe('automatic separate external card',()=>{
     expect(onAsk).toHaveBeenLastCalledWith({reference:{kind:'external_visual',id:visual.id},thumbnail:visual.image,label:visual.title});
     await act(async()=>button('View external reference').props.onPress());
     await act(async()=>tree!.root.findAllByType(Pressable).filter(n=>n.props.accessibilityLabel==='Ask about this image').at(-1)!.props.onPress());
-    expect(onAsk).toHaveBeenCalledTimes(2);expect(tree!.root.findAllByType(Sheet)).toHaveLength(0);
+    expect(onAsk).toHaveBeenCalledTimes(2);expect(tree!.root.findAllByType(ImageViewer)).toHaveLength(0);
   });
   it('closes the viewer without logging native image errors or academic URLs',async()=>{
     const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});
     try {
       await mount();await act(async()=>button('View external reference').props.onPress());
       await act(async()=>tree!.root.findByType(Image).props.onError({nativeEvent:{error:'HTTP 403 loading https://upload.wikimedia.org/private-title.png'}}));
-      expect(warning).not.toHaveBeenCalled();expect(tree!.root.findAllByType(Sheet)).toHaveLength(0);
+      expect(warning).not.toHaveBeenCalled();expect(tree!.root.findAllByType(ImageViewer)).toHaveLength(0);
     }finally{warning.mockRestore();}
   });
   it.each([{online:false},{hasSourceVisual:true}])('hides actions and images for %j',async override=>{
@@ -66,7 +67,7 @@ describe('automatic separate external card',()=>{
   it('displays the batch image without a section search and labels its zoom sheet',async()=>{
     mocks.find.mockResolvedValue(found);await mount();expect(mocks.find).not.toHaveBeenCalled();
     expect(tree!.root.findByType(Image).props.source).toEqual({uri:found.image,headers:EXTERNAL_IMAGE_HEADERS});expect(text()).toContain(EXTERNAL_VISUAL_LABEL);
-    await act(async()=>button('View external reference').props.onPress());expect(tree!.root.findByType(Sheet).props.title).toBe('External reference');
+    await act(async()=>button('View external reference').props.onPress());expect(tree!.root.findByType(ImageViewer).props.title).toBe('External reference');
     expect(tree!.root.findByType('ZoomablePage' as never).props.headers).toEqual(EXTERNAL_IMAGE_HEADERS);
     expect(text().filter(t=>t===EXTERNAL_VISUAL_LABEL)).toHaveLength(2);
     await act(async()=>button('View attribution on Wikimedia Commons').props.onPress());expect(mocks.link).toHaveBeenCalledWith(found.sourceUrl);
@@ -90,7 +91,7 @@ describe('automatic separate external card',()=>{
   it('hides the card and closes the sheet on offline/source transitions',async()=>{
     mocks.find.mockResolvedValue(found);await mount();await act(async()=>button('Show a different one').props.onPress());await act(async()=>button('View external reference').props.onPress());
     await act(async()=>tree!.update(createElement(ExternalVisual,{...props,online:false})));
-    expect(tree!.root.findAllByType(Image)).toHaveLength(0);expect(tree!.root.findAllByType(Sheet)).toHaveLength(0);
+    expect(tree!.root.findAllByType(Image)).toHaveLength(0);expect(tree!.root.findAllByType(ImageViewer)).toHaveLength(0);
     await act(async()=>tree!.update(createElement(ExternalVisual,{...props,hasSourceVisual:true})));expect(tree!.root.findAllByType(Image)).toHaveLength(0);
   });
   it('does not show a no-result after provider/network failure',async()=>{

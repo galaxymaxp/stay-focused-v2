@@ -3,7 +3,7 @@ import { AskImageButton } from './AskImageButton';
 import { SaveImageButton } from './SaveImageButton';
 import { useEffect, useRef, useState } from 'react';
 import { Image, Linking, Pressable, Text, View, useWindowDimensions } from 'react-native';
-import { Sheet } from '../../design/primitives';
+import { ImageViewer } from './ImageViewer';
 import { useTheme } from '../../design/theme';
 import { hitTarget, radius, spacing } from '../../design/tokens';
 import type { ExperienceClient } from '../../services/experienceApi';
@@ -39,10 +39,11 @@ export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisu
     </View>:null}
     {result.attemptCount<2?<Pressable accessibilityRole="button" accessibilityLabel="Show a different one" disabled={busy} accessibilityState={{busy,disabled:busy}}
       onPress={()=>void find()} style={{alignSelf:'flex-start',minHeight:hitTarget.min,padding:spacing[2],borderRadius:radius.control}}><Text style={{color:colors.accent}}>Show a different one</Text></Pressable>:null}
-    {open && result?.status==='found'?<Sheet title="External reference" onClose={()=>setOpen(false)}>
+    {open && result?.status==='found'?<ImageViewer visible title="External reference" onClose={()=>setOpen(false)}>
+      {onZoomChange => <>
       <Text style={{color:colors.textMuted}}>{EXTERNAL_VISUAL_LABEL}</Text>
-      <View style={{height:Math.min(height*0.5,spacing[12]*8)}} onTouchStart={e=>e.stopPropagation()} onTouchMove={e=>e.stopPropagation()}>
-        <ZoomablePage url={result.image} headers={EXTERNAL_IMAGE_HEADERS} width={result.width} height={result.height} label="External reference" onError={()=>setOpen(false)}/>
+      <View style={{height:Math.min(height*0.5,spacing[12]*8)}}>
+        <ZoomablePage url={result.image} headers={EXTERNAL_IMAGE_HEADERS} width={result.width} height={result.height} label={result.title} onZoomChange={onZoomChange} onError={()=>setOpen(false)}/>
       </View>
       <AskImageButton image={image} offline={!online} onAsk={target=>{setOpen(false);onAsk?.(target);}} />
       <SaveImageButton offline={!online} image={{uri:result.image,headers:EXTERNAL_IMAGE_HEADERS,reviewerTitle,sectionTitle,kind:'external_visual',sourceTitle:result.title,attribution:`${result.credit} · ${result.license}`}} />
@@ -53,6 +54,7 @@ export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisu
       <Pressable accessibilityRole="link" accessibilityLabel="View image license" onPress={()=>{void Linking.openURL(result.licenseUrl).catch(()=>{});}} style={{minHeight:hitTarget.min,justifyContent:'center'}}>
         <Text style={{color:colors.accent}}>License details</Text>
       </Pressable>
-    </Sheet>:null}
+      </>}
+    </ImageViewer>:null}
   </View>;
 }

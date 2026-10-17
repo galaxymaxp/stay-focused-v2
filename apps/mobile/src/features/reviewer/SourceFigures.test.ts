@@ -4,9 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Image, Pressable, Text, View } from 'react-native';
 import { SourceFigures, useFigureAvailability } from './SourceFigures';
 import { SaveImageButton } from './SaveImageButton';
-import { Sheet } from '../../design/primitives';
+import { ImageViewer } from './ImageViewer';
 const mocks=vi.hoisted(()=>({read:vi.fn(),availability:vi.fn(),state:{currentState:'active',addEventListener:vi.fn(()=>({remove:vi.fn()}))}}));
-vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',ActivityIndicator:'ActivityIndicator',
+vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',Modal:'Modal',ScrollView:'ScrollView',Animated:{View:'AnimatedView',Value:class {setValue(){} stopAnimation(){}},spring:()=>({start(){}})},ActivityIndicator:'ActivityIndicator',
   AppState:mocks.state,useWindowDimensions:()=>({width:360,height:800})}));
 vi.mock('react-native-safe-area-context',()=>({SafeAreaView:'SafeAreaView'}));
 vi.mock('lucide-react-native',()=>({Image:'ImageIcon',Download:'Download'}));
@@ -48,18 +48,21 @@ describe('in-place source figure sheet',()=>{
     expect(onAsk).toHaveBeenLastCalledWith({reference:{kind:'figure',id:figure.id},thumbnail:figure.url,label:'Diagram from page 2'});
     await act(async()=>button('Enlarge Diagram from page 2').props.onPress());
     await act(async()=>tree!.root.findAllByType(Pressable).filter(n=>n.props.accessibilityLabel==='Ask about this image').at(-1)!.props.onPress());
-    expect(onAsk).toHaveBeenCalledTimes(2);expect(tree!.root.findAllByType(Sheet)).toHaveLength(0);
+    expect(onAsk).toHaveBeenCalledTimes(2);expect(tree!.root.findAllByType(ImageViewer)).toHaveLength(0);
   });
   it.each([{hasFigures:false},{offline:true}])('hides icon without figures or offline (%j)',async override=>{
     await mount(override);expect(tree!.root.findAllByType(Pressable).filter(node=>!node.props.disabled)).toHaveLength(0);expect(mocks.read).not.toHaveBeenCalled();
   });
   it('shows only the image action, opens and closes the existing sheet in the reader',async()=>{
     mocks.read.mockResolvedValue([figure]);await mount();expect(mocks.read).toHaveBeenCalledOnce();
+    const text=()=>tree!.root.findAllByType(Text).map(node=>[node.props.children].flat().join(''));
+    expect(text()).toContain('From your course material');
+    expect(text()).not.toContain('From page 2');
     await act(async()=>button('Enlarge Diagram from page 2').props.onPress());
-    expect(tree!.root.findByType(Sheet).props.title).toBe('Source figures');
+    expect(tree!.root.findByType(ImageViewer).props.title).toBe('Source figures');
     expect(tree!.root.findAllByType(Text).some(node=>[node.props.children].flat().join('')==='From page 2')).toBe(true);
     expect(tree!.root.findAllByType(Image)[0]!.props.source).toEqual({uri:figure.url});
-    await act(async()=>tree!.root.findByType(Sheet).props.onClose());expect(tree!.root.findAllByType(Sheet)).toHaveLength(0);
+    await act(async()=>tree!.root.findByType(ImageViewer).props.onClose());expect(tree!.root.findAllByType(ImageViewer)).toHaveLength(0);
   });
   it('shows slide labels and navigates only real source images',async()=>{
     mocks.read.mockResolvedValue([figure,{...figure,id:'next',page:undefined,slide:4}]);await mount();
@@ -78,7 +81,7 @@ describe('in-place source figure sheet',()=>{
   it('closes the viewer on an offline device-copy switch',async()=>{
     mocks.read.mockResolvedValue([figure]);await mount();await act(async()=>button('Enlarge Diagram from page 2').props.onPress());
     await act(async()=>tree!.update(createElement(SourceFigures,{...props,offline:true})));
-    expect(tree!.root.findAllByType(Sheet)).toHaveLength(0);expect(tree!.root.findAllByType(Pressable).every(node=>node.props.disabled)).toBe(true);
+    expect(tree!.root.findAllByType(ImageViewer)).toHaveLength(0);expect(tree!.root.findAllByType(Pressable).every(node=>node.props.disabled)).toBe(true);
   });
   it('loads only near view, retains loaded inline images offscreen, and ignores an aborted late fetch',async()=>{
     mocks.read.mockResolvedValue([figure]);await mount({visible:false});expect(mocks.read).not.toHaveBeenCalled();
@@ -95,11 +98,12 @@ describe('in-place source figure sheet',()=>{
   it('reuses bounded pinch zoom and prevents the sheet from stealing image gestures',async()=>{
     mocks.read.mockResolvedValue([figure]);await mount();await act(async()=>button('Enlarge Diagram from page 2').props.onPress());
     const page=tree!.root.findAllByType(View).find(node=>node.props.accessibilityLabel?.startsWith('Source figure.'))!;
-    expect(page.props.onResponderTerminationRequest()).toBe(false);
+    expect(page.props.onResponderTerminationRequest()).toBe(true);
     await act(async()=>page.props.onLayout({nativeEvent:{layout:{width:360,height:400}}}));
     const touch=(distance:number)=>({nativeEvent:{touches:[{pageX:100,pageY:100},{pageX:100+distance,pageY:100}]}});
     await act(async()=>page.props.onResponderGrant(touch(100)));await act(async()=>page.props.onResponderMove(touch(600)));
     expect(page.findByType(Image).props.style.transform.at(-1)).toEqual({scale:4});
+    expect(page.props.onResponderTerminationRequest()).toBe(false);
   });
 });
 describe('batched availability lifecycle',()=>{

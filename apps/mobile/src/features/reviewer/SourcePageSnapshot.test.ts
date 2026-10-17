@@ -7,7 +7,7 @@ import { SaveImageButton } from './SaveImageButton';
 
 vi.mock('lucide-react-native', () => ({ Download: 'Download' }));
 const mocks = vi.hoisted(() => ({ read: vi.fn(), state: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) } }));
-vi.mock('react-native', () => ({ View: 'View', Text: 'Text', Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', ActivityIndicator: 'ActivityIndicator', AppState: mocks.state }));
+vi.mock('react-native', () => ({ View: 'View', Text: 'Text', Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', ScrollView:'ScrollView', useWindowDimensions:()=>({width:360,height:800}), Animated:{View:'AnimatedView',Value:class {setValue(){} stopAnimation(){}},spring:()=>({start(){}})}, ActivityIndicator: 'ActivityIndicator', AppState: mocks.state }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('../../design/theme', async () => {
   const tokens = await import('../../design/themeTokens'); return { useTheme: () => ({ colors: tokens.palettes.light, reducedMotion: true }) };
