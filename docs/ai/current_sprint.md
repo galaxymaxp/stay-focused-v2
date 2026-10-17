@@ -1,3 +1,49 @@
+# WG1 finite unattended scope complete locally
+
+Finite scope: WG1/N5 only, baseline fdf1937 (includes 1a9d3f9 and completed IM2).
+Endpoint is WG1; no later task is authorized by this run.
+
+## WG1 website Generate layout complete locally - PASS (2026-10-18)
+
+**PASS for unattended WG1/N5 STEP 0-2, tests, fresh serial gates, documentation
+and local commits.** Generate search/link and course heading actions wrap across
+1440-360 px. Breadcrumb levels truncate on one line without colliding with Queue.
+Batch buttons reuse shared padding/height; cards in each row stretch equally;
+material titles/meta/actions wrap. Both Generate and Canvas use one styled
+Course options disclosure with aria-expanded, Escape/focus return and outside
+click/focus dismissal. Canvas popovers escape the card list's overflow clipping.
+
+Single in-flight sync text lives in CanvasRefreshStatus below the heading.
+During that global refresh the course button keeps a spinner, disabled state
+and aria-busy without duplicate Syncing text; local text remains when global
+refresh is idle. Existing sync and move-course requests are preserved. No API,
+mobile, dependency, schema or migration change. Implementation: **ace4cb2**;
+browser harness: **f485a2f**.
+
+**FRESH PASS on f485a2f:** forced root typecheck/lint/build **8/8 tasks each,
+zero cached**; web **209/209** tests (37 files), focused render/batch **8/8**;
+standalone API/web builds **1/1 each**, **35/35** and **19/19** pages; root
+Android/iOS/web exports with 68 assets. Local Playwright **20/20** page/viewport
+checks and **10/10** mocked move-course requests, zero text-control collisions,
+horizontal page scroll, unexpected requests or runtime errors. Screenshots and
+logs: ignored .local/wg1/. Diff/staged-diff hygiene PASS. Six existing lint
+warnings remain (five mobile, one web); every final gate passed first attempt.
+Focused development failures and browser-checker false positives are retained
+in acceptance; no nondeterministic flake observed. API/mobile/shared tests
+NOT APPLICABLE (unchanged); generated Next declarations inspected and restored.
+
+**Owner steps remaining:** Rollout and Device checks skipped entirely (NOT RUN).
+Owner publishes the reviewed website change and performs RB5 Generate in a phone
+browser and resized desktop. Deployed revision, owner device acceptance and
+live DB/Scheduler state are **UNVERIFIED (owner to confirm)**. The referenced
+overnight roadmap file is absent; the complete WG1 prompt supplies the scope
+without contradicting implementation. No remote service call, deployment,
+SQL/migration application, environment-file edit, Scheduler action, email or
+push occurred. Expected unrelated untracked paths remain. This finite run ends
+at WG1; no later roadmap task was started.
+
+[WG1 acceptance](acceptance/wg1-generate-layout.md).
+
 # IM2 finite unattended scope complete locally
 
 Finite scope: IM2/N4 only, baseline 1a9d3f9 after INT1/EV1/RX1. Endpoint is IM2.

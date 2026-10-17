@@ -4016,3 +4016,78 @@ pull-down only at top and zoom 1; pinch/double-tap/zoomed pan; Android back/Clos
 Reduce Motion; no viewer interaction with reader edge swipe/scrubber; Ask/Save.
 Website: confirm scrolling at all zoom levels and Esc/Close/backdrop dismissal.
 Confirm deployed revisions. No unanswered owner question blocks local closure.
+
+
+## WG1/N5 unattended website Generate layout - PASS (2026-10-18)
+
+Status: **PASS for the finite local code scope**. STEP 0-2, tests, fresh serial
+gates, documentation and local commits are complete on
+`overnight/2026-10-15_feedback`; baseline fdf1937 includes required 1a9d3f9.
+Only the three allowed unrelated untracked paths were present and are retained.
+
+Commits:
+- ace4cb2 fix(web): repair Generate layout and course options
+- f485a2f test(web): check Generate layout at five viewport widths
+- docs: close WG1 (the documentation commit containing this footer; its final
+  hash is recorded in tmp/overnight/WG1.status).
+
+Generate search and connection link wrap; header actions clear the title;
+breadcrumb links/current text truncate on one line; batch controls use shared
+button sizing and pane padding; row cards stretch equally; detail metadata wraps.
+Generate/Canvas share a secondary Course options disclosure, with aria-expanded,
+Escape returning focus, outside pointer/focus dismissal and the unchanged move
+request. Open popovers do not change card height; Canvas list overflow permits
+its final popover action to remain clickable.
+
+Sync status choice: **CanvasRefreshStatus below the heading** is the single
+in-flight message while global refresh runs. A per-course busy button retains
+its spinner, disabled and aria-busy state, without duplicate Syncing text. Local
+sync text is visible when global refresh is idle. No transport/polling, selection,
+auth, API, mobile, dependency, schema or migration semantics changed.
+
+FRESH final gates, serial, code f485a2f:
+- npm run typecheck -- --force: 8/8 tasks, zero cached.
+- npm run lint -- --force: 8/8 tasks, zero cached; zero errors, six existing warnings.
+- npm run test --workspace @stay-focused/web: 209/209 tests, 37/37 files.
+- npm run build --workspace @stay-focused/api: 1/1, 35/35 pages.
+- npm run build --workspace @stay-focused/web: 1/1, 19/19 pages.
+- npm run build -- --force (AUTOPILOT): 8/8 tasks, zero cached; API/web
+  35/35 and 19/19 pages, Android/iOS/web exports and 68 assets.
+- git diff --check and git diff --cached --check: PASS.
+
+FRESH focused render/batch tests: 8/8 (3 files), retaining course-batch.test.ts.
+FRESH local Playwright: 20/20 Generate/course/material/Canvas viewport checks at
+1440, 1024, 768, 390 and 360 px; 10/10 mocked existing move-course requests;
+170 intercepted API requests, zero unexpected requests/runtime errors. Distinct
+text-control intersections, horizontal page scroll, equal card heights, button
+padding/height, stable disclosure geometry, Esc/outside click, aria-expanded,
+single sync and final Canvas popover clickability pass. Screenshots/report/logs
+are ignored under .local/wg1/; rerun: node apps/web/scripts/wg1-layout-check.mjs.
+
+Failed first attempts retained: focused render 2 failed/6 passed (Next Link
+needed a Node-renderer mock); isolated web typecheck TS2769 (test callback
+returned boolean). Two initial browser runs stopped after one passed check on
+same-heading font-range false positives; checker now compares distinct text
+nodes and clips actual overflow bounds. All repaired before final gates, with
+no nondeterministic flake. Python launcher was unavailable for an edit attempt;
+Node applied the edits. No final gate failed. Generated API/web next-env.d.ts
+changes were inspected and restored. Existing Vite notice/lint warnings remain.
+API/mobile/shared unit tests NOT APPLICABLE (unchanged).
+
+UNVERIFIED (owner to confirm): deployed revision, owner phone/browser acceptance,
+live DB rows/applied migrations and Scheduler state. Referenced overnight roadmap
+file is missing; complete WG1 prompt supplies scope without a code contradiction.
+No remote Supabase/Vercel/Google/Canvas/Resend call, deployment, SQL/migration
+application, environment-file edit, Scheduler change, email or push occurred.
+All browser API/auth responses were fictional and intercepted; fallback origins
+are loopback. No question blocks local closure. Planning files are reconciled.
+See [WG1 acceptance](acceptance/wg1-generate-layout.md).
+
+### Owner steps remaining
+
+**Rollout and Device checks skipped entirely (NOT RUN).** Owner reviews/publishes
+the website through the normal release flow, confirms the deployed revision and
+performs RB5 Generate at narrow phone-browser and resized desktop widths. Check
+search/link wrapping, breadcrumb/action separation, batch controls, course cards,
+Course options on Generate/Canvas, detail metadata and single sync progress.
+This run ends at WG1; no later roadmap task was started.
