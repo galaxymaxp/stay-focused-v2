@@ -11,6 +11,7 @@ vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: vi.fn(async
 const visuals=vi.hoisted(()=>({sections:{} as Record<string,import('../../services/externalVisuals').ExternalReferenceVisual>}));
 vi.mock('../../services/externalVisuals',async load=>({...await load<typeof import('../../services/externalVisuals')>(),useReviewerVisuals:(_client:unknown,_id:unknown,offline:boolean)=>offline?null:visuals.sections}));
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
+vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('./ShareReviewerMenu', () => ({ ShareReviewerMenu: 'ShareReviewerMenu' }));
 const figures=vi.hoisted(()=>({available:new Set<string>(),online:false}));
 vi.mock('./SourceFigures',()=>({
@@ -67,12 +68,12 @@ describe('snapshot discovery for persisted reviewer headers', () => {
     figures.online=true;
     visuals.sections[reviewer.sections[0]!.id]=apiFoundVisual;
     const props={artifact:detail.artifact,reviewer,deviceCopy:false};
-    const externalButtons=()=>rendered!.root.findAll(node=>node.props.accessibilityLabel==='View external reference');
+    const externalButtons=()=>rendered!.root.findAll(node=>node.props.accessibilityLabel?.startsWith('View external reference:'));
     await act(async()=>{rendered=create(createElement(ReviewerReaderScreen,props));});
     expect(externalButtons()).toHaveLength(1);
     expect(rendered!.root.findAll(node=>String(node.type)==='Image')[0]!.props.source.uri).toBe(apiFoundVisual.image);
     const labels=rendered!.root.findAll(node=>String(node.type)==='Text').map(node=>[node.props.children].flat().join(''));
-    expect(labels).toContain(apiFoundVisual.label);expect(labels).toContain(`${apiFoundVisual.credit} · ${apiFoundVisual.license}`);
+    expect(labels).toContain(apiFoundVisual.label);expect(labels).not.toContain(`${apiFoundVisual.credit} · ${apiFoundVisual.license}`);
     const snapshot=rendered!.root.findAll(node=>String(node.type)==='SourcePageSnapshot')[0]!;
     await act(async()=>snapshot.props.onAvailability(false));expect(externalButtons()).toHaveLength(1);
     await act(async()=>snapshot.props.onAvailability(null));expect(externalButtons()).toHaveLength(1);

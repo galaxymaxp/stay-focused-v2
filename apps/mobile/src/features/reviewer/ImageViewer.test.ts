@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, type ComponentProps } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Animated, Modal, ScrollView, Text } from 'react-native';
@@ -19,9 +19,10 @@ let tree: ReactTestRenderer | undefined;
 const close = vi.fn();
 let setZoom: (scale: number) => void;
 async function mount() {
-  await act(async () => { tree = create(createElement(ImageViewer, { visible: true, title: 'Image', onClose: close,
+  const props: ComponentProps<typeof ImageViewer> = { visible: true, title: 'Image', onClose: close,
     children: onZoomChange => { setZoom = onZoomChange; return createElement(Text, {}, 'Long caption and actions'); },
-  })); });
+  };
+  await act(async () => { tree = create(createElement(ImageViewer, props)); });
 }
 const touch = (x: number, y: number, timestamp: number, count = 1) => ({ nativeEvent: {
   pageX: x, pageY: y, timestamp, touches: Array.from({ length: count }, () => ({ pageX: x, pageY: y })),
