@@ -23,8 +23,9 @@ without competing with native scrolling. Dismiss only a downward vertical drag
 starting at scroll top and zoom 1, at 120 dp or at least 24 dp and 0.9 dp/ms.
 Cancel eligibility on pinch, horizontal intent, upward scrolling or cancellation.
 Reduce Motion removes translation/spring and Modal animation. Android back and
-the explicit Close control always dismiss. Native Modal isolation prevents
-viewer touches from reaching ReviewerReader's right-edge scrubber.
+the explicit Close control always dismiss. The native Modal and an explicit
+touch propagation boundary prevent viewer events from reaching ReviewerReader's
+right-edge scrubber, including renderers that bubble portal events.
 
 ## Consequences
 

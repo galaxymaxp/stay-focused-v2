@@ -2,6 +2,7 @@ import { createElement, type ComponentProps } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Animated, Modal, ScrollView, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ImageViewer } from './ImageViewer';
 
 const mocks = vi.hoisted(() => ({ reduced: true, spring: vi.fn(() => ({ start: vi.fn() })) }));
@@ -36,6 +37,11 @@ async function drag(dy: number, duration = 300) {
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; mocks.reduced = true; vi.clearAllMocks(); });
 
 describe('isolated scrollable image viewer', () => {
+  it('stops every viewer touch phase before it can reach the reader edge scrubber',async()=>{
+    await mount();const boundary=tree!.root.findByType(SafeAreaView),stopPropagation=vi.fn();
+    for(const phase of ['onTouchStart','onTouchMove','onTouchEnd','onTouchCancel'])boundary.props[phase]({stopPropagation});
+    expect(stopPropagation).toHaveBeenCalledTimes(4);
+  });
   it('scrolls image/details/actions together and closes through Android back with no Reduce Motion slide', async () => {
     await mount();
     expect(tree!.root.findByType(ScrollView).findByType(Text).props.children).toBe('Long caption and actions');

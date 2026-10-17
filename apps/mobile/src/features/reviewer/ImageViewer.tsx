@@ -5,6 +5,8 @@ import { motion, useTheme } from '../../design/theme';
 import { hitTarget, spacing } from '../../design/tokens';
 import { shouldDismissImage } from './imageViewerGesture';
 
+const stopReaderTouch = (event: GestureResponderEvent) => event.stopPropagation();
+
 /** A separate native Modal isolates image gestures from the reader's edge scrubber. */
 export function ImageViewer({ visible, title, closeLabel = 'Close image', onClose, children }: {
   visible: boolean; title: string; closeLabel?: string; onClose: () => void;
@@ -57,7 +59,8 @@ export function ImageViewer({ visible, title, closeLabel = 'Close image', onClos
   }, [drag]);
   const onZoomChange = (scale: number) => { zoomRef.current = scale; setZoom(scale); };
   return <Modal visible={visible} animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={onClose}>
-    {visible ? <SafeAreaView style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}>
+    {visible ? <SafeAreaView style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}
+      onTouchStart={stopReaderTouch} onTouchMove={stopReaderTouch} onTouchEnd={stopReaderTouch} onTouchCancel={stopReaderTouch}>
       <Animated.View {...touch} accessibilityViewIsModal style={{ flex: 1, transform: [{ translateY: reducedMotion ? 0 : drag }] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[4], gap: spacing[2] }}>
           <Text style={{ flex: 1, color: colors.textPrimary }}>{title}</Text>
