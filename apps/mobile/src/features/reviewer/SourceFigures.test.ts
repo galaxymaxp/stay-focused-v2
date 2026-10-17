@@ -24,6 +24,16 @@ const button=(label:string)=>tree!.root.findAllByType(Pressable).find(node=>node
 async function mount(overrides:Partial<typeof props> & {reviewerTitle?:string;sectionTitle?:string}={}) {await act(async()=>{tree=create(createElement(SourceFigures,{...props,...overrides}));});}
 afterEach(async()=>{if(tree)await act(async()=>tree!.unmount());tree=undefined;vi.clearAllMocks();vi.useRealTimers();});
 describe('in-place source figure sheet',()=>{
+  it('reports only loaded inline figures, not discovery or an empty/failed read',async()=>{
+    const onAvailability=vi.fn();mocks.read.mockResolvedValue([figure]);
+    await act(async()=>{tree=create(createElement(SourceFigures,{...props,onAvailability}));});
+    expect(onAvailability).toHaveBeenLastCalledWith(true);
+    await act(async()=>tree!.root.findAllByType(Image)[0]!.props.onError());
+    expect(onAvailability).toHaveBeenLastCalledWith(false);
+    await act(async()=>tree!.unmount());tree=undefined;onAvailability.mockClear();mocks.read.mockResolvedValue([]);
+    await act(async()=>{tree=create(createElement(SourceFigures,{...props,onAvailability}));});
+    expect(onAvailability).toHaveBeenLastCalledWith(false);
+  });
   it('offers Save only in zoom with the selected figure and reviewer/section titles',async()=>{
     mocks.read.mockResolvedValue([figure]);await mount({reviewerTitle:'Biology',sectionTitle:'Cells'});
     expect(button('Save image')).toBeUndefined();

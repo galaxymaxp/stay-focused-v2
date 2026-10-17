@@ -23,6 +23,18 @@ async function mount(offline = false) { await act(async () => { tree = create(cr
 const buttons = () => tree!.root.findAllByType(Pressable);
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.clearAllMocks(); vi.useRealTimers(); });
 describe('source-page thumbnail and viewer', () => {
+  it.each(['rendering','unrendered'] as const)('does not report an available source image for a %s snapshot without a URL',async status=>{
+    const onAvailability=vi.fn();mocks.read.mockResolvedValue({available:true,status,page:2});
+    await act(async()=>{tree=create(createElement(SourcePageSnapshot,{...props,onAvailability}));});
+    expect(onAvailability).toHaveBeenLastCalledWith(false);
+  });
+  it('reports a source image only while the ready thumbnail is present',async()=>{
+    const onAvailability=vi.fn();mocks.read.mockResolvedValue(ready);
+    await act(async()=>{tree=create(createElement(SourcePageSnapshot,{...props,onAvailability}));});
+    expect(onAvailability).toHaveBeenLastCalledWith(true);
+    await act(async()=>tree!.root.findAllByType(Image)[0]!.props.onError());
+    expect(onAvailability).toHaveBeenLastCalledWith(false);
+  });
   it('offers Save in the page modal with the exact URL and filename titles',async()=>{
     mocks.read.mockResolvedValue(ready);
     await act(async()=>{tree=create(createElement(SourcePageSnapshot,{...props,reviewerTitle:'Biology',sectionTitle:'Cells'}));});

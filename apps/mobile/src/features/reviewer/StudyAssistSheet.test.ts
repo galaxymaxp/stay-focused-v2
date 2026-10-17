@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ASSIST_TYPES, assistRequest, selectAssistBlock } from '@stay-focused/shared';
 import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSupport';
 import { createGenerationIntent } from '../../services/generationRecovery';
+import { apiFoundVisual } from '../../services/externalVisuals.testSupport';
 
 vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => undefined) } }));
 
@@ -62,19 +63,26 @@ describe('snapshot discovery for persisted reviewer headers', () => {
     await act(async()=>{rendered=create(createElement(ReviewerReaderScreen,{artifact:{...detail.artifact,id:'local:only'},reviewer,deviceCopy:true}));});
     expect(rendered!.root.findAllByType('ShareReviewerMenu' as never)).toHaveLength(0);
   });
-  it('shows batched references after source discovery and hides them for source visuals/offline',async()=>{
+  it('shows a found reference before/after missing or failed discovery and hides only for loaded source images/offline',async()=>{
     figures.online=true;
-    visuals.sections[reviewer.sections[0]!.id]={status:'found',image:'https://upload.wikimedia.org/reference.png',title:'Reference',credit:'Author',license:'CC BY',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',sourceUrl:'https://commons.wikimedia.org/wiki/File:Reference.png',label:'External reference \u2014 not from your course material.',width:640,height:480,attemptCount:1};
+    visuals.sections[reviewer.sections[0]!.id]=apiFoundVisual;
     const props={artifact:detail.artifact,reviewer,deviceCopy:false};
     const externalButtons=()=>rendered!.root.findAll(node=>node.props.accessibilityLabel==='View external reference');
     await act(async()=>{rendered=create(createElement(ReviewerReaderScreen,props));});
-    expect(externalButtons()).toHaveLength(0);
+    expect(externalButtons()).toHaveLength(1);
+    expect(rendered!.root.findAll(node=>String(node.type)==='Image')[0]!.props.source.uri).toBe(apiFoundVisual.image);
+    const labels=rendered!.root.findAll(node=>String(node.type)==='Text').map(node=>[node.props.children].flat().join(''));
+    expect(labels).toContain(apiFoundVisual.label);expect(labels).toContain(`${apiFoundVisual.credit} · ${apiFoundVisual.license}`);
     const snapshot=rendered!.root.findAll(node=>String(node.type)==='SourcePageSnapshot')[0]!;
     await act(async()=>snapshot.props.onAvailability(false));expect(externalButtons()).toHaveLength(1);
+    await act(async()=>snapshot.props.onAvailability(null));expect(externalButtons()).toHaveLength(1);
     await act(async()=>snapshot.props.onAvailability(true));expect(externalButtons()).toHaveLength(0);
     await act(async()=>snapshot.props.onAvailability(false));expect(externalButtons()).toHaveLength(1);
     figures.available.add(reviewer.sections[0]!.id);
-    await act(async()=>rendered!.update(createElement(ReviewerReaderScreen,props)));expect(externalButtons()).toHaveLength(0);
+    await act(async()=>rendered!.update(createElement(ReviewerReaderScreen,props)));expect(externalButtons()).toHaveLength(1);
+    const figure=rendered!.root.findAll(node=>String(node.type)==='SourceFigures')[0]!;
+    await act(async()=>figure.props.onAvailability(true));expect(externalButtons()).toHaveLength(0);
+    await act(async()=>figure.props.onAvailability(false));expect(externalButtons()).toHaveLength(1);
     figures.available.clear();figures.online=false;
     await act(async()=>rendered!.update(createElement(ReviewerReaderScreen,props)));expect(externalButtons()).toHaveLength(0);
     figures.online=true;await act(async()=>rendered!.update(createElement(ReviewerReaderScreen,{...props,deviceCopy:true})));expect(externalButtons()).toHaveLength(0);

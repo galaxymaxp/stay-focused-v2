@@ -6,6 +6,7 @@ import { Sheet } from '../../design/primitives';
 import { ExternalVisual } from './ExternalVisual';
 import { SaveImageButton } from './SaveImageButton';
 import { EXTERNAL_IMAGE_HEADERS, EXTERNAL_VISUAL_LABEL, type ExternalReferenceVisual } from '../../services/externalVisuals';
+import { apiFoundVisual } from '../../services/externalVisuals.testSupport';
 vi.mock('lucide-react-native', () => ({ Download: 'Download' }));
 const mocks=vi.hoisted(()=>({find:vi.fn(),link:vi.fn(async()=>{})}));
 vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',Linking:{openURL:mocks.link},useWindowDimensions:()=>({width:360,height:800})}));
@@ -23,6 +24,14 @@ const text=()=>tree!.root.findAllByType(Text).map(n=>[n.props.children].flat().j
 async function mount(override:Partial<typeof props> & {reviewerTitle?:string;sectionTitle?:string}={}){await act(async()=>{tree=create(createElement(ExternalVisual,{...props,...override}));});}
 afterEach(async()=>{if(tree)await act(async()=>tree!.unmount());tree=undefined;vi.clearAllMocks();});
 describe('automatic separate external card',()=>{
+  it('renders the real API-shaped found image, exact label and attribution with no source visual',async()=>{
+    await mount({visual:apiFoundVisual});
+    expect(tree!.root.findByType(Image).props.source).toEqual({uri:apiFoundVisual.image,headers:EXTERNAL_IMAGE_HEADERS});
+    expect(text()).toContain(EXTERNAL_VISUAL_LABEL);
+    expect(text()).toContain(`${apiFoundVisual.credit} · ${apiFoundVisual.license}`);
+    expect(button('View attribution on Wikimedia Commons')).toBeDefined();
+    expect(mocks.find).not.toHaveBeenCalled();
+  });
   it('offers Save only in zoom, preserving source title, identification headers and stored attribution',async()=>{
     await mount({reviewerTitle:'Biology',sectionTitle:'Cells'});expect(button('Save image')).toBeUndefined();
     await act(async()=>button('View external reference').props.onPress());

@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { act,create,type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach,describe,expect,it,vi } from 'vitest';
 import { EXTERNAL_VISUAL_LABEL,findExternalVisual,parseExternalVisual,parseReviewerVisuals,useReviewerVisuals } from './externalVisuals';
+import { apiFoundVisual, apiReviewerVisuals } from './externalVisuals.testSupport';
 const found={status:'found',image:'https://upload.wikimedia.org/image.png',title:'Cell',credit:'Ada',license:'CC BY',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',sourceUrl:'https://commons.wikimedia.org/wiki/File:Cell.png',label:EXTERNAL_VISUAL_LABEL,width:1200,height:800,attemptCount:1};
 describe('external visual DTO',()=>{
   it('validates the mandatory label/license/host/dimensions/attempt cap',()=>{
@@ -37,7 +38,29 @@ describe('reviewer batch lifecycle',()=>{
   it('validates found-only section maps and bounded integer counts',()=>{
     expect(parseReviewerVisuals(batch).sections.s).toEqual(found);
     for(const value of [{...batch,checked:-1},{...batch,total:1.5},{...batch,running:1},{...batch,sections:[]},
-      {...batch,sections:{s:{status:'none',message:'No reliable visual found',attemptCount:1}}}])expect(()=>parseReviewerVisuals(value)).toThrow('visual_invalid');
+      ])expect(()=>parseReviewerVisuals(value)).toThrow('visual_invalid');
+  });
+  it('drops malformed entries individually without weakening found visual validation',()=>{
+    const sections={...apiReviewerVisuals.sections,
+      badUrl:{...apiFoundVisual,image:'https://other.test/image.png'},
+      badLabel:{...apiFoundVisual,label:'From source'},
+      badWidth:{...apiFoundVisual,width:null},badHeight:{...apiFoundVisual,height:10001},
+      badAttempt:{...apiFoundVisual,attemptCount:3},badLicense:{...apiFoundVisual,license:'CC BY-NC'},
+      none:{status:'none',message:'No reliable visual found',attemptCount:1},
+      'invalid/id':apiFoundVisual,
+    };
+    expect(parseReviewerVisuals({...apiReviewerVisuals,sections})).toEqual(apiReviewerVisuals);
+    expect(parseReviewerVisuals({...apiReviewerVisuals,sections:{bad:null}}).sections).toEqual({});
+  });
+  it('renders valid sections and continues a running mixed batch without admitting section searches',async()=>{
+    vi.useFakeTimers();
+    fetchMock.mockResolvedValue(Response.json({ok:true,data:{...apiReviewerVisuals,
+      sections:{...apiReviewerVisuals.sections,bad:{...apiFoundVisual,width:null}}}}));
+    await mount();
+    expect(tree!.root.findByType('Visuals' as never).props.sections).toEqual(apiReviewerVisuals.sections);
+    fetchMock.mockResolvedValue(Response.json({ok:true,data:{...apiReviewerVisuals,checked:2,running:false}}));
+    await tick();expect(getCalls()).toHaveLength(2);expect(postCalls()).toHaveLength(0);
+    expect(tree!.root.findByType('Visuals' as never).props.sections).toEqual(apiReviewerVisuals.sections);
   });
   it('starts exactly one POST for incomplete idle batches then stops after four idle polls',async()=>{
     vi.useFakeTimers();fetchMock.mockImplementation(async()=>Response.json({ok:true,data:batch}));await mount();
