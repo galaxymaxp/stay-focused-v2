@@ -28,6 +28,7 @@ import {
   generateCourseGroups,
   generateCourseStatus,
 } from "../app-model/presentation";
+import { CourseOptions } from "../components/course-options";
 import { CourseMark } from "../components/course";
 import { PageCrumb } from "../components/crumbs";
 import { useAuth } from "../components/providers";
@@ -95,7 +96,14 @@ export function GenerateScreen() {
     courses.refresh();
   }
 
-  const options = (c: GenerateCourseSummary) => <details><summary>Course options</summary><button className="subtle" disabled={action.busy} onClick={() => void action.run(async () => { await api(`/api/experience/courses/${c.id}/state`, { method: 'PATCH', body: { override: c.courseState === 'past' || (!c.courseState && c.period === 'previous') ? 'current' : 'past' } }); courses.refresh(); })}>{c.courseState === 'past' || (!c.courseState && c.period === 'previous') ? 'Move to current' : 'Move to past courses'}</button></details>;
+  const options = (c: GenerateCourseSummary) => <CourseOptions
+    past={c.courseState === 'past' || (!c.courseState && c.period === 'previous')}
+    disabled={action.busy}
+    onMove={() => void action.run(async () => {
+      await api(`/api/experience/courses/${c.id}/state`, { method: 'PATCH', body: { override: c.courseState === 'past' || (!c.courseState && c.period === 'previous') ? 'current' : 'past' } });
+      courses.refresh();
+    })}
+  />;
   const card = (c: GenerateCourseSummary) => {
     const identity = courseIdentity(c);
     const counts = [
@@ -103,7 +111,7 @@ export function GenerateScreen() {
       c.reviewerCount ? `${c.reviewerCount} ${c.reviewerCount === 1 ? "Reviewer" : "Reviewers"}` : null,
     ].filter(Boolean);
     return (
-      <div key={c.id} className="stack"><Link href={generateCourseDestination(c) === 'sync' ? '/canvas' : `/generate/${c.id}`} onClick={event => { if (generateCourseDestination(c) === 'sync') { event.preventDefault(); void syncCourse(c.id); } }} className="course-card" title={c.name}>
+      <div key={c.id} className="generate-course-tile"><Link href={generateCourseDestination(c) === 'sync' ? '/canvas' : `/generate/${c.id}`} onClick={event => { if (generateCourseDestination(c) === 'sync') { event.preventDefault(); void syncCourse(c.id); } }} className="course-card" title={c.name}>
         <CourseMark course={c} identity={identity} size={44} />
         <span className="grow">
           <strong>{identity.title}</strong>
@@ -171,33 +179,37 @@ export function GenerateScreen() {
                   const identity = courseIdentity(c);
                   const run = runs[c.id];
                   return (
-                    <div key={c.id} className="course-card unsynced" title={c.name}>
-                      <CourseMark course={c} identity={identity} size={44} />
-                      <span className="grow">
-                        <strong>{identity.title}</strong>
-                        <span className="meta">
-                          {[identity.subtitle, c.termName].filter(Boolean).join(" · ") || "Canvas course"}
+                    <div key={c.id} className="generate-course-tile">
+                      <div className="course-card unsynced" title={c.name}>
+                        <CourseMark course={c} identity={identity} size={44} />
+                        <span className="grow">
+                          <strong>{identity.title}</strong>
+                          <span className="meta">
+                            {[identity.subtitle, c.termName].filter(Boolean).join(" · ") || "Canvas course"}
+                          </span>
+                          <span className="meta course-sync-line">
+                            {run === "syncing"
+                              ? canvas.phase === "syncing" ? null : "Syncing from Canvas…"
+                              : run === "failed"
+                                ? "Sync didn’t finish. Try again."
+                                : run === "partial"
+                                  ? "Synced, with some parts still missing."
+                                  : c.syncState === "sync_incomplete"
+                                    ? "Last sync didn’t finish"
+                                    : "Not synced yet"}
+                          </span>
                         </span>
-                        <span className="meta course-sync-line">
-                          {run === "syncing"
-                            ? "Syncing from Canvas…"
-                            : run === "failed"
-                              ? "Sync didn’t finish. Try again."
-                              : run === "partial"
-                                ? "Synced, with some parts still missing."
-                                : c.syncState === "sync_incomplete"
-                                  ? "Last sync didn’t finish"
-                                  : "Not synced yet"}
-                        </span>
-                      </span>
-                      <button
-                        className="primary"
-                        disabled={run === "syncing"}
-                        aria-label={`Sync ${identity.title}`}
-                        onClick={() => void syncCourse(c.id)}
-                      >
-                        {run === "syncing" ? "Syncing…" : c.syncState === "sync_incomplete" ? "Retry" : "Sync"}
-                      </button>
+                        <button
+                          className="primary"
+                          disabled={run === "syncing"}
+                          aria-busy={run === "syncing"}
+                          aria-label={`Sync ${identity.title}`}
+                          onClick={() => void syncCourse(c.id)}
+                        >
+                          {run === "syncing" && <span className="tile-spinner" aria-hidden="true" />}
+                          {c.syncState === "sync_incomplete" ? "Retry" : "Sync"}
+                        </button>
+                      </div>
                       {options(c)}
                     </div>
                   );

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "../components/providers";
+import { CourseOptions } from "../components/course-options";
 import { CourseMark } from "../components/course";
 import { Empty, Heading, Icon, Notice, State } from "../components/ui";
 import { dateLabel } from "../lib/api";
@@ -52,7 +53,8 @@ function CourseRow({ course, selected, dirty, busy, onMove, onSelectionChange, o
           </span>
         </span>
       </label>
-      <details><summary>Course options</summary><button className="subtle" disabled={busy} onClick={onMove}>{course.courseState === 'past' || (!course.courseState && course.classification === 'past_or_concluded') ? 'Move to current' : 'Move to past courses'}</button></details>
+      <CourseOptions disabled={busy} onMove={onMove}
+        past={course.courseState === 'past' || (!course.courseState && course.classification === 'past_or_concluded')} />
       {course.selected && (
         <div className="row wrap canvas-course-actions">
           <Link className="button subtle" href={`/generate/${course.id}`}>Open materials</Link>

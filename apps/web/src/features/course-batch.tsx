@@ -31,8 +31,8 @@ function BatchControls({ courseId }: { courseId: string }) {
     } catch { if (alive.current) setMessage('Could not confirm the batch. Try again to reconnect saved requests.'); }
     finally { locked.current = false; if (alive.current) setBusy(false); }
   }
-  return <div className="stack">
-    <div className="row wrap"><button disabled={busy || !generationEnabled} onClick={() => void load('all')}>Generate all</button>
+  return <div className="stack course-batch">
+    <div className="row wrap course-batch-actions"><button disabled={busy || !generationEnabled} onClick={() => void load('all')}>Generate all</button>
       <button disabled={busy || !generationEnabled} onClick={() => void load(new Set())}>Select materials</button></div>
     {preview ? <section className="surface stack" aria-label="Confirm course generation">
       <h3>Generate {batchSelection(preview, selected).length} reviewers</h3>

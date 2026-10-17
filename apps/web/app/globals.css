@@ -5004,3 +5004,47 @@ mark.find-active {
   padding: 6px 10px;
   font-size: inherit;
 }
+
+/* WG1: flexible Generate controls use the shared button sizes and surfaces. */
+.topbar-actions { flex-shrink: 0; }
+.crumbs { flex: 1; overflow: hidden; }
+.crumbs ol { overflow: hidden; white-space: nowrap; }
+.crumbs li { flex: 0 1 auto; overflow: hidden; }
+.crumbs li + li::before { flex-shrink: 0; }
+.crumbs a { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.page-heading { flex-wrap: wrap; }
+.page-heading > .row { flex: 1 1 240px; }
+.page-heading > .row > div { min-width: 0; }
+.page-heading p { overflow-wrap: anywhere; }
+.course-heading .page-heading > .row.wrap { flex: 0 1 auto; }
+.generate-tools > label { flex: 1 1 240px; min-width: 0; }
+.generate-tools > .button { flex: 0 0 auto; max-width: 100%; }
+.generate-course-tile { display: grid; grid-template-rows: 1fr auto; gap: 8px; min-width: 0; }
+.generate-course-tile > .course-card { min-width: 0; }
+.course-card .meta { overflow-wrap: anywhere; }
+.course-card.unsynced { flex-wrap: wrap; }
+.course-card.unsynced > .grow { flex-basis: 140px; }
+.course-options { position: relative; justify-self: start; max-width: 100%; }
+.course-options > button { max-width: 100%; }
+.course-options > button .icon { width: 14px; height: 14px; }
+.course-options-popover {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 6;
+  width: max-content; max-width: min(260px, calc(100vw - 40px));
+  padding: 4px; background: var(--elevated); border: 1px solid var(--line);
+  border-radius: var(--radius-control); box-shadow: var(--shadow-hover);
+}
+.course-options-popover > button { width: 100%; text-align: left; justify-content: flex-start; }
+.canvas-course .course-options-popover { left: auto; right: 0; }
+.canvas-courses .list-card { overflow: visible; }
+.course-batch { padding: 12px; border-bottom: 1px solid var(--line); min-width: 0; }
+.course-batch-actions { gap: 8px; }
+.course-batch-actions > button { flex: 1 1 auto; }
+.pane-list { min-width: 0; }
+.detail-meta { flex-wrap: wrap; }
+.detail-meta > *, .detail-actions > * { min-width: 0; max-width: 100%; }
+.detail-head > .muted { overflow-wrap: anywhere; }
+.canvas-refresh { max-width: 100%; flex-wrap: wrap; }
+.canvas-refresh > span:not(.icon):not(.tile-spinner) { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .course-batch { padding: 0 0 12px; }
+}
