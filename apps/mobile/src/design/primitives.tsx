@@ -120,6 +120,7 @@ export function Action({
   hero = false,
   label,
   testID,
+  style,
 }: {
   children: ReactNode;
   onPress: () => void;
@@ -129,11 +130,13 @@ export function Action({
   hero?: boolean;
   label?: string;
   testID?: string;
+  /** Layout of the outer animated wrapper (e.g. equal-width row actions). */
+  style?: StyleProp<ViewStyle>;
 }) {
   const { colors } = useTheme();
   const press = usePressMotion(disabled);
   return (
-    <Animated.View style={{ alignSelf: secondary && !pill ? "flex-start" : "stretch", transform: [{ scale: press.scale }] }}>
+    <Animated.View style={[{ alignSelf: secondary && !pill ? "flex-start" : "stretch", transform: [{ scale: press.scale }] }, style]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={label}

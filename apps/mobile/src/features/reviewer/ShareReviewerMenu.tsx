@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Share, View } from 'react-native';
+import { Share, View, type StyleProp, type ViewStyle } from 'react-native';
 import type { ReviewerReaderModel, ReviewerShareLink } from '@stay-focused/shared';
 import { useAuth } from '../../auth';
 import { Action, Copy, Notice, Sheet } from '../../design/primitives';
@@ -7,14 +7,16 @@ import { spacing } from '../../design/tokens';
 import { mutateReviewerShare, reviewerShareUrl } from '../../services/reviewerShares';
 import { experienceRequest, type ExperienceClient } from '../../services/experienceApi';
 
-export function ShareReviewerMenu({ artifactId, reviewer, client, offline }: {
+export function ShareReviewerMenu({ artifactId, reviewer, client, offline, triggerStyle }: {
   artifactId: string; reviewer: ReviewerReaderModel; client: ExperienceClient; offline: boolean;
+  triggerStyle?: StyleProp<ViewStyle>;
 }) {
   const { session } = useAuth();
-  return <OwnerShare key={`${session?.user.id}:${artifactId}`} owner={session?.user.id ?? ''} artifactId={artifactId} reviewer={reviewer} client={client} offline={offline} />;
+  return <OwnerShare key={`${session?.user.id}:${artifactId}`} owner={session?.user.id ?? ''} artifactId={artifactId} reviewer={reviewer} client={client} offline={offline} triggerStyle={triggerStyle} />;
 }
-function OwnerShare({ owner, artifactId, reviewer, client, offline }: {
+function OwnerShare({ owner, artifactId, reviewer, client, offline, triggerStyle }: {
   owner: string; artifactId: string; reviewer: ReviewerReaderModel; client: ExperienceClient; offline: boolean;
+  triggerStyle?: StyleProp<ViewStyle>;
 }) {
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [share, setShare] = useState<ReviewerShareLink | null>(null), [note, setNote] = useState<string | null>(null);
   const active = useRef(true);
@@ -58,7 +60,7 @@ function OwnerShare({ owner, artifactId, reviewer, client, offline }: {
     } finally { if (active.current) setBusy(false); }
   }
   return <>
-    <Action secondary disabled={offline || !owner} onPress={() => void menu()}>Share</Action>
+    <Action secondary style={triggerStyle} disabled={offline || !owner} onPress={() => void menu()}>Share</Action>
     {open && <Sheet title="Share Reviewer" onClose={() => setOpen(false)}>
       <Copy muted>Anyone with the link can read this version and take its included quizzes. Study Assist saved on this device is included. Course images and account details are excluded.</Copy>
       <View style={{ gap: spacing[2] }}>
