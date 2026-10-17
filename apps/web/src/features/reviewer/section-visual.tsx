@@ -51,7 +51,7 @@ export function SectionVisual({ artifactId, sectionId, hasFigures, external: ini
   const [visible, setVisible] = useState(false), [online, setOnline] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null), [figures, setFigures] = useState<Figure[]>([]);
   const [replacement, setReplacement] = useState<ExternalVisual | null>(null), [busy, setBusy] = useState(false);
-  const [zoomed, setZoomed] = useState<{ src: string; alt: string; image?: StudyImageTarget; download: StudyImageDownload } | null>(null), [zoom, setZoom] = useState(1);
+  const [zoomed, setZoomed] = useState<{ src: string; alt: string; grounding: string; details?: ExternalVisual; image?: StudyImageTarget; download: StudyImageDownload } | null>(null), [zoom, setZoom] = useState(1);
   const [saving, setSaving] = useState(false), [saveNote, setSaveNote] = useState('');
   const savePending = useRef(false);
   const path = `/api/reviewers/${encodeURIComponent(artifactId)}/sections/${encodeURIComponent(sectionId)}`;
@@ -87,7 +87,8 @@ export function SectionVisual({ artifactId, sectionId, hasFigures, external: ini
     return () => controller.abort();
   }, [api, path, visible, online, session?.user.id, hasFigures]);
   function open(src: string, alt: string, image: StudyImageTarget | undefined, kind: StudyImageDownload['kind']) {
-    setZoomed({ src, alt, image, download: { uri: src, reviewerTitle, sectionTitle, kind,
+    setZoomed({ src, alt, image, grounding: kind === 'external_visual' && external ? external.label : `${alt} · your course material`,
+      ...(kind === 'external_visual' && external ? { details: external } : {}), download: { uri: src, reviewerTitle, sectionTitle, kind,
       ...(kind === 'external_visual' && external ? { sourceTitle: external.title, attribution: `${external.credit} · ${external.license}` } : {}) } });
     setSaveNote(''); setZoom(1); dialog.current?.showModal();
   }
@@ -137,23 +138,30 @@ export function SectionVisual({ artifactId, sectionId, hasFigures, external: ini
     {online && !hasSource && external && <figure className="surface stack" style={{ margin: 0 }}>
       <span className="muted" style={caption}>{external.label}</span>
       {/* Commons candidates are validated by the owner-scoped API. */}
-      <button type="button" aria-label="Enlarge visual" onClick={() => open(external.image, external.title, externalImage, 'external_visual')} style={frame}>
+      <button type="button" aria-label={`Enlarge ${external.title}`} onClick={() => open(external.image, external.title, externalImage, 'external_visual')} style={frame}>
         <img src={external.image} alt={external.title} style={{ display: "block", width: "100%", maxHeight: 380, objectFit: "contain" }} />
       </button>
       <AskImageButton image={externalImage} online={online} onAsk={onAsk} />
-      <figcaption className="row" style={{ fontSize: 12, opacity: 0.7, flexWrap: "wrap", gap: 8 }}>
-        <span className="grow"><a href={external.sourceUrl} target="_blank" rel="noreferrer">{external.credit.slice(0, 120)} · {external.license}</a> · <a href={external.licenseUrl} target="_blank" rel="noreferrer">License</a></span>
-        {external.attemptCount < 2 && <button disabled={busy} onClick={() => void another()} style={{ fontSize: 12 }}>{busy ? "Finding…" : "Show a different one"}</button>}
-      </figcaption>
+      {external.attemptCount < 2 && <button disabled={busy} onClick={() => void another()} style={{ fontSize: 12 }}>{busy ? "Finding…" : "Show a different one"}</button>}
     </figure>}
     {!online && (hasSource || external) && <AskImageButton online={false} />}
-    <dialog ref={dialog} aria-label={zoomed?.alt ?? "Visual"} className="surface stack" style={{ width: "min(94vw, 1000px)", maxHeight: "90vh" }}>
+    <dialog ref={dialog} aria-label={zoomed?.alt ?? "Visual"} className="surface stack" style={{ width: "min(94vw, 1000px)", maxHeight: "90vh", overflow: "auto" }}
+      onClose={() => setZoomed(null)} onClick={event => {
+        if (event.target !== event.currentTarget) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.current?.close();
+      }}>
       <div className="row"><strong className="grow">{zoomed?.alt}</strong><button onClick={() => dialog.current?.close()}>Close</button></div>
+      {zoomed && <span className="muted" style={caption}>{zoomed.grounding}</span>}
+      {zoomed?.details && <div className="row" aria-label="Image details" style={{ fontSize: 12, flexWrap: "wrap", gap: 8 }}>
+        <a href={zoomed.details.sourceUrl} target="_blank" rel="noreferrer">{zoomed.details.credit} · {zoomed.details.license}</a>
+        <a href={zoomed.details.licenseUrl} target="_blank" rel="noreferrer">License</a>
+      </div>}
       <AskImageButton image={zoomed?.image} online={online} onAsk={image=>{dialog.current?.close();onAsk?.(image);}} />
       {session?.user.id && zoomed && <button className="subtle row" disabled={!online || saving} onClick={() => void save()}><Icon name="download" />{saving ? 'Saving…' : 'Save image'}</button>}
       {saveNote && <p role="status">{saveNote}</p>}
       <label>Zoom<input type="range" min="1" max="4" step="0.25" value={zoom} onChange={event => setZoom(Number(event.target.value))} /></label>
-      <div style={{ overflow: "auto", maxHeight: "70vh" }}>
+      <div style={{ overflow: "auto", maxHeight: "70vh", flexShrink: 0 }}>
         {zoomed && <img src={zoomed.src} alt={zoomed.alt} style={{ width: `${zoom * 100}%`, maxWidth: "none" }} />}
       </div>
     </dialog>
