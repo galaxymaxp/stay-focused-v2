@@ -1,5 +1,87 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff — FULLSEND (2026-10-18)
+
+What changed:
+Published pinned WG1 653e8d8a2b9b43b7e607e103d9d1a09a25cd451c to main;
+initial publication b55d5a50a45c2b561e44319342b25087425a67ce, native bump
+90369428a7dd34e0e1410c850051003d41f8e003, final tested application main
+dc162de3df634eea8b447f73ac67d758be75f4ee. PR #12 is MERGED. Includes
+MR1/SA1/SA2/MR2/IM1b/RT1/INT1/EV1/RX1/IM2/WG1 and retained f3dd833 behavior.
+WG2, WV1 and MD1 are not in this release. Existing worktrees were preserved.
+Expo/Router patch alignment and npm-10-compatible lock repair were scoped
+release fixes; Android is now 2.2.0, code 6, runtime 2.2.0-sdk57.
+
+Verification (exact counts):
+FRESH on dc162de: npm ci PASS (1,488 packages); Doctor 21/21; forced root
+typecheck/lint/build 8/8 each, 0 cached; shared 350/40 files including emitted
+copies, Canvas 75/1, OCR 27/3, engine 606/0 failures, API 2,268 pass + 3
+existing live skips / 199 files, mobile 1,239/133, web 209/37, provider 20/20.
+API/web pages 35/35 and 19/19; Android/iOS/web export, 68 assets. Six existing
+lint warnings, no errors. Diff hygiene passes. GitHub CI 39069451068 SUCCESS.
+First clean shared run had 175 source tests / 20 files before emission.
+Doctor's unsupported --cwd invocation and initial two-package mismatch, the
+first EAS npm-install failure, and superseded CI runs are recorded in acceptance.
+No nondeterministic test flake observed. Repo-local test temp was used; generated
+Next declarations restored after both builds; Windows TEMP was untouched.
+
+Deployments (IDs, SHAs):
+Supabase xfdbwfqtorelmurncyql: only 20261016000100_manual_reviewer_uploads.sql
+applied before main. Read-only CLI migration fetch resolved historical aliases
+in ignored staging without history repair; dry runs listed only the release
+file. After push, 95 matching versions, zero pending. Both new RPCs exist and
+remain service-role only; no existing row was deleted during application.
+Google Cloud Build a524ee7e-ffce-442a-a006-b7949fd2adef SUCCESS;
+asia-northeast1-docker.pkg.dev/stay-focus-492811/generation/worker:b55d5a5,
+digest sha256:dac2af81c85519383f8c868fd218621315b45615dfe20ee4de3f0aa56988d364;
+generation-worker-00028-f5t Ready, 100% traffic, dispatch configuration succeeds.
+API dpl_2f7nfcr1Y5JJufzTZYmqu1s7276g READY at dc162de, health status ok.
+Website dpl_EgAH83B3iJFhkHT5fWiN6PBHe5MN READY from clean b55d5a5 CLI upload,
+aliased to stay-focused-ten.vercel.app, HTTP 200. Initial bounded API/web 5xx
+and worker startup ERROR queries returned zero entries; no rollback.
+EAS first build 3c6b9e1d-8285-4655-ac7c-4d49e66e561f failed npm installation;
+repaired build 2ed33756-ef3b-4887-ac0a-fa0c59adf7ab FINISHED at dc162de.
+APK: https://expo.dev/artifacts/eas/otDX0o3Lh-NYRtnGRygzbG4N_WSgdQxO-DiBmZGabjk.apk
+adb install -r SUCCESS on RMX3151; versionName=2.2.0, versionCode=6. Owner
+session and 75 saved offline items retained. Existing keystore reused; no OTA.
+The final documentation-only commit SHA is recorded after commit in the external
+result file/Git history; application source remains dc162de.
+
+Live checks:
+PASS: STEP 7.1 Export/Share same row, text Ask first What is this?, bulleted
+answer in view; 7.2 tap-only source details, image Ask answer and pull-down close;
+7.4 Library Sort and Wi-Fi-off cold restart with 75 items. Two generation
+requests used (one image, one text), no follow-ups. Wi-Fi restored.
+FAIL: 7.3 checked external reference stays blank; viewer closes on load.
+FAIL: 7.4 Save image on a visibly loaded source figure returns its generic
+failure alert on the new online APK; underlying cause unverified.
+NOT RUN: 7.2 overflowing-viewer scroll (chosen figure fits viewport), 7.5
+website desktop/390px/reviewer UI (Windows capture black, activation Access
+denied 0x80070005), 7.6 Office upload (only local file is an administrative
+learning-contract template, no suitable instructional Canvas source).
+Neutral screenshots/XML are ignored under .local/fullsend-20261018/.
+
+Next steps:
+Repair and physically recheck the two image failures, then finish website,
+overflowing-viewer and suitable-source Office checks. Keep WG2/WV1/MD1 excluded.
+Before a later native release, increment the remote code or restore preview
+autoIncrement; it is false for this code-6 retry. Any later authorized JS OTA
+must pass apps/mobile/scripts/preview-update-preflight.mjs.
+
+Blockers:
+Windows browser interaction is unavailable (Access denied); suitable local
+Office instructional input is absent. Image failures require scoped follow-up
+diagnosis; no source-level fix or root cause is claimed.
+
+Risks:
+SHIPPED, with live acceptance PARTIAL. Gallery saving and the checked external
+image are not accepted. Automated gates do not replace the remaining physical
+or browser checks. Email delivery remains disabled; no purchase, destructive
+SQL, signing/service credential rotation, branch deletion, force-push,
+uninstall or app-data clear was performed.
+
+[Full acceptance](acceptance/fullsend-20261018.md).
+
 ## B38.1 production generation quality acceptance (2026-09-24)
 
 B38.1 passes. Fresh production outputs on the realme RMX3151 covered a CC16 Firewalls PDF Reviewer, its five-question Quiz, a CC17 Android Platform PPTX Reviewer, and a CC17 Android Versions assignment Activity Output. Inspecting the actual artifacts found no material unsupported Reviewer claims, source omissions, wrong Quiz answer, ambiguity, or invented instructor requirement; Queue/background and Library/relaunch persistence passed. The first PPTX attempt failed before provider execution because the strict response schema enumerated every long source block ID and exceeded the contract budget. Commit `1d992aa` bounds that provider schema while exact local source-reference validation remains intact. Regression 30/30 and all full gates pass. Production `dpl_EBwoR9gdNTvWBTMdezJD1ydqDXdk` is READY and healthy, and the repaired 32-topic PPTX Reviewer completed on `gpt-5.4-2026-03-05`. See `docs/ai/acceptance/b38-1/production-generation-quality-acceptance.md`. Next: B39 Full E2E / Demo Acceptance.

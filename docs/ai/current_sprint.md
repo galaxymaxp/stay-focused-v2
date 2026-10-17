@@ -1,3 +1,50 @@
+# FULLSEND finite release scope — shipped; live acceptance PARTIAL
+
+## FULLSEND shipped; live acceptance PARTIAL (2026-10-18)
+
+The explicitly authorized release is on main and production: pinned WG1
+653e8d8a2b9b43b7e607e103d9d1a09a25cd451c, tested application main
+dc162de3df634eea8b447f73ac67d758be75f4ee. It includes INT1/PR #12, MR1,
+SA1/SA2, MR2, IM1b, RT1, EV1, RX1, IM2 and WG1. **WG2, WV1 and MD1 are not
+in this release.** The active autopilot worktree and other worktrees were
+preserved; this release used a separate clean clone.
+
+All fresh gates and GitHub CI run 39069451068 pass. Root forced
+typecheck/lint/build: 8/8 each, zero cached. Doctor: 21/21. Shared: 350,
+Canvas: 75, OCR: 27, engine: 606, API: 2,268 plus 3 existing live skips,
+mobile: 1,239, web: 209, provider contract: 20; zero failing tests.
+The sole release migration, 20261016000100_manual_reviewer_uploads.sql,
+was applied before main; all 95 staged/remote versions match.
+
+Worker generation-worker-00028-f5t is Ready with 100% traffic on image
+worker:b55d5a5. API dpl_2f7nfcr1Y5JJufzTZYmqu1s7276g and website
+dpl_EgAH83B3iJFhkHT5fWiN6PBHe5MN are READY; health and HTTP availability
+pass. Realme RMX3151 was upgraded in place to **2.2.0 / code 6**, runtime
+2.2.0-sdk57, from signed EAS build 2ed33756-ef3b-4887-ac0a-fa0c59adf7ab.
+The owner session and all 75 offline Library items remain. No OTA was published.
+
+Physical PASS: Export/Share row, first What is this? Ask chip, bulleted and
+revealed text/image answers, tap-only source-figure details, pull-down close,
+Library Sort placement and offline cold restart. Two live generation requests
+were used. Physical FAIL: Save image shows its generic failure alert, and the
+checked external-reference image stays blank and cannot keep its viewer open.
+Causes are unverified. NOT RUN: desktop/390px website UI (Windows browser
+activation Access denied), overflowing-viewer scroll, and Office upload
+(no suitable local instructional source). These prevent full live acceptance.
+
+Next: repair/recheck the two image failures and finish the unrun checks; keep
+the finite release endpoint at WG1. Preview autoIncrement is false to retain
+code 6 after the first failed build; deliberately advance the code or restore
+auto-increment before a later native release. Email delivery remains disabled
+(CANVAS_EMAIL_DELIVERY_ENABLED=0 was not changed); no plan purchase, persistent
+credential creation/rotation, destructive SQL or app-data deletion occurred.
+This entry supersedes older owner-rollout-pending statements for the shipped
+scope; their historical local evidence remains below.
+
+[Full release acceptance](acceptance/fullsend-20261018.md).
+
+## Previous finite-scope history
+
 # WG1 finite unattended scope complete locally
 
 Finite scope: WG1/N5 only, baseline fdf1937 (includes 1a9d3f9 and completed IM2).
