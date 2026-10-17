@@ -106,7 +106,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
       <Text style={{color:colors.textMuted}}>From {unit} {snapshot.page} · your course material</Text>
       <Pressable accessibilityRole="button" accessibilityLabel={`From ${unit} ${snapshot.page}`} accessibilityState={{ busy: waiting }}
       onPress={() => void show()} style={{ minHeight: hitTarget.min }}>
-      {ready ? <Image source={{ uri: ready.url }} resizeMode="contain" accessibilityIgnoresInvertColors
+      {ready ? <Image source={{ uri: ready.url }} resizeMode="contain" accessibilityIgnoresInvertColors accessibilityLabel={`${ready.sourceLabel} · ${captionUnit} ${ready.page}`}
         style={{ width:'100%', height:Math.min(420,360*ready.height/ready.width) }} onError={() => { setSnapshot(null); setOpen(false); }} />
         : <View style={{ height:spacing[12], backgroundColor:colors.surfacePrimary }}>
           {'status' in snapshot && snapshot.status === 'rendering' ? <ActivityIndicator color={colors.accent} /> : null}
@@ -115,7 +115,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
     {ready ? <AskImageButton image={image} offline={offline} onAsk={onAsk} /> : null}
     </View>
     <Modal visible={open} animationType={reducedMotion ? 'none' : 'fade'} onRequestClose={() => setOpen(false)}>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}>
+      {open ? <SafeAreaView style={{ flex: 1, backgroundColor: colors.backgroundPrimary }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Close source page" onPress={() => setOpen(false)}
           style={{ minHeight: hitTarget.min, padding: spacing[4], alignSelf: 'flex-end' }}><Text style={{ color: colors.accent }}>Close</Text></Pressable>
         {ready ? <ZoomablePage key={ready.page} url={ready.url} width={ready.width} height={ready.height} onError={() => { setSnapshot(null); setOpen(false); }} />
@@ -128,7 +128,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
         <Text style={{ color: colors.textPrimary, textAlign: 'center', padding: spacing[4] }}>
           {ready ? `${ready.sourceLabel} · ${captionUnit} ${ready.page}` : `${captionUnit} ${snapshot.page}`}
         </Text>
-      </SafeAreaView>
+      </SafeAreaView> : null}
     </Modal>
   </>;
 }

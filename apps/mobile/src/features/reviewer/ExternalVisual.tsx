@@ -31,17 +31,11 @@ export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisu
   return <View style={{gap:spacing[2]}}>
     {result?.status==='found'?<View style={{gap:spacing[2],padding:spacing[3],borderWidth:1,borderColor:colors.separator,borderRadius:radius.card,backgroundColor:colors.surfaceSecondary}}>
       <Text style={{color:colors.textMuted}}>{EXTERNAL_VISUAL_LABEL}</Text>
-      <Pressable accessibilityRole="button" accessibilityLabel="View external reference" onPress={()=>setOpen(true)}>
+      <Pressable accessibilityRole="button" accessibilityLabel={`View external reference: ${result.title}`} onPress={()=>setOpen(true)} style={{minHeight:hitTarget.min}}>
         <Image source={{uri:result.image,headers:EXTERNAL_IMAGE_HEADERS}} accessibilityLabel={result.title} resizeMode="contain" style={{height:spacing[12]*4,width:'100%'}}
           onError={()=>setOpen(false)}/>
       </Pressable>
       <AskImageButton image={image} offline={!online} onAsk={onAsk} />
-      <Pressable accessibilityRole="link" accessibilityLabel="View attribution on Wikimedia Commons" onPress={()=>{void Linking.openURL(result.sourceUrl).catch(()=>{});}} style={{minHeight:hitTarget.min,justifyContent:'center'}}>
-        <Text style={{color:colors.accent}}>{result.credit} · {result.license}</Text>
-      </Pressable>
-      <Pressable accessibilityRole="link" accessibilityLabel="View image license" onPress={()=>{void Linking.openURL(result.licenseUrl).catch(()=>{});}} style={{minHeight:hitTarget.min,justifyContent:'center'}}>
-        <Text style={{color:colors.accent}}>License details</Text>
-      </Pressable>
     </View>:null}
     {result.attemptCount<2?<Pressable accessibilityRole="button" accessibilityLabel="Show a different one" disabled={busy} accessibilityState={{busy,disabled:busy}}
       onPress={()=>void find()} style={{alignSelf:'flex-start',minHeight:hitTarget.min,padding:spacing[2],borderRadius:radius.control}}><Text style={{color:colors.accent}}>Show a different one</Text></Pressable>:null}
@@ -52,7 +46,13 @@ export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisu
       </View>
       <AskImageButton image={image} offline={!online} onAsk={target=>{setOpen(false);onAsk?.(target);}} />
       <SaveImageButton offline={!online} image={{uri:result.image,headers:EXTERNAL_IMAGE_HEADERS,reviewerTitle,sectionTitle,kind:'external_visual',sourceTitle:result.title,attribution:`${result.credit} · ${result.license}`}} />
-      <Text style={{color:colors.textMuted}}>{result.credit} · {result.license}</Text>
+      <Text style={{color:colors.textPrimary}}>{result.title}</Text>
+      <Pressable accessibilityRole="link" accessibilityLabel="View attribution on Wikimedia Commons" onPress={()=>{void Linking.openURL(result.sourceUrl).catch(()=>{});}} style={{minHeight:hitTarget.min,justifyContent:'center'}}>
+        <Text style={{color:colors.accent}}>{result.credit} · {result.license}</Text>
+      </Pressable>
+      <Pressable accessibilityRole="link" accessibilityLabel="View image license" onPress={()=>{void Linking.openURL(result.licenseUrl).catch(()=>{});}} style={{minHeight:hitTarget.min,justifyContent:'center'}}>
+        <Text style={{color:colors.accent}}>License details</Text>
+      </Pressable>
     </Sheet>:null}
   </View>;
 }

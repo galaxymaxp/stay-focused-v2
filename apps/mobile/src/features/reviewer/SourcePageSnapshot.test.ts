@@ -23,6 +23,15 @@ async function mount(offline = false) { await act(async () => { tree = create(cr
 const buttons = () => tree!.root.findAllByType(Pressable);
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.clearAllMocks(); vi.useRealTimers(); });
 describe('source-page thumbnail and viewer', () => {
+  it('hides source details until opening, retaining grounding and the accessible image name',async()=>{
+    mocks.read.mockResolvedValue(ready);await mount();
+    const text=()=>tree!.root.findAllByType(Text).map(n=>[n.props.children].flat().join('')).join(' ');
+    expect(text()).not.toContain(ready.sourceLabel);
+    expect(text()).toContain('From page 2 · your course material');
+    expect(tree!.root.findByType(Image).props.accessibilityLabel).toContain(ready.sourceLabel);
+    await act(async()=>buttons()[0]!.props.onPress());
+    expect(text()).toContain('Accepted lecture · Page 2');
+  });
   it.each(['rendering','unrendered'] as const)('does not report an available source image for a %s snapshot without a URL',async status=>{
     const onAvailability=vi.fn();mocks.read.mockResolvedValue({available:true,status,page:2});
     await act(async()=>{tree=create(createElement(SourcePageSnapshot,{...props,onAvailability}));});

@@ -1,3 +1,12 @@
+# IM2 finite unattended scope in progress
+
+Endpoint: IM2/N4 only, starting at 1a9d3f9 after INT1/EV1/RX1. Implement
+caption/details reveal inside every mobile/web image viewer, scrolling,
+zoom-aware pull-down dismissal, web backdrop close, tests, fresh serial gates,
+reconciled docs and local commits. Rollout and Device checks are excluded.
+No external services, remote SQL, migrations, environment-file edits or pushes.
+Acceptance: [IM2 matrix](acceptance/im2-reviewer-images.md).
+
 # RX1 finite unattended scope complete locally
 
 ## RX1 reviewer header complete locally - PASS (2026-10-17)

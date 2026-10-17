@@ -19,16 +19,21 @@ const baseProps={client:{baseUrl:'https://local.test',accessToken:'jwt'},artifac
 const found:ExternalReferenceVisual={status:'found',image:'https://upload.wikimedia.org/image.png',title:'Cell',credit:'Ada',license:'CC BY',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',sourceUrl:'https://commons.wikimedia.org/wiki/File:Cell.png',label:EXTERNAL_VISUAL_LABEL,width:1200,height:800,attemptCount:1};
 const props={...baseProps,visual:found};
 let tree:ReactTestRenderer|undefined;
-const button=(name:string)=>tree!.root.findAllByType(Pressable).find(n=>n.props.accessibilityLabel===name)!;
+const button=(name:string)=>tree!.root.findAllByType(Pressable).find(n=>(n.props.accessibilityLabel===name || (name==='View external reference' && n.props.accessibilityLabel?.startsWith('View external reference:'))))!;
 const text=()=>tree!.root.findAllByType(Text).map(n=>[n.props.children].flat().join(''));
 async function mount(override:Partial<typeof props> & {reviewerTitle?:string;sectionTitle?:string}={}){await act(async()=>{tree=create(createElement(ExternalVisual,{...props,...override}));});}
 afterEach(async()=>{if(tree)await act(async()=>tree!.unmount());tree=undefined;vi.clearAllMocks();});
 describe('automatic separate external card',()=>{
-  it('renders the real API-shaped found image, exact label and attribution with no source visual',async()=>{
+  it('keeps grounding visible and reveals attribution and license only after opening',async()=>{
     await mount({visual:apiFoundVisual});
     expect(tree!.root.findByType(Image).props.source).toEqual({uri:apiFoundVisual.image,headers:EXTERNAL_IMAGE_HEADERS});
     expect(text()).toContain(EXTERNAL_VISUAL_LABEL);
+    expect(text()).not.toContain(`${apiFoundVisual.credit} · ${apiFoundVisual.license}`);
+    expect(button('View image license')).toBeUndefined();
+    expect(button('View external reference').props.accessibilityLabel).toContain(apiFoundVisual.title);
+    await act(async()=>button('View external reference').props.onPress());
     expect(text()).toContain(`${apiFoundVisual.credit} · ${apiFoundVisual.license}`);
+    expect(button('View image license')).toBeDefined();
     expect(button('View attribution on Wikimedia Commons')).toBeDefined();
     expect(mocks.find).not.toHaveBeenCalled();
   });

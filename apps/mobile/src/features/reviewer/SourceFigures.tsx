@@ -77,7 +77,7 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
       <Text style={{color:colors.textMuted}}>From your course material</Text>
       {figures.map((item,i)=>{
         const caption=item.slide?`Diagram from slide ${item.slide}`:item.page?`Diagram from page ${item.page}`:'Source diagram';
-        return <View key={item.id}><Pressable accessibilityRole="button" accessibilityLabel={`Enlarge ${caption}`} onPress={()=>{setIndex(i);setOpen(true);}}>
+        return <View key={item.id}><Pressable accessibilityRole="button" accessibilityLabel={`Enlarge ${caption}`} style={{minHeight:hitTarget.min}} onPress={()=>{setIndex(i);setOpen(true);}}>
           <Image source={{uri:item.url}} accessibilityLabel={caption} resizeMode="contain" style={{width:'100%',height:Math.min(360,360*item.height/item.width)}} onError={()=>{setHidden(true);close();}}/>
         </Pressable><AskImageButton offline={offline} onAsk={onAsk} image={{reference:{kind:'figure',id:item.id},thumbnail:item.url,label:caption}} /></View>;
       })}
