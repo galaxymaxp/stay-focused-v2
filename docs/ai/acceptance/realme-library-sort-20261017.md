@@ -11,11 +11,34 @@ Layout follow-up scope (2026-10-17): move Sort out of both page title rows,
 align it with update status, retain 48-point touch targets, compact the choice
 sheet and verify the long-title course, grid, selection and all six choices
 on Realme. Sorting, saved preferences and drag behavior remain in scope.
-Implementation and physical verification are in progress.
+FRESH PASS on source bcb9988: mobile 1,135 tests / 121 files; forced root
+typecheck/lint/build 8/8 each, zero cached. Six pre-existing lint warnings.
+React review: local event-driven sheet state, no added effects/fetches, strict
+props, native accessible buttons/radios and retained 48-point touch targets.
+
+Android preview group b60fe0f0-5319-4c11-b0a3-9aba991bbc43, update
+01a14a01-00f6-70b7-a358-d708971b2e95, runtime 2.1.0-sdk57, published
+2026-10-17 21:15 Manila. Applied by download/relaunch on Realme 2.1.0/code 5.
+FRESH native: ten layout/interaction checks PASS. Grid/course Sort sits below
+the title, status shares its row, long course title has more width (two visual
+lines instead of three), all six choices fit in the shorter sheet, grid and
+course choices work, Sort is disabled during selection and the four-icon
+toolbar remains available. Inspected course/menu screenshots. Current process
+sample has zero matching fatal/JS errors. Course order selected; sheet closed.
+
+Evidence (ignored): .local/sort/layout-{mobile-tests,typecheck,lint,build}.log,
+layout-ota.json, layout-device-result.json, layout-process.log and screenshots
+.local/offline/layout-final-{course,menu}.png. Initial baseline capture found
+no course title because the device was on a Reviewer; an attempted Done target
+was absent. Navigated Back and recaptured the correct baseline before update.
+This was a setup issue, not a failed product check. EAS/PowerShell stderr wraps
+normal CLI environment/progress messages as NativeCommandError; publication
+exited zero and returned the update metadata. Draft PR #12 source CI pending
+at closure; all local gates passed. Verdict: PASS, no remaining layout blocker.
 
 | Requirement | Implementation | Evidence |
 | --- | --- | --- |
-| Discoverable Sort control | Status-row control on course grid and saved-work pages; accessible radio choices | Original feature FRESH screen/menu tests PASS; layout verification pending |
+| Discoverable Sort control | Status-row control on course grid and saved-work pages; accessible radio choices | FRESH mobile suite and ten native layout/interaction checks PASS |
 | Date in both directions | Updated newest/oldest; invalid dates last, stable ties | FRESH sorting regressions PASS |
 | Alphabet in both directions | Natural, case-insensitive A-Z/Z-A including numbered units | FRESH sorting regressions PASS |
 | Original Canvas course sequence | Complete paginated existing material inventory; direct source and related Reviewer/Quiz matching | FRESH rank/pagination regressions PASS; native complete-sequence read PASS |

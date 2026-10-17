@@ -6,7 +6,15 @@ Owner feedback: Sort crowds the title and looks out of place. Finite scope:
 move it beside update status on both Library pages, use a compact horizontal
 pill, remove duplicate status inset, tighten the option sheet and retain all
 presets, touch targets and drag selection. Mobile tests FRESH PASS: 1,135 / 121.
-Repository gates, preview publication and Realme layout verification pending.
+FRESH PASS: forced root typecheck/lint/build, 8/8 each, zero cached; six existing
+lint warnings. Preview source bcb9988, group b60fe0f0-5319-4c11-b0a3-9aba991bbc43,
+update 01a14a01-00f6-70b7-a358-d708971b2e95, runtime 2.1.0-sdk57, published
+2026-10-17 21:15 Manila, applied on Realme. Ten native layout/interaction checks
+PASS, with screenshots inspected: title now two lines, status and Sort share a
+row, all six menu choices fit, selection toolbar remains compact. Zero matching
+fatal/JS errors in current process sample. Draft PR #12 updated; CI pending.
+Acceptance: docs/ai/acceptance/realme-library-sort-20261017.md. No remaining
+layout blocker; course page left open with Course order selected.
 
 ## Library sort presets (2026-10-17)
 
