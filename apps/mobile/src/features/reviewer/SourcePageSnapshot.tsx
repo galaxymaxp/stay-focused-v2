@@ -26,6 +26,9 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
   const [exhausted, setExhausted] = useState(false);
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
+  // Match the website: eligibility/rendering is not an inline source image.
+  const hasImage = !offline && snapshot?.available === true && 'url' in snapshot;
+  useEffect(() => { availabilityRef.current?.(hasImage); }, [hasImage]);
   const inFlight = useRef<AbortController | null>(null);
   const alive = useRef(true);
   const request = useCallback(async (render: boolean) => {
@@ -37,17 +40,15 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
       const result = await readPageSnapshot(client, artifactId, sectionId, render, controller.signal);
       if (!alive.current || controller.signal.aborted || inFlight.current !== controller) return null;
       setSnapshot(result);
-      availabilityRef.current?.(result.available);
       if (!result.available) setOpen(false);
       return result;
     } catch {
-      if (alive.current && !controller.signal.aborted && inFlight.current === controller) { setSnapshot(null); setOpen(false); availabilityRef.current?.(null); }
+      if (alive.current && !controller.signal.aborted && inFlight.current === controller) { setSnapshot(null); setOpen(false); }
       return null;
     } finally { clearTimeout(timeout); }
   }, [client, artifactId, sectionId]);
   useEffect(() => {
     setSnapshot(null); setOpen(false); setExhausted(false);
-    availabilityRef.current?.(null);
   }, [offline, request]);
   useEffect(() => {
     alive.current = true;
@@ -59,7 +60,6 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
     void discover();
     const subscription = AppState.addEventListener('change', state => {
       setSnapshot(null); setOpen(false);
-      availabilityRef.current?.(null);
       inFlight.current?.abort();
       if (state === 'active') void discover();
     });

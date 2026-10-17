@@ -45,10 +45,13 @@ export function parseReviewerVisuals(value: unknown): ReviewerVisuals {
       typeof v.running !== 'boolean' || !v.sections || typeof v.sections !== 'object' || Array.isArray(v.sections)) throw new Error('visual_invalid');
   const sections: Record<string, ExternalReferenceVisual> = Object.create(null);
   for (const [id, raw] of Object.entries(v.sections)) {
-    if (!/^[a-zA-Z0-9_-]{1,220}$/.test(id)) throw new Error('visual_invalid');
-    const visual = parseExternalVisual(raw);
-    if (visual.status !== 'found') throw new Error('visual_invalid');
-    sections[id] = visual;
+    if (!/^[a-zA-Z0-9_-]{1,220}$/.test(id)) continue;
+    // Stored rows can be stale or malformed. Keep each visual's strict safety
+    // checks without allowing one bad section to hide the rest of the batch.
+    try {
+      const visual = parseExternalVisual(raw);
+      if (visual.status === 'found') sections[id] = visual;
+    } catch { /* Omit only this invalid section; retain batch progress/polling. */ }
   }
   return { sections, checked: Number(v.checked), total: Number(v.total), running: v.running };
 }

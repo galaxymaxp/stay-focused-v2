@@ -40,13 +40,17 @@ export function useFigureAvailability(client:ExperienceClient,artifactId:string|
   return !offline && artifactId===state.artifactId?state.sections:EMPTY;
 }
 
-export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,visible=true,onAsk,reviewerTitle='Reviewer',sectionTitle='Section'}:{
+export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,visible=true,onAsk,onAvailability,reviewerTitle='Reviewer',sectionTitle='Section'}:{
   client:ExperienceClient;artifactId:string;sectionId:string;hasFigures:boolean;offline:boolean;visible?:boolean;onAsk?:(image:StudyImageTarget)=>void;
+  onAvailability?:(available:boolean)=>void;
   reviewerTitle?:string;sectionTitle?:string;
 }) {
   const {colors}=useTheme();const {height}=useWindowDimensions();
   const [open,setOpen]=useState(false);const [figures,setFigures]=useState<readonly SourceFigure[]>([]);
   const [index,setIndex]=useState(0);const [hidden,setHidden]=useState(false);
+  const availabilityRef=useRef(onAvailability);availabilityRef.current=onAvailability;
+  const hasImages=!offline && hasFigures && !hidden && figures.length>0;
+  useEffect(()=>{availabilityRef.current?.(hasImages);},[hasImages]);
   const request=useRef<AbortController|null>(null);
   useEffect(()=>{
     setOpen(false);setFigures([]);setHidden(false);request.current?.abort();
