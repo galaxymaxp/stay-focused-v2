@@ -1,5 +1,46 @@
 # Current State
 
+## IM2 reviewer images complete locally - PASS (2026-10-17)
+
+**PASS for unattended IM2/N4 STEP 0-3, tests, fresh serial gates, documentation
+and local commits.** Opening an image reveals its details inside the viewer on
+all mobile/web surfaces. Grounding remains visible; external Commons/source and
+license links are direct viewer actions. Named thumbnails, Ask/Save exact targets,
+offline guards, source precedence and existing gallery permissions remain.
+
+Mobile uses one scrollable ImageViewer Modal for images/details/actions, with
+pinch/double-tap zoom, bounded pan, top/zoom-1 pull-down dismissal (120 dp or a
+fast downward flick), Android back and Reduce Motion. An explicit touch boundary
+prevents reader edge-scrubber interaction. Web dialog/image overflow supports
+all zoom levels; Close/backdrop dismissal and native Esc semantics remain.
+No dependency, native module, API, schema or migration is added. Code commits:
+**93dea65**, **13833e9**, **11fb0ee**, **739d80b**, **311cc58**.
+
+**FRESH PASS on code 311cc58:** forced root typecheck/lint/build **8/8 each,
+zero cached**; mobile **1,239/1,239** (133 files), web **204/204** (35 files);
+standalone API and Android builds **1/1 each**, API/web pages **35/35** and
+**19/19**, Android one bundle/35 assets, root Android/iOS/web exports with 68
+assets. Diff/staged-diff hygiene PASS. Zero lint errors, six existing warnings.
+Initial lint (7/8 tasks) and mobile (3 import failures / 130 passing files)
+failures were fixed; focused test expectation failures and retries are retained
+in acceptance. No nondeterministic flake observed. API/shared tests NOT
+APPLICABLE (unchanged). Generated Next declarations inspected and restored.
+
+**Owner steps remaining:** Rollout and Device checks skipped entirely (NOT RUN).
+Release mobile/website through the normal owner flow; perform RB5 on Realme for
+caption reveal, always-visible grounding, direct license access, tall-content
+scroll, pull-down, zoom/pan, Android back, Reduce Motion and edge-swipe isolation;
+check website scrolling and Esc/Close/backdrop. Deployed revisions, native/browser
+interaction and DB/Scheduler state are **UNVERIFIED (owner to confirm)**. The
+referenced overnight roadmap file was missing locally; the full IM2 prompt
+supplied the scope without an implementation contradiction. No remote service
+call, deployment, SQL/migration application, environment-file edit, Scheduler
+action, email, fetch or push occurred. Expected unrelated untracked paths remain.
+This finite run ends at IM2; no later roadmap item was started.
+
+[IM2 acceptance](ai/acceptance/im2-reviewer-images.md);
+[ADR-041](architecture/ADR-041-reviewer-image-viewer.md).
+
 ## RX1 reviewer header complete locally - PASS (2026-10-17)
 
 **PASS for unattended RX1/N3 STEP 0-2, fresh serial gates, documentation and local

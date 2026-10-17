@@ -3929,3 +3929,90 @@ the row and Generate Quiz remains primary. Verify narrow/320 dp and large-font
 layout, Export-before-Share focus order, existing export/share behavior, offline
 Share disabling and full-width Export for non-artifact reviewers. Confirm the
 actual deployed revision. No unanswered owner question blocks local closure.
+
+
+## IM2 unattended reviewer images (2026-10-17)
+
+Status: **PASS for the finite unattended IM2/N4 code scope, fresh serial gates,
+documentation and local commits.** Baseline 1a9d3f9 after INT1/EV1/RX1; branch
+overnight/2026-10-15_feedback. Initial tracked tree was clean. Expected untracked
+UI/, apps/mobile/.gitignore and supabase/.temp/ are preserved. Endpoint is IM2;
+no later roadmap slice was started. The referenced overnight roadmap file was
+missing locally; the full prompt supplied the scope without a code contradiction.
+
+Commits (author galaxymaxp <omgraythekid@gmail.com>, no push):
+
+- 93dea65 feat(mobile): show image details on opening the viewer
+- 13833e9 feat(mobile): scroll and pull down to close image viewers
+- 11fb0ee feat(web): reveal image details in scrollable dialogs
+- 739d80b test(mobile): retain reader contracts with the shared image viewer
+- 311cc58 fix(mobile): isolate image touches from the reader scrubber
+- docs: close IM2 is the documentation commit containing this footer; final
+  hash is in Git and ignored tmp/overnight/IM2.status.
+
+Chosen reveal pattern: **opening an image reveals its details inside the viewer**
+on every mobile/web surface; no Details toggle. Grounding labels stay visible.
+External title, credit/Own work, license, Commons/source and legal-license link
+are hidden before opening and directly reachable when open. Thumbnail accessible
+names and 48-point mobile targets remain; Ask/Save keep exact targets, attribution,
+headers, permission policy and offline behavior. Source precedence remains intact.
+
+Mobile shares a full-screen ImageViewer Modal with scrollable image/details/actions.
+ZoomablePage retains pinch/double-tap/bounded pan, permits native scroll takeover
+at zoom 1, and keeps zoomed pans away from dismissal. A downward gesture starting
+at top/zoom 1 closes at 120 dp, or at least 24 dp with velocity >=0.9 dp/ms.
+Pinch, upward/horizontal intent, leaving the top, cancellation and stale flick
+velocity prevent dismissal. All raw touch phases stop before reaching the reader
+edge scrubber. Android back/Close remain available; Reduce Motion removes Modal
+animation, translation and spring. Web dialog and enlarged image scroll at all
+slider zooms; native Esc is unprevented, Close/backdrop close, and close clears
+details. Bounds/target checks preserve clicks inside the content and padding.
+No dependency, native module, API/schema/migration or provider change.
+[ADR-041](../architecture/ADR-041-reviewer-image-viewer.md) records the pattern.
+
+FRESH final serial gates, tested code 311cc58:
+
+- npm run typecheck -- --force: 8/8 tasks, zero cached.
+- npm run lint -- --force: 8/8 tasks, zero cached; zero errors, six existing
+  warnings (five mobile import-order, one web unused useMemo).
+- npm run test --workspace @stay-focused/mobile: 1,239/1,239 tests, 133/133 files.
+- npm run test --workspace @stay-focused/web: 204/204 tests, 35/35 files.
+- npm run build --workspace @stay-focused/api: PASS, 1/1 build, 35/35 pages.
+- npm run build --workspace @stay-focused/mobile -- --platform android: PASS,
+  1/1 export, one Android bundle and 35 assets.
+- npm run build -- --force (AUTOPILOT): 8/8 tasks, zero cached; API/web 35/35
+  and 19/19 pages; Android/iOS/web exports, 68 assets.
+- git diff --check, git diff --cached --check and full task diff: PASS.
+  Generated API/web next-env.d.ts changes inspected and restored.
+
+Failed attempts retained: focused mobile 49 passed/1 failed (old always-visible
+attribution expectation), web 3 passed/1 failed (React children array comparison),
+root lint 7/8 tasks (new test's react/no-children-prop), full mobile 130 passing
+files/3 import failures with 1,186 collected tests passing (native safe-area context
+needed stubs). All repaired within scope. StudyAssistSheet's attribution assertion
+now checks hidden text; all source precedence/discovery/offline assertions remain.
+SourceFigures permits responder takeover at zoom 1 and rejects it when zoomed.
+Retries passed; no nondeterministic flake observed. A preliminary all-green cycle
+was repeated after the explicit touch boundary; final acceptance uses no cached
+results. Existing Vite CommonJS/config-loader and Expo color-env warnings remain.
+API/shared tests NOT APPLICABLE (unchanged). Preparation tool/path errors and the
+full matrix are in [IM2 acceptance](acceptance/im2-reviewer-images.md). Planning
+files are reconciled. Logs/progress/status are ignored under tmp/overnight/IM2*.
+
+UNVERIFIED (owner to confirm): deployed revisions, native/browser interaction,
+physical gesture arbitration/accessibility, DB rows/applied migrations and Scheduler
+state. Local native-host assertions and native dialog semantics are not physical
+or real-browser acceptance. No deploy, push, fetch, remote service/SQL call,
+migration application, environment-file edit, Scheduler action or email occurred.
+
+### Owner steps remaining
+
+Rollout and Device checks were skipped entirely (NOT RUN). Release the reviewed
+mobile/website changes using the normal owner flow; IM2 adds no native module,
+while inherited IM1b still needs its compatible native gallery baseline. RB5 on
+Realme: caption/details only after tap; external-reference/course grounding always
+visible; license/source links directly reachable; tall content/actions scroll;
+pull-down only at top and zoom 1; pinch/double-tap/zoomed pan; Android back/Close;
+Reduce Motion; no viewer interaction with reader edge swipe/scrubber; Ask/Save.
+Website: confirm scrolling at all zoom levels and Esc/Close/backdrop dismissal.
+Confirm deployed revisions. No unanswered owner question blocks local closure.
