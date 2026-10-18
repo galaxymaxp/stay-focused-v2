@@ -1,3 +1,5 @@
+IF1 / BACKLOG N10 (2026-10-18): finite STEP 0-4 complete locally from 2b6cad3; `bcd9ad6` repairs Android MIME failure from unescaped cache filenames, preserving decoded names/destination. FRESH PASS 6/6 prompt gates (1434 mobile tests), plus forced root build 8/8, 0 cached. Rollout/device checks NOT RUN; historical device cause UNVERIFIED (owner to confirm); endpoint IF1 only. [Acceptance](acceptance/if1-save-image.md).
+
 QZ1 (2026-10-18): finite STEP 0-4 code scope completed on `overnight/2026-10-15_feedback` from `8bf6b2d`; commits `3eb0be0`, `8df68cc`, `0880274`; prompt gates FRESH PASS 9/9 (470 shared / 1406 mobile / 304 web tests). Rollout/device checks skipped entirely for owner; production state UNVERIFIED (owner to confirm), flagged intentionally not implemented. Endpoint QZ1 only. [Acceptance](acceptance/qz1-question-jump.md).
 
 <!-- MD1 begin -->

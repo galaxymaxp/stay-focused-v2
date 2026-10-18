@@ -5962,3 +5962,89 @@ excluded from commits; Next-generated declarations were inspected/restored.
 Closing commit: `docs: close MD1b` (this commit; final hash in Git and `tmp/overnight/MD1b.status`). All commits use `galaxymaxp <omgraythekid@gmail.com>`; no push.
 
 [MD1 acceptance](acceptance/md1-material-description.md) records the baseline, exact counts and limitations. No later roadmap item was started.
+
+## IF1 unattended Save image diagnosis and repair - 2026-10-18
+
+**Status: PASS for the finite unattended code scope.** IF1 / BACKLOG
+N10 STEP 0-4, regressions, gates and docs resumed from the interrupted dirty
+tree at `2b6cad3` on `overnight/2026-10-15_feedback`; no committed work repeated.
+Required ancestors `0d7bfed`, `dfbf466f` and `c78e4b54` are present. The local
+main ref is stale at `d00a543`; release comparison uses `0d7bfed` without fetch.
+
+FX1b already refreshes owner-scoped URLs and exposes safe failure stages, but
+the interrupted deeper inspection found a remaining filename defect. Raw spaces,
+Unicode and punctuation in cache file URIs can defeat Android MIME lookup and
+reject the album call before directory creation. IF1 encodes only the filename
+URI component, preserving the native decoded filename, original image, existing
+permissions, success copy and **Stay Focused** destination. Six native-contract
+cases reproduce the old failure. No dependency, permission, runtime, API, schema
+or save-design change; no ADR required. Initial no-product-change notes are
+superseded. The historical phone exception remains unknown.
+
+| Candidate cause | Evidence | Fixed on HEAD by | Test |
+| --- | --- | --- | --- |
+| Stale signed figure/snapshot URL | Release `SourceFigures.tsx:95`, `SourcePageSnapshot.tsx:129`, `saveImage.ts:28`; server signs for 600 seconds (`source-figures/sections.ts:104-106`) | Existing FX1b `dfbf466f` / OI1 `c78e4b54` proactively refresh exact owner identity | Stale 403 then deliberate retry through refresh succeeds; refresh before bytes, changed-source refusal retained |
+| Unsupported source URI | Release `saveImage.ts:27-36`; source service validation already requires HTTPS | Existing refusal retained, with safe `download` stage (`studyImageFile.ts:18-25`) | data/content/http refused before gallery write |
+| HTTP/network/non-image/empty bytes | Release `saveImage.ts:28-31,37-38`; loaded pixels do not prove a later byte request succeeds | Existing FX1b/OI1 safe HTTP/download/not_image/empty stages | 302/401/403/404/429/500/503, rejection, MIME and empty/invalid-size regressions |
+| Android permission/native write; alleged copyAsset=false move bug | Expo `MediaLibraryModule.kt:155-170,309-320,393-400`, legacy JS `MediaLibrary.ts:779,783-815`; without asset ID, initial-file path ignores copyAsset; API 30 write permission is WRITE_EXTERNAL_STORAGE | No speculative native change; FX1b reports media_write. Actual APK permission/OEM/query behavior UNVERIFIED | Exact Android album arguments, write-only photo request, awaited native write; simulated storage exception preserves local original and cleans only cache |
+| Extension/MIME mismatch | Release `saveImage.ts:30-33`, shared `image-download.ts:12-18` already choose MIME extension; Expo `MediaLibraryUtils.kt:190-196` uses extension | Existing MIME rename retained | Misleading PNG suffix/JPEG response renames before insertion; rename rejection publishes nothing |
+| Unescaped cache filename URI | Release `saveImage.ts:26,33`, starting HEAD `saveImage.ts:50,52`; Expo `MediaLibraryUtils.kt:190-196`, `CreateAlbum.kt:50-58`; installed Android SDK `MimeTypeMap.java:48-77` restricts filename characters before extracting extension | IF1 `saveImage.ts:50-57` encodes filename for download and rename; native path/display-name decoding preserves readable title | Six contract regressions fail on pre-fix code and pass after encoding: spaces, Unicode, hash, apostrophe/ampersand, literal punctuation and percent |
+| Hidden module/permission/cache/native exception | Release catch `saveImage.ts:49-50` discards all exception evidence | Existing FX1b stage-only logging and plain notices retained | Module suite and stage tests; four new Alert cases expose safe messages and reenable Save |
+
+Mobile reviewer paths in the table are under
+`apps/mobile/src/features/reviewer/`; shared under `packages/shared/src/`,
+server under `apps/api/src/lib/`, Expo under `node_modules/expo-media-library/`.
+Android source was inspected in local SDK `sources/android-37.0/android/webkit/`.
+Contract mocks are not physical MediaStore/OEM execution.
+
+**Final verification (FRESH):** 6/6 prompt commands PASS: forced typecheck
+**8/8 tasks, 0 cached**; forced lint **8/8 tasks, 0 cached**, zero errors and
+six existing warnings; full mobile **1434/1434 tests, 143 files**; API build
+**1/1, 35/35 static pages**; Android export **1/1, one bundle**; diff hygiene
+**0 whitespace errors**, staged check also PASS. Focused development suite
+**99/99, five files**. Additional AUTOPILOT
+`npm run build -- --force --env-mode=loose`: **8/8 tasks PASS, 0 cached**,
+including API, web and Android/iOS/web exports. Gates ran against implementation
+now committed as `bcd9ad6`; only documentation and inspected/restored generated
+ambient declarations changed afterward. Loose mode retains process-local offline,
+no-telemetry and Node outbound-connection guard flags in child builds.
+
+Failure history retained: intentional pre-fix filename red run **43 passed /
+6 failed**; first green attempt **98 passed / 1 failed** (old test expected a
+literal filename space), corrected to encoded expectation, then **99/99**.
+Earlier full mobile **1428/1428** and pre-fix gates are superseded. First
+resumed typecheck/lint/mobile launches failed before suites with preload
+MODULE_NOT_FOUND because NODE_OPTIONS consumed Windows backslashes; corrected
+only the invocation to forward-slash paths. No nondeterministic flakes or
+weakened validation. Vitest retains its existing native-config/CJS warning and
+Metro its existing color warning. Logs stay ignored in `tmp/overnight/IF1*`.
+
+**Commits:** `bcd9ad6 fix(mobile): encode save image cache filenames for Android`;
+`docs: close IF1` is this closing docs commit (final hash in Git and
+`tmp/overnight/IF1.status`). Both use author
+`galaxymaxp <omgraythekid@gmail.com>`. No push. Unrelated untracked `UI/`,
+`apps/mobile/.gitignore`, `supabase/.temp/` preserved. Temporary logs, build
+artifacts and generated Next ambient declarations are excluded from commits.
+
+**UNVERIFIED (owner to confirm):** actual failed image/URL/HTTP/native exception,
+installed APK module and permission state, Realme Android/OEM behavior, shipped
+or deployed revisions, database rows/applied migrations, Scheduler state and
+remote-ref freshness. No Supabase, Vercel, Google Cloud, Canvas or Resend call,
+remote SQL/migration, Scheduler action, deployment, email, environment-file edit
+or push was performed. No phone access attempted.
+
+**Owner steps remaining**
+
+- **Rollout - NOT RUN, skipped entirely:** ship reviewed changes in the next
+  fullsend RB6/N9 via new APK or separately authorized OTA, following existing
+  preflight. IF1 adds no native dependency or runtime change.
+- **Device checks - NOT RUN, skipped entirely:** on Realme save a freshly
+  opened source figure and an external reference; confirm the **Stay Focused**
+  album and intact original image. Include filenames with spaces, accents and
+  punctuation; regress source-page Save too. If still failing, capture only the
+  safe failure stage and Android permission/API/native evidence without private
+  URLs or academic content.
+- Fullsend row 4b's recorded FAIL is preserved; its IF1 follow-up links the
+  diagnosis. No physical fix or production acceptance is claimed.
+
+Endpoint IF1 only; no later slice started. [IF1 acceptance](acceptance/if1-save-image.md).
