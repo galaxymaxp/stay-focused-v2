@@ -47,9 +47,13 @@ export async function saveImage(image: StudyImageDownload, refreshUri?: () => Pr
     const directory = `${files.cacheDirectory}study-image-${Date.now()}-${Math.random().toString(36).slice(2)}/`;
     cleanup = () => files.deleteAsync(directory, { idempotent: true });
     await files.makeDirectoryAsync(directory, { intermediates: true });
-    let uri = directory + studyImageFilename(image);
+    // Android MimeTypeMap rejects raw spaces/Unicode/punctuation in a file URI.
+    // Encode only the filename; native file paths and gallery names decode it.
+    const fileUri = (mime?: string) => directory + encodeURIComponent(studyImageFilename(image, mime))
+      .replace(/[!'()*~]/g, character => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+    let uri = fileUri();
     const { mime } = await downloadStudyImage(files, image, uri, refreshUri);
-    const named = directory + studyImageFilename(image, mime);
+    const named = fileUri(mime);
     if (named !== uri) { await files.moveAsync({ from: uri, to: named }); uri = named; }
     stage = 'media_write';
     if (Platform.OS === 'ios') {
