@@ -610,6 +610,12 @@ export type CourseReviewerRequestRow = {
 export interface Database {
   public: {
     Tables: {
+      user_profiles: {
+        Row: { user_id: string; avatar_path: string | null; avatar_updated_at: string | null; avatar_cleanup_paths: string[] };
+        Insert: { user_id: string; avatar_path?: string | null; avatar_updated_at?: string | null; avatar_cleanup_paths?: string[] };
+        Update: { avatar_path?: string | null; avatar_updated_at?: string | null; avatar_cleanup_paths?: string[] };
+        Relationships: [];
+      };
       material_descriptions: {
         Row: MaterialDescriptionRow;
         Insert: Pick<MaterialDescriptionRow,'user_id'|'revision_fingerprint'|'description_status'> & Partial<MaterialDescriptionRow>;
@@ -4384,6 +4390,8 @@ export interface Database {
       };
     };
     Functions: {
+      commit_profile_avatar_v1: { Args: { p_user_id: string; p_expected_path: string | null; p_path: string | null }; Returns: boolean };
+      finish_profile_avatar_cleanup_v1: { Args: { p_user_id: string; p_paths: string[] }; Returns: undefined };
       claim_material_description_v1: { Args: { p_user_id: string; p_preparation_id: string | null; p_source_version_id: string | null; p_model: string; p_empty: boolean }; Returns: MaterialDescriptionRow[] };
       finish_material_description_v1: { Args: { p_id: string; p_user_id: string; p_description: string }; Returns: boolean };
       read_material_descriptions_v1: { Args: { p_user_id: string; p_course_id: string; p_material_ids: string[] }; Returns: { material_id: string; description: string }[] };
