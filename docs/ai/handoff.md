@@ -5664,3 +5664,85 @@ environment-file edit or push was run.
 - Device checks: browser **1440 / 768 / 360px**, Library grid and course:
   menu opens, correct checked choice, choice persists after reload, keyboard
   Escape closes/refocuses - **NOT RUN**, skipped entirely.
+
+## WD1 - draft activity instructions - PASS (2026-10-18)
+
+Status: **PASS for the finite unattended code scope**. STEP 0-5, tests,
+10/10 fresh serial prompt gate commands, additional AUTOPILOT forced root
+build, docs and local commits are complete. Branch
+`overnight/2026-10-15_feedback`, baseline `fe660af`. Resumed from the
+interruption without redoing the committed API/shared change.
+
+Commits (required galaxymaxp author):
+
+- `8aa10db feat(api): expose assignment points in activity detail`
+- `30a009e feat(web): draft aside shows activity instructions`
+- `3817695 feat(mobile): draft editor instructions section`
+- `docs: close WD1` (this documentation commit; exact final hash recorded
+  after commit in ignored `tmp/overnight/WD1.status` and Git).
+
+Web replaces the draft aside's outline with literal activity instructions,
+due date and available points. Long instructions clamp to eight lines with
+accessible Show all/Show less. Missing/unavailable activities fall back to
+section/slide links only with 2+ items, without the Draft title link. Loading
+is nonblocking. Status, warnings, Save and editor anchor IDs stay intact.
+Mobile puts a default-collapsed Instructions Surface above the title with
+chevron, expanded accessibility state and a 44pt minimum button. It reuses
+useExperience and the existing owner-scoped activityDetailOfflineCache;
+uncached unavailable activity is hidden. Tokens/primitives only, no new palette.
+
+DTO decision: ActivityDetail gains optional nullable `pointsPossible`.
+The existing owner-filtered assignment supplies points; local tasks use null.
+No query/migration change; older clients and cached payloads remain valid.
+
+**FRESH PASS - 10/10 prompt gate commands:**
+
+- `npm run typecheck -- --force`: 8/8 tasks, 0 cached (saved initial-session
+  passing log; no subsequent code edits).
+- `npm run lint -- --force`: 8/8 tasks, 0 cached, zero errors, six existing
+  warnings (one web unused useMemo; five mobile import-order).
+- `npm run test --workspace @stay-focused/api -- --maxWorkers=2`:
+  2316 passed / 3 skipped, 201 files; process-local B24_6_LIVE=0 and
+  B24_7_LIVE=0 disable opt-in remote cases.
+- `npm run test --workspace @stay-focused/shared`: 464/464, 44 files.
+- `npm run test --workspace @stay-focused/web`: 297/297, 43 files.
+- `npm run test --workspace @stay-focused/mobile`: 1401/1401, 143 files.
+- `npm run build --workspace @stay-focused/api`: 1/1, 35/35 static pages.
+- `npm run build --workspace @stay-focused/web`: 1/1, 19/19 static pages.
+- `npm run build --workspace @stay-focused/mobile -- --platform android`:
+  1/1 local Android export, one bundle, EXPO_OFFLINE=1.
+- `git diff --check`: PASS, zero whitespace errors; staged diff also PASS.
+
+Additional `npm run build -- --force --env-mode=loose`: **FRESH PASS, 8/8
+tasks, 0 cached**, including Android/iOS/web exports. Loose mode carries
+process-local offline/no-telemetry flags through to child builds. Generated
+API/web Next declarations were inspected and restored; outputs/logs excluded.
+Focused results: API 82/82; web 8/8; mobile 94/94 (2 files), including real
+SQLite offline remount and owner isolation. Initial focused fixture failures
+(web 3 pass/5 fail, then 7 pass/1 fail; mobile 92 pass/2 fail) and the first
+typecheck's test-only TS2345 failure (6 successful/8 total tasks) were repaired.
+The old API log stopped at startup with no completion/counts and was rerun.
+No failures/retries/flakes in resumed full suites; no weakened assertions,
+timeouts or validation. Existing Vite config and Expo color advisories remain.
+
+**UNVERIFIED (owner to confirm):** production revisions, database rows,
+Scheduler state, remote-ref freshness and browser/phone behavior. No remote
+service operation, deployment, SQL/migration, Scheduler change, email,
+environment-file edit or push was run. Baseline untracked `UI/`,
+`apps/mobile/.gitignore` and `supabase/.temp/` are preserved. Local refs
+are ahead 55 / behind 0 after closure relative to locally recorded
+`github/main`; no remote freshness claimed.
+
+**Owner steps remaining**
+
+- **Rollout - NOT RUN, skipped entirely:** Fely's API/web deployment and
+  mobile OTA/APK. The Vercel CLI is missing in this session; installing
+  `npm i -g vercel` is recommended for the owner's deployment tooling.
+- **Device checks - NOT RUN, skipped entirely:** browser 1440/768px,
+  Canvas-linked Library draft Instructions/due/points, long-text toggle and
+  unavailable-activity minimal outline. Phone: collapsed by default, expand,
+  and offline instructions after one online open.
+
+[WD1 acceptance](acceptance/wd1-draft-activity-instructions.md) contains the
+baseline, matrix, commands, failures and limits. Endpoint reached; no later
+roadmap slice was started or authorized.

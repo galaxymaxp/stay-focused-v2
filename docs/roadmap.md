@@ -1,5 +1,44 @@
 # Roadmap
 
+## WD1 draft activity instructions complete locally - PASS (2026-10-18)
+
+WD1's finite unattended code scope is complete: STEP 0-5, tests, fresh serial
+gates, docs and local commits on `overnight/2026-10-15_feedback`, baseline
+`fe660af`. Implementation: `8aa10db` (API/shared), `30a009e` (web),
+`3817695` (mobile). The interrupted API suite was resumed; committed API work
+was preserved. No later roadmap slice started.
+
+The web draft aside now shows the linked activity's plain-text instructions,
+due date and available points, with an eight-line Show all/Show less clamp.
+Unavailable activities use section/slide outline links only with 2+ items,
+without a Draft title link. Mobile shows a default-collapsed, accessible
+Instructions section above the title, using the existing owner-scoped offline
+activity cache. Editor saving, status and warnings stay intact. The optional
+nullable pointsPossible DTO field uses the already-read assignment row;
+no new query, migration, dependency, palette or cache behavior change.
+
+**FRESH PASS: 10/10 prompt gate commands.** Forced root typecheck/lint each
+**8/8 tasks, 0 cached**; API **2316 passed / 3 skipped** (201 files, two workers,
+live cases disabled); shared **464/464** (44 files); web **297/297** (43 files);
+mobile **1401/1401** (143 files). API build **1/1, 35/35** pages; web build
+**1/1, 19/19** pages; Android export **1/1**; diff/staged-diff hygiene PASS.
+Additional AUTOPILOT forced root build **8/8 tasks, 0 cached**, including
+Android/iOS/web exports. Six existing lint warnings remain. Initial focused
+fixture and test-only typecheck failures were corrected and all attempts are
+recorded in acceptance; the resumed full suites had no failures or flakes.
+Build-generated Next declarations were inspected and restored.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Fely owns API/web deployment, mobile OTA/APK, browser 1440/768px
+instructions/due/points/clamp/fallback checks and phone collapsed/expanded/
+offline-after-online-open checks. Production revisions, database rows,
+Scheduler state, remote-ref freshness and browser/device behavior remain
+**UNVERIFIED (owner to confirm)**. No remote service operation, deployment,
+SQL/migration, Scheduler change, email, environment-file edit or push was run.
+Unrelated `UI/`, `apps/mobile/.gitignore` and `supabase/.temp/` are preserved.
+
+[WD1 acceptance](ai/acceptance/wd1-draft-activity-instructions.md) records exact commands/results and remaining owner steps.
+
 ## WL1 website Library sort menu complete locally - PASS (2026-10-18)
 
 WL1's finite unattended website code scope is complete: STEP 0-4, local tests,
