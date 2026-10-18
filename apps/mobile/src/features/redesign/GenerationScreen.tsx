@@ -41,8 +41,10 @@ export function GenerationScreen() {
   const confirmationInFlight = useRef(false);
   const activity = useAppActivity();
   const queue = useQueueItems();
+  // Queue refreshes after admission settles. Observe its persisted identity
+  // even if the first read raced a slow acceptance; never submit from here.
   useEffect(() => {
-    if (!params.intent || !session) return;
+    if (!params.intent || !session || id) return;
     let live = true;
     setError(null);
     void (async () => {
@@ -68,7 +70,7 @@ export function GenerationScreen() {
     return () => {
       live = false;
     };
-  }, [params.intent, session, client, attempt]);
+  }, [params.intent, session, client, attempt, queue.data, focused, id]);
   async function confirmGeneration() {
     if (!session || !intent || id || confirmationInFlight.current) return;
     confirmationInFlight.current = true;

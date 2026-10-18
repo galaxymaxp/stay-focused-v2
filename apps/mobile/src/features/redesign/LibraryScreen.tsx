@@ -23,6 +23,7 @@ import { useTheme } from "../../design/theme";
 import { ExperienceApiError, experienceRequest } from "../../services/experienceApi";
 import { acceptGeneration, createGenerationIntent } from "../../services/generationRecovery";
 import { useQueueItems } from "../queue/useQueueItems";
+import { useGraceNavigation } from "./useGraceNavigation";
 import { removeLocalArtifact } from "../../services/localLibrary/deviceLibrary";
 import { deleteReviewer } from "../../services/reviewerLibraryApi";
 import { reviewerArtifactIdFromLibraryId } from "./quizRequest";
@@ -144,6 +145,7 @@ function useRemakeReviewer() {
   const { session } = useAuth();
   const client = useExperienceClient();
   const queue = useQueueItems();
+  const grace = useGraceNavigation(queue.open);
   const submitting = useRef(false);
   const [note, setNote] = useState<string | null>(null);
   const remake = async (item: LibraryArtifactSummary) => {
@@ -161,6 +163,7 @@ function useRemakeReviewer() {
       });
       setNote("Request saved. Follow progress in Queue; you can leave this page.");
       queue.refresh();
+      grace.schedule({ pathname: "/generation", params: { intent: intent.key } });
       void acceptGeneration(session.user.id, client, intent).then(queue.refresh, queue.refresh);
     } catch {
       haptic.error();

@@ -28,6 +28,7 @@ import { readCourseIdParam } from "../../navigation/appRoutes";
 import { ExperienceApiError, experienceRequest } from "../../services/experienceApi";
 import { acceptGeneration, createGenerationIntent } from "../../services/generationRecovery";
 import { useQueueItems } from "../queue/useQueueItems";
+import { useGraceNavigation } from "./useGraceNavigation";
 import { GenerationCore } from "./GenerationCore";
 import { SyncStatus } from "../sync/SyncStatus";
 import { useCanvasSync } from "../sync/CanvasSyncProvider";
@@ -347,6 +348,7 @@ export function GenerateMaterialScreen() {
   const [generationNote, setGenerationNote] = useState<string | null>(null);
   const [reviewerSubmitted, setReviewerSubmitted] = useState(false);
   const queue = useQueueItems();
+  const grace = useGraceNavigation(queue.open);
   useEffect(() => {
     setReviewerSubmitted(false);
     setGenerationNote(null);
@@ -446,6 +448,7 @@ export function GenerateMaterialScreen() {
         setReviewerSubmitted(true);
         setGenerationNote("Request saved. Follow progress in Queue; you can leave this page.");
         queue.refresh();
+        grace.schedule({ pathname: "/generation", params: { intent: intent.key } });
         // The promise belongs to the admission service and survives navigation.
         void acceptGeneration(session.user.id, client, intent).then(queue.refresh, queue.refresh);
       } else {

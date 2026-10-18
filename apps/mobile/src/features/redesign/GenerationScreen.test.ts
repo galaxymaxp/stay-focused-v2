@@ -5,7 +5,7 @@ import type { GenerationView } from "@stay-focused/shared";
 import type { GenerationIntent } from "../../services/generationRecovery";
 import { GenerationScreen } from "./GenerationScreen";
 
-vi.mock("../queue/useQueueItems", () => ({ useQueueItems: () => ({ show: vi.fn() }), useJobRead: (id: string | null) => { mocks.detailRead(id); return { data: id ? mocks.generation : null, job: { stage: 'generating_sections' }, error: null, refresh: vi.fn() }; } }));
+vi.mock("../queue/useQueueItems", () => ({ useQueueItems: () => ({ show: vi.fn(), data: mocks.queueData }), useJobRead: (id: string | null) => { mocks.detailRead(id); return { data: id ? mocks.generation : null, job: { stage: 'generating_sections' }, error: null, refresh: vi.fn() }; } }));
 
 const mocks = vi.hoisted(() => ({
   accept: vi.fn(),
@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
   detailRead: vi.fn(),
   request: vi.fn(),
   key: vi.fn(),
+  queueData: null as object | null,
 }));
 vi.mock('../../services/experienceApi', async original => ({ ...await original<typeof import('../../services/experienceApi')>(), experienceRequest: mocks.request, newRequestKey: mocks.key }));
 
@@ -67,6 +68,7 @@ beforeEach(() => {
   mocks.params = { intent: "pending-key" };
   mocks.generation = null;
   mocks.focused = true;
+  mocks.queueData = null;
   mocks.persistedId = null;
   mocks.storeCompleted.mockResolvedValue(undefined);
   mocks.read.mockResolvedValue([pending]);
@@ -83,6 +85,25 @@ async function render(element: ReactElement) {
 }
 
 describe("Queue generation confirmation safety", () => {
+  it("observes an admission that finishes after the first intent read without accepting again", async () => {
+    let finish!: (value: GenerationIntent) => void;
+    mocks.accept.mockImplementationOnce(() => new Promise<GenerationIntent>(resolve => { finish = resolve; }));
+    // The originating Generate/Remake handler already invoked admission.
+    const admission = mocks.accept("owner", {}, pending);
+    await render(createElement(GenerationScreen));
+    expect(mocks.detailRead).toHaveBeenLastCalledWith(null);
+    expect(mocks.accept).toHaveBeenCalledTimes(1);
+    const accepted = { ...pending, generationId: "late-job" };
+    await act(async () => { finish(accepted); await admission; });
+    mocks.read.mockResolvedValue([accepted]);
+    mocks.queueData = {};
+    await act(async () => rendered!.update(createElement(GenerationScreen)));
+    expect(mocks.detailRead).toHaveBeenLastCalledWith("late-job");
+    expect(mocks.accept).toHaveBeenCalledTimes(1);
+    mocks.queueData = {};
+    await act(async () => rendered!.update(createElement(GenerationScreen)));
+    expect(mocks.accept).toHaveBeenCalledTimes(1);
+  });
   it('releases the shared detail while covered and subscribes again on return', async () => {
     mocks.params = { id: 'job-id' };
     await render(createElement(GenerationScreen));
@@ -145,6 +166,18 @@ describe("Queue generation confirmation safety", () => {
 describe("Draft generation result", () => {
   const failed = (retryable = true): GenerationView => ({ id: 'job-id', state: 'failed', artifactId: null, updatedAt: '2026-10-18', progress: null,
     error: { code: 'generation_failed', title: 'Could not finish', message: 'Could not finish.', retryable, action: retryable ? 'retry' : 'choose_material' } });
+  it('does not replace a retried job with the original saved intent on Queue refresh', async () => {
+    mocks.read.mockResolvedValue([{ ...pending, generationId: 'job-id' }]);
+    mocks.generation = failed();
+    const root = await render(createElement(GenerationScreen));
+    mocks.request.mockResolvedValueOnce({ id: 'retry-current' });
+    await act(async () => root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Try again')[0]!.props.onPress());
+    expect(mocks.detailRead).toHaveBeenLastCalledWith('retry-current');
+    mocks.queueData = {};
+    await act(async () => rendered!.update(createElement(GenerationScreen)));
+    expect(mocks.detailRead).toHaveBeenLastCalledWith('retry-current');
+    expect(mocks.accept).not.toHaveBeenCalled();
+  });
   it('offers Try again with the real stage and safe-material copy; suppresses duplicate taps and makes fresh accepted attempts', async () => {
     mocks.params = { id: 'job-id' }; mocks.generation = failed();
     let accept!: (value: unknown) => void;

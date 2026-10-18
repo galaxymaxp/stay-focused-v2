@@ -63,16 +63,32 @@ const mocks = vi.hoisted(() => ({
   unsync: vi.fn(async () => true),
   selectedCourseIds: new Set<string>(),
   reducedMotion: true,
+  focused: true,
+  queueOpen: false,
+  navigationListeners: new Map<string, Set<() => void>>(),
+  appState: "active",
+  appListeners: new Set<(state: string) => void>(),
 }));
+const graceNavigation = {
+  dispatch: vi.fn(),
+  isFocused: () => mocks.focused,
+  getParent: () => undefined,
+  addListener: (name: string, listener: () => void) => {
+    const listeners = mocks.navigationListeners.get(name) ?? new Set();
+    listeners.add(listener);
+    mocks.navigationListeners.set(name, listeners);
+    return () => listeners.delete(listener);
+  },
+};
 vi.mock("expo-router", () => ({
   router: { push: mocks.push, navigate: mocks.navigate, back: mocks.back, replace: mocks.replace, canGoBack: () => true },
   useLocalSearchParams: () => mocks.params,
 }));
 vi.mock('./GenerationCore', () => ({ GenerationCore: 'GenerationCore' }));
-vi.mock('../queue/useQueueItems', () => ({ useQueueItems: () => ({ refresh: mocks.refresh, show: vi.fn() }) }));
+vi.mock('../queue/useQueueItems', () => ({ useQueueItems: () => ({ refresh: mocks.refresh, show: vi.fn(), open: mocks.queueOpen }) }));
 vi.mock("expo-router/react-navigation", () => ({
-  useIsFocused: () => true,
-  useNavigation: () => ({ dispatch: vi.fn() }),
+  useIsFocused: () => mocks.focused,
+  useNavigation: () => graceNavigation,
   usePreventRemove: vi.fn(),
 }));
 vi.mock('../courses/CourseBatchControls', () => ({ CourseBatchControls: 'CourseBatchControls' }));
@@ -131,6 +147,13 @@ vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView",
 vi.mock("../../auth/sessionStore", () => ({ sessionStore: { getItem: async () => null, setItem: async () => {} } }));
 vi.mock("./DayOrb", () => ({ DayOrb: "DayOrb", DAY_ORB_FILL: 0.642, dayOrbTouch: { active: false } }));
 vi.mock("react-native", () => ({
+  AppState: {
+    get currentState() { return mocks.appState; },
+    addEventListener: (_name: string, listener: (state: string) => void) => {
+      mocks.appListeners.add(listener);
+      return { remove: () => mocks.appListeners.delete(listener) };
+    },
+  },
   Alert: { alert: mocks.alert },
   View: "View",
   StyleSheet: { absoluteFill: { position: "absolute" } },
@@ -267,6 +290,11 @@ beforeEach(() => {
   mocks.prefs = { pinned: { course: [], artifact: [], today: [], announcement: [] }, hidden: { generate: [], library: [], libraryItems: [], today: [], announcements: [], queue: [] }, read: { announcements: [] }, libraryOrder: {}, librarySort: {} };
   mocks.selectedCourseIds = new Set();
   mocks.reducedMotion = true;
+  mocks.focused = true;
+  mocks.queueOpen = false;
+  mocks.appState = "active";
+  mocks.navigationListeners.clear();
+  mocks.appListeners.clear();
   vi.clearAllMocks();
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
@@ -297,6 +325,76 @@ const savedQuiz: LibraryArtifactSummary = {
   status: "completed",
   relatedArtifactIds: [],
 };
+
+describe("Generate and confirmed Library Remake grace", () => {
+  async function submit(kind: "generate" | "remake") {
+    mocks.createIntent.mockResolvedValue({ key: "grace-key" });
+    if (kind === "generate") {
+      mocks.data["/api/experience/courses/course"] = workspace;
+      mocks.params = { courseId: "course", materialId: "file:one" };
+      const root = await render(createElement(GenerateMaterialScreen));
+      await act(async () => root.findAll(node => String(node.type) === "Action" && node.props.children === "Generate Reviewer")[0]!.props.onPress());
+      return GenerateMaterialScreen;
+    }
+    mocks.params = { courseKey: "course" };
+    mocks.library.items = [{ ...savedQuiz, id: "artifact:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", type: "reviewer", course: workspace.course, sourceMaterialId: "file:one" }];
+    const root = await render(createElement(LibraryCourseScreen));
+    const swipe = root.findAll(node => String(node.type) === "SwipeRow")[0]!;
+    const action = (swipe.props.trailing as { key: string; onPress: () => void }[]).find(item => item.key === "remake")!;
+    await act(async () => action.onPress());
+    expect(mocks.createIntent).not.toHaveBeenCalled();
+    const buttons = mocks.alert.mock.calls.at(-1)![2] as { text: string; onPress?: () => void }[];
+    await act(async () => buttons.find(button => button.text === "Remake")!.onPress!());
+    return LibraryCourseScreen;
+  }
+
+  it("confirmed Remake schedules the observe-only route at 2000ms", async () => {
+    vi.useFakeTimers(); await submit("remake");
+    expect(mocks.acceptIntent).toHaveBeenCalledTimes(1);
+    await act(async () => { vi.advanceTimersByTime(1999); });
+    expect(mocks.push).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(mocks.push).toHaveBeenCalledExactlyOnceWith({ pathname: "/generation", params: { intent: "grace-key" } });
+    expect(mocks.acceptIntent).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["generate", "remake"] as const)("%s cancels on blur within the window", async kind => {
+    vi.useFakeTimers(); const Screen = await submit(kind);
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    mocks.focused = false;
+    await act(async () => rendered!.update(createElement(Screen)));
+    mocks.focused = true;
+    await act(async () => rendered!.update(createElement(Screen)));
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    expect(mocks.push).not.toHaveBeenCalled();
+    expect(mocks.acceptIntent).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["generate", "remake"] as const)("%s cancels when Queue opens without blur", async kind => {
+    vi.useFakeTimers(); const Screen = await submit(kind);
+    mocks.queueOpen = true;
+    await act(async () => rendered!.update(createElement(Screen)));
+    mocks.queueOpen = false;
+    await act(async () => rendered!.update(createElement(Screen)));
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it.each(["generate", "remake"] as const)("%s cancels on navigation events before blur commits", async kind => {
+    vi.useFakeTimers(); await submit(kind);
+    mocks.navigationListeners.get("state")!.forEach(listener => listener());
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+
+  it.each(["generate", "remake"] as const)("%s stays put after background and return", async kind => {
+    vi.useFakeTimers(); await submit(kind);
+    mocks.appState = "background"; mocks.appListeners.forEach(listener => listener("background"));
+    mocks.appState = "active"; mocks.appListeners.forEach(listener => listener("active"));
+    await act(async () => { vi.advanceTimersByTime(3000); });
+    expect(mocks.push).not.toHaveBeenCalled();
+  });
+});
 function generateCourse(course: Partial<GenerateCourseSummary> & Pick<CourseSummary, "id">): GenerateCourseSummary {
   return { name: course.id, code: null, status: null, materialCount: null, reviewerCount: null, lastActivityAt: null, syncState: "synced", period: "current", termName: null, lastSuccessfulSyncAt: null, ...course };
 }
@@ -643,7 +741,8 @@ describe("B25 screen interactions", () => {
     expect(copy(root)).toContain("Materials could not be loaded");
     expect(root.findAll((node) => String(node.type) === "Action").some((node) => node.props.children === "Try again")).toBe(true);
   });
-  it("selects real material, disables unavailable Quiz and saves and submits Reviewer intent without navigation", async () => {
+  it("selects real material, disables unavailable Quiz and opens Reviewer progress after two seconds", async () => {
+    vi.useFakeTimers();
     mocks.data["/api/experience/courses"] = { classificationSource: "canvas", items: [generateCourse(workspace.course)] };
     mocks.data["/api/experience/courses/course"] = workspace;
     mocks.createIntent.mockResolvedValue({ key: "saved-key" });
@@ -675,6 +774,11 @@ describe("B25 screen interactions", () => {
     expect(mocks.createIntent).toHaveBeenCalledWith('owner', expect.objectContaining({ autoSubmit: true }));
     expect(mocks.acceptIntent).toHaveBeenCalledWith('owner', expect.anything(), { key: 'saved-key' });
     expect(mocks.push.mock.calls.some(call => call[0]?.pathname === '/generation')).toBe(false);
+    await act(async () => { vi.advanceTimersByTime(1999); });
+    expect(mocks.push.mock.calls.some(call => call[0]?.pathname === '/generation')).toBe(false);
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(mocks.push).toHaveBeenLastCalledWith({ pathname: '/generation', params: { intent: 'saved-key' } });
+    expect(mocks.acceptIntent).toHaveBeenCalledTimes(1);
   });
   it("keeps Retry quiet, single-flight, and rejoins it after returning to the material", async () => {
     const needsPreparation = { ...workspace.materials.items[0]!, preparation: {status:'failed' as const,reasonCode:'preparation_failed' as const} };
@@ -759,6 +863,7 @@ describe("B25 screen interactions", () => {
     expect(mocks.push).not.toHaveBeenCalled();
   });
   it("creates Quiz only from the persisted Reviewer linked to a material", async () => {
+    vi.useFakeTimers();
     const reviewerWorkspace: CourseLearningWorkspace = {
       ...workspace,
       materials: {
@@ -786,6 +891,10 @@ describe("B25 screen interactions", () => {
         reviewerArtifactId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
       }),
     }));
+    expect(mocks.push).toHaveBeenCalledExactlyOnceWith({ pathname: '/generation', params: { intent: 'quiz-key', start: '1' } });
+    expect(mocks.acceptIntent).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(2000); });
+    expect(mocks.push).toHaveBeenCalledTimes(1);
   });
   it("opens a Library artifact without calling generation", async () => {
     mocks.library.items = [savedQuiz];
