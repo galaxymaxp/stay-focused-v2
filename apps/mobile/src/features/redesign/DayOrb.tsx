@@ -1,6 +1,7 @@
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { AppState, Image, View } from "react-native";
+import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import * as THREE from "three";
 
 import { createOrbAura } from "../generation-core/orbAura";
@@ -63,8 +64,10 @@ export const DayOrb = memo(function DayOrb({
 }) {
   const [foreground, setForeground] = useState(AppState.currentState === "active");
   const [renderingFailed, setRenderingFailed] = useState(false);
-  const runtime = useRef<Runtime>({ tones: dayOrbTones(minutes), mode, reducedMotion, running: live && foreground });
-  runtime.current = { tones: dayOrbTones(minutes), mode, reducedMotion, running: live && foreground };
+  const tones = useMemo(() => dayOrbTones(minutes), [minutes]);
+  const haloId = useId();
+  const runtime = useRef<Runtime>({ tones, mode, reducedMotion, running: live && foreground });
+  runtime.current = { tones, mode, reducedMotion, running: live && foreground };
   const controller = useRef<{ wake: () => void; dispose: () => void } | null>(null);
   const context = useRef<ExpoWebGLRenderingContext | null>(null);
   useEffect(() => {
@@ -91,6 +94,21 @@ export const DayOrb = memo(function DayOrb({
   const inner = size * RENDER_SCALE;
   return (
     <View pointerEvents="none" style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {/* Static spill also survives transparent GL compositing and PNG fallback.
+          Keep the glass clear and fade out before the schedule ring/handles. */}
+      <Svg testID="day-orb-halo" pointerEvents="none" width={size} height={size} viewBox="0 0 1 1" style={{ position: "absolute", top: 0, left: 0 }}>
+        <Defs>
+          <RadialGradient id={haloId} cx="50%" cy="50%" r="50%">
+            <Stop offset={0} stopColor={tones.aura} stopOpacity={0} />
+            <Stop offset={DAY_ORB_FILL * 0.97} stopColor={tones.aura} stopOpacity={0} />
+            <Stop offset={DAY_ORB_FILL * 1.04} stopColor={tones.aura} stopOpacity={mode === "dark" ? 0.35 : 0.16} />
+            <Stop offset={0.76} stopColor={tones.aura} stopOpacity={mode === "dark" ? 0.1 : 0.04} />
+            <Stop offset={0.84} stopColor={tones.aura} stopOpacity={0} />
+            <Stop offset={1} stopColor={tones.aura} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={0.5} cy={0.5} r={0.5} fill={`url(#${haloId})`} />
+      </Svg>
       {renderingFailed
         ? <Image source={require("../../../assets/branding/orb-adaptive-foreground.png")} style={{ width: size, height: size }} resizeMode="contain" />
         : <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />}
