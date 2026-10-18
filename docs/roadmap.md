@@ -1,5 +1,7 @@
 # Roadmap
 
+OR1 / BACKLOG P14 (2026-10-18): **STOPPED at STEP 0; remains open.** Existing mobile/web GL aura source matches; the reported device cause is UNVERIFIED and the referenced testing roadmap is missing. No speculative halo or later OR2 work started. FRESH diff hygiene PASS; six code gates NOT RUN. Next: owner resolves the recorded preflight question before OR1 resumes; rollout/device checks remain owner steps. [OR1 evidence](ai/acceptance/or1-today-orb-glow.md).
+
 IF1 / BACKLOG N10 (2026-10-18): complete locally with `bcd9ad6` cache-URI filename repair and six native-contract regressions; FRESH PASS 6/6 prompt gates (1434 mobile tests), plus forced root build 8/8, 0 cached. Endpoint IF1 only; RB6/N9 rollout and Realme saves remain owner steps, NOT RUN; historical phone exception UNVERIFIED (owner to confirm). [IF1 acceptance](ai/acceptance/if1-save-image.md).
 
 QZ1 / BACKLOG P13 (2026-10-18): mobile/web tap-to-jump code complete locally (`3eb0be0`, `8df68cc`, `0880274`), prompt gates FRESH PASS 9/9; no scoring/persistence/API change and no flagged state. Next fullsend RB6 rollout and Realme/390px/desktop checks remain owner steps, NOT RUN; production/device state UNVERIFIED (owner to confirm). No later slice started. [QZ1 acceptance](ai/acceptance/qz1-question-jump.md).

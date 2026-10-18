@@ -6048,3 +6048,58 @@ or push was performed. No phone access attempted.
   diagnosis. No physical fix or production acceptance is claimed.
 
 Endpoint IF1 only; no later slice started. [IF1 acceptance](acceptance/if1-save-image.md).
+
+## OR1 unattended Today orb glow preflight - 2026-10-18
+
+**Status: STOPPED at STEP 0**, baseline `4517181` on
+`overnight/2026-10-15_feedback`. OR1 / BACKLOG P14 remains open; no OR2 work.
+The supplied unattended rules require a stop on preflight surprises and when
+the matching outer glow already exists in mobile code. No product changes
+were made after finding this condition.
+
+Mobile and web already use the same `createOrbAura()` shader, 3.3 plane,
+0.86 mesh scale, outside-glass fade, additive blending, camera, host footprint,
+day/time tint, alpha-zero clearing, sRGB and ACES exposure. Mobile has canvas
+room beyond the glass and no clipping style in the inspected orb/host/ring.
+Installed Expo Android GLView explicitly sets `isOpaque = false`. A concrete
+cause for a mobile-only missing/weaker glow cannot be established from this
+source comparison. The reduced render resolution is a known performance
+difference, not proof of a missing halo. The PNG fallback lacks a separate
+glow, but whether the reported phone was using it is UNVERIFIED. No speculative
+alpha/shader/host change or second halo was added. The referenced
+`overnight/roadmaps/2026-10-18-web-desktop-mobile-polish-profiles.md` and its
+`overnight/` directory are absent; no matching tracked roadmap was found.
+
+**Exact question for the owner:** Which installed mobile revision and render
+path (live GL or PNG fallback), theme and time of day showed the weaker glow,
+and should OR1 proceed with a static mobile-only halo despite the existing
+matching GL aura? Please provide the missing testing roadmap or correct its path.
+Recorded for morning; no response requested during the unattended run.
+
+**Gate counts: 1/7 FRESH PASS, 6/7 NOT RUN, 0 failed.** Diff/staged-diff hygiene
+passes with zero whitespace errors. Forced root typecheck/lint, mobile/shared
+tests, API build and Android export are NOT RUN because STEP 0 stopped the
+implementation. Additional AUTOPILOT root build NOT RUN; this checkpoint is
+documentation-only. No test failures or flakes. Source-discovery misses and
+the complete comparison are recorded in [OR1 evidence](acceptance/or1-today-orb-glow.md).
+
+**Commits:** `docs: record OR1 preflight stop` is this scoped documentation
+commit; final hash is in Git and `tmp/overnight/OR1.status`. Author
+`galaxymaxp <omgraythekid@gmail.com>`. Progress/status files are not committed.
+Unrelated untracked `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` preserved.
+No Supabase, Vercel, Google Cloud, Canvas or Resend call, deployment, remote
+SQL/migration, Scheduler operation, email, environment-file edit or push.
+
+**UNVERIFIED (owner to confirm):** installed/shipped revisions, actual mobile
+render path, visual output, power behavior, production/database/migration/
+Scheduler state and remote-ref freshness. Physical visual parity is not claimed.
+
+**Owner steps remaining**
+
+- Resolve the preflight question and missing roadmap before resuming OR1.
+- **Rollout - NOT RUN, skipped entirely:** Preview OTA after an implementation
+  is reviewed and the owner separately authorizes rollout.
+- **Device checks - NOT RUN, skipped entirely:** Realme Today dark/light glow
+  comparison, immediate ring handles, scrolling and Reduce Motion acceptance.
+
+Endpoint: OR1 preflight STOP only; no further code step or roadmap slice started.
