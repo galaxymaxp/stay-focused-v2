@@ -4777,3 +4777,83 @@ edit or push was performed.
    Generate home at desktop and phone widths after implementation and rollout.
 4. Vercel CLI is not installed. Strongly recommend `npm i -g vercel` for the
    later owner-controlled environment, deployment and log workflow; not run here.
+
+
+---
+
+## RV1 unattended reviewer header - PASS (2026-10-18)
+
+**Status: PASS for STEP 0-5, tests, fresh serial gates, docs and local commits.**
+Baseline 1e53edd on overnight/2026-10-15_feedback. The complete RV1 prompt and
+its overriding UNATTENDED rules governed this run. All seven code assumptions
+hold. The referenced overnight roadmap file is absent; the complete prompt
+provides scope. WG3 stopped before implementation. Original untracked UI/,
+apps/mobile/.gitignore and supabase/.temp/ were preserved. No questions,
+branch switch or later task.
+
+Mobile title-row Reviewer actions uses a 48-point IconAction and the existing
+Queue native Modal/anchor/outside/Android Back pattern, without animation.
+Export stays available offline; Share retains its existing owner/offline guard,
+fetching, sheet, mutation, clipboard and system sharing logic. Website reuses
+the AccountMenu popover pattern with Escape/focus return, arrows/Tab and outside
+dismissal; Share and Save to file are inside it, Generate Quiz remains visible.
+Compact minutes/topics retain mobile automatic labels and web course/date.
+Reviewer usages alone hide idle Updated, keeping Syncing, error/Retry and
+update-available actions. RV1 supersedes RX1's button row. No existing reviewer
+Save offline action was found; none was added. No reusable primitive, ADR,
+dependency, native module, API change or migration.
+
+### Commits
+
+- `e4f5ee9` feat(shared): allow hiding idle snapshot freshness
+- `0f500cd` feat(mobile): compact reviewer header and actions menu
+- `6bef993` feat(web): compact reviewer header and actions menu
+
+Closure: docs: close RV1 reviewer header (final hash in local Git and
+tmp/overnight/RV1.status; no self-hash amendment).
+All commits use galaxymaxp <omgraythekid@gmail.com> via --author. No push.
+
+### Gate counts
+
+**FRESH PASS, serial:** forced root typecheck/lint/build **8/8 tasks each,
+0 cached**; mobile **1321/1321** (139 files), web **249/249** (42 files), shared
+workspace **427/427** (44 files including existing compiled test copies).
+Separate shared source-only **215/215** (22 files). Standalone API build
+**1/1**, **35/35** pages; Android export **1/1**. Root build includes web
+**19/19**, API **35/35** and Android/iOS/web exports. All eight mandatory gate
+commands plus root build/source-only pass. Diff/staged-diff PASS. Six existing
+lint warnings, no new lint errors. No nondeterministic flake observed.
+
+First attempts retained: focused mobile **20 passed / 4 failed** from a
+floating-point assertion (retry **24/24**); typecheck **5/8 tasks**, three
+TS18046 errors in new test mock props (typed unknown props; retry **8/8**);
+full mobile **1320 passed / 1 failed** from a missing safe-area mock (focused
+retry **23/23**, full retry **1321/1321**). Preliminary passing lint overlapped
+the end of typecheck; the complete chain was rerun serially. Initial Python
+setup was unavailable; Node completed it. No product validation or acceptance
+requirement was weakened.
+API tests: NOT RUN (API unchanged, outside requested suites); provider/workflow
+probes: NOT APPLICABLE. Generated Next declarations were restored; generated
+artifacts, private fixtures, tmp and unrelated files were not staged.
+
+Production revision, database rows, Scheduler and physical/browser behavior:
+**UNVERIFIED (owner to confirm)**. No remote service operation, deployment,
+remote SQL/migration, Scheduler change, email, environment-file edit or push.
+Exact commands, counts, failed attempts and local logs:
+[RV1 acceptance](acceptance/rv1-reviewer-header.md).
+
+### Owner steps remaining
+
+1. Rollout **NOT RUN**, skipped entirely: next owner RB6 fullsend with website
+   deploy and reviewed mobile APK/OTA. No RV1 migration.
+2. Device checks **NOT RUN**, skipped entirely: Realme menu Export/Share,
+   offline disabled Share/working Export, compact meta/large text, outside/Back,
+   no idle Updated, preserved Syncing/error/Retry/update-available and sharing.
+3. Browser at **1440 and 390 px: NOT RUN**, skipped entirely: Share/Save menu,
+   compact meta/course/date, Generate Quiz, Enter/Space, arrows/Tab,
+   Escape/focus return and outside dismissal.
+4. Vercel CLI is not installed. Strongly recommend npm i -g vercel for later
+   owner-controlled environment, deployment and log work; not run here.
+
+RV1 is the finite endpoint. Current state, roadmap and sprint are reconciled;
+RX1 layout is explicitly superseded. WG3's STOP remains independent.

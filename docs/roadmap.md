@@ -1,5 +1,41 @@
 # Roadmap
 
+## RV1 reviewer header complete locally - PASS (2026-10-18)
+
+**PASS for unattended STEP 0-5, tests, fresh serial local gates, docs and local
+commits.** Mobile title-row Reviewer actions contains Export and Share in a
+measured native popover, reusing QueueDropdown's outside/Android Back pattern.
+The title wraps beside a 48-point trigger; the menu has no animation. Offline
+Export works; Share keeps its owner/offline guard, sheet and request logic.
+Website Share/Save to file use the existing account popover pattern with
+Escape/focus return, arrows/Tab and outside dismissal; Generate Quiz stays
+visible. Both clients group minutes/topics compactly. Mobile automatic labels
+and website course/date remain. Reviewer-only hideFreshLabel suppresses idle
+Updated while preserving Syncing, error/Retry and update-available actions.
+Other screens retain default status behavior. **RV1 supersedes RX1's button
+row.** No existing reviewer Save offline action; none invented. No reusable
+primitive, ADR, dependency, native module, API change or migration.
+
+**FRESH PASS, serial:** forced root typecheck/lint/build **8/8 tasks each,
+0 cached**; mobile **1321/1321** (139 files), web **249/249** (42 files), shared
+workspace **427/427** (44 files including existing compiled copies), separate
+shared source-only **215/215** (22 files). Standalone API build **1/1**,
+**35/35** pages; Android export **1/1**. Root build includes website **19/19**
+pages and Android/iOS/web exports. Diff/staged-diff PASS; six existing lint
+warnings. Deterministic failed first attempts are recorded in acceptance;
+no nondeterministic flake. Implementation: **e4f5ee9**, **0f500cd**, **6bef993**.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Owner RB6 fullsend: website deploy and APK/OTA, then Realme menu,
+offline/meta/status checks and browser checks at 1440/390 px. Production
+revision, database rows, Scheduler and device/browser behavior are **UNVERIFIED
+(owner to confirm)**. No remote service operation, deployment, remote SQL,
+Scheduler change, email, environment-file edit or push. Generated Next
+declarations were restored; original untracked work is preserved. RV1 is the
+finite endpoint; no later task started. WG3's earlier stop remains independent.
+
+[RV1 acceptance](ai/acceptance/rv1-reviewer-header.md).
+
 ## MR3 Try again on failed generation complete locally - PASS (2026-10-18)
 
 Finite unattended STEP 0-5, tests, fresh serial gates, docs and local commits are
@@ -296,6 +332,8 @@ This finite run ends at IM2; no later roadmap item was started.
 [ADR-041](architecture/ADR-041-reviewer-image-viewer.md).
 
 ## RX1 reviewer header complete locally - PASS (2026-10-17)
+
+**Header layout superseded by RV1; RX1 validation below is historical.**
 
 **PASS for unattended RX1/N3 STEP 0-2, fresh serial gates, documentation and local
 commits.** Mobile now renders title, equal-width secondary Export/Share row,
