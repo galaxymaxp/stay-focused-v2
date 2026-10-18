@@ -10,9 +10,9 @@ import { clampPagePan, clampPageZoom, readPageSnapshot, type PageSnapshot } from
 import type { ExperienceClient } from '../../services/experienceApi';
 
 /** Discover and render the exact cited page only when its topic approaches view. */
-export function SourcePageSnapshot({ client, artifactId, sectionId, offline, visible=true, onAsk, onAvailability, reviewerTitle = 'Reviewer', sectionTitle = 'Section' }: {
+export function SourcePageSnapshot({ client, artifactId, sectionId, offline, visible=true, loadedSnapshot, refreshOnce, onAsk, onAvailability, reviewerTitle = 'Reviewer', sectionTitle = 'Section' }: {
   client: ExperienceClient; artifactId: string; sectionId: string; offline: boolean;
-  visible?: boolean;
+  visible?: boolean; loadedSnapshot?: PageSnapshot | null; refreshOnce?: () => Promise<boolean>;
   reviewerTitle?: string; sectionTitle?: string;
   onAsk?: (image: StudyImageTarget) => void;
   onAvailability?: (available: boolean | null) => void;
@@ -51,9 +51,10 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
   useEffect(() => {
     setSnapshot(null); setOpen(false); setExhausted(false);
   }, [offline, request]);
+  useEffect(() => { if (loadedSnapshot !== undefined) setSnapshot(loadedSnapshot); }, [loadedSnapshot, offline, request]);
   useEffect(() => {
     alive.current = true;
-    if (offline || !visible) return () => { alive.current = false; inFlight.current?.abort(); };
+    if (loadedSnapshot !== undefined || offline || !visible) return () => { alive.current = false; inFlight.current?.abort(); };
     const discover=async()=>{
       const probe=await request(false);
       if(alive.current && probe?.available && !('url' in probe))await request(true);
@@ -72,10 +73,10 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
           AppState.currentState === 'active') void request(false);
     }, 10000);
     return () => { alive.current = false; clearInterval(heartbeat); subscription.remove(); inFlight.current?.abort(); };
-  }, [offline, visible, request]);
+  }, [offline, visible, request, loadedSnapshot]);
   const snapshotStatus = snapshot?.available && 'status' in snapshot ? snapshot.status : null;
   useEffect(() => {
-    if (offline || !visible || snapshotStatus !== 'rendering') return;
+    if (loadedSnapshot !== undefined || offline || !visible || snapshotStatus !== 'rendering') return;
     let polls = 0;
     const timer = setInterval(() => {
       polls += 1;
@@ -83,14 +84,16 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
       if (polls === 5) { clearInterval(timer); setExhausted(true); }
     }, 3000);
     return () => clearInterval(timer);
-  }, [offline, visible, snapshotStatus, request]);
+  }, [offline, visible, snapshotStatus, request, loadedSnapshot]);
   const show = async () => {
     if (waiting || offline) return;
+    if (loadedSnapshot !== undefined) {setOpen(true);return;}
     setWaiting(true); setExhausted(false);
     const result = await request(true);
     if (alive.current && result?.available) setOpen(true);
     if (alive.current) setWaiting(false);
   };
+  const failed = () => {setSnapshot(null);setOpen(false);void refreshOnce?.();};
   if (offline) return <AskImageButton offline />;
   if (!snapshot) return null;
   const unit = snapshot.labelKind === 'slide' ? 'slide' : 'page';
@@ -108,7 +111,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
       <Pressable accessibilityRole="button" accessibilityLabel={`From ${unit} ${snapshot.page}`} accessibilityState={{ busy: waiting }}
       onPress={() => void show()} style={{ minHeight: hitTarget.min }}>
       {ready ? <Image source={{ uri: ready.url }} resizeMode="contain" accessibilityIgnoresInvertColors accessibilityLabel={`${ready.sourceLabel} · ${captionUnit} ${ready.page}`}
-        style={{ width:'100%', height:Math.min(420,360*ready.height/ready.width) }} onError={() => { setSnapshot(null); setOpen(false); }} />
+        style={{ width:'100%', height:Math.min(420,360*ready.height/ready.width) }} onError={failed} />
         : <View style={{ height:spacing[12], backgroundColor:colors.surfacePrimary }}>
           {'status' in snapshot && snapshot.status === 'rendering' ? <ActivityIndicator color={colors.accent} /> : null}
         </View>}
@@ -119,7 +122,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
       {onZoomChange => <>
         <Text style={{ color: colors.textMuted }}>From {unit} {snapshot.page} {'\u00b7'} your course material</Text>
         <View style={{ height: windowHeight * 0.6 }}>
-        {ready ? <ZoomablePage key={ready.page} url={ready.url} width={ready.width} height={ready.height} onZoomChange={onZoomChange} onError={() => { setSnapshot(null); setOpen(false); }} />
+        {ready ? <ZoomablePage key={ready.page} url={ready.url} width={ready.width} height={ready.height} onZoomChange={onZoomChange} onError={failed} />
           : <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing[3] }}>
             {!exhausted ? <ActivityIndicator color={colors.accent} /> : null}
             <Text style={{ color: colors.textMuted }}>{exhausted ? 'The page is still preparing. Close and open it again in a moment.' : 'Preparing source page'}</Text>

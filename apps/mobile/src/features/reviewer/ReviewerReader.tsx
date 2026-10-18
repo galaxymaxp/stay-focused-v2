@@ -58,10 +58,11 @@ import { ExportSheet } from '../export/ExportSheet';
 import { automaticReviewerLabel } from "../redesign/automationPresentation";
 import { reviewerSecondaryLine } from './reviewerEstimatePresentation';
 import { SourcePageSnapshot } from './SourcePageSnapshot';
-import { SourceFigures, useFigureAvailability } from './SourceFigures';
+import { SourceFigures } from './SourceFigures';
 import { ExternalVisual } from './ExternalVisual';
-import { useReviewerVisuals } from '../../services/externalVisuals';
+import { useReviewerImages } from '../../services/reviewerImages';
 import { ReviewerHeader } from './ReviewerHeader';
+const EMPTY_FIGURES: readonly import('@stay-focused/shared').ReviewerFigure[] = [];
 
 type Measurable = View | Text;
 /** Keeps a found line below the header/search bar with readable context above it. */
@@ -104,19 +105,6 @@ export function ReviewerReaderScreen({
   const sectionY = useRef<number[]>([]);
   const blockY = useRef(new Map<string, number>());
   const metrics = useRef({ y: 0, content: 0, viewport: 0 });
-  const { height: screenHeight } = useWindowDimensions();
-  const visualFrames = useRef(new Map<string, { artifact: string; y: number; height: number }>());
-  const [nearbyVisuals, setNearbyVisuals] = useState<{artifact:string;ids:ReadonlySet<string>}>({artifact:artifact.id,ids:new Set()});
-  const updateNearbyVisuals = useCallback(() => {
-    const top=metrics.current.y-800, bottom=metrics.current.y+(metrics.current.viewport||screenHeight)+800;
-    const ids=new Set<string>();
-    for(const [id,frame] of visualFrames.current) {
-      const y=rootY.current+frame.y;
-      if(frame.artifact===artifact.id && y<=bottom && y+frame.height>=top)ids.add(id);
-    }
-    setNearbyVisuals(previous=>previous.artifact===artifact.id && previous.ids.size===ids.size && [...ids].every(id=>previous.ids.has(id))?previous:{artifact:artifact.id,ids});
-  },[artifact.id,screenHeight]);
-  const visualIsNear=(id:string)=>nearbyVisuals.artifact===artifact.id && nearbyVisuals.ids.has(id);
   const [scrollEnabled, setScrollEnabled] = useState(true);
   const [current, setCurrent] = useState(-1);
   const scrubber = useRef<ScrubberHandle>({ reveal: () => {}, touch: null });
@@ -130,8 +118,9 @@ export function ReviewerReaderScreen({
   const { session } = useAuth();
   const snapshotClient = useMemo(() => ({ baseUrl: getApiBaseUrl() ?? '', accessToken: session?.accessToken ?? '' }), [session?.accessToken]);
   const figureArtifactId = session?.accessToken && /^artifact:/.test(artifact.id) ? artifact.id.slice('artifact:'.length) : null;
-  const figureSections = useFigureAvailability(snapshotClient, figureArtifactId, deviceCopy);
-  const reviewerVisuals = useReviewerVisuals(snapshotClient, figureArtifactId, deviceCopy);
+  const reviewerImages = useReviewerImages(snapshotClient, figureArtifactId, deviceCopy);
+  const imageSections = new Map(reviewerImages.data?.sections.map(s => [s.sectionId, s]));
+  const figureSections = {has:(id:string)=>imageSections.get(id)?.hasFigures===true, online:!!reviewerImages.data};
   const [snapshotAvailability, setSnapshotAvailability] = useState<Record<string, boolean | null>>({});
   const [figureAvailability, setFigureAvailability] = useState<Record<string, boolean>>({});
   useEffect(() => { setSnapshotAvailability({}); setFigureAvailability({}); }, [artifact.id, snapshotClient, deviceCopy]);
@@ -269,7 +258,6 @@ export function ReviewerReaderScreen({
   const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     metrics.current = { y: contentOffset.y, content: contentSize.height, viewport: layoutMeasurement.height };
-    updateNearbyVisuals();
     const offsets = anchors.map((_, index) => anchorOffset(index));
     const next = currentAnchorIndex(offsets, contentOffset.y);
     setCurrent((value) => (value === next ? value : next));
@@ -379,7 +367,6 @@ export function ReviewerReaderScreen({
         collapsable={false}
         onLayout={(event: LayoutChangeEvent) => {
           rootY.current = event.nativeEvent.layout.y;
-          updateNearbyVisuals();
         }}
         style={{ gap: spacing[8], paddingTop: spacing[3], paddingRight: spacing[3] }}
       >
@@ -390,8 +377,6 @@ export function ReviewerReaderScreen({
             collapsable={false}
             onLayout={(event) => {
               sectionY.current[sectionIndex] = event.nativeEvent.layout.y;
-              visualFrames.current.set(section.id,{artifact:artifact.id,y:event.nativeEvent.layout.y,height:event.nativeEvent.layout.height});
-              updateNearbyVisuals();
             }}
             style={{ gap: spacing[4] }}
           >
@@ -400,18 +385,18 @@ export function ReviewerReaderScreen({
               <Text ref={register(segmentIds.sectionTitle(section.id))} style={{ color: colors.textPrimary, fontSize: 22, lineHeight: 29, fontWeight: "600" }}>
                 {render(segmentIds.sectionTitle(section.id), section.title)}
               </Text>
-              {figureArtifactId ? <SourceFigures client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id}
+              {figureArtifactId ? <SourceFigures key={`${session?.user.id}:${figureArtifactId}`} client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id}
                 reviewerTitle={reviewer.title} sectionTitle={section.title}
                 onAvailability={available => setFigureAvailability(current => current[section.id] === available ? current : { ...current, [section.id]: available })}
-                onAsk={image => askImage(section.id, image)} hasFigures={figureSections.has(section.id)} offline={deviceCopy} visible={visualIsNear(section.id)} /> : null}
+                onAsk={image => askImage(section.id, image)} hasFigures={figureSections.has(section.id)} offline={deviceCopy} loadedFigures={imageSections.get(section.id)?.figures ?? EMPTY_FIGURES} refreshOnce={reviewerImages.refreshOnce} /> : null}
               {!figureSections.has(section.id) && (artifact.sourceType === 'canvas_file' || artifact.sourceType === 'local_file' || artifact.sourceType == null) && session?.accessToken && /^artifact:/.test(artifact.id) ?
-                <SourcePageSnapshot client={snapshotClient} artifactId={artifact.id.slice('artifact:'.length)} sectionId={section.id} offline={deviceCopy} visible={figureSections.online===true && visualIsNear(section.id)}
+                <SourcePageSnapshot key={`${session?.user.id}:${figureArtifactId}`} client={snapshotClient} artifactId={artifact.id.slice('artifact:'.length)} sectionId={section.id} offline={deviceCopy} loadedSnapshot={imageSections.get(section.id)?.snapshot ?? null} refreshOnce={reviewerImages.refreshOnce}
                   reviewerTitle={reviewer.title} sectionTitle={section.title}
                   onAsk={image => askImage(section.id, image)} onAvailability={available => setSnapshotAvailability(current => current[section.id] === available ? current : { ...current, [section.id]: available })} /> : null}
             </View>
             <TopicAssist key={`${session?.user.id}|${reviewer.id}|${reviewer.generatedAt}|${section.id}|${deferredQuery}`} reviewer={reviewer} sectionId={section.id}
               owner={session?.user.id ?? ""} client={snapshotClient} online={!deviceCopy && figureSections.online === true}>
-            {figureArtifactId ? <ExternalVisual client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id} visual={reviewerVisuals?.[section.id]} onAsk={image => askImage(section.id, image)}
+            {figureArtifactId ? <ExternalVisual client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id} visual={imageSections.get(section.id)?.external} onAsk={image => askImage(section.id, image)}
               reviewerTitle={reviewer.title} sectionTitle={section.title}
               online={!deviceCopy && figureSections.online === true}
               hasSourceVisual={figureSections.has(section.id) ? figureAvailability[section.id] === true : hasSnapshotControl && snapshotAvailability[section.id] === true} /> : null}

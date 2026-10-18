@@ -24,6 +24,15 @@ const button=(label:string)=>tree!.root.findAllByType(Pressable).find(node=>node
 async function mount(overrides:Partial<typeof props> & {reviewerTitle?:string;sectionTitle?:string}={}) {await act(async()=>{tree=create(createElement(SourceFigures,{...props,...overrides}));});}
 afterEach(async()=>{if(tree)await act(async()=>tree!.unmount());tree=undefined;vi.clearAllMocks();vi.useRealTimers();});
 describe('in-place source figure sheet',()=>{
+  it('uses reviewer-loaded figures immediately offscreen without section requests and refreshes image failures once through the reader',async()=>{
+    const refreshOnce=vi.fn(async()=>true);
+    await act(async()=>{tree=create(createElement(SourceFigures,{...props,visible:false,loadedFigures:[figure],refreshOnce}));});
+    expect(tree!.root.findAllByType(Image)).toHaveLength(1);expect(mocks.read).not.toHaveBeenCalled();
+    await act(async()=>tree!.root.findAllByType(Image)[0]!.props.onError());expect(refreshOnce).toHaveBeenCalledOnce();
+    expect(tree!.root.findAllByType(Image)).toHaveLength(0);
+    await act(async()=>tree!.update(createElement(SourceFigures,{...props,visible:false,loadedFigures:[{...figure,url:'https://image.test/fresh'}],refreshOnce})));
+    expect(tree!.root.findAllByType(Image)[0]!.props.source.uri).toBe('https://image.test/fresh');expect(mocks.read).not.toHaveBeenCalled();
+  });
   it('reports only loaded inline figures, not discovery or an empty/failed read',async()=>{
     const onAvailability=vi.fn();mocks.read.mockResolvedValue([figure]);
     await act(async()=>{tree=create(createElement(SourceFigures,{...props,onAvailability}));});

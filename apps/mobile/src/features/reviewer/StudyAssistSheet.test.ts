@@ -13,7 +13,13 @@ vi.mock('../../services/externalVisuals',async load=>({...await load<typeof impo
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('./ShareReviewerMenu', () => ({ ShareReviewerMenu: 'ShareReviewerMenu' }));
-const figures=vi.hoisted(()=>({available:new Set<string>(),online:false}));
+const figures=vi.hoisted(()=>({available:new Set<string>(),online:false,snapshots:{} as Record<string,import('@stay-focused/shared').ReviewerSnapshot>}));
+vi.mock('../../services/reviewerImages',()=>({useReviewerImages:(_client:unknown,_id:unknown,offline:boolean)=>({
+  data:offline || !figures.online?null:{sections:[...new Set([...reviewer.sections.map(s=>s.id),...figures.available,...Object.keys(visuals.sections)])].map(sectionId=>({
+    sectionId,hasFigures:figures.available.has(sectionId),figures:figures.available.has(sectionId)?[{id:'figure',url:'https://image.test/figure',width:300,height:200}]:[],
+    snapshot:figures.snapshots[sectionId]??{available:false,reason:'no_page_source'},external:visuals.sections[sectionId],
+  })),external:{checked:0,total:0,running:false}},refreshOnce:async()=>true,
+})}));
 vi.mock('./SourceFigures',()=>({
   SourceFigures:(props:{hasFigures:boolean;offline:boolean})=>props.hasFigures&&!props.offline?createElement('SourceFigures',props):null,
   useFigureAvailability:(_client:unknown,_id:unknown,offline:boolean)=>Object.assign(offline?new Set():figures.available,{online:!offline&&figures.online}),
@@ -48,7 +54,7 @@ const { assistStore } = await import('./assistStore');
 beforeEach(() => { vi.stubGlobal('requestAnimationFrame', (work: FrameRequestCallback) => { work(0); return 0; }); });
 let rendered: ReactTestRenderer | undefined;
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; vi.clearAllMocks(); vi.unstubAllGlobals(); assistStore.reset(); figures.available.clear(); figures.online=false; visuals.sections={}; });
+afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; vi.clearAllMocks(); vi.unstubAllGlobals(); assistStore.reset(); figures.available.clear(); figures.online=false; figures.snapshots={}; visuals.sections={}; });
 const detail = reviewerDetail();
 const reviewer = ('reviewer' in detail ? detail.reviewer : null)!;
 const selection = selectAssistBlock(reviewer, reviewer.sections[0]!.id, reviewer.sections[0]!.blocks[0]!.id)!;
@@ -88,21 +94,24 @@ describe('snapshot discovery for persisted reviewer headers', () => {
     await act(async()=>rendered!.update(createElement(ReviewerReaderScreen,props)));expect(externalButtons()).toHaveLength(0);
     figures.online=true;await act(async()=>rendered!.update(createElement(ReviewerReaderScreen,{...props,deviceCopy:true})));expect(externalButtons()).toHaveLength(0);
   });
-  it('activates course visual reads only for sections near the current scroll viewport',async()=>{
+  it('passes cached course images to offscreen sections immediately, independent of the scroll viewport',async()=>{
     figures.online=true;
+    const cached={available:true as const,id:'snapshot',url:'https://image.test/cached',page:2,width:300,height:200,sourceLabel:'Synthetic source'};
+    figures.snapshots[reviewer.sections[0]!.id]=cached;
     await act(async()=>{rendered=create(createElement(ReviewerReaderScreen,{artifact:detail.artifact,reviewer,deviceCopy:false}));});
     const snapshot=()=>rendered!.root.findAll(node=>String(node.type)==='SourcePageSnapshot')[0]!;
-    expect(snapshot().props.visible).toBe(false);
+    expect(snapshot().props.loadedSnapshot).toEqual(cached);expect(snapshot().props.visible).toBeUndefined();
     const section=snapshot().parent!.parent!;
     await act(async()=>section.props.onLayout({nativeEvent:{layout:{y:4000,height:1000}}}));
-    expect(snapshot().props.visible).toBe(false);
+    expect(snapshot().props.loadedSnapshot).toEqual(cached);
     const page=rendered!.root.findAll(node=>String(node.type)==='Page')[0]!;
     await act(async()=>page.props.onScroll({nativeEvent:{contentOffset:{y:3500},contentSize:{height:6000},layoutMeasurement:{height:800}}}));
-    expect(snapshot().props.visible).toBe(true);
+    expect(snapshot().props.loadedSnapshot).toEqual(cached);
     await act(async()=>page.props.onScroll({nativeEvent:{contentOffset:{y:0},contentSize:{height:6000},layoutMeasurement:{height:800}}}));
-    expect(snapshot().props.visible).toBe(false);
+    expect(snapshot().props.loadedSnapshot).toEqual(cached);
   });
   it('uses batched figure availability per header and keeps the page fallback for other sections',async()=>{
+    figures.online=true;
     figures.available.add(reviewer.sections[0]!.id);
     await act(async()=>{rendered=create(createElement(ReviewerReaderScreen,{artifact:detail.artifact,reviewer,deviceCopy:false}));});
     const icons=rendered!.root.findAll(node=>String(node.type)==='SourceFigures');

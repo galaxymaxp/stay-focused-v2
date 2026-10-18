@@ -23,6 +23,14 @@ async function mount(offline = false) { await act(async () => { tree = create(cr
 const buttons = () => tree!.root.findAllByType(Pressable);
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.clearAllMocks(); vi.useRealTimers(); });
 describe('source-page thumbnail and viewer', () => {
+  it('uses the reviewer-loaded snapshot offscreen without discovery, render, heartbeat or tap requests',async()=>{
+    vi.useFakeTimers();const refreshOnce=vi.fn(async()=>true),snapshot={...ready,available:true as const};
+    await act(async()=>{tree=create(createElement(SourcePageSnapshot,{...props,visible:false,loadedSnapshot:snapshot,refreshOnce}));});
+    expect(tree!.root.findAllByType(Image)).toHaveLength(1);expect(mocks.read).not.toHaveBeenCalled();
+    await act(async()=>buttons()[0]!.props.onPress());expect(tree!.root.findByType(Modal).props.visible).toBe(true);
+    await act(async()=>{await vi.advanceTimersByTimeAsync(30000);});expect(mocks.read).not.toHaveBeenCalled();
+    await act(async()=>tree!.root.findAllByType(Image)[0]!.props.onError());expect(refreshOnce).toHaveBeenCalledOnce();
+  });
   it('hides source details until opening, retaining grounding and the accessible image name',async()=>{
     mocks.read.mockResolvedValue(ready);await mount();
     const text=()=>tree!.root.findAllByType(Text).map(n=>[n.props.children].flat().join('')).join(' ');

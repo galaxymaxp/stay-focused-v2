@@ -40,9 +40,9 @@ export function useFigureAvailability(client:ExperienceClient,artifactId:string|
   return !offline && artifactId===state.artifactId?state.sections:EMPTY;
 }
 
-export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,visible=true,onAsk,onAvailability,reviewerTitle='Reviewer',sectionTitle='Section'}:{
+export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,visible=true,loadedFigures,refreshOnce,onAsk,onAvailability,reviewerTitle='Reviewer',sectionTitle='Section'}:{
   client:ExperienceClient;artifactId:string;sectionId:string;hasFigures:boolean;offline:boolean;visible?:boolean;onAsk?:(image:StudyImageTarget)=>void;
-  onAvailability?:(available:boolean)=>void;
+  onAvailability?:(available:boolean)=>void; loadedFigures?:readonly SourceFigure[]; refreshOnce?:()=>Promise<boolean>;
   reviewerTitle?:string;sectionTitle?:string;
 }) {
   const {colors}=useTheme();const {height}=useWindowDimensions();
@@ -53,12 +53,12 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
   useEffect(()=>{availabilityRef.current?.(hasImages);},[hasImages]);
   const request=useRef<AbortController|null>(null);
   useEffect(()=>{
-    setOpen(false);setFigures([]);setHidden(false);request.current?.abort();
+    setOpen(false);setFigures(loadedFigures ?? []);setHidden(false);setIndex(0);request.current?.abort();
     return ()=>{request.current?.abort();request.current=null;};
-  },[client,artifactId,sectionId,offline,hasFigures]);
+  },[client,artifactId,sectionId,offline,hasFigures,loadedFigures]);
   const close=()=>setOpen(false);
   useEffect(()=>{
-    if(offline || !hasFigures || !visible || figures.length || hidden)return;
+    if(loadedFigures !== undefined || offline || !hasFigures || !visible || figures.length || hidden)return;
     request.current?.abort();const controller=new AbortController();request.current=controller;
     const timeout=setTimeout(()=>{controller.abort();if(request.current===controller){setHidden(true);setOpen(false);}},10000);
     void (async()=>{try {
@@ -68,7 +68,8 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
     }catch {if(request.current===controller && !controller.signal.aborted){setHidden(true);setOpen(false);}}
     finally {clearTimeout(timeout);}})();
     return ()=>{controller.abort();clearTimeout(timeout);if(request.current===controller)request.current=null;};
-  },[client,artifactId,sectionId,hasFigures,offline,visible,figures.length,hidden]);
+  },[client,artifactId,sectionId,hasFigures,offline,visible,figures.length,hidden,loadedFigures]);
+  const failed=()=>{setHidden(true);close();void refreshOnce?.();};
   if(offline)return hasFigures ? <AskImageButton offline /> : null;
   if(!hasFigures || hidden)return null;
   const figure=figures[index];const label=figure?.page?`From page ${figure.page}`:figure?.slide?`From slide ${figure.slide}`:'From source';
@@ -78,7 +79,7 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
       {figures.map((item,i)=>{
         const caption=item.slide?`Diagram from slide ${item.slide}`:item.page?`Diagram from page ${item.page}`:'Source diagram';
         return <View key={item.id}><Pressable accessibilityRole="button" accessibilityLabel={`Enlarge ${caption}`} style={{minHeight:hitTarget.min}} onPress={()=>{setIndex(i);setOpen(true);}}>
-          <Image source={{uri:item.url}} accessibilityLabel={caption} resizeMode="contain" style={{width:'100%',height:Math.min(360,360*item.height/item.width)}} onError={()=>{setHidden(true);close();}}/>
+          <Image source={{uri:item.url}} accessibilityLabel={caption} resizeMode="contain" style={{width:'100%',height:Math.min(360,360*item.height/item.width)}} onError={failed}/>
         </Pressable><AskImageButton offline={offline} onAsk={onAsk} image={{reference:{kind:'figure',id:item.id},thumbnail:item.url,label:caption}} /></View>;
       })}
     </View>:null}
@@ -89,7 +90,7 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
         <Text style={{color:colors.textPrimary}}>{label}</Text>
         <View style={{height:Math.min(height*0.5,spacing[12]*8)}}>
           <ZoomablePage key={figure.id} url={figure.url} width={figure.width} height={figure.height} label="Source figure" onZoomChange={onZoomChange}
-            onError={()=>{setHidden(true);close();}}/>
+            onError={failed}/>
         </View>
         <AskImageButton offline={offline} onAsk={target=>{close();onAsk?.(target);}} image={{reference:{kind:'figure',id:figure.id},thumbnail:figure.url,label}} />
         <SaveImageButton offline={offline} image={{uri:figure.url,reviewerTitle,sectionTitle,kind:'figure'}} refreshUri={async()=>{

@@ -7,6 +7,7 @@ vi.mock('expo-constants',()=>({default:{expoConfig:{version:'2.2.0'}}}));
 vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => undefined) } }));
 
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
+vi.mock('../../services/reviewerImages',()=>({useReviewerImages:()=>({data:null,refreshOnce:async()=>false})}));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('./ShareReviewerMenu', () => ({ ShareReviewerMenu: 'ShareReviewerMenu' }));
 vi.mock("react-native", () => ({
