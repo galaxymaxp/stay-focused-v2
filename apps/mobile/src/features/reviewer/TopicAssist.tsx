@@ -1,7 +1,7 @@
-import { TOPIC_ACTIONS, TOPIC_LEVELS, TOPIC_LABELS, STUDY_OFFLINE, STUDY_GROUNDING_LABELS, selectTopic, topicLevelAction,
+import { TOPIC_ACTIONS, TOPIC_LEVELS, TOPIC_LABELS, TOPIC_SHORT_LABELS, EXPOUND_LABEL, STUDY_OFFLINE, STUDY_GROUNDING_LABELS, selectTopic, topicLevelAction,
   type ReviewerReaderModel, type TopicAction, type TopicLevel, type TopicResult } from '@stay-focused/shared';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import type { ExperienceClient } from '../../services/experienceApi';
 import { Copy } from '../../design/primitives';
 import { useTheme } from '../../design/theme';
@@ -23,6 +23,9 @@ function TopicAssistContent({ reviewer, sectionId, owner, client, online, childr
   const selection = useMemo(() => selectTopic(reviewer, sectionId), [reviewer, sectionId]);
   const [level, setLevel] = useState<TopicLevel>('original');
   const [expanded, setExpanded] = useState(false);
+  // Below 380pt, each quarter has less than ~85pt for the longest full label.
+  const [rowWidth, setRowWidth] = useState(0);
+  const labels = rowWidth < 380 ? TOPIC_SHORT_LABELS : TOPIC_LABELS;
   const [entries, setEntries] = useState<Partial<Record<TopicAction, Entry>>>({});
   const alive = useRef(true);
   const reveal = useAnswerReveal();
@@ -66,19 +69,23 @@ function TopicAssistContent({ reviewer, sectionId, owner, client, online, childr
     : entry?.status === 'error' ? <View><Copy>{entry.error}</Copy><Pressable accessibilityRole="button" accessibilityLabel="Retry topic explanation" disabled={!online} onPress={retry}><Copy color={colors.accent}>Retry</Copy></Pressable></View>
     : <Copy muted>Creating your explanation…</Copy>;
   return <View style={{ gap: spacing[3] }}>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', gap: spacing[1] }}>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Topic level" style={{ flexDirection: 'row', borderRadius: radius.control, backgroundColor: colors.surfaceSecondary }}>
+    <View testID="topic-level-pill" onLayout={event => setRowWidth(event.nativeEvent.layout.width)}
+      style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, paddingHorizontal: spacing[1], borderRadius: radius.control, backgroundColor: colors.surfaceSecondary }}>
+      <View accessibilityRole="radiogroup" accessibilityLabel="Topic level" style={{ flex: 3, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center' }}>
         {TOPIC_LEVELS.map(item => { const a = topicLevelAction(item), disabled = !!a && !canUse(a); return <Pressable key={item}
           accessibilityRole="radio" accessibilityLabel={TOPIC_LABELS[item]} accessibilityState={{ checked: level === item, disabled }}
-          disabled={disabled} onPress={() => choose(item)} style={{ minHeight: 44, paddingHorizontal: spacing[2], justifyContent: 'center', borderRadius: radius.control, backgroundColor: level === item ? colors.blueSoft : undefined, opacity: disabled ? 0.45 : 1 }}>
-          <Copy size="caption" color={level === item ? colors.accent : colors.textSecondary}>{TOPIC_LABELS[item]}</Copy>
+          disabled={disabled} onPress={() => choose(item)} hitSlop={{ top: spacing[1] + 2, bottom: spacing[1] + 2 }}
+          style={{ flex: 1, minWidth: 0, minHeight: spacing[8], paddingHorizontal: spacing[1], justifyContent: 'center', borderRadius: radius.control, backgroundColor: level === item ? colors.blueSoft : undefined, opacity: disabled ? 0.45 : 1 }}>
+          <Copy size="caption" numberOfLines={1} style={{ textAlign: 'center' }} color={level === item ? colors.accent : colors.textSecondary}>{labels[item]}</Copy>
         </Pressable>; })}
       </View>
-      <Pressable accessibilityRole="button" accessibilityLabel="Expound" accessibilityState={{ expanded, disabled: !expanded && !canUse('topic_expound') }}
-        disabled={!expanded && !canUse('topic_expound')} onPress={toggleExpound} style={{ minHeight: 44, paddingHorizontal: spacing[2], justifyContent: 'center', opacity: canUse('topic_expound') ? 1 : 0.45 }}>
-        <Copy size="caption" color={colors.accent}>Expound</Copy>
+      <View importantForAccessibility="no" style={{ width: 1, height: spacing[5], backgroundColor: colors.separator }} />
+      <Pressable accessibilityRole="button" accessibilityLabel={EXPOUND_LABEL} accessibilityState={{ expanded, disabled: !expanded && !canUse('topic_expound') }}
+        disabled={!expanded && !canUse('topic_expound')} onPress={toggleExpound} hitSlop={{ top: spacing[1] + 2, bottom: spacing[1] + 2 }}
+        style={{ flex: 1, minWidth: 0, minHeight: spacing[8], paddingHorizontal: spacing[1], justifyContent: 'center', borderRadius: radius.control, backgroundColor: expanded ? colors.blueSoft : undefined, opacity: canUse('topic_expound') ? 1 : 0.45 }}>
+        <Copy size="caption" numberOfLines={1} style={{ textAlign: 'center' }} color={expanded ? colors.accent : colors.textSecondary}>{EXPOUND_LABEL}</Copy>
       </Pressable>
-    </ScrollView>
+    </View>
     {!online && <Copy size="caption" muted>{STUDY_OFFLINE}</Copy>}
     <StudyAnswerArea id={bodyId}>{level === 'original' ? children : renderEntry(current, () => action && run(action, bodyId))}</StudyAnswerArea>
     {expanded && <StudyAnswerArea id={expoundId}><View style={{ gap: spacing[2] }}><Copy size="h3">Expound</Copy>{renderEntry(expound, () => run('topic_expound', expoundId))}</View></StudyAnswerArea>}

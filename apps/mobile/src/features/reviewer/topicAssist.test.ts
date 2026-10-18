@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { selectTopic, TOPIC_PROMPT_VERSION, type TopicAction, type TopicResult, type ReviewerReaderModel } from '@stay-focused/shared';
 vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable' }));
 vi.mock('../../design/primitives', () => ({ Copy: 'Copy' }));
-vi.mock('../../design/theme', () => ({ useTheme: () => ({ colors: {} }) }));
+vi.mock('../../design/theme', () => ({ useTheme: () => ({ colors: { blueSoft: 'selected', accent: 'accent', textSecondary: 'secondary', separator: 'border', surfaceSecondary: 'surface' } }) }));
 const mocks = vi.hoisted(() => ({ peek: vi.fn(), run: vi.fn(), begin: vi.fn(() => 1), complete: vi.fn(), cancel: vi.fn() }));
 vi.mock('./assistStore', () => ({ topicAssist: { peek: mocks.peek, run: mocks.run } }));
 vi.mock('./studyAnswerScroll', () => ({ useAnswerReveal: () => ({ begin: mocks.begin, complete: mocks.complete, cancel: mocks.cancel }), StudyAnswerArea: 'Answer' }));
@@ -21,6 +21,54 @@ async function mount(online = true) { await act(async () => { tree = create(crea
 function button(label: string) { return tree!.root.findAllByType('Pressable' as never).find(node => node.props.accessibilityLabel === label)!; }
 async function press(label: string) { await act(async () => button(label).props.onPress()); }
 const body = () => JSON.stringify(tree!.toJSON());
+it('keeps full radio labels and an independent Expound button together without scrolling', async () => {
+  await mount();
+  const pill = tree!.root.findByProps({ testID: 'topic-level-pill' });
+  const levels = pill.findByProps({ accessibilityRole: 'radiogroup' });
+  expect(tree!.root.findAllByType('ScrollView' as never)).toHaveLength(0);
+  expect(pill.findAllByType('Pressable' as never)).toHaveLength(4);
+  expect(levels.findAllByType('Pressable' as never)).toHaveLength(3);
+  expect(pill.findAllByType('Pressable' as never).includes(button('Expound'))).toBe(true);
+  for (const label of ['Original', 'Simplify', 'Explain simply']) {
+    expect(button(label).props.accessibilityRole).toBe('radio');
+    expect(button(label).props.accessibilityState).toEqual({ checked: label === 'Original', disabled: false });
+  }
+  expect(button('Expound').props.accessibilityState.expanded).toBe(false);
+  expect(button('Expound').findByType('Copy' as never).props.color).toBe('secondary');
+  await press('Simplify'); await press('Expound');
+  expect(button('Simplify').props.accessibilityState.checked).toBe(true);
+  expect(button('Expound').props.accessibilityRole).toBe('button');
+  expect(button('Expound').props.accessibilityState).toEqual({ expanded: true, disabled: false });
+  expect(button('Expound').props.style.backgroundColor).toBe('selected');
+  expect(body()).toContain('topic_expound');
+  await press('Explain simply');
+  expect(button('Expound').props.accessibilityState.expanded).toBe(true);
+  await press('Expound');
+  expect(button('Explain simply').props.accessibilityState.checked).toBe(true);
+  expect(button('Expound').props.style.backgroundColor).toBeUndefined();
+  expect(body()).not.toContain('topic_expound');
+});
+it('uses compact labels below 380 measured points with centered single-line text and vertical 44pt targets', async () => {
+  await mount();
+  const pill = tree!.root.findByProps({ testID: 'topic-level-pill' });
+  const visible = (label: string) => button(label).findByType('Copy' as never).props.children;
+  for (const width of [360, 379, 380, 500, 320]) {
+    await act(async () => pill.props.onLayout({ nativeEvent: { layout: { width } } }));
+    expect(visible('Simplify')).toBe(width < 380 ? 'Simpler' : 'Simplify');
+    expect(visible('Explain simply')).toBe(width < 380 ? 'Simplest' : 'Explain simply');
+    for (const label of ['Original', 'Simplify', 'Explain simply', 'Expound']) {
+      const segment = button(label), text = segment.findByType('Copy' as never);
+      expect(text.props.numberOfLines).toBe(1); expect(text.props.style.textAlign).toBe('center');
+      expect(segment.props.style.minHeight).toBe(32);
+      expect(segment.props.style.minHeight + segment.props.hitSlop.top + segment.props.hitSlop.bottom).toBeGreaterThanOrEqual(44);
+      expect(segment.props.hitSlop.left).toBeUndefined(); expect(segment.props.hitSlop.right).toBeUndefined();
+    }
+    expect(pill.props.style.minHeight).toBeGreaterThanOrEqual(44);
+    expect(pill.findByProps({ accessibilityRole: 'radiogroup' }).props.style.minHeight).toBeGreaterThanOrEqual(44);
+  }
+  await press('Simplify');
+  expect(mocks.run).toHaveBeenCalledWith(props.owner, props.client, selection, 'topic_simplify', true);
+});
 it('Original renders instantly without generation; each topic has one compact level control and Expound', async () => {
   await mount(); expect(body()).toContain('CANONICAL_BODY'); expect(mocks.run).not.toHaveBeenCalled();
   for (const label of ['Original', 'Simplify', 'Explain simply', 'Expound']) expect(button(label)).toBeDefined();
