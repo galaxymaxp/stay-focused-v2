@@ -4398,3 +4398,67 @@ email, environment-file edit or push occurred. Unrelated work is preserved.
 Finite endpoint WG2 reached; WV1/MD1 and other later work were not started.
 
 Acceptance: [WG2 generated Reviewer state](acceptance/wg2-generated-reviewer-state.md).
+
+
+## WV1/N7 unattended reviewer image load - PASS (2026-10-18)
+
+Status: **PASS** for STEP 0-5, mocked tests, fresh serial gates, docs and local
+commits on `overnight/2026-10-15_feedback`, baseline `7112770` (includes
+`653e8d8`). Website
+and mobile load all cached reviewer image URLs in one owner-scoped `/figures`
+response on open. Bulk snapshot discovery checks the exact original once and
+never renders. Missing snapshots use a three-request queue with read-only
+bounded polling; source-image errors share one signed-URL refresh. Website
+reserves image boxes, eagerly loads the first two images, and lazily loads the
+rest with async decoding. IM2 Ask/Save/details, source priority, owner isolation
+and offline/identity guards remain. Legacy routes are compatible; no migration
+or dependency change.
+
+Synthetic fixture: **7 -> 2 metadata requests**, first course URL **2 -> 1
+sequential responses**; unrendered page **3 -> 2** with mocked immediate
+completion. Earliest URL including stored external remains **1 -> 1**.
+Production speed is unverified.
+
+
+**FRESH PASS, serial:** forced root typecheck/lint/build **8/8 tasks each,
+0 cached**; API **2283/2283** (201 files, three existing live skips),
+web **227/227** (39 files), shared **362/362** (42 files),
+mobile **1269/1269** (135 files); standalone API/web builds
+**1/1 each**, **35/35** and **19/19** pages; mobile Android export **1/1**.
+Root build also exports Android/iOS/web. Six existing lint warnings remain.
+Shared's default result includes emitted tests; the separate source-only run
+is **FRESH PASS, 181/181 tests in 21 files**.
+Diff and staged-diff hygiene PASS. First-attempt failures and corrected fixture
+mocks are retained in acceptance; no nondeterministic flake observed.
+
+Local implementation commits:
+
+- 3d54f97 feat(api): batch owner-scoped reviewer image discovery
+- e5c1165 perf(web): load reviewer visuals on open
+- 32a1714 perf(mobile): load reviewer visuals with the reader
+- docs: close WV1 (this documentation/handoff commit; final hash in `tmp/overnight/WV1.status`).
+
+First full API run: 2,281 pass, 1 fail, 3 live skips; corrected old route mock.
+Next full mobile run: 1,246 pass, 22 fail across three reader files; corrected
+old hook mocks and replaced obsolete scroll gating with offscreen propagation
+coverage (focused 52/52 PASS). Initial type/fixture and preload-path failures
+are also retained in acceptance. Final suites have zero failures. No flake
+observed. Baseline exact fixture was reproduced from Git under ignored tmp,
+1/1 PASS; no duplicate baseline code or generated validation artifact is staged.
+
+### Owner steps remaining
+
+**Rollout and Device checks - NOT RUN, skipped entirely.** Owner RB5: deploy
+reviewed API/web and measure website image load speed on a real reviewer.
+Publish the mobile change and verify cached/pending images, expired signatures,
+offline behavior and IM2 controls on device. Deployment revision, production
+rows, actual speed, device behavior and Scheduler state are **UNVERIFIED
+(owner to confirm)**. No remote service call, deploy, remote SQL/migration,
+Scheduler operation, email, environment-file edit or push occurred. Local
+gate children blocked non-loopback sockets; live-test switches and telemetry
+were disabled. Unrelated UI/, mobile .gitignore and supabase/.temp are preserved.
+The absent overnight roadmap is recorded; the complete WV1 prompt supplied
+scope. The finite endpoint is WV1; no later task was started.
+
+Acceptance: [WV1](acceptance/wv1-reviewer-images.md).
+ADR: [ADR-042](../adr/ADR-042-reviewer-visuals-single-load.md).

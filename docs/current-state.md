@@ -1,5 +1,42 @@
 # Current State
 
+## WV1/N7 reviewer image load complete locally - PASS (2026-10-18)
+
+**PASS for unattended STEP 0-5, tests, local gates, docs and commits.** Website
+and mobile load all cached reviewer image URLs in one owner-scoped `/figures`
+response on open. Bulk snapshot discovery checks the exact original once and
+never renders. Missing snapshots use a three-request queue with read-only
+bounded polling; source-image errors share one signed-URL refresh. Website
+reserves image boxes, eagerly loads the first two images, and lazily loads the
+rest with async decoding. IM2 Ask/Save/details, source priority, owner isolation
+and offline/identity guards remain. Legacy routes are compatible; no migration
+or dependency change.
+
+Synthetic fixture: **7 -> 2 metadata requests**, first course URL **2 -> 1
+sequential responses**; unrendered page **3 -> 2** with mocked immediate
+completion. Earliest URL including stored external remains **1 -> 1**.
+Production speed is unverified.
+
+**FRESH PASS, serial:** forced root typecheck/lint/build **8/8 tasks each,
+0 cached**; API **2283/2283** (201 files, three existing live skips),
+web **227/227** (39 files), shared **362/362** (42 files),
+mobile **1269/1269** (135 files); standalone API/web builds
+**1/1 each**, **35/35** and **19/19** pages; mobile Android export **1/1**.
+Root build also exports Android/iOS/web. Six existing lint warnings remain.
+Diff and staged-diff hygiene PASS. First-attempt failures and corrected fixture
+mocks are retained in acceptance; no nondeterministic flake observed.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Owner RB5: deploy reviewed API/web and assess real reviewer image
+loading; publish/recheck the mobile change on device. Deployment revision,
+production rows, device behavior and Scheduler state are **UNVERIFIED (owner
+to confirm)**. No remote call, deployment, SQL/migration application, Scheduler
+action, email, environment-file edit or push occurred. The referenced overnight
+roadmap is absent; the complete WV1 prompt supplied scope. Unrelated untracked
+paths are preserved. This finite run ends at WV1; no later task was started.
+
+[WV1 acceptance](ai/acceptance/wv1-reviewer-images.md).
+
 ## WG2 Generate saved Reviewer state complete locally - PASS (2026-10-18)
 
 **PASS for unattended WG2/N6 STEP 0-2, tests, fresh serial gates, documentation
