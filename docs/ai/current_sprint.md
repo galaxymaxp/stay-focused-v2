@@ -1,17 +1,47 @@
 <!-- SH2 begin -->
-## SH2 mobile hide-on-scroll - STOPPED (2026-10-18)
+## SH2 mobile hide-on-scroll complete locally - PASS (2026-10-18)
 
-Finite scope: SH2 STEP 0 through implementation, tests, local gates, docs and
-local commits only; no remote calls, environment edits, rollout or device work.
-Baseline `ef79f23`, branch `overnight/2026-10-15_feedback`.
-Preflight found Page uses native `RefreshControl`, whereas `pull.onScroll`
-belongs to Sheet's drag-to-dismiss helper. Step 2 assumes a Page pull scroll
-handler to compose. Stopped under unattended rule 4 before implementation.
-No app changes; SH2 remains pending. Tests/build gates **NOT RUN (0 executed)**.
-Documentation diff checks are recorded in the handoff. Production revision,
-database and Scheduler state: **UNVERIFIED (owner to confirm)**.
-Next: resolve the exact handoff question, then resume SH2. Owner Rollout and
-Device checks remain. PAR1 website hide-on-scroll is absent in inspected code.
+SH2 is done via SH2b: the corrected Page/native RefreshControl facts resolve
+and supersede the earlier preflight stop at `d98e58b`. Finite unattended
+STEP 0-4, local tests/gates and implementation are complete on
+`overnight/2026-10-15_feedback`, baseline `d98e58b`. Implementation commits:
+**10347e2**, **fb99de4**. Documentation closes this finite mobile-only slice;
+no later roadmap task was started.
+
+One shared hook collapses measured height and opacity with the existing
+**180ms** eased motion token (Reduce Motion: instant). Downward travel hides
+past **header height + 24pt**; **8pt** accumulated hysteresis prevents jitter.
+Up, top/negative overscroll and short refreshed/resized content reveal it;
+bottom rebound and viewport offset correction cannot reopen it accidentally.
+Page opts in and composes hook then caller at 16ms; native RefreshControl
+and Sheet drag logic are preserved. Hidden descendants leave accessibility
+and touch navigation. No dependency, schema, API or token change.
+
+Today collapses date/status, keeping its greeting in the fixed Queue/Profile
+actions row. Both Tasks pages collapse SnapshotStatus; main Tasks includes
+its existing sync line. Library course collapses only the offline caption,
+keeping sort/filter/selection/status controls fixed and organizer scroll
+connected. Reviewer snapshot/search collapses except while focused or a raw
+or deferred query is active, including match jumps. Back/actions/tab bar stay
+visible. **PAR1:** website has no hide-on-scroll header in inspected source.
+
+**FRESH PASS:** final forced root typecheck/lint **8/8 tasks each, 0 cached**;
+shared **447/447** (44 files, existing compiled copies included); mobile
+**1365/1365** (141 files); API build **1/1**, **35/35** static pages; Android
+local export **1/1**; diff/staged-diff checks **2/2**, zero whitespace errors.
+Focused tests **117/117**. Six existing lint warnings remain. Initial stub,
+missing-import and test-lint failures and their repairs are recorded in
+[SH2b acceptance](acceptance/sh2b-hide-on-scroll.md); no nondeterministic
+flake. Build-generated Next declarations were restored.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely: owner mobile OTA/APK, then Realme down/up/no-gap, existing refresh,
+Reduce Motion, search and TalkBack checks. Production revision, database/
+Scheduler state and real-account/device behavior are **UNVERIFIED (owner to
+confirm)**. No remote service calls, deployment, remote SQL, migration,
+Scheduler operation, email, environment-file edit or push. Unrelated work
+is preserved.
+
 <!-- SH2 end -->
 
 <!-- RV2 begin -->

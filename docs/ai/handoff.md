@@ -5219,3 +5219,95 @@ No application code, dependency, migration, environment file or unrelated
 work changed. No remote service call, deployment, remote SQL, Scheduler
 operation, email or push occurred. Current state, roadmap and sprint record
 this stop consistently; no later implementation step was entered.
+
+
+## SH2b mobile hide-on-scroll - PASS (2026-10-18)
+
+Status: **PASS - all finite unattended code steps and fresh gates complete
+locally.** SH2 is done via SH2b; the owner's corrected Page/Sheet facts
+resolve the earlier `d98e58b` stop. Baseline `d98e58b`, branch
+`overnight/2026-10-15_feedback`. The earlier SH2 footer is historical.
+
+Commits:
+
+- `10347e2 feat(mobile): add hide-on-scroll header hook`
+- `fb99de4 feat(mobile): hide secondary headers on scroll`
+- This footer, acceptance report and planning reconciliation are committed
+  as `docs: close SH2 mobile hide-on-scroll`; the resulting hash is recorded
+  in `tmp/overnight/SH2b.status` and progress after commit.
+
+One shared hook animates measured height and opacity to remove occupied
+space; the natural inner measurement stays available when hidden. Existing
+`motion.small` **180ms**, `Easing.inOut(Easing.quad)`; Reduce Motion sets
+values instantly. Hide after downward travel beyond **measured height +
+24pt** with **8pt accumulated hysteresis**; reveal on up, top/negative
+overscroll, short refreshed content or a fitting resized viewport. Clamp
+bottom offsets so elastic rebound/viewport enlargement cannot reopen it
+accidentally. Stop interrupted/unmounted animations. Hidden descendants
+use both accessibility exclusion properties and no pointer events.
+
+Title decision (STEP 0.3): Today greeting stays in the title row because
+Queue/Profile controls share that row; date moves from subtitle into the
+collapsible SnapshotStatus region. Main and course Tasks status headers opt
+in; main Tasks' existing Canvas sync line joins the collapsible region.
+Library course isolates the offline caption, leaving sort/filter/selection
+and status controls fixed via `headerBelowFixed`; organizer.onScroll still
+runs. Reviewer snapshot/search collapses except when focused or a raw or
+deferred query is active. This also holds it visible during match jumps.
+Page calls hook then caller at 16ms; native RefreshControl is unchanged.
+Back/header actions/tab bar remain visible. Sheet drag logic is untouched.
+No new dependency, native module, schema, API or token; no ADR required.
+**PAR1:** website has no hide-on-scroll header in inspected source.
+
+Verification (final code, fresh and serial):
+
+- **FRESH PASS:** `npm run typecheck -- --force`, **8/8 tasks, 0 cached**.
+- **FRESH PASS:** `npm run lint -- --force`, **8/8 tasks, 0 cached**;
+  zero errors, six existing warnings (five mobile import-order, one web unused import).
+- **FRESH PASS:** `npm run test --workspace @stay-focused/shared`,
+  **447/447**, **44 files**, including existing compiled copies.
+- **FRESH PASS:** `npm run test --workspace @stay-focused/mobile`,
+  **1365/1365**, **141 files**. Focused design/screens/Reviewer: **117/117**.
+- **FRESH PASS:** `npm run build --workspace @stay-focused/api`, **1/1**,
+  **35/35 static pages**. Generated `next-env.d.ts` restored to baseline.
+- **FRESH PASS:** `npm run build --workspace @stay-focused/mobile -- --platform android`,
+  **1/1 local export**. Expo offline and telemetry disabled in process env;
+  environment files untouched. Generated exports remain ignored.
+- **FRESH PASS:** `git diff --check` and `git diff --cached --check`,
+  **2/2**, zero whitespace errors, including final documentation.
+- All **7/7 required gate commands** passed; staged-diff checks also passed.
+  API unit/provider suites were **NOT RUN / NOT APPLICABLE** to this mobile-only change.
+
+Failed first attempts are retained: initial hook stub **15 passed / 2 failed**
+(static interpolation stub corrected); initial mobile typecheck **1 error**
+and combined focused tests **107 passed / 8 failed** (missing Today spacing
+import corrected); initial forced lint **7/8 tasks**, **1 error / 8 total
+warnings** (test element construction and two new import warnings corrected).
+The next focused run passed **115/115**; two added bottom-offset regressions
+bring the final focused total to **117/117**. Final root gates were repeated
+for the final code. No nondeterministic flake. Existing Vite config-loader,
+react-test-renderer and terminal color diagnostics do not indicate failures.
+Documentation helper first attempts found Python unavailable; Node performed
+the local edits successfully. Exact acceptance:
+[SH2b report](acceptance/sh2b-hide-on-scroll.md).
+Ignored raw logs/progress/status: `tmp/overnight/SH2b*`; none committed.
+
+### Owner steps remaining
+
+1. **Rollout - NOT RUN, skipped entirely:** Fely's mobile OTA/APK.
+2. **Device checks - NOT RUN, skipped entirely:** Realme Today, Tasks,
+   course Tasks, Library course and reviewer down/up with no blank gap;
+   persistent actions/tab bar; existing pull-to-refresh at top; instant
+   Reduce Motion; reviewer search while focused/typing/querying/match jumping;
+   TalkBack hidden descendants and restoration at the top.
+3. Production revision, database rows, Cloud Scheduler state and real-account/
+   device behavior are **UNVERIFIED (owner to confirm)**. No live check attempted.
+4. For later owner Vercel work, the CLI is absent; strongly recommend
+   `npm i -g vercel` for environment/deployment/log tooling. No installation
+   or Vercel CLI command was run in this unattended slice.
+
+No remote service call, deployment, remote SQL/migration, Scheduler change,
+email, environment-file edit or push. Unrelated `UI/`,
+`apps/mobile/.gitignore`, `supabase/.temp/` and ignored temporary work are
+preserved. Current state, roadmap and sprint are reconciled. SH2b is the
+finite endpoint; no later roadmap work was started.
