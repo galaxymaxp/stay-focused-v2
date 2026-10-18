@@ -1,5 +1,31 @@
 # Roadmap
 
+## QU1 Queue popout complete locally - PASS (2026-10-18)
+
+Finite unattended mobile + web Queue scope is complete: STEP 0-5, tests,
+fresh serial gates, docs and local commits. Shared helpers hide finished batch
+progress and govern idle state; compact headers use accessible busy refresh
+icons beside Close. Existing dismissal, focus and generation actions remain.
+The 4/4 screenshot was stale finished display, with a separate terminal-count
+defect repaired in the API. Failure attention remains independent of progress.
+No DTO/schema change, dependency, migration or new design token.
+Implementation: **7eb50c2**, **529d466**, **7f519a3**, **bc2e6b2**.
+
+**FRESH PASS:** root forced typecheck/lint **8/8 each, 0 cached**; shared
+**446/446** (44 files, existing compiled copies included), web **278/278**
+(42 files), mobile **1332/1332** (139 files), API **2315 passed / 3 skipped**
+(201 files); API build **1/1**, **35/35** pages; Android export **1/1**;
+final web typecheck/lint and diff/staged checks. Six existing lint warnings;
+the first mobile run's **8 assertion failures** and repair are retained in
+[QU1 acceptance](ai/acceptance/qu1-queue-popout.md). No nondeterministic flake.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely: owner website deploy, mobile OTA/APK, Android finished-batch/empty
+state/TalkBack refresh/outside/Back review, and web review at 1440/390 px.
+Production revision/database/Scheduler and real-account/device behavior remain
+**UNVERIFIED (owner to confirm)**. No remote calls, deployment, migration,
+environment-file edit or push. QU1 is the stopping point; no later task started.
+
 ## WG3 done via WG3b - PASS locally (2026-10-18)
 
 WG3b supersedes WG3's docs-only preflight stop at `1e53edd`. Website Generate

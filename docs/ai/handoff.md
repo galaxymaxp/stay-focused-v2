@@ -4959,3 +4959,107 @@ browser/device behavior: **UNVERIFIED (owner to confirm)**.
 
 Current state, roadmap and sprint are reconciled. WG3b is the finite endpoint;
 no next roadmap item is authorized by this run.
+
+## QU1 Queue popout redone - PASS locally (2026-10-18)
+
+**Status: PASS for unattended STEP 0-5, tests, required fresh serial gates,
+documentation and scoped local commits.** Branch
+`overnight/2026-10-15_feedback`, baseline `cabd5b8`; no branch switch or push.
+The finite endpoint is QU1. No later roadmap task was started.
+
+Both apps use shared active-only batch summaries and one idle rule. Completed
+outputs allow idle; running/queued/stopping jobs, visible attention items,
+mobile pending intents, batch waiting/quota/failed requests and unfinished
+summaries prevent it. Refresh is an accessible header icon beside Close, with
+busy/disabled state during initial and cached-data refresh. The existing
+pollers still deduplicate requests. Mobile retains outside tap and Android
+Back; web retains outside pointerdown, Escape, blur and trigger focus return.
+Existing Clear, QueueCard, batch Retry/Cancel and result-open actions remain.
+Spacing/icons/colors come from the existing design system.
+
+**4 of 4 diagnosis:** legitimate successful completion, not duplicate counting.
+The screenshot defect was stale finished progress display. Code review also
+found a separate count defect: terminal failed/cancelled requests and jobs
+could leave progress unfinished forever, including after Clear. Terminal
+attempts now settle progress while failures keep their independent attention
+UI; Retry changes a request back to waiting and reopens progress. In-memory
+API tests cover exact 4/4, overlapping membership, owner filtering, every job
+status and retry reopening. No DTO/schema, grant/RLS, quota, job publication,
+provider, dependency or migration change. No new ADR is needed.
+
+### Commits
+
+- `7eb50c2` feat(shared): add active batch summaries and idle queue rule
+- `529d466` fix(api): settle terminal course batch progress
+- `7f519a3` feat(mobile): compact queue popout with refresh icon
+- `bc2e6b2` feat(web): compact queue popout with refresh icon
+- `docs: close QU1` is the documentation closure commit containing this footer;
+  its hash and all five commits are recorded in `tmp/overnight/QU1.status`.
+
+All commits use author `galaxymaxp <omgraythekid@gmail.com>`. Only owned paths
+are staged. Original untracked `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/`
+remain untouched. Build-generated API `next-env.d.ts` was restored; generated
+outputs, local credentials, private fixtures and validation logs are not committed.
+
+### Gate counts (all local, FRESH, serial)
+
+- `npm run typecheck -- --force`: **8/8 tasks, 0 cached**, PASS.
+- `npm run lint -- --force`: **8/8 tasks, 0 cached**, PASS; **0 errors,
+  6 existing warnings** (five mobile import-order, one web unused import).
+- Shared workspace tests: **446/446**, **44/44 files**, PASS; includes existing
+  compiled copies and source tests. No separate source-only count is claimed.
+- Web workspace tests: **278/278**, **42/42 files**, PASS.
+- Mobile workspace tests: **1332/1332**, **139/139 files**, PASS.
+- API workspace tests: **2315 passed, 3 skipped, 0 failed**, **201/201 files**, PASS.
+- `npm run build --workspace @stay-focused/api`: **1/1**, **35/35** static pages,
+  PASS after the final terminal-count change.
+- `npm run build --workspace @stay-focused/mobile -- --platform android`:
+  **1/1 export**, **1 Android bundle, 35 assets, 4262 modules**, PASS with Expo
+  offline/telemetry disabled. This is a local export, not an APK or OTA release.
+- Final scoped web typecheck/lint after the corrected fixture: **1/1 each**,
+  PASS, one existing warning. Diff and each implementation staged-diff check:
+  **0 whitespace errors**, PASS; docs staged check is part of closure.
+
+First mobile attempt: **1324 passed / 8 failed**, **138/139 files**. New
+assertions serialized mocked icon props with circular React Fiber references;
+rendered-text assertions fixed that test-only defect. Initial lint passed
+8/8 with eight warnings; two new duplicate imports were removed, final six
+warnings are pre-existing. Initial API tests/build passed before final review;
+the final API suite adds all terminal-status and retry coverage. A web test
+fixture that combined a running badge with an empty list was corrected, then
+the full web suite and scoped typecheck/lint passed. Non-failing Vite and Expo
+color-environment notices remain. **No nondeterministic flake observed.**
+
+Evidence, exact commands and acceptance matrix:
+[QU1 acceptance](acceptance/qu1-queue-popout.md). Logs are ignored under
+`tmp/overnight/QU1-*.log`; progress/status remain under `tmp/overnight/`.
+Root aggregate/website production build: **NOT RUN**, outside QU1's explicit
+gate list. Live provider/workflow probes: **NOT APPLICABLE**.
+
+Production revision, actual database rows (including the screenshot's exact
+batch), Scheduler state and real-account/device/browser behavior are
+**UNVERIFIED (owner to confirm)**. Repository code/tests establish the display
+and count diagnosis; no live production evidence is claimed. The referenced
+`overnight/roadmaps/2026-10-18-web-desktop-mobile-polish-profiles.md` is absent;
+the self-contained QU1 prompt and repository/current planning files establish
+this scope. Named components were present and still had the old presentation;
+existing web outside/Escape handling was preserved rather than duplicated.
+No Supabase, Vercel, Google Cloud, Canvas or Resend call, deployment, remote SQL,
+migration, Scheduler operation, email, environment-file edit or push occurred.
+
+### Owner steps remaining
+
+1. **Rollout - NOT RUN, skipped entirely:** owner website deployment and mobile
+   OTA/APK. No QU1 migration is required. Coordinate rollout through the existing
+   owner release procedure; no remote action was taken here.
+2. **Device checks - NOT RUN, skipped entirely:** Android finished batch shows
+   no N-of-N line and correct idle text; TalkBack says Refresh queue; refresh
+   shows busy state/ignores repeated taps; outside tap and Android Back close.
+   Web at 1440 and 390 px: same finished/partial/attention behavior, refresh
+   label/busy state, outside/Escape/blur dismissal and trigger focus return.
+3. Confirm production revision, database/Scheduler state and real-account
+   behavior; these remain **UNVERIFIED (owner to confirm)**.
+4. Vercel CLI is absent. Strongly recommend `npm i -g vercel` for later
+   owner-controlled environment, deployment and log work; not run here.
+
+Current state, roadmap and sprint are reconciled. QU1 stops here.

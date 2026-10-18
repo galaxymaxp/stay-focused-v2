@@ -1,5 +1,34 @@
 # Current State
 
+## QU1 Queue popout complete locally - PASS (2026-10-18)
+
+Unattended STEP 0-5, tests and required fresh serial gates are complete on
+`overnight/2026-10-15_feedback`, baseline `cabd5b8`. Both apps show batch progress
+only while `done < total` and use one shared idle rule. Accessible header refresh
+icons replace the full Refresh actions and reflect in-flight refreshes with
+cached data. Existing dismissal, focus, Clear, Retry/Cancel and result actions
+remain. Spacing uses existing tokens. The valid 4/4 screenshot was stale display;
+a separate API defect now settles terminal batch attempts without hiding their
+independent failure attention. Retry reopens progress. No DTO/schema change.
+
+Implementation: **7eb50c2**, **529d466**, **7f519a3**, **bc2e6b2**.
+**FRESH PASS:** forced root typecheck/lint **8/8 tasks each, 0 cached**;
+shared **446/446** (44 files, including existing compiled copies), web
+**278/278** (42 files), mobile **1332/1332** (139 files), API **2315 passed,
+3 skipped** (201 files); API build **1/1**, **35/35** static pages; Android
+export **1/1**. Final web typecheck/lint and diff/staged-diff checks pass.
+Six existing lint warnings. First mobile attempt **1324 passed / 8 failed**
+(circular test serialization), corrected to green; no nondeterministic flake.
+[Acceptance and exact evidence](ai/acceptance/qu1-queue-popout.md).
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Owner website deploy and mobile OTA/APK, then Android finished-batch,
+TalkBack/refresh/outside-tap/Back checks and web review at 1440/390 px.
+Production revision, database rows, Scheduler and real-account/device behavior
+are **UNVERIFIED (owner to confirm)**. No remote service call, deployment,
+migration, Scheduler operation, environment-file edit or push. Unrelated work
+is preserved. QU1 is the finite endpoint; no later task started.
+
 ## WG3b Generate home complete locally - PASS (2026-10-18)
 
 WG3 is done via WG3b; this supersedes the docs-only preflight stop at

@@ -1,3 +1,32 @@
+<!-- QU1 begin -->
+## QU1 Queue popout complete locally - PASS (2026-10-18)
+
+Finite unattended endpoint: STEP 0-5, tests, fresh serial gates, documentation
+and scoped local commits on `overnight/2026-10-15_feedback`, baseline `cabd5b8`.
+Shared active-summary/idle helpers, accessible busy header refresh icons on
+mobile/web, tighter existing spacing and preserved dismissal/actions. The
+valid 4/4 screenshot was stale finished display; terminal-count repair also
+prevents failed/cancelled attempts from stranding progress. Failure attention
+and retry reopening remain. No DTO/schema change or migration.
+Implementation: **7eb50c2**, **529d466**, **7f519a3**, **bc2e6b2**.
+
+**FRESH PASS:** forced root typecheck/lint **8/8 each, 0 cached**; shared
+**446/446**, web **278/278**, mobile **1332/1332**, API **2315 passed / 3 skipped**;
+API build **1/1** (**35/35** pages), Android export **1/1**; final web
+typecheck/lint and diff/staged checks. Six existing lint warnings. Initial
+mobile **1324 passed / 8 failed** was a new assertion serialization defect,
+fixed to 1332/1332. No nondeterministic flake. Exact commands/files/evidence:
+[QU1 acceptance](acceptance/qu1-queue-popout.md).
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Owner website deploy and mobile OTA/APK, Android finished-batch,
+TalkBack/refresh/outside/Back checks and web at 1440/390 px. Production revision,
+database/Scheduler and real-account/device behavior are **UNVERIFIED (owner
+to confirm)**. No remote call, deployment, migration, environment-file edit or
+push. Unrelated work preserved; QU1 is complete locally. No later task started.
+
+<!-- QU1 end -->
+
 <!-- WG3b begin -->
 ## WG3 done via WG3b - PASS locally (2026-10-18)
 
