@@ -5129,3 +5129,93 @@ Scheduler action, email, environment-file edit or push occurred. API-generated
 Next declarations were inspected and restored. Unrelated untracked paths were
 preserved; no generated artifact, `tmp/` or `.local/` file was staged. Current
 state, roadmap and sprint are reconciled. RV2 stops here.
+
+## SH2 unattended handoff - STOPPED at STEP 0 (2026-10-18)
+
+Status: **STOPPED**, per SH2 unattended rule 4 and STEP 0's instruction to
+stop on code contradictions. SH2 is not implemented or complete. Baseline
+`ef79f23`, branch `overnight/2026-10-15_feedback`; no branch switch. Local
+upstream comparison: **37 ahead / 0 behind**, without fetching. Existing
+untracked `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` are preserved.
+
+Preflight evidence (baseline line numbers):
+
+- `primitives.tsx:198`: Page exists; expected props at :200-241. Header title
+  and subtitle at :288-293 share the row with back/leading/header actions,
+  Queue and Profile controls. `headerBelow` is :302, outside the scroll area.
+- Page's `onScroll` is passed directly to ScrollView at :307; native
+  `RefreshControl` is :318. **Page has no `pull` helper or pull scroll handler.**
+  The only `pull.onScroll` in the file is Sheet's at :564, from
+  `useSheetDrag(dismiss, ...)` at :519. This observes scrolling for sheet
+  drag-to-dismiss, not Page pull-to-refresh. Step 2 requires composing the
+  Page hook with an existing pull handler that does not exist in Page.
+  Reusing Sheet's handler would introduce unrelated dismissal semantics.
+- `theme.tsx:30,85,98`: `useTheme()` exposes `reducedMotion`.
+- `TodayScreen.tsx:289`: greeting is Page title; date is subtitle :290-294;
+  SnapshotStatus is headerBelow :295-296.
+- `TasksScreen.tsx:46,54`: Tasks and SnapshotStatus; course screen :100,124.
+  The separate Tasks SyncStatus is currently scroll content at :58.
+- `LibraryScreen.tsx:254`: LibraryCourseScreen; organizer onScroll :303;
+  headerBelow :307 includes status, sort and filter/selection actions as well
+  as offline caption :325. `libraryPresentation.ts:18-20` produces the caption;
+  `useLibraryOrganizer.ts:138` observes offsets for drag organization.
+- `ReviewerReader.tsx:268` updates anchors/metrics/scrubber; headerBelow :324
+  includes snapshot status and ReviewerSearchBar. No existing shared
+  hide-on-scroll header found by local design/web source inspection.
+
+**Exact owner question for resumption (not asked during unattended run):**
+May SH2 proceed by preserving Page's native RefreshControl unchanged and
+composing the hide-on-scroll handler only with Page's existing caller
+onScroll, treating the prompt's pull.onScroll reference as a Sheet-only
+misidentification?
+
+Title decision from STEP 0.3: keep the Today greeting/title row visible
+because it shares the row with persistent header controls. On an approved
+resume, only content below that row should collapse; the date currently in
+subtitle would need moving into the collapsible region with SnapshotStatus.
+No title/date layout changes were made. No animation method or thresholds
+were implemented/chosen; the prompt's >24px beyond measured height, 8px
+hysteresis and approximately 200ms easing remain proposed requirements.
+Library's sort/filter/selection actions also need to stay visible when
+isolating its offline caption. **PAR1:** no website hide-on-scroll header
+found in inspected code; website implementation remains outside SH2 scope.
+
+Verification and gate counts:
+
+- **FRESH:** local STEP 0 source/Git inspection completed with the contradiction
+  above. Initial upstream argument parsing failed once; quoted argument
+  rerun succeeded with 37/0. This was metadata inspection, not a gate failure.
+- **NOT RUN (0 executed):** `npm run typecheck -- --force`,
+  `npm run lint -- --force`, `npm run test -w @stay-focused/shared`,
+  `npm run test -w @stay-focused/mobile`,
+  `npm run build --workspace @stay-focused/api`, and
+  `npm run build --workspace @stay-focused/mobile -- --platform android`.
+  Stopped before app edits; no test pass counts inferred from previous runs.
+- **FRESH PASS (2/2, 0 whitespace errors):** documentation-only
+  `git diff --check` and `git diff --cached --check`. No suite failure or flake.
+- Production revision, database rows and Scheduler state are
+  **UNVERIFIED (owner to confirm)**. No live check attempted.
+
+Commits: one scoped documentation checkpoint, planned subject
+`docs: record SH2 preflight stop`; the resulting hash is recorded in
+`tmp/overnight/SH2.status` and `tmp/overnight/SH2.progress` after commit.
+No implementation commits exist for SH2.
+
+### Owner steps remaining
+
+1. Resolve the handler question above, then resume SH2 implementation, tests
+   and every required fresh serial gate before declaring code completion.
+2. **Rollout - NOT RUN, skipped entirely:** mobile OTA/APK is Fely's, only
+   after implementation and gates pass.
+3. **Device checks - NOT RUN, skipped entirely:** Realme Today, Tasks,
+   Library course and reviewer scroll down/up with no blank gap; persistent
+   actions/tab bar; pull-to-refresh at top; instant Reduce Motion; reviewer
+   search remains visible while typing/with query and after match jumps.
+4. Confirm any needed live production state. Vercel CLI is absent; strongly
+   recommend `npm i -g vercel` for later owner environment/deployment/log work.
+   No installation or Vercel CLI command was run here.
+
+No application code, dependency, migration, environment file or unrelated
+work changed. No remote service call, deployment, remote SQL, Scheduler
+operation, email or push occurred. Current state, roadmap and sprint record
+this stop consistently; no later implementation step was entered.

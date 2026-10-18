@@ -1,5 +1,20 @@
 # Current State
 
+## SH2 preflight - STOPPED (2026-10-18)
+
+SH2 remains unimplemented. At baseline `ef79f23` on
+`overnight/2026-10-15_feedback`, STEP 0 found a code/prompt contradiction:
+Page uses native `RefreshControl` (`primitives.tsx:318`) and forwards its
+caller's `onScroll` directly (`:307`). The `pull.onScroll` named by the
+prompt is in Sheet (`:564`), created by `useSheetDrag` (`:519`), for
+drag-to-dismiss; Page has no such handler to compose as required by step 2.
+The unattended rules require stopping on code contradictions. No app code
+changed. Tests and build gates: **NOT RUN (0 executed)** after the preflight
+stop. See the SH2 handoff footer for evidence and the exact resumption question.
+Rollout and Device checks remain owner steps; production state is
+**UNVERIFIED (owner to confirm)**. PAR1: the website has no hide-on-scroll
+header in the inspected code; no website implementation was attempted.
+
 ## RV2 topic level pill complete locally - PASS (2026-10-18)
 
 Finite unattended STEP 0-4, tests, all eight required fresh serial gate

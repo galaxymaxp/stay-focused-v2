@@ -1,5 +1,16 @@
 # Roadmap
 
+## SH2 mobile hide-on-scroll - STOPPED at preflight (2026-10-18)
+
+Pending owner resolution of the STEP 0 / step 2 handler assumption. Page's
+pull-to-refresh uses native `RefreshControl`; `pull.onScroll` is Sheet's
+drag-to-dismiss observer, outside Page. Unattended rule 4 requires stopping
+on this code contradiction. No hook, Page prop or screen opt-in was added;
+SH2 is **not done**. Tests/build gates **NOT RUN (0 executed)**. The handoff
+records exact locations and a question for the owner to resolve before resume.
+Owner Rollout and Device checks were skipped entirely. **PAR1:** website
+hide-on-scroll is absent in inspected code and remains outside SH2's mobile scope.
+
 ## RV2 topic level pill complete locally - PASS (2026-10-18)
 
 Finite unattended STEP 0-4, tests, all eight required fresh serial gate

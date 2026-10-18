@@ -1,3 +1,19 @@
+<!-- SH2 begin -->
+## SH2 mobile hide-on-scroll - STOPPED (2026-10-18)
+
+Finite scope: SH2 STEP 0 through implementation, tests, local gates, docs and
+local commits only; no remote calls, environment edits, rollout or device work.
+Baseline `ef79f23`, branch `overnight/2026-10-15_feedback`.
+Preflight found Page uses native `RefreshControl`, whereas `pull.onScroll`
+belongs to Sheet's drag-to-dismiss helper. Step 2 assumes a Page pull scroll
+handler to compose. Stopped under unattended rule 4 before implementation.
+No app changes; SH2 remains pending. Tests/build gates **NOT RUN (0 executed)**.
+Documentation diff checks are recorded in the handoff. Production revision,
+database and Scheduler state: **UNVERIFIED (owner to confirm)**.
+Next: resolve the exact handoff question, then resume SH2. Owner Rollout and
+Device checks remain. PAR1 website hide-on-scroll is absent in inspected code.
+<!-- SH2 end -->
+
 <!-- RV2 begin -->
 ## RV2 topic level pill complete locally - PASS (2026-10-18)
 
