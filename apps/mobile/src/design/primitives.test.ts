@@ -1,13 +1,13 @@
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Page, RowLink, SearchField } from "./primitives";
+import { Page, RowLink, SearchField, Sheet } from "./primitives";
 
 vi.mock("expo-router", () => ({ router: { canGoBack: () => true, back: vi.fn() } }));
 vi.mock("expo-router/js-tabs", async () => ({ BottomTabBarHeightContext: (await import("react")).createContext(undefined) }));
 vi.mock("../auth", () => ({ useAuth: () => ({ session: null }) }));
 vi.mock("./QueueButton", () => ({ QueueButton: "QueueButton" }));
-vi.mock("./sheetDrag", () => ({ useSheetDrag: vi.fn() }));
+vi.mock("./sheetDrag", () => ({ useSheetDrag: () => ({ drag: { interpolate: () => 1 }, touchHandlers: { onTouchMove: vi.fn() }, onScroll: vi.fn() }) }));
 vi.mock("./haptics", () => ({ haptic: { tap: vi.fn() } }));
 vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView", useSafeAreaInsets: () => ({ top: 0, bottom: 0 }) }));
 vi.mock("lucide-react-native", () => Object.fromEntries(["ArrowLeft", "ChevronRight", "FileText", "RefreshCw", "Search", "Settings", "X", "BookOpen", "ClipboardList", "Presentation", "FileQuestion", "Globe", "Info"].map(name => [name, name])));
@@ -19,8 +19,12 @@ vi.mock("react-native", () => ({
   View: "View", Text: "Text", TextInput: "TextInput", ScrollView: "ScrollView", RefreshControl: "RefreshControl",
   Pressable: "Pressable", Modal: "Modal", StatusBar: "StatusBar",
   useWindowDimensions: () => ({ width: 360, height: 800 }),
-  Easing: { inOut: (value: unknown) => value, quad: "quad" },
+  Easing: { inOut: (value: unknown) => value, out: (value: unknown) => value, in: (value: unknown) => value, quad: "quad" },
   Animated: {
+    timing: () => ({ start: (done?: () => void) => done?.() }),
+    parallel: () => ({ start: (done?: () => void) => done?.() }),
+    multiply: () => 1,
+    add: () => 0,
     View: "AnimatedView",
     Value: class {
       constructor(public value: number) {}
@@ -44,6 +48,31 @@ async function mount(props: Partial<React.ComponentProps<typeof Page>> = {}) {
   return rendered!.root;
 }
 const event = (y: number) => ({ nativeEvent: { contentOffset: { y }, contentSize: { height: 2000 }, layoutMeasurement: { height: 700 } } });
+
+describe('required sheet dismissal', () => {
+  it('disables back, backdrop, Done and drag dismissal while preserving scroll content', async () => {
+    const onClose=vi.fn();
+    const props={onClose,dismissible:false,children:'Download update'};
+    await act(async () => { rendered=create(createElement(Sheet,props)); });
+    const root=rendered!.root;
+    await act(async () => root.findByType('Modal' as never).props.onRequestClose());
+    const backdrop=root.findByProps({accessibilityLabel:'Dismiss'});
+    expect(backdrop.props.disabled).toBe(true);
+    await act(async () => backdrop.props.onPress());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(root.findAllByProps({testID:'sheet-done'})).toHaveLength(0);
+    expect(root.findAll(node => node.props.onTouchMove)).toHaveLength(0);
+    expect(root.findByType('ScrollView' as never).props.onScroll).toBeUndefined();
+  });
+  it('retains the default Done and Android back behavior for existing sheets', async () => {
+    const onClose=vi.fn();
+    const props={onClose,children:'Content'};
+    await act(async () => { rendered=create(createElement(Sheet,props)); });
+    expect(rendered!.root.findAllByProps({testID:'sheet-done'}).length).toBeGreaterThan(0);
+    await act(async () => rendered!.root.findByType('Modal' as never).props.onRequestClose());
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+});
 
 describe("Page secondary headers", () => {
   it("keeps default Page unwrapped and forwards the caller's exact handler", async () => {

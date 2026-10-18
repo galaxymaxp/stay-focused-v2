@@ -1,4 +1,5 @@
 import { useTodayClockWindow } from "./useTodayClockWindow";
+import { AppUpdateBanner } from './AppUpdateNotice';
 import { SnapshotStatus } from "./SnapshotStatus";
 import type {
   TodayItem,
@@ -295,6 +296,7 @@ export function TodayScreen() {
       scrollRef={scrollRef}
       scrollTouch={orbTouchPause}
     >
+      <AppUpdateBanner />
       <DayRingClock
         locked={locked}
         onToggleLock={toggleLock}

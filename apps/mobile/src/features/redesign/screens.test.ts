@@ -1707,3 +1707,9 @@ it('keeps the lock storage key and sends typed free time through the drag planni
   const request = mocks.request.mock.calls.find(call => call[1] === '/api/experience/planner/preview');
   expect(request?.[2].body).toEqual(planningRequest(localDate(), 1320, 240));
 });
+vi.mock('../../services/useAppUpdate', () => ({
+  useAppUpdate: () => ({ banner: false, unsupported: false, status: 'up-to-date', latest: null, lastCheckedAt: null }),
+  installedApp: { version: '2.2.0', versionCode: 6, update: 'built-in' },
+  appUpdateStore: { check: vi.fn(), dismiss: vi.fn() },
+  downloadAppUpdate: vi.fn(),
+}));

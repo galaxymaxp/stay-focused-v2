@@ -500,6 +500,7 @@ export function Sheet({
   footer,
   scrollRef,
   onScrollBeginDrag,
+  dismissible = true,
 }: {
   children: ReactNode;
   onClose: () => void;
@@ -509,6 +510,8 @@ export function Sheet({
   /** Lets content bring a focused field into view; the Modal does not resize for the keyboard. */
   scrollRef?: Ref<ScrollView>;
   onScrollBeginDrag?: React.ComponentProps<typeof ScrollView>["onScrollBeginDrag"];
+  /** Required-update sheets release through connectivity state, never a close gesture. */
+  dismissible?: boolean;
 }) {
   const { colors, reducedMotion } = useTheme();
   const insets = useSafeAreaInsets();
@@ -528,6 +531,7 @@ export function Sheet({
   }, [reducedMotion, rise, tint]);
 
   const dismiss = (from = 0) => {
+    if (!dismissible) return;
     if (closing.current) return;
     closing.current = true;
     rise.setValue(from);
@@ -553,11 +557,11 @@ export function Sheet({
     <Modal transparent visible statusBarTranslucent navigationBarTranslucent animationType="none" onRequestClose={() => dismiss()}>
       <View style={{ flex: 1, justifyContent: "flex-end" }}>
         <Animated.View pointerEvents="box-none" style={{ position: "absolute", top: 0, right: 0, bottom: 0, left: 0, backgroundColor: "rgba(0,0,0,0.42)", opacity: shade }}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Dismiss" onPress={() => dismiss()} style={{ flex: 1 }} />
+          <Pressable disabled={!dismissible} accessibilityRole="button" accessibilityLabel="Dismiss" onPress={() => dismiss()} style={{ flex: 1 }} />
         </Animated.View>
         <Animated.View
           accessibilityViewIsModal
-          {...pull.touchHandlers}
+          {...(dismissible ? pull.touchHandlers : {})}
           onLayout={(event) => {
             panelHeight.current = event.nativeEvent.layout.height;
           }}
@@ -576,13 +580,13 @@ export function Sheet({
           }}
         >
           <View style={{ alignItems: "center", paddingTop: spacing[2], paddingBottom: spacing[1] }}>
-            <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: colors.separator }} />
+            {dismissible ? <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: colors.separator }} /> : null}
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: spacing[5], paddingRight: spacing[2], minHeight: hitTarget.min }}>
             <View style={{ flex: 1, minWidth: 0 }}>
               {title ? <Copy size="h3" style={{ fontWeight: "600" }}>{title}</Copy> : null}
             </View>
-            <DoneButton onPress={() => dismiss()} />
+            {dismissible ? <DoneButton onPress={() => dismiss()} /> : null}
           </View>
           <ScrollView
             ref={scrollRef}
@@ -590,7 +594,7 @@ export function Sheet({
             scrollEnabled={!contentFits}
             onLayout={(event) => setViewport(event.nativeEvent.layout.height)}
             onContentSizeChange={(_width, height) => setContentHeight(height)}
-            onScroll={pull.onScroll}
+            onScroll={dismissible ? pull.onScroll : undefined}
             onScrollBeginDrag={onScrollBeginDrag}
             scrollEventThrottle={16}
             alwaysBounceVertical={false}
