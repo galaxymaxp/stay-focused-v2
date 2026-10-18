@@ -3379,6 +3379,14 @@ mark.find-active {
 }
 
 /* ---------- Your own material ---------- */
+.own-material .segments {
+  background: transparent;
+}
+.own-material .segments button[aria-pressed="true"],
+.own-material .segments button:active:not(:disabled) {
+  background: var(--hover);
+  box-shadow: none;
+}
 .own-material {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;

@@ -23,7 +23,20 @@ beforeEach(async () => {
   await act(async () => { rendered = create(createElement(OwnMaterialScreen)); });
 });
 afterEach(async () => { await act(async () => rendered.unmount()); });
-async function fileMode() { await act(async () => rendered.root.findAllByType("button").find(node => node.props.children === "Upload a file")!.props.onClick()); }
+const sourceButtons = () => rendered.root.findByProps({ role: "group", "aria-label": "Source" }).findAllByType("button");
+async function fileMode() { await act(async () => sourceButtons()[1]!.props.onClick()); }
+it("shows decorative source icons before labels and retains aria-pressed mode toggling", async () => {
+  const [paste, file] = sourceButtons();
+  expect(paste!.findByType("Icon" as never).props.name).toBe("text-align-start");
+  expect(file!.findByType("Icon" as never).props.name).toBe("file-text");
+  expect(paste!.children[1]).toBe("Paste text");
+  expect(file!.children[1]).toBe("Upload a file");
+  expect(sourceButtons().map(node => node.props["aria-pressed"])).toEqual([true, false]);
+  await fileMode();
+  expect(sourceButtons().map(node => node.props["aria-pressed"])).toEqual([false, true]);
+  await act(async () => sourceButtons()[0]!.props.onClick());
+  expect(sourceButtons().map(node => node.props["aria-pressed"])).toEqual([true, false]);
+});
 it.each([OFFICE_MIME.docx, OFFICE_MIME.pptx, "application/pdf", "image/png"])("picking %s uploads and accepts one chain with no editor", async mime => {
   await fileMode(); const picker = rendered.root.findByProps({ type: "file" }); expect(picker.props.accept).toBe(MANUAL_UPLOAD_ACCEPT);
   await act(async () => picker.props.onChange({ target: { files: [{ name: "notes", type: mime, size: 50 }] } }));

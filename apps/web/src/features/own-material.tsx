@@ -83,8 +83,8 @@ export function OwnMaterialScreen() {
     <Heading title="Your own material" subtitle="Paste notes, or choose a PDF, photo, DOCX or PPTX to create a Reviewer." back="/generate" crumb="Your own material" />
     <div className="own-material"><section className="surface stack">
       <div className="segments" role="group" aria-label="Source">
-        <button disabled={busy} aria-pressed={mode === "paste"} onClick={() => setMode("paste")}>Paste text</button>
-        <button disabled={busy} aria-pressed={mode === "file"} onClick={() => setMode("file")}>Upload a file</button>
+        <button disabled={busy} aria-pressed={mode === "paste"} onClick={() => setMode("paste")}><Icon name="text-align-start" />Paste text</button>
+        <button disabled={busy} aria-pressed={mode === "file"} onClick={() => setMode("file")}><Icon name="file-text" />Upload a file</button>
       </div>
       {mode === "paste" ? <label>Your notes or reading
         <textarea className="source-text" aria-label="Your notes or reading" placeholder="Paste instructional material: lecture notes, a chapter, slides as text?"
