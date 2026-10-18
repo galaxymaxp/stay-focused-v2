@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { verifyBearerToken } from "@/lib/auth";
+import { ExperienceFailure } from "@/lib/experience/errors";
 import { validateIdempotencyKey } from "@/lib/processing-jobs/creation";
 import { quizRetryCapacity } from "@/lib/quiz/service";
 import {
@@ -43,8 +44,11 @@ export async function POST(
     const client = createProcessingJobServiceClient();
     const live = await findLiveProcessingJobRetry(client, user.id, jobId);
     if (live) {
+      // Recheck source deletion inside the same RPC used for new retries.
+      const existing = await retryProcessingJob(client, user.id, jobId, live.idempotency_key);
+      if (!existing) return notFound();
       return NextResponse.json(
-        { ok: true, data: toProcessingJobStatusView(live) },
+        { ok: true, data: toProcessingJobStatusView(existing) },
         { status: 202, headers: corsHeaders() },
       );
     }
@@ -65,6 +69,10 @@ export async function POST(
       { status: 202, headers: corsHeaders() },
     );
   } catch (caught) {
+    if (caught instanceof ExperienceFailure && caught.status < 500) {
+      if (caught.code === "not_found") return notFound();
+      return error(409, "processing_job_not_retryable", "This job cannot be retried.", false);
+    }
     if (
       caught instanceof ProcessingJobRepositoryError &&
       caught.code === "processing_job_not_retryable"

@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   source: { id: "source", source_kind: "pdf", page_count: null as number | null,
     storage_bucket: "private", storage_object_path: "fixture", display_name: "lecture.pdf", mime_type: "application/pdf" },
   download: vi.fn(), update: vi.fn(), fail: vi.fn(), inspect: vi.fn(), provider: vi.fn(),
+  reviewer: vi.fn(),
 }));
 vi.mock("./repository", () => ({
   createProcessingJobServiceClient: () => ({
@@ -18,10 +19,13 @@ vi.mock("./worker-repository", () => ({
   heartbeatProcessingJob: async () => {}, failProcessingJob: mocks.fail,
 }));
 vi.mock("./deferred-canvas-reviewer", () => ({ isDeferredCanvasReviewerJob: async () => true }));
+vi.mock("./deferred-canvas-composite", () => ({ prepareDeferredCanvasCompositeSource: async () => false }));
+vi.mock("./ai-reviewer", () => ({ processAIReviewerJob: mocks.reviewer }));
 vi.mock("@/lib/ocr/pdf-native-text", () => ({ inspectPdfTextPages: mocks.inspect }));
 vi.mock("@/lib/ocr/create-server-ocr-provider", () => ({ createServerOcrProvider: mocks.provider }));
 
-import { prepareCanvasReviewerExtractionStep } from "./operations";
+import { prepareCanvasReviewerExtractionStep, processAIReviewerStep } from "./operations";
+import { ExperienceFailure } from "../experience/errors";
 import { validatePdfOcrBytes } from "@/lib/ocr/extraction-service";
 import { getConfiguredDurableDocumentMaxOcrPages, getConfiguredDurableDocumentMaxPdfPages } from "@/lib/ocr/upload-policy";
 
@@ -41,6 +45,13 @@ async function pdfBytes(pages: number): Promise<Uint8Array> {
 }
 
 describe("Canvas deferred extraction total-page admission", () => {
+  it.each([
+    ['generation_failed', true], ['not_ready', false], ['insufficient_source', false], ['source_attachment_unavailable', false],
+  ] as const)('Reviewer %s has manual retryability %s without automatic retries', async (code, retryable) => {
+    mocks.reviewer.mockRejectedValueOnce(new ExperienceFailure(422, code));
+    await expect(processAIReviewerStep('job', 'worker')).rejects.toThrow(code);
+    expect(mocks.fail).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ errorCode: code, retryable, automaticRetryable: false }));
+  });
   it("accepts fresh 40-page Canvas bytes before inspection", async () => {
     const bytes = await pdfBytes(40);
     mocks.download.mockResolvedValue({ data: new Blob([Buffer.from(bytes)]), error: null });

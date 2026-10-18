@@ -1,4 +1,5 @@
 import { currentCourseJobs } from '@/lib/course-state';
+import { isSafeGenerationFailure } from '@stay-focused/shared';
 import type {
   Database,
   Json,
@@ -309,7 +310,9 @@ export function toProcessingJobStatusView(
     cancellationRequestedAt: job.cancellation_requested_at,
     errorCode: job.error_code,
     safeErrorMessage: job.safe_error_message,
-    retryable: job.retryable,
+    retryable: job.retryable || isSafeGenerationFailure({
+      jobType: job.job_type, status: job.status, stage: job.stage, errorCode: job.error_code,
+    }),
     attemptCount: job.attempt_count,
     resultAvailable: job.status === "succeeded" && job.result_id !== null,
     retryOfJobId: job.retry_of_job_id,

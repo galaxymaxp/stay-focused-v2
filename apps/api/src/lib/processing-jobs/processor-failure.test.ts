@@ -5,8 +5,10 @@ import { mapWorkerFailure } from "./processor";
 import { WorkerRepositoryError } from "./worker-repository";
 
 describe("processing worker failure classification", () => {
-  it('does not retry deterministically rejected quiz questions', () => {
-    expect(mapWorkerFailure(new ExperienceFailure(422, 'quiz_generation_failed'))).toMatchObject({code:'quiz_generation_failed',retryable:false,automaticRetryable:false});
+  it('permits manual validation retry without automatic retry', () => {
+    expect(mapWorkerFailure(new ExperienceFailure(422, 'quiz_generation_failed'))).toMatchObject({code:'quiz_generation_failed',retryable:true,automaticRetryable:false});
+    expect(mapWorkerFailure(new ExperienceFailure(422, 'generation_failed'))).toMatchObject({code:'generation_failed',retryable:true,automaticRetryable:false});
+    expect(mapWorkerFailure(new ExperienceFailure(422, 'quiz_source_capacity_exceeded'))).toMatchObject({retryable:false,automaticRetryable:false});
     expect(mapWorkerFailure(new ExperienceFailure(503, 'quiz_generation_failed'))).toMatchObject({retryable:true});
   });
   it("stops automatic retries for deterministic database contract failures", () => {

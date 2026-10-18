@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(), job: vi.fn(), result: vi.fn(), cancel: vi.fn(), retry: vi.fn(),
+  auth: vi.fn(), job: vi.fn(), result: vi.fn(), cancel: vi.fn(), retry: vi.fn(), retryRecord: vi.fn(),
   source: vi.fn(), revision: vi.fn(), upload: vi.fn(), intent: vi.fn(),
   register: vi.fn(), disable: vi.fn(), notification: vi.fn(), list: vi.fn(),
 }));
@@ -10,7 +10,7 @@ vi.mock("@/lib/processing-jobs/repository", () => ({
   createProcessingJobServiceClient: () => ({}),
   findOwnedProcessingJob: mocks.job, findOwnedProcessingJobResult: mocks.result,
   requestProcessingJobCancellation: mocks.cancel, findLiveProcessingJobRetry: mocks.retry,
-  retryProcessingJob: vi.fn(), toProcessingJobStatusView: (job: unknown) => job,
+  retryProcessingJob: mocks.retryRecord, toProcessingJobStatusView: (job: unknown) => job,
   listOwnedActiveProcessingJobs: mocks.list, listOwnedProcessingJobs: mocks.list,
   ProcessingJobRepositoryError: class extends Error {},
 }));
@@ -77,7 +77,7 @@ beforeEach(() => {
   mocks.auth.mockResolvedValue({ id: "owner" });
   const completed = { id, status: "succeeded", result_id: id, source_version_id: null };
   mocks.job.mockResolvedValue(completed); mocks.cancel.mockResolvedValue(completed);
-  mocks.retry.mockResolvedValue(completed); mocks.list.mockResolvedValue([completed]);
+  mocks.retry.mockResolvedValue(completed); mocks.retryRecord.mockResolvedValue(completed); mocks.list.mockResolvedValue([completed]);
   mocks.result.mockResolvedValue({ job_id: id, result_type: "reviewer", payload: { lesson: "Synthetic lesson" }, metrics: {} });
   mocks.source.mockResolvedValue({ source_text: "Synthetic lesson", metadata: null });
   mocks.revision.mockResolvedValue({ id: "revision-id" });

@@ -879,7 +879,7 @@ export async function processAIReviewerStep(jobId: string, workerId: string): Pr
         throw new FatalError(error.code);
       }
       if (error instanceof ExperienceFailure && error.status < 500) {
-        await failProcessingJob(client, { jobId, workerId, errorCode: error.code, safeErrorMessage: "Reviewer generation could not be completed.", retryable: false, automaticRetryable: false });
+        await failProcessingJob(client, { jobId, workerId, errorCode: error.code, safeErrorMessage: "Reviewer generation could not be completed.", retryable: error.code === "generation_failed", automaticRetryable: false });
         throw new FatalError(error.code);
       }
       throw error;

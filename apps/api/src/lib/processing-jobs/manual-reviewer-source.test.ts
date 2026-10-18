@@ -88,4 +88,11 @@ describe("manual extract-to-reviewer chain", () => {
     mocks.run.mockClear(); mocks.source.source_kind = "docx"; mocks.state.status = "cancellation_requested";
     await expect(processAIReviewerJob(client, job, "worker")).rejects.toThrow(); expect(mocks.run).not.toHaveBeenCalled();
   });
+  it('a failed generation retry uses stored extraction with no upload, OCR, or attachment', async () => {
+    mocks.source.source_kind = 'text'; mocks.source.source_text = 'Exact previously extracted lesson.';
+    mocks.source.source_version_id = 'saved-version';
+    await processAIReviewerJob(client, { ...job, id: 'fresh-retry', source_version_id: 'saved-version', retry_of_job_id: 'failed-parent' }, 'worker');
+    expect(mocks.run).toHaveBeenCalledWith(expect.objectContaining({ input: expect.objectContaining({ text: 'Exact previously extracted lesson.' }) }));
+    for (const call of [mocks.download, mocks.inspect, mocks.prepare, mocks.image, mocks.chunk, mocks.finalize, rpc]) expect(call).not.toHaveBeenCalled();
+  });
 });

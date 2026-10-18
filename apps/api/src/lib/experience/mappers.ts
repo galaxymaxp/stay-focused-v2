@@ -167,7 +167,7 @@ function failedGenerationError(job: ProcessingJobStatusView): GenerationView['er
     ? job.errorCode : 'generation_failed';
   const error = normalizeExperienceError(new ExperienceFailure(422, code)).error;
   const retryable = job.retryable === true;
-  return retryable ? { ...error, message: code === 'generation_failed' ? 'This generation didn’t pass its checks. Retry to try again with the same settings.' : error.message, retryable: true, action: 'retry' } : error;
+  return retryable ? { ...error, message: code === 'generation_failed' ? 'Your material is safe. Try again with the same settings.' : error.message, retryable: true, action: 'retry' } : error;
 }
 export function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};

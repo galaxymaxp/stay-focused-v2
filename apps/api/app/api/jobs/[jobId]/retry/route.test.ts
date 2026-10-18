@@ -16,6 +16,7 @@ vi.mock("@/lib/processing-jobs/workflow-dispatch", async (original) => ({
 }));
 
 import { POST } from "./route";
+import { ProcessingJobRepositoryError } from "@/lib/processing-jobs/repository";
 
 const failed = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 const post = (key: string) => POST(new Request(`https://api.test/api/jobs/${failed}/retry`, { method: "POST", headers: { authorization: "Bearer token", "idempotency-key": key } }), { params: Promise.resolve({ jobId: failed }) });
@@ -38,11 +39,12 @@ describe("POST /api/jobs/:jobId/retry", () => {
     expect(mocks.dispatch).toHaveBeenCalledTimes(1);
   });
   it.each(["queued", "running", "succeeded"])("returns the %s retry instead of creating a duplicate", async (status) => {
-    mocks.live.mockResolvedValue({ id: "retry-1", status });
+    mocks.live.mockResolvedValue({ id: "retry-1", status, idempotency_key: "accepted-retry-key" });
+    mocks.retry.mockResolvedValue({ id: "retry-1", status });
     const response = await post("retry-key-000000000002");
     expect(response.status).toBe(202);
     expect(await response.json()).toMatchObject({ data: { id: "retry-1", status } });
-    expect(mocks.retry).not.toHaveBeenCalled();
+    expect(mocks.retry).toHaveBeenCalledWith({}, "owner", failed, "accepted-retry-key");
     expect(mocks.dispatch).not.toHaveBeenCalled();
   });
   it("rejects an older oversized Quiz before creating a retry", async () => {
@@ -52,5 +54,18 @@ describe("POST /api/jobs/:jobId/retry", () => {
     expect(response.status).toBe(422);
     expect(await response.json()).toMatchObject({ error: { code: "quiz_source_capacity_exceeded", supportedMaximum: 43 } });
     expect(mocks.retry).not.toHaveBeenCalled();
+  });
+  it.each(['processing_job_not_retryable', 'processing_job_idempotency_conflict'])("keeps %s a safe 409", async code => {
+    mocks.retry.mockRejectedValue(new ProcessingJobRepositoryError(code));
+    const response = await post('retry-key-000000000004');
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: { code, retryable: false } });
+    expect(mocks.dispatch).not.toHaveBeenCalled();
+  });
+  it('denies a live retry after its source was deleted', async () => {
+    mocks.live.mockResolvedValue({ id: 'retry-1', status: 'running', idempotency_key: 'accepted-retry-key' });
+    mocks.retry.mockRejectedValue(new ProcessingJobRepositoryError('processing_job_not_retryable'));
+    expect((await post('retry-key-000000000005')).status).toBe(409);
+    expect(mocks.dispatch).not.toHaveBeenCalled();
   });
 });
