@@ -1,5 +1,36 @@
 # Roadmap
 
+## MR3 Try again on failed generation complete locally - PASS (2026-10-18)
+
+Finite unattended STEP 0-5, tests, fresh serial gates, docs and local commits are
+complete. Mobile and website reuse the accepted source/extraction with fresh
+accepted-attempt keys, duplicate guards, plain stage copy and typed 409/422
+rejection handling. Historical safe Reviewer/Quiz failures become eligible
+without weakening validation or automatic retry policy. Deleted/unavailable
+source denial remains authoritative. Existing primary/secondary styles remain.
+
+**New function-only migration: `20261018000100_failed_generation_retry.sql`.
+Owner application is required before rollout; no existing-row backfill and no
+remote application occurred.** Implementation commits: **84ab171**, **71f3d25**,
+**55d4eb0**, **cb36f82**. Policy and failure-code table: ADR-044.
+
+**FRESH PASS:** forced root typecheck/lint/build **8/8 each, 0 cached**; shared
+**393/393**, API **2306 passed + 3 existing live skips**, mobile **1311/1311**,
+web **236/236**; standalone API build **1/1**, **35/35** pages, Android export
+**1/1**. Root build includes website **19/19** and all Expo platforms. Both diff
+checks PASS; six existing lint warnings. First failures and corrective checks
+are retained. Optional standalone workflow probe is **BLOCKED (zero test files)**,
+NOT APPLICABLE to mandatory MR3 gates; runtime/provider boundary unchanged.
+
+**Owner steps remaining:** apply migration, publish API/web/mobile and perform
+the specified failure/retry device check. Rollout/Device checks **NOT RUN**,
+skipped entirely. Live deployment/database/Scheduler/device state **UNVERIFIED
+(owner to confirm)**. No remote calls, deployment, remote SQL, Scheduler, email,
+environment-file edit or push. Preserve unrelated work; no later task is started.
+
+[MR3 acceptance](ai/acceptance/mr3-failed-generation-retry.md) ·
+[ADR-044](adr/ADR-044-failed-generation-retry.md).
+
 ## OI1 offline reviewer images complete locally - PASS (2026-10-18)
 
 Finite unattended STEP 0-8, tests, fresh local gates, docs and local commits

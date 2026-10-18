@@ -1,3 +1,43 @@
+<!-- MR3 begin -->
+## MR3 failed-generation recovery complete locally - PASS (2026-10-18)
+
+Finite owner-approved scope: MR3 STEP 0-5, tests, fresh serial local gates,
+documentation and atomic local commits on overnight/2026-10-15_feedback.
+Reviewer/Quiz manual retry uses the exact stored source, fresh accepted-attempt
+keys, real-stage phrases and safe rejection handling on mobile and web.
+Existing automatic retry, quotas, OCR accounting, ownership and cancellation
+remain. New function-only migration adds legacy eligibility/deletion checks;
+no existing-row backfill. Migration application is an owner step.
+
+**PASS for this finite unattended scope.** Implementation: **84ab171** shared,
+**71f3d25** API/function-only migration, **55d4eb0** web, **cb36f82** mobile.
+All requested surfaces offer Try again/stage/safe-material copy; stale 409/422
+denials suppress retry, synchronous locks prevent duplicates, and accepted
+attempts get fresh keys including a still-mounted original Queue card.
+
+**FRESH PASS, serial:** forced root typecheck/lint/build **8/8 each, 0 cached**;
+shared **393/393** (43 files), API **2306 passed + 3 existing live skips**
+(201 files), mobile **1311/1311** (138 files), web **236/236** (40 files).
+Standalone API build **1/1**, **35/35** pages; Android export **1/1**. Root build
+includes website **19/19** and Android/iOS/web exports. Both diff checks PASS;
+six existing lint warnings. Failed first attempts and key-rotation review are
+retained; no nondeterministic flake observed. Optional standalone workflow probe
+is **BLOCKED, zero tests**, NOT APPLICABLE to mandatory MR3 gates because no
+runtime/provider boundary changed; existing API workflow/source-chain tests pass.
+
+**Owner steps remaining:** apply `20261018000100_failed_generation_retry.sql`
+before API/web/mobile rollout, then the specified SOC_SCI_103 failure/retry
+device check. These actions are NOT RUN and skipped entirely. No migration or
+existing-row backfill was applied remotely. Generated build type changes were
+restored; the three original untracked paths remain preserved.
+
+Acceptance: [MR3](acceptance/mr3-failed-generation-retry.md); policy:
+[ADR-044](../adr/ADR-044-failed-generation-retry.md). Endpoint is MR3 only.
+Rollout/Device checks are excluded; production/Scheduler/database/device state
+is UNVERIFIED (owner to confirm). No provider calls, deployment, remote SQL,
+Scheduler change, email, environment-file edit or push. No later task is started.
+<!-- MR3 end -->
+
 <!-- OI1 begin -->
 ## OI1 offline reviewer images complete locally - PASS (2026-10-18)
 

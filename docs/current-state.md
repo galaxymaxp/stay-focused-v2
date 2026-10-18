@@ -1,5 +1,44 @@
 # Current State
 
+## MR3 failed-generation recovery complete locally - PASS (2026-10-18)
+
+**PASS for unattended STEP 0-5, tests, local gates, docs and local commits.**
+Mobile Generation, Canvas and Queue plus website Generation/Queue offer
+**Try again** for safe Reviewer/Quiz failures, with the real stage in plain words
+and **Your material is safe.** Accepted retries get fresh keys and reuse the
+exact stored extraction/source; duplicate taps are fenced. Typed 409/422 denials
+remove the action despite stale polling. View Queue remains secondary; Canvas
+choose-another is secondary for non-retryable failures. Existing tokens remain.
+
+**Owner must apply the new function-only migration
+`20261018000100_failed_generation_retry.sql` before API/client rollout.** It
+admits safe historical generation failures without backfilling existing rows,
+retains exact source/version/contract identity and denies deleted/unavailable
+documents, Canvas items and Quiz Reviewer sources. Automatic retry policy,
+quotas, source validation, OCR accounting, ownership and cancellation remain.
+
+**FRESH PASS, serial:** forced root typecheck/lint/build **8/8 each, 0 cached**;
+shared **393/393** (43 files), API **2306 passed + 3 existing live skips**
+(201 files), mobile **1311/1311** (138 files), web **236/236** (40 files).
+Standalone API build **1/1**, **35/35** pages; Android export **1/1**. Root
+build also produces website **19/19** pages and Android/iOS/web exports. Diff
+and staged-diff checks PASS; six existing lint warnings. Failed first attempts
+and final key-rotation review are retained in acceptance; no observed flake.
+Optional standalone workflow probe: **BLOCKED, zero tests discovered** (only
+.gitignore is tracked); runtime/provider boundary unchanged, so it is NOT
+APPLICABLE to MR3's mandatory gates. API source-chain/workflow tests pass.
+
+Implementation: **84ab171**, **71f3d25**, **55d4eb0**, **cb36f82**.
+**Owner steps remaining:** migration application, API/website deploy, mobile OTA
+and the specified SOC_SCI_103 failure/retry device check are **NOT RUN**, skipped
+entirely. Production revision, rows, Scheduler and physical behavior are
+**UNVERIFIED (owner to confirm)**. No remote service call, deployment, remote SQL,
+Scheduler change, email, environment-file edit or push. Generated build type
+changes were restored; original untracked work is preserved. MR3 is the endpoint.
+
+[MR3 acceptance](ai/acceptance/mr3-failed-generation-retry.md) ·
+[ADR-044](adr/ADR-044-failed-generation-retry.md).
+
 ## OI1 offline reviewer images complete locally - PASS (2026-10-18)
 
 **PASS for unattended STEP 0-8, tests, local gates, docs and commits.** Saving

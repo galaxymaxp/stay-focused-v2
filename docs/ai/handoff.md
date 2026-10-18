@@ -4584,3 +4584,136 @@ was performed. The finite endpoint is OI1; no later task was started.
 
 Acceptance: [OI1](acceptance/oi1-offline-reviewer-images.md).
 ADR: [ADR-043](../adr/ADR-043-offline-reviewer-images.md).
+
+---
+
+## MR3 unattended failed-generation recovery - PASS (2026-10-18)
+
+**Status: PASS for STEP 0-5, tests, requested local gates, docs and local
+commits.** Baseline `73bafb1`, branch `overnight/2026-10-15_feedback`; WG2
+`0eaffa9 bb2395f 7112770` and FX1b `37fcd16 dfbf466 a10642b b750224` are present.
+Mobile Generation/Canvas/Queue and website Generation/Queue now offer Try again
+for safe generation failures, show the persisted stage in plain words and say
+Your material is safe. Stored extraction/source/version/settings are reused,
+without a new upload/OCR when resolved. Duplicate taps are fenced; accepted
+attempts get fresh keys, including a mounted original mobile Queue card.
+Typed 409/422 rejection removes the action despite stale polling. Source checks,
+quotas, automatic retry policy, source validation and cancellation remain.
+
+**NEW MIGRATION FILE - OWNER APPLICATION REQUIRED BEFORE ROLLOUT:**
+`packages/db/migrations/20261018000100_failed_generation_retry.sql` only replaces
+the retry function and restates its restricted grant. It does not backfill or
+update existing rows. Historical safe Reviewer/Quiz generation failures can
+retry despite stored retryable=false. Deleted/unavailable document, Canvas and
+Quiz Reviewer sources are denied even if immutable text survives. No migration
+was applied remotely; local PGlite verification used synthetic, in-memory data.
+
+### STEP 0 file:line record
+
+- `apps/api/app/api/jobs/[jobId]/retry/route.ts:38` key validation; :45 live
+  retry lookup; :48 same-key source recheck; :55 Quiz capacity 422; :59 retry;
+  :66 dispatch; :78 non-retryable 409. `apps/api/src/lib/processing-jobs/repository.ts:270`
+  calls retry_processing_job; :313 projects safe historical failure eligibility.
+- Original copying/eligibility:
+  `packages/db/migrations/20260723084329_reusable_processing_assets.sql:1562`
+  (failed + retryable, same-key replay/conflict, source snapshot/version and
+  contract copy). New function :48 checks source ownership, :125 admits the
+  exact failed generation codes/stages, :185-186 copies the same source IDs.
+  Resolved manual text short-circuits at
+  `apps/api/src/lib/processing-jobs/manual-reviewer-source.ts:24`; resolved
+  Canvas PDF/composite metadata also skips extraction. No source reuse rewrite.
+- `apps/api/src/lib/processing-jobs/ai-reviewer.ts:49` emits generation_failed
+  for contract/coverage failure. Reviewed every fail call in `operations.ts`:
+  :114/:749/:878 forward WorkerJobError policy; :149/:166 PDF validation false;
+  :236 Quiz generation only true, capacity false; :263 Activity false (outside
+  MR3); :341 incomplete inspection true; :412 OCR limit false;
+  :489 extraction-specific policy; :691/:810 incomplete extraction only true;
+  :712/:819 empty text false; :840/:869 Canvas preparation false;
+  :882 Reviewer generation only true after MR3; :913 interrupted true except
+  cancellation; :998 forwards known policy. Local worker classification:
+  `apps/api/src/lib/processing-jobs/processor.ts:501` (manual generation retry,
+  same automatic policy); legacy validation at :513. Google dispatch and worker
+  `apps/api/src/lib/processing-jobs/google-cloud.ts:131` and :164-168 remain true,
+  with automaticRetryable unchanged.
+- `apps/mobile/src/features/redesign/GenerationScreen.tsx:128` canRetry;
+  :129 retryFailed; :204 stage; :207 action; :226 failed notice.
+  `apps/mobile/src/features/courses/CanvasSourceReviewerScreen.tsx:1433`
+  retries with a fresh key and lock; :2479 stage; :2505 action;
+  :2510 non-retryable secondary path. `apps/mobile/src/features/queue/QueueContents.tsx:155`
+  submits retry; :256 stage; :259 Try again. Aligned copy:
+  `apps/mobile/src/services/experienceApi.ts:35`.
+- `apps/web/src/features/queue.tsx:57` Queue retry policy; :183 label;
+  :221 Generation canRetry; :283 stage/safe-material copy; :361 label.
+  Real enum: `packages/db/src/types.ts:449`. Shared mapping/predicate:
+  `packages/shared/src/processing-job-recovery.ts:1`.
+  Before/after failure-code table and complete evidence:
+  [MR3 acceptance](acceptance/mr3-failed-generation-retry.md) and
+  [ADR-044](../adr/ADR-044-failed-generation-retry.md).
+
+### Commits
+
+- `84ab171 feat(shared): describe failed generation recovery`
+- `71f3d25 fix(api): retry failed generation from stored sources`
+- `55d4eb0 feat(web): try again on failed generation`
+- `cb36f82 feat(mobile): try again on failed generation`
+
+Author on every commit: `galaxymaxp <omgraythekid@gmail.com>`. Documentation
+closure: `docs: record MR3 recovery and owner steps`; its final hash is in local
+Git history and `tmp/overnight/MR3.status` (no self-hash amendment). No push.
+
+### Gates and first attempts
+
+**FRESH PASS, serial:** `npm run typecheck -- --force`, `npm run lint -- --force`
+and `npm run build -- --force`: **8/8 tasks each, zero cached**. Lint has six
+existing warnings. `npm run test --workspace @stay-focused/shared`: **393/393**
+(43 files); `@stay-focused/api`: **2306 passed, 3 existing live skips**
+(201 files); `@stay-focused/mobile`: **1311/1311** (138 files, no unhandled errors);
+`@stay-focused/web`: **236/236** (40 files). Standalone
+`npm run build --workspace @stay-focused/api`: **1/1**, **35/35** pages;
+`npm run build --workspace @stay-focused/mobile -- --platform android`: **1/1**.
+Root build also generates website **19/19** pages and Android/iOS/web exports.
+`git diff --check` and scoped `git diff --cached --check`: PASS.
+
+Additional diagnostic `npm run test:workflow --workspace @stay-focused/api`:
+**BLOCKED as a standalone probe: exit 1, zero tests found**. Only .gitignore is
+tracked in workflow-tests. Runtime graph/provider boundary is unchanged, so this
+is NOT APPLICABLE to MR3's mandatory gates; no empty-suite bypass was used.
+Existing API workflow/source-chain tests pass and the API build compiles the
+workflow. Provider contract: NOT APPLICABLE (unchanged interface).
+
+First attempts retained: two draft-migration setup failures each had 29 passing
+tests, 20 skipped and 1 failed/4 passed files; corrected focused 49/49. First
+final typecheck launch failed before tasks on Windows preloader path escaping;
+corrected. First full API: **2304 passed/2 failed/3 skipped**, **199 passed/2 failed
+files**; real Quiz constraints and the cache mock were repaired, then focused
+**52/52** and full **2306** passed. First full mobile: **1306 passed/4 failed**,
+**137 passed/1 failed files**, **1 unhandled rejection** from new assertion/mock
+contamination; corrected focused **6/6**, then full **1310** passed. Final Queue
+key review added a regression (**7/7** focused), then affected typecheck/lint,
+mobile **1311**, Android and root builds were repeated. Earlier root build was
+also green but is retained separately. No nondeterministic flake observed.
+The unavailable Python helper and rejected no-op patch are recorded in acceptance.
+
+### UNVERIFIED
+
+Production/deployed revision, migration application, live database rows,
+Scheduler state, SOC_SCI_103 failure/retry behavior and physical device behavior
+are **UNVERIFIED (owner to confirm)**. No remote service call, deployment,
+remote SQL/migration, Scheduler action, email, environment-file edit or push.
+Checks used a local non-loopback socket blocker and disabled live test flags,
+telemetry and Expo network access. Generated Next type files were restored;
+untracked `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` remain untouched.
+
+### Owner steps remaining
+
+Rollout and Device checks are **NOT RUN**, skipped entirely.
+
+1. Apply the reviewed function-only migration before publishing the new API and
+   clients; deploy API and website and publish mobile OTA through owner tooling.
+2. Re-upload SOC_SCI_103 on device; if generation fails, confirm Try again reports
+   its stage and resumes from stored extraction without another upload/OCR.
+   Check a non-retryable limit and safe capacity rejection as appropriate.
+3. Vercel CLI is not installed. Strongly recommend `npm i -g vercel` for the
+   later owner-controlled environment/deployment/log workflow; not run here.
+
+MR3 is the finite endpoint. Planning files are reconciled; no later task started.
