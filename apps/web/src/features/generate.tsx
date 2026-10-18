@@ -18,6 +18,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useId,
   useRef,
   useState,
   type ReactNode,
@@ -374,6 +375,7 @@ export function CourseWorkspace({
                         className="material-link"
                         href={`/generate/${courseId}/${encodeURIComponent(m.id)}`}
                         aria-current={m.id === selectedId ? "page" : undefined}
+                        aria-label={`Open material: ${m.title}${m.reviewerArtifactId ? ", Reviewer ready" : ""}`}
                       >
                         <ContentIcon kind={m.kind} />
                         <span className="grow">
@@ -381,6 +383,7 @@ export function CourseWorkspace({
                           <span className="meta">
                             {kindLabels[m.kind]} ·{" "}
                             {m.preparation ? preparationPresentation(m.preparation).label : readinessLabels[m.readiness]}
+                            {m.reviewerArtifactId ? " · Reviewer ready" : null}
                           </span>
                         </span>
                         <span
@@ -454,6 +457,20 @@ export function MaterialScreen({ id }: { id: string }) {
     [searched, setSearched] = useState(false),
     [lookupError, setLookupError] = useState<string | null>(null);
   const [online, setOnline] = useState(false);
+  const [remakeFor, setRemakeFor] = useState<string | null>(null);
+  const remakeButton = useRef<HTMLButtonElement>(null);
+  const cancelRemake = useRef<HTMLButtonElement>(null);
+  const remakeDialogId = useId();
+  const remakeKey = JSON.stringify([session?.user.id, courseId, id, material?.reviewerArtifactId]);
+  const confirmingRemake = !!material?.reviewerArtifactId && remakeFor === remakeKey;
+  useEffect(() => { setRemakeFor(null); }, [id, session?.user.id]);
+  useEffect(() => {
+    if (confirmingRemake) cancelRemake.current?.focus();
+  }, [confirmingRemake]);
+  function dismissRemake() {
+    setRemakeFor(null);
+    remakeButton.current?.focus();
+  }
   const preparationPolls = useRef(0);
   const refreshCourse = course.refresh;
   useEffect(() => {
@@ -515,6 +532,8 @@ export function MaterialScreen({ id }: { id: string }) {
   }, [course.data, api, courseId, id]);
   const [quiz, setQuiz] = useState(false);
   function generate() {
+    if (!material || material.id !== id || !session ||
+      (material.reviewerArtifactId && !confirmingRemake)) return;
     void action.run(async () => {
       if (!generationEnabled)
         throw new Error("Generation is unavailable in this environment.");
@@ -526,6 +545,8 @@ export function MaterialScreen({ id }: { id: string }) {
         key: submission.key,
       });
       submission.accepted();
+      setRemakeFor(null);
+      course.refresh();
       router.push(`/generation/${job.id}`);
     });
   }
@@ -592,16 +613,27 @@ export function MaterialScreen({ id }: { id: string }) {
                   Retry
                 </button>
               )}
+              {material.reviewerArtifactId ? (
+                <Link
+                  className="button primary"
+                  href={`/library/${encodeURIComponent(`artifact:${material.reviewerArtifactId}`)}`}
+                >
+                  Open reviewer
+                </Link>
+              ) : null}
               <button
-                className="primary"
+                ref={remakeButton}
+                className={material.reviewerArtifactId ? undefined : "primary"}
+                aria-expanded={material.reviewerArtifactId ? confirmingRemake : undefined}
+                aria-controls={confirmingRemake ? remakeDialogId : undefined}
                 disabled={
                   action.busy ||
                   !generationEnabled ||
                   material.generation.reviewer.status !== "available"
                 }
-                onClick={generate}
+                onClick={material.reviewerArtifactId ? () => setRemakeFor(remakeKey) : generate}
               >
-                Generate Reviewer
+                {material.reviewerArtifactId ? "Remake" : "Generate Reviewer"}
               </button>
               <button
                 aria-expanded={quiz}
@@ -614,6 +646,35 @@ export function MaterialScreen({ id }: { id: string }) {
                 Generate Quiz
               </button>
             </div>
+            {confirmingRemake ? (
+              <div
+                id={remakeDialogId}
+                className="surface stack finish-confirm"
+                role="alertdialog"
+                aria-label="Remake Reviewer?"
+                aria-describedby={`${remakeDialogId}-description`}
+                onKeyDown={event => {
+                  if (event.key === "Escape" && !action.busy) {
+                    event.preventDefault();
+                    dismissRemake();
+                  }
+                }}
+              >
+                <p id={`${remakeDialogId}-description`}>
+                  Create a fresh version from this material? The current Reviewer stays available until the replacement finishes.
+                </p>
+                <div className="row wrap">
+                  <button ref={cancelRemake} disabled={action.busy} onClick={dismissRemake}>Cancel</button>
+                  <button
+                    className="primary"
+                    disabled={action.busy || !generationEnabled || material.generation.reviewer.status !== "available"}
+                    onClick={generate}
+                  >
+                    Remake Reviewer
+                  </button>
+                </div>
+              </div>
+            ) : null}
             {!generationEnabled && (
               <p className="meta">
                 Generation is unavailable in this environment. You can still
@@ -648,7 +709,7 @@ export function MaterialScreen({ id }: { id: string }) {
                 <dt>Status</dt>
                 <dd>{material.preparation ? preparationPresentation(material.preparation).label : readinessLabels[material.readiness]}</dd>
                 <dt>Reviewer</dt>
-                <dd>{capabilityLabel(material.generation.reviewer)}</dd>
+                <dd>{material.reviewerArtifactId ? "Ready" : capabilityLabel(material.generation.reviewer)}</dd>
                 <dt>Quiz</dt>
                 <dd>{capabilityLabel(material.generation.quiz)}</dd>
               </dl>
