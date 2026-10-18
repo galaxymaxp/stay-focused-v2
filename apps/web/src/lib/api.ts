@@ -7,6 +7,8 @@ export class ApiError extends Error {
   }
 }
 const messages: Record<string, string> = {
+  file_too_large: 'Choose a photo under 2 MB.',
+  invalid_image: 'Choose a JPEG, PNG or WebP photo.',
   sign_in_required: "Please sign in again.",
   unauthorized: "Please sign in again.",
   not_found: "This item is no longer available.",
@@ -26,6 +28,7 @@ const messages: Record<string, string> = {
 export interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
   body?: unknown;
+  binaryBody?: Blob;
   key?: string;
   signal?: AbortSignal;
   envelope?: "data" | "root";
@@ -60,10 +63,10 @@ export function createApi(
           credentials: "omit",
           headers: {
             Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
+            "Content-Type": options.binaryBody?.type || "application/json",
             ...(options.key ? { "Idempotency-Key": options.key } : {}),
           },
-          ...(options.body !== undefined
+          ...(options.binaryBody ? { body: options.binaryBody } : options.body !== undefined
             ? { body: JSON.stringify(options.body) }
             : {}),
           signal: controller.signal,

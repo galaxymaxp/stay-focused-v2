@@ -8,6 +8,8 @@ import { Breadcrumbs, CrumbProvider, trailFor, useCrumbState } from "./crumbs";
 import { useAuth } from "./providers";
 import { QueueButton } from "./queue-button";
 import { Icon, Notice } from "./ui";
+import { Avatar } from './avatar';
+import { ProfileAvatarProvider, useProfileAvatar } from './profile-avatar';
 const tabs = [
   { href: "/today", label: "Today", icon: "clock" },
   { href: "/generate", label: "Generate", icon: "sparkles" },
@@ -19,7 +21,7 @@ const tools = [
   { href: "/canvas", label: "Canvas", icon: "globe" },
 ];
 export function Shell({ children }: { children: ReactNode }) {
-  return <QueueReadProvider><ShellContent>{children}</ShellContent></QueueReadProvider>;
+  return <ProfileAvatarProvider><QueueReadProvider><ShellContent>{children}</ShellContent></QueueReadProvider></ProfileAvatarProvider>;
 }
 function ShellContent({ children }: { children: ReactNode }) {
   const { session, loading, error } = useAuth(),
@@ -182,6 +184,7 @@ function useSidebar() {
 
 /** The signed-in account: a menu for settings, appearance and signing out. */
 function AccountMenu({ email }: { email: string }) {
+  const photo = useProfileAvatar();
   const { session, signOut, theme, setTheme } = useAuth();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -206,6 +209,7 @@ function AccountMenu({ email }: { email: string }) {
       {open && (
         <div className="account-popover" role="menu" aria-label="Account">
           <div className="account-popover-head">
+            <Avatar url={photo.url} initial={photo.initial} />
             {name && <strong>{name}</strong>}
             <span className="meta">{email}</span>
           </div>
@@ -244,9 +248,7 @@ function AccountMenu({ email }: { email: string }) {
         title={email}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="avatar" aria-hidden="true">
-          {email.charAt(0).toUpperCase()}
-        </span>
+        <Avatar url={photo.url} initial={photo.initial} />
         <span className="account-email">{email}</span>
         <Icon name="chevron-down" />
       </button>

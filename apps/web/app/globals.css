@@ -4228,6 +4228,8 @@ mark.find-active {
   background: var(--field);
   font-weight: 650;
 }
+.avatar, .account-avatar { overflow: hidden; }
+.avatar img, .account-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .account-email {
   overflow-wrap: anywhere;
 }

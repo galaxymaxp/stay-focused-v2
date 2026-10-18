@@ -3,7 +3,22 @@ import { useAuth } from "../components/providers";
 import { Heading, Notice, RowLink } from "../components/ui";
 import { useAction } from "../lib/hooks";
 import { NotificationSettings } from "./notification-settings";
+import { useRef, useState } from 'react';
+import { Avatar } from '../components/avatar';
+import { useProfileAvatar } from '../components/profile-avatar';
+import { cropAvatar } from '../lib/crop-avatar';
 export function SettingsScreen() {
+  const photo = useProfileAvatar();
+  const input = useRef<HTMLInputElement>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  async function changePhoto(file?: File) {
+    if (photoBusy) return;
+    setPhotoBusy(true); setPhotoError(null);
+    try { await photo.change(file ? await cropAvatar(file) : undefined); }
+    catch (error) { setPhotoError(error instanceof Error ? error.message : 'Could not update your photo. Try again.'); }
+    finally { setPhotoBusy(false); }
+  }
   const { session, signOut, theme, setTheme } = useAuth(),
     action = useAction();
   return (
@@ -13,11 +28,17 @@ export function SettingsScreen() {
         <section className="surface stack">
           <h2>Account</h2>
           <div className="row">
-            <span className="account-avatar" aria-hidden="true">
-              {(session?.user.email ?? "S")[0].toUpperCase()}
-            </span>
+            <Avatar url={photo.url} initial={photo.initial} className="account-avatar" />
             <p className="grow account-email">{session?.user.email ?? "Signed-in account"}</p>
           </div>
+          <input ref={input} type="file" hidden accept="image/jpeg,image/png,image/webp" aria-label="Choose profile photo" onChange={event => {
+            const file = event.target.files?.[0]; event.target.value = ''; if (file) void changePhoto(file);
+          }} />
+          <div className="row wrap">
+            <button disabled={photoBusy} onClick={() => input.current?.click()}>{photoBusy ? 'Updating photo…' : 'Change photo'}</button>
+            {photo.hasUpload && <button disabled={photoBusy} onClick={() => { if (window.confirm('Remove your uploaded photo? Your sign-in photo or initials will appear instead.')) void changePhoto(); }}>Remove photo</button>}
+          </div>
+          {photoError && <Notice error>{photoError}</Notice>}
           <button
             disabled={action.busy}
             onClick={() =>

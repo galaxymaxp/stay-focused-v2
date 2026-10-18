@@ -3,6 +3,12 @@ import { createApi, safeUrl } from "./api";
 const response = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), { status });
 describe("shared bearer API boundary", () => {
+  it('sends photo bytes with their MIME type and preserves the token retry', async () => {
+    const photo = new Blob(['png'], { type: 'image/png' });
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValueOnce(response({ ok: false }, 401)).mockResolvedValueOnce(response({ ok: true, data: { url: null, expiresAt: null } }));
+    await createApi(async () => 'jwt', vi.fn(), fetcher)('/api/profile/avatar', { method: 'PUT', binaryBody: photo });
+    expect(fetcher.mock.calls[1]![1]).toMatchObject({ body: photo, method: 'PUT', headers: { 'Content-Type': 'image/png', Authorization: 'Bearer jwt' } });
+  });
   it.each([
     [409, 'processing_job_not_retryable', 'This job cannot be retried.'],
     [422, 'quiz_source_capacity_exceeded', 'This material supports up to 43 questions. Choose a shorter Quiz.'],
