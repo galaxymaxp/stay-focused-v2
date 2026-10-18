@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Page, SearchField } from "./primitives";
+import { Page, RowLink, SearchField } from "./primitives";
 
 vi.mock("expo-router", () => ({ router: { canGoBack: () => true, back: vi.fn() } }));
 vi.mock("expo-router/js-tabs", async () => ({ BottomTabBarHeightContext: (await import("react")).createContext(undefined) }));
@@ -111,4 +111,24 @@ it("SearchField forwards focus and blur to the actual input", async () => {
   const input = rendered!.root.findByType("TextInput" as never);
   expect(input.props.onFocus).toBe(onFocus);
   expect(input.props.onBlur).toBe(onBlur);
+});
+
+it.each([false, true])("RowLink retains its accessible 48pt unfilled press target (disabled=%s)", async disabled => {
+  const onPress = vi.fn();
+  const rowProps = { label: "Text", testID: "source-choice-text", disabled, onPress, icon: createElement("SourceIcon"), children: "Text" };
+  await act(async () => { rendered = create(createElement(RowLink, rowProps)); });
+  const target = rendered!.root.findByType("Pressable" as never);
+  expect(target.props).toMatchObject({ testID: "source-choice-text", accessibilityRole: "button", accessibilityLabel: "Text", disabled, accessibilityState: { disabled } });
+  for (const pressed of [false, true]) {
+    const style = target.props.style({ pressed });
+    expect(style.minHeight).toBeGreaterThanOrEqual(48);
+    expect(style.backgroundColor).toBeUndefined();
+    expect(style.opacity).toBe(pressed ? 0.7 : 1);
+  }
+  expect(target.children[0]).toBe(target.findByType("SourceIcon" as never));
+  expect(target.props.onPress).toBe(onPress);
+  if (!disabled) {
+    await act(async () => target.props.onPress());
+    expect(onPress).toHaveBeenCalledOnce();
+  }
 });

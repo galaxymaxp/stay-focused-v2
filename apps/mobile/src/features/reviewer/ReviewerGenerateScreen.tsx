@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { Camera, FileUp, Image, Type } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Platform, Text, View } from "react-native";
 import { manualUploadKind, LEGACY_OFFICE_MESSAGE } from "@stay-focused/shared";
@@ -6,7 +7,7 @@ import { useAuth } from "../../auth";
 import { useLegacyTheme } from "../../design/theme";
 import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
-import { SegmentedControl, Sheet } from "../../design/primitives";
+import { Copy, RowLink, SegmentedControl, Sheet } from "../../design/primitives";
 import { getApiBaseUrl } from "../../config/apiBaseUrl";
 import { API_CONFIGURATION_MESSAGE } from "../../config/apiBaseUrlResolution";
 import { persistCanonicalSource, type CanonicalSource } from "../../services/canonicalSourcesApi";
@@ -120,9 +121,9 @@ export function ReviewerGenerateScreen(_props: { readonly onOpenLibrary?: () => 
     </View> : <Button disabled={!text.trim() || busy} loading={busy} fullWidth onPress={() => void continueText()} testID="source-continue-button">Continue</Button> : null}>
     <View style={{ gap: 16 }} testID="reviewer-generate-screen">
       {mode === null ? <View style={{ gap: 12 }} testID="source-choice-sheet">
-        <Button fullWidth variant="secondary" onPress={() => changeMode("paste")} testID="source-choice-text">Text</Button>
-        <Button fullWidth disabled={busy} variant="secondary" onPress={() => void pick("camera")} testID="source-choice-camera">Camera</Button>
-        <Button fullWidth disabled={busy} variant="secondary" onPress={() => void pick("file")} testID="source-choice-file">Local File (PDF, DOCX, PPTX)</Button>
+        <RowLink label="Text" icon={<Type size={20} color={colors.textPrimary} />} onPress={() => changeMode("paste")} testID="source-choice-text"><Copy>Text</Copy></RowLink>
+        <RowLink label="Camera" icon={<Camera size={20} color={colors.textPrimary} />} disabled={busy} onPress={() => void pick("camera")} testID="source-choice-camera"><Copy>Camera</Copy></RowLink>
+        <RowLink label="Local File (PDF, DOCX, PPTX)" icon={<FileUp size={20} color={colors.textPrimary} />} disabled={busy} onPress={() => void pick("file")} testID="source-choice-file"><Copy>Local File (PDF, DOCX, PPTX)</Copy></RowLink>
       </View> : <>
         <SegmentedControl segments={[{ value: "paste", label: "Text" }, { value: "image", label: "Camera" }, { value: "pdf", label: "Local File" }]}
           value={mode === "docx" || mode === "pptx" ? "pdf" : mode} onChange={changeMode} />
@@ -135,9 +136,9 @@ export function ReviewerGenerateScreen(_props: { readonly onOpenLibrary?: () => 
         </> : <>
           <Text style={{ color: colors.textPrimary }}>Choose a file or photo to read and create your Reviewer automatically.</Text>
           {mode === "image" ? <>
-            <Button disabled={busy} onPress={() => void pick("camera")}>Take photo</Button>
-            <Button disabled={busy} onPress={() => void pick("gallery")}>Choose photo</Button>
-          </> : <Button disabled={busy} onPress={() => void pick("file")}>Choose PDF, DOCX or PPTX</Button>}
+            <RowLink label="Take photo" icon={<Camera size={20} color={colors.textPrimary} />} disabled={busy} onPress={() => void pick("camera")}><Copy>Take photo</Copy></RowLink>
+            <RowLink label="Choose photo" icon={<Image size={20} color={colors.textPrimary} />} disabled={busy} onPress={() => void pick("gallery")}><Copy>Choose photo</Copy></RowLink>
+          </> : <RowLink label="Choose PDF, DOCX or PPTX" icon={<FileUp size={20} color={colors.textPrimary} />} disabled={busy} onPress={() => void pick("file")}><Copy>Choose PDF, DOCX or PPTX</Copy></RowLink>}
           <Text style={{ color: colors.textPrimary }}>{LEGACY_OFFICE_MESSAGE}</Text>
         </>}
       </>}

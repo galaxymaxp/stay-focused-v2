@@ -408,6 +408,7 @@ export function RowLink({
   onAccessibilityAction,
   onLongPress,
   selected,
+  testID,
 }: {
   children: ReactNode;
   label: string;
@@ -421,12 +422,14 @@ export function RowLink({
   /** Additional options, e.g. a quick-actions sheet. */
   onLongPress?: () => void;
   selected?: boolean;
+  testID?: string;
 }) {
   const { colors } = useTheme();
   const press = usePressMotion(disabled);
   return (
     <Animated.View style={{ transform: [{ scale: press.scale }] }}>
     <Pressable
+      testID={testID}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityActions={accessibilityActions ? [...accessibilityActions] : undefined}
