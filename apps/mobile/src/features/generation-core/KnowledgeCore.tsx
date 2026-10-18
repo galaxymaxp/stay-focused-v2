@@ -1,12 +1,14 @@
+import { OrbTouchLayer, useOrbInteraction, type OrbInteractionHandle } from './orbInteraction';
+import { createOrbInteractionSampler } from './orbInteractionFrame';
 import { useIsFocused } from "expo-router/react-navigation";
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Image, Pressable, StyleSheet, View } from "react-native";
+import { AppState, Image, StyleSheet, View } from "react-native";
 import * as THREE from "three";
 
 import type { ThemeColors } from "../../design/theme";
 import {
-  CORE_MOTION_PROFILES, coreAccessibilityLabel, coreMotionRate, coreShimmerTarget, coreSpinTarget, type CoreState,
+  CORE_MOTION_PROFILES, coreMotionRate, coreShimmerTarget, coreSpinTarget, type CoreState,
 } from "./coreModel";
 import { createOrbAura } from "./orbAura";
 import { createOrbBody } from "./orbBody";
@@ -18,13 +20,13 @@ const ORB_MAX_SPIN = 0.9;
 const SPIN_AXIS = new THREE.Vector3(0.18, 1, -0.12).normalize();
 const CAMERA_DISTANCE = 4.55;
 const CAMERA_FOV = 36;
+const ORB_FILL = (0.95 * 2) / (2 * CAMERA_DISTANCE * Math.tan(CAMERA_FOV * Math.PI / 360));
 
 interface SceneController { renderForChange: () => void; dispose: () => void }
 interface RuntimeProps {
   state: CoreState; colors: ThemeColors; mode: "light" | "dark";
   reducedMotion: boolean; active: boolean; focused: boolean;
 }
-interface TouchState { strength: number; x: number; y: number; age: number }
 
 export interface KnowledgeCoreProps {
   readonly state: CoreState;
@@ -41,7 +43,7 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
   const [renderingFailed, setRenderingFailed] = useState(false);
   const runtime = useRef<RuntimeProps>({ state, colors, mode, reducedMotion, active: active && foreground, focused });
   const controller = useRef<SceneController | null>(null);
-  const touch = useRef<TouchState>({ strength: 0, x: 0, y: 0, age: 10 });
+  const interaction = useOrbInteraction();
   runtime.current = { state, colors, mode, reducedMotion, active: active && foreground, focused };
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (next) => setForeground(next === "active"));
@@ -53,7 +55,7 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
   useEffect(() => {
     if (context.current && !controller.current) {
       try {
-        controller.current = buildScene(context.current, runtime, touch);
+        controller.current = buildScene(context.current, runtime, interaction);
         controller.current.renderForChange();
       } catch { context.current = null; setRenderingFailed(true); }
     }
@@ -61,36 +63,21 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
       controller.current?.dispose();
       controller.current = null;
     };
-  }, []);
+  }, [interaction]);
   const createScene = useCallback((gl: ExpoWebGLRenderingContext) => {
     context.current = gl;
     controller.current?.dispose();
     try {
-      controller.current = buildScene(gl, runtime, touch);
+      controller.current = buildScene(gl, runtime, interaction);
       controller.current.renderForChange();
     } catch { context.current = null; setRenderingFailed(true); }
-  }, []);
+  }, [interaction]);
   return (
-    <View style={[styles.frame, { width: size, height: size }]}>
+    <View style={[styles.frame, { width: size, height: size }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" testID="knowledge-core">
       {renderingFailed
         ? <Image source={require("../../../assets/branding/orb-adaptive-foreground.png")} style={{ width: size, height: size }} resizeMode="contain" />
         : <GLView onContextCreate={createScene} style={styles.canvas} />}
-      <Pressable
-        accessibilityLabel={coreAccessibilityLabel(state)}
-        accessibilityRole="imagebutton"
-        accessibilityState={{ busy: ["reading", "generating", "finalizing"].includes(state) }}
-        hitSlop={8}
-        onPressIn={(event) => {
-          if (reducedMotion) return;
-          touch.current = {
-            strength: reducedMotion ? 0.25 : 1, age: 0,
-            x: event.nativeEvent.locationX / size - 0.5, y: event.nativeEvent.locationY / size - 0.5,
-          };
-          controller.current?.renderForChange();
-        }}
-        style={styles.touchTarget}
-        testID="knowledge-core"
-      />
+      <OrbTouchLayer interaction={interaction} size={size * ORB_FILL} left={size * (1 - ORB_FILL) / 2} top={size * (1 - ORB_FILL) / 2} reducedMotion={reducedMotion} />
     </View>
   );
 }
@@ -98,8 +85,9 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
 function buildScene(
   gl: ExpoWebGLRenderingContext,
   runtime: React.MutableRefObject<RuntimeProps>,
-  touch: React.MutableRefObject<TouchState>,
+  interaction: OrbInteractionHandle,
 ): SceneController {
+  const sampleInteraction = createOrbInteractionSampler(interaction);
   const canvas = {
     width: gl.drawingBufferWidth,
     height: gl.drawingBufferHeight,
@@ -169,13 +157,8 @@ function buildScene(
     animatedTime += motionDelta;
     spinAngle = (spinAngle + spin * ORB_MAX_SPIN * delta) % (Math.PI * 2);
     spinMatrix.setFromMatrix4(spinRotation.makeRotationAxis(SPIN_AXIS, spinAngle));
-    touch.current.strength *= Math.pow(0.2, delta);
-    touch.current.age += delta;
-
+    const interactionFrame = sampleInteraction(now, delta * 1000, current.reducedMotion, spinMatrix);
     root.position.y = Math.sin(animatedTime * 0.5) * 0.02;
-    const parallax = touch.current.strength * Math.min(1, touch.current.age * 3);
-    camera.position.x += (touch.current.x * 0.12 * parallax - camera.position.x) * Math.min(1, delta * 5);
-    camera.position.y += (-touch.current.y * 0.09 * parallax + 0.02 - camera.position.y) * Math.min(1, delta * 5);
     camera.lookAt(0, 0, 0);
     camera.updateMatrixWorld();
 
@@ -188,24 +171,27 @@ function buildScene(
     body.update({
       time: animatedTime, life, glow, error, spin: spinMatrix, mode: current.mode,
       level: aura.shimmer.level,
-      // A touch stirs the liquid briefly.
-      stir: touch.current.strength,
+      stir: 0,
+      idleColor: current.state === 'idle' ? interactionFrame.idleColor : undefined,
+      bulgeDir: interactionFrame.bulgeDir, bulgeAmount: interactionFrame.bulgeAmount,
     });
     renderer.render(scene, camera);
     gl.endFrameEXP();
     const settling = now < settleUntil || Math.abs(activity - profile.activity) > 0.006
       || Math.abs(spin - spinTarget) > 0.004 || Math.abs(shimmer - shimmerTarget) > 0.004 || Math.abs(life - lifeTarget) > 0.004
-      || touch.current.strength > 0.01;
+      || interactionFrame.animating;
     requestId = !current.reducedMotion && (motionRate > 0 || settling) ? requestAnimationFrame(draw) : null;
   };
 
-  return {
-    renderForChange: () => {
+  const renderForChange = () => {
       settleUntil = Date.now() + (runtime.current.reducedMotion ? 360 : 1100);
       if (requestId === null) { lastFrame = Date.now(); requestId = requestAnimationFrame(draw); }
-    },
+    };
+  interaction.wake.current = renderForChange;
+  return { renderForChange,
     dispose: () => {
       disposed = true;
+      if (interaction.wake.current === renderForChange) interaction.wake.current = null;
       if (requestId !== null) cancelAnimationFrame(requestId);
       body.dispose();
       aura.dispose();
@@ -217,5 +203,4 @@ function buildScene(
 const styles = StyleSheet.create({
   frame: { alignItems: "center", justifyContent: "center" },
   canvas: { ...StyleSheet.absoluteFill },
-  touchTarget: { ...StyleSheet.absoluteFill },
 });

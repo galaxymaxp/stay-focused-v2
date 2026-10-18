@@ -1,3 +1,4 @@
+import { OrbTouchLayer, useOrbInteraction } from '../generation-core/orbInteraction';
 import { clockTimeLabel, freeTimeDuration, containsMinute, type TodayItem } from "@stay-focused/shared";
 import { useIsFocused } from "expo-router/react-navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -347,6 +348,7 @@ export function DayRingClock({
     kind === "study_session" ? colors.blue : kind === "calendar_block" ? colors.orange : colors.violet;
   const marker = ringPoint(nowMinutes);
   const middle = range.start + freeTimeDuration(range.start, range.end) / 2;
+  const orbInteraction = useOrbInteraction();
   const orbCanvas = (CLOCK.glass * 2) / DAY_ORB_FILL;
   const handles: { key: Mode; at: number }[] = [
     { key: "start", at: range.start },
@@ -357,7 +359,7 @@ export function DayRingClock({
     <View style={{ alignItems: "center", gap: 4 }}>
       <View style={{ width: size, height: size }} testID="day-ring">
         <View pointerEvents="none" style={{ position: "absolute", left: (CLOCK.center - orbCanvas / 2) * scale, top: (CLOCK.center - orbCanvas / 2) * scale }}>
-          <DayOrb minutes={nowMinutes} size={orbCanvas * scale} mode={theme} reducedMotion={reducedMotion} live={focused && active} />
+          <DayOrb interaction={orbInteraction} minutes={nowMinutes} size={orbCanvas * scale} mode={theme} reducedMotion={reducedMotion} live={focused && active} />
         </View>
         <View
           pointerEvents="none"
@@ -450,6 +452,9 @@ export function DayRingClock({
           importantForAccessibility="no"
           style={{ position: "absolute", top: 0, left: 0, width: size, height: size }}
         />
+        <OrbTouchLayer interaction={orbInteraction} size={CLOCK.glass * 2 * scale}
+          left={(CLOCK.center - CLOCK.glass) * scale} top={(CLOCK.center - CLOCK.glass) * scale}
+          reducedMotion={reducedMotion} delegate={responder.panHandlers} />
         {onToggleLock ? <ClockOptions start={start} end={end} locked={locked} onToggleLock={onToggleLock} onCommit={onCommit} disabled={disabled} /> : null}
       </View>
     </View>

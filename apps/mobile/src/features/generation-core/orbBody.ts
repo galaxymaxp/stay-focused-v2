@@ -8,11 +8,16 @@ uniform float uBulgeAmount;
 varying vec3 vNormal;
 varying vec3 vWorldPosition;
 void main() {
-  float alignment = max(dot(normal, uBulgeDir), 0.0);
-  float height = 0.18 * uBulgeAmount * pow(alignment, 12.0);
-  vec3 displaced = position + normal * height;
-  vec3 slope = (uBulgeDir - normal * alignment) * (2.16 * uBulgeAmount * pow(alignment, 11.0));
-  vec3 surfaceNormal = normalize(normal - slope / (length(position) + height));
+  vec3 displaced = position;
+  vec3 surfaceNormal = normal;
+  // Uniform zero fast path retains the original idle vertex/shading work.
+  if (uBulgeAmount > 0.0) {
+    float alignment = max(dot(normal, uBulgeDir), 0.0);
+    float height = 0.18 * uBulgeAmount * pow(alignment, 12.0);
+    displaced = position + normal * height;
+    vec3 slope = (uBulgeDir - normal * alignment) * (2.16 * uBulgeAmount * pow(alignment, 11.0));
+    surfaceNormal = normal - slope / (length(position) + height);
+  }
   vec4 world = modelMatrix * vec4(displaced, 1.0);
   vWorldPosition = world.xyz;
   vNormal = normalize(mat3(modelMatrix) * surfaceNormal);

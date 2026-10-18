@@ -1,3 +1,6 @@
+import { createOrbInteraction } from '@stay-focused/shared';
+import type { OrbInteractionHandle } from '../generation-core/orbInteraction';
+import { createOrbInteractionSampler } from '../generation-core/orbInteractionFrame';
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { AppState, Image, View } from "react-native";
@@ -54,6 +57,7 @@ export const DayOrb = memo(function DayOrb({
   mode,
   reducedMotion,
   live,
+  interaction: suppliedInteraction,
 }: {
   minutes: number;
   /** Canvas size in points; the ball fills DAY_ORB_FILL of it. */
@@ -61,7 +65,11 @@ export const DayOrb = memo(function DayOrb({
   mode: "light" | "dark";
   reducedMotion: boolean;
   live: boolean;
+  interaction?: OrbInteractionHandle;
 }) {
+  const localState = useRef(createOrbInteraction());
+  const localWake = useRef<(() => void) | null>(null);
+  const interaction = useMemo(() => suppliedInteraction ?? { state: localState, wake: localWake }, [suppliedInteraction]);
   const [foreground, setForeground] = useState(AppState.currentState === "active");
   const [renderingFailed, setRenderingFailed] = useState(false);
   const tones = useMemo(() => dayOrbTones(minutes), [minutes]);
@@ -77,20 +85,20 @@ export const DayOrb = memo(function DayOrb({
   useEffect(() => controller.current?.wake(), [minutes, mode, reducedMotion, live, foreground]);
   useEffect(() => {
     if (context.current && !controller.current) {
-      try { controller.current = buildScene(context.current, runtime); }
+      try { controller.current = buildScene(context.current, runtime, interaction); }
       catch { context.current = null; setRenderingFailed(true); }
     }
     return () => {
       controller.current?.dispose();
       controller.current = null;
     };
-  }, []);
+  }, [interaction]);
   const create = useCallback((gl: ExpoWebGLRenderingContext) => {
     context.current = gl;
     controller.current?.dispose();
-    try { controller.current = buildScene(gl, runtime); }
+    try { controller.current = buildScene(gl, runtime, interaction); }
     catch { context.current = null; setRenderingFailed(true); }
-  }, []);
+  }, [interaction]);
   const inner = size * RENDER_SCALE;
   return (
     <View pointerEvents="none" style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
@@ -116,7 +124,8 @@ export const DayOrb = memo(function DayOrb({
   );
 });
 
-function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }) {
+function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }, interaction: OrbInteractionHandle) {
+  const sampleInteraction = createOrbInteractionSampler(interaction);
   const canvas = {
     width: gl.drawingBufferWidth,
     height: gl.drawingBufferHeight,
@@ -151,6 +160,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   let time = 8.4;
   let spinAngle = 0;
   let settleUntil = 0;
+  let interacting = false;
   const spinMatrix = new THREE.Matrix3();
   const spinRotation = new THREE.Matrix4();
 
@@ -161,12 +171,12 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
     const current = runtime.current;
     const moving = current.running && !current.reducedMotion;
     // While a finger is down, skip frames entirely (the clock keeps its pose).
-    if (dayOrbTouch.active && moving) {
+    if (dayOrbTouch.active && moving && !interaction.state.current.gesture?.rotating) {
       lastFrame = now;
       requestId = requestAnimationFrame(draw);
       return;
     }
-    if (now - lastRender >= FRAME_MS || !moving) {
+    if (now - lastRender >= (interacting || interaction.state.current.gesture?.rotating ? 16 : FRAME_MS) || !moving) {
       const delta = Math.min((now - lastFrame) / 1000, 0.08);
       lastFrame = now;
       lastRender = now;
@@ -176,6 +186,8 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
         spinAngle = (spinAngle + delta * (current.reducedMotion ? 0.03 : 0.12)) % (Math.PI * 2);
       }
       spinMatrix.setFromMatrix4(spinRotation.makeRotationAxis(SPIN_AXIS, spinAngle));
+      const interactionFrame = sampleInteraction(now, delta * 1000, current.reducedMotion, spinMatrix);
+      interacting = interactionFrame.animating;
       camera.lookAt(0, 0, 0);
       camera.updateMatrixWorld();
       const tones = current.tones;
@@ -197,6 +209,8 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
         },
       });
       body.update({
+        idleColor: interactionFrame.idleColor,
+        bulgeDir: interactionFrame.bulgeDir, bulgeAmount: interactionFrame.bulgeAmount,
         time,
         life: 0.22,
         stir: 0,
@@ -211,7 +225,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
       renderer.render(scene, camera);
       gl.endFrameEXP();
     }
-    if (!disposed && !current.reducedMotion && (moving || now < settleUntil)) requestId = requestAnimationFrame(draw);
+    if (!disposed && current.running && !current.reducedMotion && (moving || interacting || now < settleUntil)) requestId = requestAnimationFrame(draw);
   };
 
   const wake = () => {
@@ -221,11 +235,13 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
       requestId = requestAnimationFrame(draw);
     }
   };
+  interaction.wake.current = wake;
   wake();
   return {
     wake,
     dispose: () => {
       disposed = true;
+      if (interaction.wake.current === wake) interaction.wake.current = null;
       if (requestId !== null) cancelAnimationFrame(requestId);
       body.dispose();
       aura.dispose();
