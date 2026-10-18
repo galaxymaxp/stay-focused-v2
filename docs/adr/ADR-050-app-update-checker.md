@@ -1,6 +1,6 @@
 # ADR-050: Public Android release checks
 
-Date: 2026-10-19. Status: accepted for UC1 local implementation.
+Date: 2026-10-19. Status: accepted for UC1/UC2 local implementation.
 
 The private source repository remains private. Android release metadata and APKs
 come from the public `galaxymaxp/stay-focused-releases` repository. UC0's release
@@ -54,6 +54,38 @@ Settings About shows installed version/code, short OTA ID or built-in, manual
 check, last successful check time and the available release's plain notes.
 Up-to-date feedback is shown only after a successful manual metadata response.
 
-UC2 website/download links and UC3 publishing automation remain separate work.
+UC3 publishing automation remains separate work.
 API deployment, mobile OTA and physical acceptance remain owner steps. Health's
 existing hardcoded version `2.1.0` is intentionally outside UC1.
+
+## UC2: Public download page (2026-10-19)
+
+`/download` is outside the signed-in route group and uses the public theme
+provider without initializing auth or private caches. A client-only request to
+`/api/app/latest-release` uses the existing same-origin API rewrite, no bearer
+token, a ten-second timeout, and UC1's shared `isLatestRelease` validator. The
+API remains the only GitHub metadata collector; builds do not fetch releases.
+204, HTTP/network/JSON failures and invalid metadata show only the public
+All versions destination, without an invented version or APK URL.
+
+The page has one primary Download APK action, a UTC publication date, plain
+notes clamped to three lines with an accessible expansion control, and three
+Android installation steps. QR is generated locally from that exact APK URL
+using pinned `qrcode-generator` 2.0.4 (MIT, zero runtime dependencies, bundled
+TypeScript declarations). It is imported only by client code; no QR web
+service, HTML injection or external image request is used. SVG modules use
+black on white in both themes with a four-module quiet zone. Oversized QR
+input omits the QR while keeping the download action available.
+
+`/release` redirects to `/download`, removing stale private-repository links.
+The shared sign-in/sign-up screen and existing account menu link to download.
+Mobile About uses React Native Share, with the existing validated website
+origin from reviewer sharing (`EXPO_PUBLIC_WEBSITE_URL`, default
+`https://stay-focused-ten.vercel.app`) now centralized in `publicWebsite.ts`.
+Invalid website configuration falls back to the public releases/latest page.
+No native dependency, runtime or build-number change is required.
+
+The showcase already has an Android CTA in its own styles. UC2 changes its
+destination to the same website `/download` in a separate ignored local clone
+and `download-link` branch. Its push/PR and all rollout/device checks remain
+owner steps; nothing is published by this run.

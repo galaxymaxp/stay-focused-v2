@@ -7052,3 +7052,94 @@ was used as a reason to skip the authorized code work.
   `npm i -g vercel` is strongly recommended. No installation/invocation ran.
 
 Final UC1 checkpoint/status is recorded in ignored `tmp/overnight/UC1.*`.
+
+
+## UC2 / public Android download page (2026-10-19)
+
+**Status: PASS for the finite unattended code scope.** Baseline `c958cc1`;
+current branch `overnight/2026-10-15_feedback` retained, as required. The
+prompt's branch label was stale; UC1 commits, exact shared release shape,
+public API route, same-origin rewrite and Settings About were verified in code.
+The tracked tree was clean before changes. Owner paths `UI/`,
+`apps/mobile/.gitignore`, `supabase/.temp/` remain untouched and unstaged.
+
+What changed: public `/download`, validated metadata, UTC date/plain notes,
+three-line expansion, one primary APK action, locally encoded QR and three
+install steps. `/release` redirects. Sign-in/sign-up and the existing account
+menu link to download; public routes do not initialize auth/private caches.
+Mobile About shares the website download URL via native Share. The existing
+website origin is centralized with reviewer sharing, with public releases as
+invalid-config fallback. Pinned QR encoder: `qrcode-generator` 2.0.4, MIT,
+zero runtime dependencies. No native module, version/runtime, migration or API
+behavior change. The showcase already had an Android CTA; only its destination
+and obsolete comment changed in the ignored local clone.
+
+Commits (all author `galaxymaxp <omgraythekid@gmail.com>`):
+
+- `053beb6 feat(web): add public Android download page and entry links`
+- `eef9c67 feat(mobile): share public download link from Settings About`
+- Showcase clone only: `77dd54b feat: link Android download to public website`
+- `docs: complete UC2 download page handoff` is this documentation checkpoint;
+  its final hash is in Git and `tmp/overnight/UC2.status` after committing.
+
+FRESH verification: **10/10 prompt gates pass**. Forced root typecheck and lint
+are each 8/8 tasks, zero cached; lint has six existing warnings and zero errors.
+Shared tests 588/588 (56 files, existing emitted copies included); API 2404
+passed / 3 intentional live skips (210 files, two workers); web 363/363
+(55 files); mobile 1511/1511 (158 files). API build 36/36 static pages, web
+20/20, Android local export and diff hygiene pass. Additional forced root build
+passes 8/8 tasks, zero cached, including local Android/iOS/web exports.
+Showcase Vite build passes with its existing large-chunk warning. Local Chromium
+passes 9/9 scenarios with mocked metadata, zero page errors and zero external
+requests; inspected narrow/light and desktop/dark screenshots. The owned local
+server is stopped. Full commands and acceptance rows:
+[UC2 acceptance](acceptance/uc2-download-page.md); amended ADR-050.
+
+Failed attempts retained: first typecheck/shared/web launches exited 1 before
+suite execution due to Windows preload-path parsing; the concurrent gate-ledger
+append also collided. Forward-slash preload paths and per-gate exit files fixed
+the harness. First showcase commit lacked clone committer identity; scoped
+`git -c` identity fixed it. No failing application tests or nondeterministic
+flakes occurred. First dark screenshot caught an entrance animation, so final
+screenshots fast-forward finite animations. Atomic patch validation failures,
+corrected exploratory reads and restored unrelated npm lockfile pruning are
+recorded in acceptance. Generated Next declarations are restored to HEAD and excluded from commits;
+logs/build/test output stay ignored. Tests use repository-local TEMP/TMP,
+disabled live flags and an outbound-service guard; builds use offline/no-telemetry
+flags. Local browser traffic is restricted to loopback and mocked metadata.
+
+**UNVERIFIED (owner to confirm):** real public release/tag/APK, production website
+origin and deployed revisions, remote-ref freshness, applied production database
+and Scheduler state, actual OTA identity, APK install/QR scan/native sharing on
+the phone. No Supabase, Vercel, Google Cloud, Canvas or Resend call, remote SQL,
+migration application, Scheduler operation, email, deployment, environment-file
+edit or push ran. GitHub showcase cloning and npm package installation were the
+explicitly permitted read-only/dependency operations. Live-state limitations did
+not stop the authorized code work. UC3 is the next separate slice, not started.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** deploy the website and API if UC1
+  has not been deployed; ship mobile through the existing OTA process. For later
+  rollout tooling, installing the Vercel CLI with `npm i -g vercel` is strongly
+  recommended; this run installed/invoked no deployment CLI.
+- **Device checks - NOT RUN, skipped entirely:** open `/download` on the Realme,
+  scan the QR and confirm the APK downloads from the public releases repository;
+  verify Settings > About > Share download link and native sharing behavior.
+- Confirm production website origin, current public tag/APK and deployed
+  revisions. Remote production/database/Scheduler/device state is
+  **UNVERIFIED (owner to confirm)**.
+- Push the showcase branch and open its PR (commands below); owner chooses the
+  final merge/deployment. `--base` matches the clone's actual default branch.
+- UC3 release automation is the next separately scoped item, not started.
+
+Run from this repository root, when the owner is ready:
+
+```powershell
+git -C .local/showcase-download-link push -u origin download-link
+gh pr create --repo galaxymaxp/stay-focused-showcase --head download-link --base claude/dazzling-shannon-cn82ol --title "Link Android download to public website" --body "Route the existing Download for Android CTA to https://stay-focused-ten.vercel.app/download. Preserve the existing showcase styles. Local Vite build and diff hygiene pass."
+```
+
+No command in this owner section was executed.
+
+Final UC2 checkpoint/status is in ignored `tmp/overnight/UC2.*`.

@@ -1,3 +1,28 @@
+<!-- UC2 begin -->
+UC2 / public Android download page (2026-10-19): **PASS** for the finite local
+code scope, baseline `c958cc1`, branch `overnight/2026-10-15_feedback` retained.
+Endpoint: UC2 STEP 0-5, tests/gates/docs/local commits; UC3 is not started.
+Public `/download` validates UC1 API metadata and shows version, UTC date,
+plain notes, one APK action, local QR and installation steps. `/release`
+redirects; auth entry points and the existing account menu link to download.
+Mobile About shares the website download URL using the existing origin config.
+Main implementation: `053beb6` (web), `eef9c67` (mobile). Showcase's existing
+CTA is updated in ignored local clone `.local/showcase-download-link`, branch
+`download-link`, commit `77dd54b`; no push or PR was performed.
+FRESH PASS: all 10 prompt gates; shared 588/588, API 2404 passed/3 intentional
+live skips, web 363/363, mobile 1511/1511; forced typecheck/lint 8/8 tasks each,
+zero cached, six existing lint warnings. API 36/36 and web 20/20 static pages,
+Android export, extra forced root build 8/8 tasks (zero cached, including local
+Android/iOS/web exports), showcase build, diff hygiene, local browser 9/9.
+Failed harness launches and clone commit attempt are recorded in acceptance.
+Rollout and Device checks NOT RUN, skipped entirely; live production/release,
+remote-ref freshness, database/Scheduler and physical-device behavior remain
+**UNVERIFIED (owner to confirm)**. No deployment, production-service call,
+remote SQL, Scheduler action, environment-file edit or push. Owner rollout,
+Realme/QR/native-share checks and showcase push/PR remain. Next separate slice:
+UC3 release automation. [Acceptance](acceptance/uc2-download-page.md); ADR-050 amended.
+<!-- UC2 end -->
+
 <!-- UC1 begin -->
 UC1 / in-app update checker (2026-10-19): **PASS** for the finite local
 code scope, baseline `7506d51`, branch `overnight/2026-10-15_feedback`.
@@ -17,9 +42,8 @@ including API/web and Android/iOS/web exports; final diff hygiene passes.
 Rollout and Device checks NOT RUN, skipped entirely. Live release, production,
 remote refs and phone behavior UNVERIFIED (owner to confirm); no remote service
 operation, deployment, SQL, Scheduler change, environment-file edit or push.
-Owner rollout/device acceptance remains separate; UC2 website download/showcase
-links and UC3 release automation are the next separately scoped slices, not
-started. [Acceptance](acceptance/uc1-update-checker.md); ADR-050 in `docs/adr/`.
+Owner rollout/device acceptance remains separate; UC2 status is recorded above.
+UC3 release automation is the next separately scoped slice, not started. [Acceptance](acceptance/uc1-update-checker.md); ADR-050 in `docs/adr/`.
 <!-- UC1 end -->
 
 PAR1b / web-mobile parity audit (2026-10-19): **PASS for the finite docs-only source audit**, baseline `796e312` on `overnight/2026-10-15_feedback`, endpoint PAR1b only. Completed 54 source-backed feature rows and 16 gaps ranked by student impact; both platforms have file:line evidence, with partial behavior and roadmap mismatches explicit. Expected untracked owner paths remain untouched. FRESH PASS: `git diff --check` (1/1 prompt gate, 0 errors), docs-only scope (1/1, five docs paths), source-link/line validation; build/typecheck/lint/application tests NOT APPLICABLE. One local commit `docs: complete web vs mobile parity audit`; exact hash in Git and `tmp/overnight/PAR1b.status`. Rollout/Device checks NOT RUN, skipped entirely; live/deployed/migration/provider/Scheduler/device state UNVERIFIED (owner to confirm). Supersedes the prior PAR1 preflight-only record; owner exception is resolved. Next: Claude and Fely use Gaps for the next roadmap; no later slice started. [Audit](parity-web-mobile-20261018.md).
