@@ -68,3 +68,17 @@ export function snapshotUpdatedLabel(savedAt: string | null, now = Date.now()): 
   return minutes < 1 ? "Updated just now" : minutes < 60 ? `Updated ${minutes}m ago` :
     minutes < 1440 ? `Updated ${Math.floor(minutes / 60)}h ago` : `Updated ${Math.floor(minutes / 1440)}d ago`;
 }
+
+/** Reviewer headers may omit idle freshness while keeping actionable states. */
+export function snapshotStatusLabel(props: {
+  savedAt?: string | null;
+  refreshing?: boolean;
+  error: string | null;
+  updateAvailable?: boolean;
+  hideFreshLabel?: boolean;
+}, now = Date.now()): string {
+  const updated = snapshotUpdatedLabel(props.savedAt ?? null, now);
+  return props.updateAvailable ? 'Updated — tap to refresh' : props.error ?
+    `Couldn't refresh · Retry${updated ? ` · ${updated}` : ''}` : props.refreshing ? 'Syncing…' :
+      props.hideFreshLabel ? '' : updated;
+}

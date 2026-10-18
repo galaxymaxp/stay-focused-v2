@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeSavedData, readSavedSnapshot, savedSnapshot, snapshotUpdatedLabel, stableSavedList } from "./saved-snapshot";
+import { mergeSavedData, readSavedSnapshot, savedSnapshot, snapshotStatusLabel, snapshotUpdatedLabel, stableSavedList } from "./saved-snapshot";
 
 describe("saved snapshots", () => {
   it("keeps derived course groups in place when refreshed dates would sort them differently", () => {
@@ -29,5 +29,18 @@ describe("saved snapshots", () => {
   it("labels successful refresh time without animation", () => {
     expect(snapshotUpdatedLabel("2026-10-15T00:00:00Z", Date.parse("2026-10-15T00:00:01Z"))).toBe("Updated just now");
     expect(snapshotUpdatedLabel("2026-10-15T00:00:00Z", Date.parse("2026-10-15T00:02:00Z"))).toBe("Updated 2m ago");
+  });
+  it.each([false, true])('preserves actionable status precedence with hideFreshLabel=%s', hideFreshLabel => {
+    const now = Date.parse('2026-10-15T00:02:00Z');
+    const props = { savedAt: '2026-10-15T00:00:00Z', error: null, hideFreshLabel };
+    expect(snapshotStatusLabel(props, now)).toBe(hideFreshLabel ? '' : 'Updated 2m ago');
+    expect(snapshotStatusLabel({ ...props, refreshing: true }, now)).toBe('Syncing…');
+    expect(snapshotStatusLabel({ ...props, error: 'offline', refreshing: true }, now)).toBe("Couldn't refresh · Retry · Updated 2m ago");
+    expect(snapshotStatusLabel({ ...props, error: 'offline', refreshing: true, updateAvailable: true }, now)).toBe('Updated — tap to refresh');
+    expect(snapshotStatusLabel({ ...props, savedAt: null }, now)).toBe('');
+    expect(snapshotStatusLabel({ ...props, savedAt: null, error: 'offline' }, now)).toBe("Couldn't refresh · Retry");
+  });
+  it('keeps the default idle label without opting in', () => {
+    expect(snapshotStatusLabel({ savedAt: '2026-10-15T00:00:00Z', error: null }, Date.parse('2026-10-15T00:02:00Z'))).toBe('Updated 2m ago');
   });
 });
