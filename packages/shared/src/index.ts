@@ -232,6 +232,7 @@ export type * from './experience';
 export type * from './quiz';
 export * from './quiz-capacity';
 export * from './quiz-title';
+export * from './quiz-question-states';
 export * from './study-assist';
 export * from './study-tools';
 export * from './reviewer-estimate';
