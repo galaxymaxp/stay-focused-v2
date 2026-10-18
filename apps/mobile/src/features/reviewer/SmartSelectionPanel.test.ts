@@ -299,3 +299,4 @@ describe('Smart Selection learning sheet', () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
+vi.mock('expo-constants',()=>({default:{expoConfig:{version:'2.2.0'}}}));

@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { LibraryArtifactSummary, ReviewerReaderModel } from '@stay-focused/shared';
+vi.mock('expo-constants',()=>({default:{expoConfig:{version:'2.2.0'}}}));
 
 vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => undefined) } }));
 

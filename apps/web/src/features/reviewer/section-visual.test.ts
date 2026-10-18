@@ -76,3 +76,22 @@ it('closes on backdrop and Close, leaves content/padding clicks alone, and clear
   expect(tree!.root.findByType('strong').props.children).toBeUndefined();
   expect(tree!.root.findAllByType('span').some(n=>n.props.children===external.label)).toBe(true);
 });
+
+it.each(['card','viewer'])('shows safe error copy, Retry and Commons without closing on %s image failure',async surface=>{
+  const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});
+  const external={status:'found' as const,image:'https://upload.wikimedia.org/private-title.png',title:'Cell',credit:'Own work',license:'CC BY',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',sourceUrl:'https://commons.wikimedia.org/wiki/File:Cell.png',label:'External reference',attemptCount:1};
+  mocks.api.mockResolvedValue({available:false});
+  await act(async()=>{tree=create(createElement(SectionVisual,{artifactId:'artifact',sectionId:'section',hasFigures:false,external}),{createNodeMock:element=>element.type==='dialog'?{close,showModal}:{}});});
+  const enlarge=()=>tree!.root.findAllByType('button').find(n=>n.props['aria-label']==='Enlarge Cell')!;
+  await act(async()=>enlarge().props.onClick());
+  const images=tree!.root.findAllByType('img');
+  await act(async()=>(surface==='card'?images[0]:images.at(-1))!.props.onError({message:'private response URL'}));
+  expect(close).not.toHaveBeenCalled();
+  expect(warning).toHaveBeenCalledExactlyOnceWith('reviewer.external_image_failed');
+  expect(tree!.root.findAllByType('p').some(n=>n.props.children==="Image couldn't load")).toBe(true);
+  expect(tree!.root.findAllByType('a').find(n=>n.props.children==='Open on Commons')!.props).toMatchObject({href:external.sourceUrl,target:'_blank',rel:'noreferrer'});
+  await act(async()=>tree!.root.findAllByType('button').find(n=>n.props.children==='Retry')!.props.onClick());
+  expect(tree!.root.findAllByType('p').some(n=>n.props.children==="Image couldn't load")).toBe(false);
+  expect(tree!.root.findAllByType('img').map(n=>n.props.src)).toEqual([external.image,external.image]);
+  expect(mocks.api.mock.calls.every(([,init])=>!init?.method || init.method==='GET')).toBe(true);
+});

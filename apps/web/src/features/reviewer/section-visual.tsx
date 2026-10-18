@@ -56,6 +56,10 @@ export function SectionVisual({ artifactId, sectionId, hasFigures, external: ini
   const savePending = useRef(false);
   const path = `/api/reviewers/${encodeURIComponent(artifactId)}/sections/${encodeURIComponent(sectionId)}`;
   const external = replacement ?? initialExternal;
+  const [failedImage, setFailedImage] = useState<string | null>(null), [retry, setRetry] = useState(0);
+  const imageKey = (src: string) => `${src}:${retry}`;
+  function imageFailed(src: string) { setFailedImage(imageKey(src)); console.warn('reviewer.external_image_failed'); }
+  function retryImage() { setFailedImage(null); setRetry(n => n + 1); }
   useEffect(() => {
     const update = () => { setOnline(navigator.onLine); if (!navigator.onLine) dialog.current?.close(); };
     update(); window.addEventListener("online", update); window.addEventListener("offline", update);
@@ -138,9 +142,9 @@ export function SectionVisual({ artifactId, sectionId, hasFigures, external: ini
     {online && !hasSource && external && <figure className="surface stack" style={{ margin: 0 }}>
       <span className="muted" style={caption}>{external.label}</span>
       {/* Commons candidates are validated by the owner-scoped API. */}
-      <button type="button" aria-label={`Enlarge ${external.title}`} onClick={() => open(external.image, external.title, externalImage, 'external_visual')} style={frame}>
-        <img src={external.image} alt={external.title} style={{ display: "block", width: "100%", maxHeight: 380, objectFit: "contain" }} />
-      </button>
+      {failedImage === imageKey(external.image) ? <ExternalImageError sourceUrl={external.sourceUrl} onRetry={retryImage} /> : <button type="button" aria-label={`Enlarge ${external.title}`} onClick={() => open(external.image, external.title, externalImage, 'external_visual')} style={frame}>
+        <img key={imageKey(external.image)} src={external.image} alt={external.title} onError={() => imageFailed(external.image)} style={{ display: "block", width: "100%", maxHeight: 380, objectFit: "contain" }} />
+      </button>}
       <AskImageButton image={externalImage} online={online} onAsk={onAsk} />
       {external.attemptCount < 2 && <button disabled={busy} onClick={() => void another()} style={{ fontSize: 12 }}>{busy ? "Finding…" : "Show a different one"}</button>}
     </figure>}
@@ -162,9 +166,18 @@ export function SectionVisual({ artifactId, sectionId, hasFigures, external: ini
       {saveNote && <p role="status">{saveNote}</p>}
       <label>Zoom<input type="range" min="1" max="4" step="0.25" value={zoom} onChange={event => setZoom(Number(event.target.value))} /></label>
       <div style={{ overflow: "auto", maxHeight: "70vh", flexShrink: 0 }}>
-        {zoomed && <img src={zoomed.src} alt={zoomed.alt} style={{ width: `${zoom * 100}%`, maxWidth: "none" }} />}
+        {zoomed && (zoomed.details && failedImage === imageKey(zoomed.src) ? <ExternalImageError sourceUrl={zoomed.details.sourceUrl} onRetry={retryImage} />
+          : <img key={imageKey(zoomed.src)} src={zoomed.src} alt={zoomed.alt} onError={zoomed.details ? () => imageFailed(zoomed.src) : undefined} style={{ width: `${zoom * 100}%`, maxWidth: "none" }} />)}
       </div>
     </dialog>
+  </div>;
+}
+
+function ExternalImageError({sourceUrl,onRetry}:{sourceUrl:string;onRetry:()=>void}) {
+  return <div className="stack">
+    <p role="alert">{"Image couldn't load"}</p>
+    <button type="button" onClick={onRetry}>Retry</button>
+    <a href={sourceUrl} target="_blank" rel="noreferrer">Open on Commons</a>
   </div>;
 }
 

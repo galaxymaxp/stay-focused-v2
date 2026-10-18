@@ -3,6 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { selectAssistBlock, type StudyToolResult } from '@stay-focused/shared';
 import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSupport';
+vi.mock('expo-constants',()=>({default:{expoConfig:{version:'2.2.0'}}}));
 
 const mocks = vi.hoisted(() => ({ run: vi.fn(), request: vi.fn(), reduced: false, scrollTo: vi.fn() }));
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', TextInput: 'TextInput', ActivityIndicator: 'Spinner', useWindowDimensions: () => ({ height: 800 }) }));

@@ -8,12 +8,13 @@ import { SaveImageButton } from './SaveImageButton';
 import { EXTERNAL_IMAGE_HEADERS, EXTERNAL_VISUAL_LABEL, type ExternalReferenceVisual } from '../../services/externalVisuals';
 import { apiFoundVisual } from '../../services/externalVisuals.testSupport';
 vi.mock('lucide-react-native', () => ({ Download: 'Download' }));
+vi.mock('expo-constants',()=>({default:{expoConfig:{version:'2.2.0'}}}));
 const mocks=vi.hoisted(()=>({find:vi.fn(),link:vi.fn(async()=>{})}));
 vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',Modal:'Modal',ScrollView:'ScrollView',Animated:{View:'AnimatedView',Value:class {setValue(){} stopAnimation(){}},spring:()=>({start(){}})},Linking:{openURL:mocks.link},useWindowDimensions:()=>({width:360,height:800})}));
 vi.mock('react-native-safe-area-context',()=>({SafeAreaView:'SafeAreaView'}));
 vi.mock('../../design/primitives',()=>({Sheet:({children,...props}:{children:unknown})=>createElement('Sheet',props,children as never)}));
 vi.mock('../../design/theme',async()=>{const tokens=await import('../../design/themeTokens');return {useTheme:()=>({colors:tokens.palettes.light,reducedMotion:true})};});
-vi.mock('./SourcePageSnapshot',()=>({ZoomablePage:({url,label,headers}:{url:string;label:string;headers?:Readonly<Record<string,string>>})=>createElement('ZoomablePage',{url,label,headers})}));
+vi.mock('./SourcePageSnapshot',()=>({ZoomablePage:(props:Record<string,unknown>)=>createElement('ZoomablePage',props)}));
 vi.mock('../../services/externalVisuals',async load=>({...await load<typeof import('../../services/externalVisuals')>(),findExternalVisual:mocks.find}));
 Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
 const baseProps={client:{baseUrl:'https://local.test',accessToken:'jwt'},artifactId:'artifact',sectionId:'s',online:true,hasSourceVisual:false};
@@ -53,12 +54,21 @@ describe('automatic separate external card',()=>{
     await act(async()=>tree!.root.findAllByType(Pressable).filter(n=>n.props.accessibilityLabel==='Ask about this image').at(-1)!.props.onPress());
     expect(onAsk).toHaveBeenCalledTimes(2);expect(tree!.root.findAllByType(ImageViewer)).toHaveLength(0);
   });
-  it('closes the viewer without logging native image errors or academic URLs',async()=>{
+  it.each(['card','viewer'])('keeps the viewer open on %s failure, logs no URL, and retries the same image',async surface=>{
     const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});
     try {
       await mount();await act(async()=>button('View external reference').props.onPress());
-      await act(async()=>tree!.root.findByType(Image).props.onError({nativeEvent:{error:'HTTP 403 loading https://upload.wikimedia.org/private-title.png'}}));
-      expect(warning).not.toHaveBeenCalled();expect(tree!.root.findAllByType(ImageViewer)).toHaveLength(0);
+      const target=surface==='card'?tree!.root.findByType(Image):tree!.root.findByType('ZoomablePage' as never);
+      await act(async()=>target.props.onError({nativeEvent:{error:'HTTP 403 loading https://upload.wikimedia.org/private-title.png'}}));
+      expect(warning).toHaveBeenCalledExactlyOnceWith('reviewer.external_image_failed');
+      expect(tree!.root.findAllByType(ImageViewer)).toHaveLength(1);
+      expect(text()).toContain("Image couldn't load");
+      await act(async()=>button('Open on Commons').props.onPress());expect(mocks.link).toHaveBeenCalledWith(found.sourceUrl);
+      await act(async()=>button('Retry external image').props.onPress());
+      expect(text()).not.toContain("Image couldn't load");
+      expect(tree!.root.findByType(Image).props.source).toEqual({uri:found.image,headers:EXTERNAL_IMAGE_HEADERS});
+      expect(tree!.root.findByType('ZoomablePage' as never).props.url).toBe(found.image);
+      expect(mocks.find).not.toHaveBeenCalled();
     }finally{warning.mockRestore();}
   });
   it.each([{online:false},{hasSourceVisual:true}])('hides actions and images for %j',async override=>{

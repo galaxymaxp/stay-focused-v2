@@ -237,3 +237,4 @@ describe('Reviewer Study Assist interaction', () => {
     expect(studyAssist.request).not.toHaveBeenCalled();
   });
 });
+vi.mock('expo-constants',()=>({default:{expoConfig:{version:'2.2.0'}}}));

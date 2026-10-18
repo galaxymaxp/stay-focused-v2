@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import Constants from 'expo-constants';
+import appConfig from '../../app.json';
 import { experienceRequest, type ExperienceClient } from './experienceApi';
 export const EXTERNAL_VISUAL_LABEL='External reference — not from your course material.';
 // Identify the native image client as required by Wikimedia's User-Agent policy.
 // Course images keep their own signed URLs and receive no external headers.
 export const EXTERNAL_IMAGE_HEADERS = Object.freeze({
-  'User-Agent': 'StayFocused/2.1.0 (https://github.com/galaxymaxp/stay-focused-v2)',
+  'User-Agent': `StayFocused/${Constants.expoConfig?.version ?? appConfig.expo.version} (https://github.com/galaxymaxp/stay-focused-v2)`,
 });
 export type ExternalVisual = ({status:'found';id?:string;image:string;title:string;credit:string;license:string;licenseUrl:string;sourceUrl:string;label:typeof EXTERNAL_VISUAL_LABEL;width:number;height:number}
   | {status:'none';message:'No reliable visual found'}) & {attemptCount:number};

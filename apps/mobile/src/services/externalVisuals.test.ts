@@ -1,10 +1,14 @@
 import { createElement } from 'react';
 import { act,create,type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach,describe,expect,it,vi } from 'vitest';
-import { EXTERNAL_VISUAL_LABEL,findExternalVisual,parseExternalVisual,parseReviewerVisuals,useReviewerVisuals } from './externalVisuals';
+import { EXTERNAL_IMAGE_HEADERS,EXTERNAL_VISUAL_LABEL,findExternalVisual,parseExternalVisual,parseReviewerVisuals,useReviewerVisuals } from './externalVisuals';
 import { apiFoundVisual, apiReviewerVisuals } from './externalVisuals.testSupport';
+vi.mock('expo-constants',()=>({default:{expoConfig:{version:'9.8.7'}}}));
 const found={status:'found',image:'https://upload.wikimedia.org/image.png',title:'Cell',credit:'Ada',license:'CC BY',licenseUrl:'https://creativecommons.org/licenses/by/4.0/',sourceUrl:'https://commons.wikimedia.org/wiki/File:Cell.png',label:EXTERNAL_VISUAL_LABEL,width:1200,height:800,attemptCount:1};
 describe('external visual DTO',()=>{
+  it('identifies the real configured app version and existing contact URL',()=>{
+    expect(EXTERNAL_IMAGE_HEADERS).toEqual({'User-Agent':'StayFocused/9.8.7 (https://github.com/galaxymaxp/stay-focused-v2)'});
+  });
   it('validates the mandatory label/license/host/dimensions/attempt cap',()=>{
     expect(parseExternalVisual(found)).toEqual(found);
     for(const patch of [{label:undefined},{label:'From source'},{image:'https://other.test/image.png'},{sourceUrl:'https://commons.wikimedia.org/other'},{license:'CC BY-NC'},{width:1201},{attemptCount:3}])expect(()=>parseExternalVisual({...found,...patch})).toThrow('visual_invalid');
