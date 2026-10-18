@@ -1,6 +1,9 @@
 # FX1 image diagnosis — 2026-10-18
 
-Status: **STOPPED during STEP 0; no application repair implemented.**
+Status: **FX1b PASS for code, tests, gates, docs and local commits; physical acceptance pending.**
+
+The original FX1 STOP below is historical. The owner answered its scope question
+in FX1b; the appended outcome records the approved repair and current evidence.
 
 The unattended rules take precedence over the implementation instructions.
 Rule 3 says, "It is a STOP if the code itself contradicts what the prompt
@@ -112,3 +115,129 @@ No deployment, push, remote SQL/migration application, Scheduler action,
 Supabase/Vercel/Google Cloud/Canvas/Resend call, email or environment-file edit
 was performed. Production and Scheduler state are **UNVERIFIED (owner to
 confirm)**; migrations were not changed.
+
+## FX1b outcome — 2026-10-18
+
+## FX1b image repair complete locally (2026-10-18)
+
+**PASS for the finite unattended code scope; device acceptance remains pending.**
+Owner's revised FX1b scope supersedes the earlier diagnostic STOP. Commons
+already selected bounded thumbnails from its first implementation; no legacy
+conversion is needed. New GIF candidates are skipped. The native User-Agent
+uses expo-constants/app config (currently 2.2.0) and the existing contact URL.
+Mobile and web external-image failures retain the viewer and display
+Image couldn't load, Retry and Open on Commons; safe failure logs contain no URL.
+
+Save returns/logs typed permission, download, HTTP-status, MIME, empty-file,
+media-write and missing-module stages with specific messages. Source saves
+refresh signed URLs through existing bearer-protected reads after permission,
+match the exact figure/snapshot identity, and fail safely if it changed.
+SDK 57 explicitly supports the current Android initial-file album call, so
+ADR-038's Android write-only and iOS add-only paths remain; cleanup follows
+the awaited native write. These fixes do not establish the actual phone exception.
+
+**FRESH final gates:** forced root typecheck/lint/build **8/8 tasks each,
+zero cached**; shared **350/350** (40 files), API **2273/2273** (199 files, 3 existing live skips), mobile **1263/1263** (134 files), web **211/211** (37 files); zero test failures. All seven application gates
+ran serially with repo-local TEMP/TMP. Diff and staged-diff hygiene PASS.
+Lint retains six existing warnings. First lint attempt failed on a new web
+JSX apostrophe (5/8 tasks complete, one error); fixed and the serial sequence
+restarted. Focused mobile first attempt had 141 pass/1 fail from an invalid
+test fixture; corrected, then 142/142 passed. First full mobile run had 1,243
+passing tests and two failed suites (132 passing files) because indirect imports
+needed an expo-constants Node mock; fixed before restarting the final sequence.
+No nondeterministic flake observed.
+
+**Owner steps remaining:** Rollout and Device checks skipped entirely (NOT RUN).
+Publish reviewed JS/TS changes and the GIF API rule, then recheck figure,
+snapshot and external saves plus external card/viewer rendering on Realme.
+ADB evidence is BLOCKED (zero devices); actual native cause/module resolution,
+failed image/response and production/database/Scheduler state are **UNVERIFIED
+(owner to confirm)**. No remote service call, deployment, SQL, migration,
+Scheduler action, email, environment-file edit or push occurred. The absent
+2026-10-17 roadmap file was skipped; unrelated untracked work is preserved.
+This run ends at FX1b; FULLSEND's other live checks remain pending.
+
+[FX1 diagnosis and FX1b outcome](fx1-image-diagnosis.md).
+
+
+### Acceptance matrix and root-cause limits
+
+| Requirement / hypothesis | Result and evidence |
+| --- | --- |
+| STEP 0 reuse and baseline | DONE. Read FX1.progress, last 15 commits and dirty tree first. Existing merge cb4df08 and install retained; node_modules present, npm ci NOT RUN (already done). Read-only fetch confirms github/main 0d7bfed. Source evidence in the original table is reused. |
+| Original format/size | DOES NOT HOLD, closed by owner. First implementation d1775c18 already selected thumburl. No read-time conversion or original-URL tests added. |
+| Selected GIF | FRESH PASS: commons.ts:78-81 excludes GIF MIME and selected GIF suffix; commons.test.ts covers fallback to a supported candidate, PNG/JPEG/WebP and SVG raster thumbnails. Existing allow-list and bounds retained. Actual failed device format UNVERIFIED. |
+| User-Agent | FRESH PASS: services/externalVisuals.ts:9 derives version from Constants.expoConfig with app.json fallback and existing GitHub contact URL. Test uses 9.8.7 to prove this is not hardcoded to 2.2.0. A real Wikimedia 403 remains UNVERIFIED. |
+| Silent close | FRESH PASS: ExternalVisual.tsx:18-23 and 39-51 retain the viewer and share retry/error state; section-visual.tsx:59-62,145-147,169-170 mirror it on web. Tests cover both card and viewer failure, URL-free logs, retrying the same image and Commons source links. |
+| Save diagnostics | FRESH PASS: saveImage.ts:5-23,25-78 classifies every requested stage, plus download for network/read/cache failures. Only stage is logged; no native errors, URLs or academic text are returned. Permission denial retains Open settings. Missing native imports are mocked independently. |
+| Signed-URL lifetime | CODE RISK CONFIRMED, actual phone cause UNVERIFIED. SourceFigures.tsx:60-72 can retain a loaded figure indefinitely (availability heartbeat does not refresh figures). Snapshot polling pauses outside active app; no expiry guard existed at save. SourceFigures.tsx:95-100 and SourcePageSnapshot.tsx:129-134 now supply refreshUri through SaveImageButton.tsx:16 to saveImage.ts:45. Existing owner reads mint fresh URLs after permission and before download; no bearer header is sent to storage bytes. Missing/replaced IDs and non-ready snapshots safely fail without downloading the stale URL. |
+| Android media path | SUPPORTED, retained. Installed expo-media-library 57.0.5 src/legacy/MediaLibrary.ts:768-815 documents/types initialAssetLocalUri and forwards it on Android. MediaLibraryModule.kt:155-170 explicitly dispatches it to createAlbumWithInitialFileUri under write permission; :357-364 preserves that permission gate. albums/CreateAlbum.kt:50-66 awaits asset insertion then returns the album. No evidence warrants asset-first/addAssetsToAlbumAsync, so no ADR-038 addendum/call-order rewrite. Tests instead assert download validation before native write, no asset/album lookup and cleanup only after Android/iOS write resolves. |
+| Legacy imports | Both package exports resolve locally to src/legacy/index.ts; forced mobile export validates bundling. The signed APK's native module contents remain UNVERIFIED (owner to confirm). |
+| ADB | BLOCKED: fresh adb devices returned zero devices. adb logcat -d was not started without a device; prior FX1 already recorded its indefinite wait. Zero log records. No phone mutation or device checks. |
+| Requested dated roadmap | NOT APPLICABLE: no 2026-10-17 roadmap exists; skipped as owner instructed. Other canonical docs reconciled. |
+
+### Exact verification and attempts
+
+Seven final serial commands, all **FRESH PASS**:
+
+Environment: local Windows checkout, repo-local TEMP/TMP, live-test flags off.
+The tested source snapshot is now committed at **a10642b**, including
+**37fcd16** and **dfbf466**; only documentation changed after these gates.
+
+1. npm run typecheck -- --force: 8/8 tasks, 0 cached.
+2. npm run lint -- --force: 8/8 tasks, 0 cached, six existing warnings, no errors.
+3. npm test -w @stay-focused/shared: 350 passed, 40 files.
+4. npm test -w @stay-focused/api: 2273 passed, 3 existing live skips, 199 passing files.
+5. npm test -w @stay-focused/mobile: 1263 passed, 134 files.
+6. npm test -w @stay-focused/web: 211 passed, 37 files.
+7. npm run build -- --force: 8/8 tasks, 0 cached. Generated API/web next-env.d.ts restored from pre-build copies.
+
+Build details: API 35/35 and web 19/19 generated pages; Expo Android 1/1,
+iOS 1/1 and web 10/10 emitted bundles, 68 assets. Build exit 0.
+
+git diff --check and git diff --cached --check: FRESH PASS, exit 0.
+Focused API: 23/23 (1 file); focused mobile final: 142/142 (9 files);
+focused web/download: 9/9 (2 files). These are additional development checks,
+not a substitute for the final full suites. No cached acceptance is claimed.
+First focused mobile attempt: 141 pass/1 fail, fixture included an impossible
+rendering url:undefined rather than omitting URL; corrected to the real DTO.
+First lint: 5/8 tasks completed, 1 new JSX-entity error and 1 warning reported
+before Turbo cancellation; fixed with a JSX string expression. Typecheck/lint
+were rerun fresh before continuing serially. An interim successful lint had
+seven warnings; the introduced test import-order warning was removed. Final
+review also narrowed module detection so source-unavailable errors stay in
+the download stage; regressions cover that case, and typecheck/lint were rerun.
+First full mobile run: 1,243 passing tests in 132 files and two import-failed
+suites (SectionScrubber and studyAnswer, __DEV__ undefined in Expo native code).
+Added the same expo-constants stand-in to those Node-only test boundaries;
+focused 20/20 passed, then the final seven-command serial sequence was restarted.
+A Node -e import-resolution probe
+had a PowerShell quoting SyntaxError; a local .cjs probe then resolved both
+legacy imports. No test flake. Logs and temporary tools stay ignored under
+tmp/overnight/FX1b*, with TEMP/TMP in tmp/fx1b-temp.
+
+### Local commits
+
+```text
+37fcd16 fix(api): serve raster Commons thumbnails for external visuals
+dfbf466 fix(mobile): save images through fresh owner reads and report failure stage
+a10642b fix(mobile): show retry when an external image fails
+```
+
+The docs: close FX1 checkpoint contains this outcome; its hash is recorded
+after commit in FX1b.status and Git history. All commits use author galaxymaxp
+<omgraythekid@gmail.com>. No push. Starting unrelated untracked UI/,
+apps/mobile/.gitignore and supabase/.temp/ are preserved.
+
+### Owner steps remaining
+
+Rollout and Device checks: **NOT RUN, skipped entirely**. Owner runs the
+preview-update preflight before separately authorized OTA to 2.2.0-sdk57,
+publishes the API GIF exclusion and website error state, and rechecks all three
+save kinds plus external inline/viewer loading on Realme. No native/dependency
+change was needed; if a later native fix is needed, build a new APK with deliberate
+versionCode 7 (preview autoIncrement remains false). Recheck iOS add-only saving.
+FULLSEND desktop/390px browser, overflowing viewer and suitable instructional
+Office-source checks remain pending. Actual deployed revisions, DB rows,
+Scheduler, failed image/response and native cause remain UNVERIFIED (owner to
+confirm). No further owner approval is needed for this completed local scope.

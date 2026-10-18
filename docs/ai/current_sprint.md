@@ -1,30 +1,45 @@
-# FULLSEND finite release scope — shipped; live acceptance PARTIAL
+# FX1b finite unattended repair complete locally; live acceptance pending
 
-## FX1 diagnosis stopped before implementation (2026-10-18)
+## FX1b image repair complete locally (2026-10-18)
 
-**STOPPED under FX1 unattended rule 3 during STEP 0.** The current server
-already requests Commons thumbnails at 1200 px, selects `info.thumburl` with
-thumbnail dimensions, and rejects raw SVG, TIFF and oversized thumbnails.
-This contradicts the prompt's original-file premise. Neither device failure
-is repaired and no root cause is claimed. Main release fixes from expected
-`github/main` **0d7bfed** were merged normally as **cb4df08**; the shipped release
-remains dc162de according to FULLSEND's historical evidence.
+**PASS for the finite unattended code scope; device acceptance remains pending.**
+Owner's revised FX1b scope supersedes the earlier diagnostic STOP. Commons
+already selected bounded thumbnails from its first implementation; no legacy
+conversion is needed. New GIF candidates are skipped. The native User-Agent
+uses expo-constants/app config (currently 2.2.0) and the existing contact URL.
+Mobile and web external-image failures retain the viewer and display
+Image couldn't load, Retry and Open on Commons; safe failure logs contain no URL.
 
-All seven requested application gates are **NOT RUN (0/7 executed)** because
-the earlier STOP takes precedence. `adb devices` found no connected phone;
-the read-only log dump was interrupted while waiting, with zero records
-obtained (**BLOCKED**). Missing device access alone did not cause the STOP.
-Live revisions, failed image/response, native exception, module resolution,
-database and Scheduler state are **UNVERIFIED (owner to confirm)**.
+Save returns/logs typed permission, download, HTTP-status, MIME, empty-file,
+media-write and missing-module stages with specific messages. Source saves
+refresh signed URLs through existing bearer-protected reads after permission,
+match the exact figure/snapshot identity, and fail safely if it changed.
+SDK 57 explicitly supports the current Android initial-file album call, so
+ADR-038's Android write-only and iOS add-only paths remain; cleanup follows
+the awaited native write. These fixes do not establish the actual phone exception.
 
-**Owner steps remaining:** resolve the exact scope question in the FX1 report,
-complete diagnosis and repairs, then run every fresh serial gate. Rollout and
-Device checks were skipped entirely (**NOT RUN**). No push, deployment,
-remote service call, database operation, migration change, Scheduler action,
-email or environment-file edit occurred. Unrelated untracked files remain.
-The requested 2026-10-17 roadmap file was not found; no replacement was created.
+**FRESH final gates:** forced root typecheck/lint/build **8/8 tasks each,
+zero cached**; shared **350/350** (40 files), API **2273/2273** (199 files, 3 existing live skips), mobile **1263/1263** (134 files), web **211/211** (37 files); zero test failures. All seven application gates
+ran serially with repo-local TEMP/TMP. Diff and staged-diff hygiene PASS.
+Lint retains six existing warnings. First lint attempt failed on a new web
+JSX apostrophe (5/8 tasks complete, one error); fixed and the serial sequence
+restarted. Focused mobile first attempt had 141 pass/1 fail from an invalid
+test fixture; corrected, then 142/142 passed. First full mobile run had 1,243
+passing tests and two failed suites (132 passing files) because indirect imports
+needed an expo-constants Node mock; fixed before restarting the final sequence.
+No nondeterministic flake observed.
 
-[FX1 diagnosis and owner question](acceptance/fx1-image-diagnosis.md).
+**Owner steps remaining:** Rollout and Device checks skipped entirely (NOT RUN).
+Publish reviewed JS/TS changes and the GIF API rule, then recheck figure,
+snapshot and external saves plus external card/viewer rendering on Realme.
+ADB evidence is BLOCKED (zero devices); actual native cause/module resolution,
+failed image/response and production/database/Scheduler state are **UNVERIFIED
+(owner to confirm)**. No remote service call, deployment, SQL, migration,
+Scheduler action, email, environment-file edit or push occurred. The absent
+2026-10-17 roadmap file was skipped; unrelated untracked work is preserved.
+This run ends at FX1b; FULLSEND's other live checks remain pending.
+
+[FX1 diagnosis and FX1b outcome](acceptance/fx1-image-diagnosis.md).
 
 ## FULLSEND shipped; live acceptance PARTIAL (2026-10-18)
 

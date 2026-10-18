@@ -4239,3 +4239,90 @@ figures, page snapshots and external images, plus external card/viewer loading.
 FULLSEND browser, overflowing-viewer and suitable-source Office checks remain.
 
 [FX1 file:line evidence and hypothesis verdicts](acceptance/fx1-image-diagnosis.md).
+
+
+## FX1b unattended repair — 2026-10-18
+
+## FX1b image repair complete locally (2026-10-18)
+
+**PASS for the finite unattended code scope; device acceptance remains pending.**
+Owner's revised FX1b scope supersedes the earlier diagnostic STOP. Commons
+already selected bounded thumbnails from its first implementation; no legacy
+conversion is needed. New GIF candidates are skipped. The native User-Agent
+uses expo-constants/app config (currently 2.2.0) and the existing contact URL.
+Mobile and web external-image failures retain the viewer and display
+Image couldn't load, Retry and Open on Commons; safe failure logs contain no URL.
+
+Save returns/logs typed permission, download, HTTP-status, MIME, empty-file,
+media-write and missing-module stages with specific messages. Source saves
+refresh signed URLs through existing bearer-protected reads after permission,
+match the exact figure/snapshot identity, and fail safely if it changed.
+SDK 57 explicitly supports the current Android initial-file album call, so
+ADR-038's Android write-only and iOS add-only paths remain; cleanup follows
+the awaited native write. These fixes do not establish the actual phone exception.
+
+**FRESH final gates:** forced root typecheck/lint/build **8/8 tasks each,
+zero cached**; shared **350/350** (40 files), API **2273/2273** (199 files, 3 existing live skips), mobile **1263/1263** (134 files), web **211/211** (37 files); zero test failures. All seven application gates
+ran serially with repo-local TEMP/TMP. Diff and staged-diff hygiene PASS.
+Lint retains six existing warnings. First lint attempt failed on a new web
+JSX apostrophe (5/8 tasks complete, one error); fixed and the serial sequence
+restarted. Focused mobile first attempt had 141 pass/1 fail from an invalid
+test fixture; corrected, then 142/142 passed. First full mobile run had 1,243
+passing tests and two failed suites (132 passing files) because indirect imports
+needed an expo-constants Node mock; fixed before restarting the final sequence.
+No nondeterministic flake observed.
+
+**Owner steps remaining:** Rollout and Device checks skipped entirely (NOT RUN).
+Publish reviewed JS/TS changes and the GIF API rule, then recheck figure,
+snapshot and external saves plus external card/viewer rendering on Realme.
+ADB evidence is BLOCKED (zero devices); actual native cause/module resolution,
+failed image/response and production/database/Scheduler state are **UNVERIFIED
+(owner to confirm)**. No remote service call, deployment, SQL, migration,
+Scheduler action, email, environment-file edit or push occurred. The absent
+2026-10-17 roadmap file was skipped; unrelated untracked work is preserved.
+This run ends at FX1b; FULLSEND's other live checks remain pending.
+
+[FX1 diagnosis and FX1b outcome](acceptance/fx1-image-diagnosis.md).
+
+
+### Commits
+
+```text
+37fcd16 fix(api): serve raster Commons thumbnails for external visuals
+dfbf466 fix(mobile): save images through fresh owner reads and report failure stage
+a10642b fix(mobile): show retry when an external image fails
+```
+
+The final docs: close FX1 commit contains this footer; its post-commit hash
+is in tmp/overnight/FX1b.status and Git history. Author galaxymaxp
+<omgraythekid@gmail.com>; branch overnight/2026-10-15_feedback; no push.
+Existing merge cb4df08 and dependency install were not repeated. Read-only
+fetch confirms github/main 0d7bfed. Unrelated UI/, apps/mobile/.gitignore,
+supabase/.temp/ preserved. Runtime/build/native configuration is unchanged.
+
+**Evidence:** Commons already chose thumburl (original hypothesis closed);
+new GIF exclusion commons.ts:78-81, dynamic native User-Agent
+services/externalVisuals.ts:9, retained card/viewer failure states
+ExternalVisual.tsx:18-23,39-51 and section-visual.tsx:59-62,145-170.
+saveImage.ts:25-78 adds stage-only diagnostics and awaits writes before cleanup;
+SourceFigures.tsx:95 and SourcePageSnapshot.tsx:129 refresh expirable URLs
+via existing owner-scoped reads, requiring the same accepted image identity.
+Installed SDK source explicitly supports initialAssetLocalUri
+(src/legacy/MediaLibrary.ts:768-815, Android MediaLibraryModule.kt:155-170,
+albums/CreateAlbum.kt:50-66); Android media path stays as ADR-038 specifies.
+Local legacy imports and forced bundle export pass; APK contents and actual
+device exception/HTTP response remain **UNVERIFIED (owner to confirm)**.
+
+### Owner steps remaining
+
+**Rollout and Device checks — NOT RUN, skipped entirely.** Run mobile preview
+preflight before an authorized OTA to 2.2.0-sdk57; publish API GIF filtering and
+website error state. Recheck Save for a figure, page snapshot and external image,
+and external card/viewer rendering on Realme, plus iOS add-only Photos saving.
+No native change was required; any later native release must deliberately
+advance versionCode from 6 (preview autoIncrement is false). Complete remaining
+FULLSEND browser/overflow/Office-source checks. Production revisions/database/
+Scheduler/native causes are UNVERIFIED; zero ADB devices means log evidence is
+BLOCKED. No deployment, remote service/SQL, migration, Scheduler, email,
+environment-file edit or push occurred. The dated roadmap is absent and skipped.
+Finite FX1b endpoint reached; no later roadmap work started.
