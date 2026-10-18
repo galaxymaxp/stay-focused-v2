@@ -497,6 +497,7 @@ export function GenerateMaterialScreen() {
           <Surface style={{ gap: spacing[3] }}>
             <Copy size="h3">Reviewer</Copy>
             <Copy muted size="bodySmall">A structured study guide written from this material.</Copy>
+            {material.description ? <Copy muted size="bodySmall">{material.description}</Copy> : null}
             <Copy muted size="bodySmall">{preparationPresentation(materialStatus(material)).message}</Copy>
             {materialStatus(material).status === "failed" && workspace.errorCode !== "connection" && materialPage.errorCode !== 'connection' && !retryOffline ? <Action disabled={busy} onPress={() => void retry()}>{busy ? "Retrying…" : "Retry"}</Action> : null}
             <Action disabled={busy || reviewerSubmitted || materialStatus(material).status !== "ready" || !available(material.generation.reviewer) || !available(workspace.data?.capabilities.reviewerGeneration)} onPress={() => void generate("reviewer")}>

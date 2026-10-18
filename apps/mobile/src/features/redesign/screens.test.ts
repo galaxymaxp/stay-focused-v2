@@ -781,6 +781,21 @@ describe("B25 screen interactions", () => {
     expect(mocks.push).toHaveBeenLastCalledWith({ pathname: '/generation', params: { intent: 'saved-key' } });
     expect(mocks.acceptIntent).toHaveBeenCalledTimes(1);
   });
+  it.each([null, 'Covers cells and their energy needs.'])('shows the optional material description above Generate and keeps Generate enabled: %s', async description => {
+    mocks.data['/api/experience/courses/course'] = { ...workspace, materials: { ...workspace.materials,
+      items: [{ ...workspace.materials.items[0]!, description }] } };
+    mocks.params = { courseId: 'course', materialId: 'file:one' };
+    const root = await render(createElement(GenerateMaterialScreen));
+    const copies = root.findAll(node => String(node.type) === 'Copy' && node.props.children === description);
+    expect(copies).toHaveLength(description ? 1 : 0);
+    const generate = root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Generate Reviewer')[0]!;
+    expect(generate.props.disabled).toBe(false);
+    if (description) {
+      expect(copies[0]!.props.size).toBe('bodySmall');
+      const children = copies[0]!.parent!.children;
+      expect(children.indexOf(copies[0]!)).toBeLessThan(children.indexOf(generate));
+    }
+  });
   it("keeps Retry quiet, single-flight, and rejoins it after returning to the material", async () => {
     const needsPreparation = { ...workspace.materials.items[0]!, preparation: {status:'failed' as const,reasonCode:'preparation_failed' as const} };
     mocks.data["/api/experience/courses/course"] = {
