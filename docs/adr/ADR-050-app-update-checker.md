@@ -54,7 +54,9 @@ Settings About shows installed version/code, short OTA ID or built-in, manual
 check, last successful check time and the available release's plain notes.
 Up-to-date feedback is shown only after a successful manual metadata response.
 
-UC3 publishing automation remains separate work.
+UC3 publishing automation is implemented separately under
+[ADR-051](ADR-051-android-release-distribution.md) and the
+[Android release runbook](../dev/android-release-runbook.md).
 API deployment, mobile OTA and physical acceptance remain owner steps. Health's
 existing hardcoded version `2.1.0` is intentionally outside UC1.
 

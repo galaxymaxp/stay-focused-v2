@@ -1,5 +1,7 @@
 # Mobile Device Validation Runbook
 
+For native APK publishing versus same-runtime OTA, follow the [Android release runbook](android-release-runbook.md).
+
 This runbook validates the authenticated reviewer plus gallery and camera OCR
 development flow with Expo Go on a physical iPhone. It documents local setup
 only; it does not deploy, run live OpenAI smoke tests outside reviewer
