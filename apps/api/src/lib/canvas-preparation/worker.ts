@@ -78,6 +78,7 @@ export async function executePreparation(reference:PreparationReference,dependen
   reconcile?:(client:PreparationClient,job:CanvasMaterialPreparationRow)=>Promise<void>;
   dispatch?:typeof dispatchPreparation;
   figures?:typeof import("../source-figures/store").extractPreparedFigures;
+  description?:typeof import('../material-descriptions').describePreparedMaterial;
 }={}):Promise<'ack'|'retry'>{
   const client=dependencies.client??createCanvasServiceClient();
   const workerId=dependencies.workerId??`google-preparation:${randomUUID()}`;const leaseToken=dependencies.leaseToken??randomUUID();
@@ -91,6 +92,8 @@ export async function executePreparation(reference:PreparationReference,dependen
       if(current.state==='prepared') {
         try { await (dependencies.figures??(await import('../source-figures/store')).extractPreparedFigures)(client,current); }
         catch { console.warn('source_figures.extraction',{code:'post_commit_failed',failureCount:1}); }
+        try { await (dependencies.description??(await import('../material-descriptions')).describePreparedMaterial)(client,current); }
+        catch { console.warn('material_description',{code:'post_commit_failed'}); }
       }
       await (dependencies.reconcile??preparationCompleted)(client,current);
       return 'ack';
@@ -118,6 +121,8 @@ export async function executePreparation(reference:PreparationReference,dependen
     if(current?.state==='prepared') {
       try { await (dependencies.figures??(await import('../source-figures/store')).extractPreparedFigures)(client,current); }
       catch { console.warn('source_figures.extraction',{code:'post_commit_failed',failureCount:1}); }
+      try { await (dependencies.description??(await import('../material-descriptions')).describePreparedMaterial)(client,current); }
+      catch { console.warn('material_description',{code:'post_commit_failed'}); }
     }
     if(current)await (dependencies.reconcile??preparationCompleted)(client,current);
     return current && ['running','pending'].includes(current.state) && current.dispatch_id===reference.dispatchId?'retry':'ack';

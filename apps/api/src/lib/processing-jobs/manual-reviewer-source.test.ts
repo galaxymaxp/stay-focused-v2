@@ -15,7 +15,7 @@ vi.mock("@stay-focused/engine", async original => ({ ...await original<typeof im
 vi.mock("./ai-generation", () => ({ durableGenerationProvider: mocks.provider }));
 vi.mock("./workflow-repository", () => ({ readProcessingJobCheckpoint: mocks.read, writeProcessingJobCheckpoint: mocks.write }));
 import { processAIReviewerJob } from "./ai-reviewer";
-import { prepareManualReviewerSource } from "./manual-reviewer-source";
+import { attachManualReviewerSource, prepareManualReviewerSource } from "./manual-reviewer-source";
 import { processClaimedJob } from "./processor";
 
 const job = { id: "job", user_id: "owner", job_type: "reviewer_generation" } as ProcessingJobDatabaseRow;
@@ -46,6 +46,20 @@ beforeEach(() => {
   mocks.finalize.mockImplementation(async () => { mocks.source = { ...mocks.source, source_kind: "text", source_text: "Exact extracted text." }; });
 });
 describe("manual extract-to-reviewer chain", () => {
+  it('starts descriptions only after exact source attachment, without waiting or changing generation on failure', async () => {
+    let reject!: (reason: Error) => void;
+    const pending = new Promise<void>((_resolve, fail) => { reject = fail; });
+    const description = vi.fn(() => pending);
+    const attached = { ...job, source_version_id: 'persisted-version' };
+    const attach = vi.fn().mockResolvedValue({ data: [attached], error: null });
+    await expect(attachManualReviewerSource({ rpc: attach } as never, job, 'worker', 'Exact source.', [], { description })).resolves.toBeUndefined();
+    expect(description).toHaveBeenCalledExactlyOnceWith(expect.anything(), attached);
+    expect(attach.mock.invocationCallOrder[0]).toBeLessThan(description.mock.invocationCallOrder[0]!);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    reject(new Error('private provider details'));
+    await Promise.resolve(); await Promise.resolve(); await Promise.resolve();
+    expect(warn).toHaveBeenCalledWith('material_description', { code: 'post_attach_failed' });
+  });
   it.each(["docx", "pptx"] as const)("extracts %s with the shared parser, saves exact ordered blocks, and ends in one reviewer", async kind => {
     mocks.source.source_kind = kind;
     mocks.download.mockResolvedValue({ data: new Blob([Buffer.from(bytes(kind))]), error: null });

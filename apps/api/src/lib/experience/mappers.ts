@@ -45,14 +45,14 @@ export function orderGenerateCourses(items: readonly CanvasCourseInventoryItem[]
       (a.at === b.at ? 0 : b.at > a.at ? 1 : -1) || a.course.name.localeCompare(b.course.name) || a.course.id.localeCompare(b.course.id))
     .map(entry => entry.course);
 }
-export function learningMaterial(row: CanvasReviewerSourceDescriptor, courseId: string, reviewerArtifactId: string | null = null): LearningMaterial {
+export function learningMaterial(row: CanvasReviewerSourceDescriptor, courseId: string, reviewerArtifactId: string | null = null, description: string | null = null): LearningMaterial {
   // Legacy availability means usable right now, so it is also unavailable for
   // preparable, empty and unsupported materials. Preserve those useful states.
   const readiness = row.capability === 'failed' || row.capability === 'inaccessible' || (row.capability === 'ready' && row.availability !== 'available') ? 'unavailable' : row.capability;
   const kind = row.file?.kind === 'docx' ? 'document' : row.file?.kind === 'pptx' ? 'slides' : row.type !== 'file' ? row.type : row.file?.kind === 'unsupported'
     ? /\.pptx?$/i.test(row.title) ? 'slides' : 'document' : row.file?.kind ?? 'document';
   const ready = row.preparation ? row.preparation.status === 'ready' : readiness === 'ready';
-  return { id: row.id, courseId, title: row.title, kind, readiness, preparation: row.preparation, count: null, sourceId: row.id, reviewerArtifactId,
+  return { id: row.id, courseId, title: row.title, description, kind, readiness, preparation: row.preparation, count: null, sourceId: row.id, reviewerArtifactId,
     moduleTitle: row.placement.moduleTitle, generation: generationCapability(ready, readiness === 'unsupported', ready && reviewerArtifactId !== null) };
 }
 export function dayWindow(date: string, offset = 0) {

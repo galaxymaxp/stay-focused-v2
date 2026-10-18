@@ -47,4 +47,19 @@ describe('durable Canvas preparation worker',()=>{
     expect(parsePreparationReference(reference)).toEqual(reference);
     expect(parsePreparationReference({...reference,accessToken:'secret'})).toBeNull();
   });
+  it.each([false,true])('runs the description after prepared on redelivery=%s, isolating failures from ack',async redelivery=>{
+    const rpc=vi.fn().mockResolvedValueOnce({data:redelivery?[]:[job],error:null}).mockResolvedValue({data:true,error:null});
+    const prepared={...job,state:'prepared' as const,result_id:'result'};
+    mocks.read.mockResolvedValue(prepared);
+    const description=vi.fn(async()=>{throw new Error('private provider details');});
+    const figures=vi.fn(async()=>{});const reconcile=vi.fn(async()=>{});
+    const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+    expect(await executePreparation(reference,{client:{rpc} as never,workerId:'worker',leaseToken:lease,
+      loadToken:async()=> 'synthetic-token',run:async()=>({version:1,components:[]}),figures,description,reconcile})).toBe('ack');
+    expect(description).toHaveBeenCalledExactlyOnceWith(expect.anything(),prepared);
+    expect(mocks.read.mock.invocationCallOrder[0]).toBeLessThan(description.mock.invocationCallOrder[0]!);
+    expect(description.mock.invocationCallOrder[0]).toBeLessThan(reconcile.mock.invocationCallOrder[0]!);
+    expect(warn).toHaveBeenCalledWith('material_description',{code:'post_commit_failed'});
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('private provider');
+  });
 });

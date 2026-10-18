@@ -64,8 +64,12 @@ export class ExperienceService {
     if (this.dependencies.repository.materialReviewers) {
       const result = await this.dependencies.materials(userId, courseId, offset);
       if (!result.ok) this.materialsFailure(result);
-      const reviewers = await this.dependencies.repository.materialReviewers(userId, courseId, result.value.sources.map(row => row.id));
-      return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewers.get(row.id) ?? null)), totalKnown: result.value.pagination.totalKnown,
+      const ids = result.value.sources.map(row => row.id);
+      const [reviewers, descriptions] = await Promise.all([
+        this.dependencies.repository.materialReviewers(userId, courseId, ids),
+        this.dependencies.repository.materialDescriptions?.(userId, courseId, ids),
+      ]);
+      return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewers.get(row.id) ?? null, descriptions?.get(row.id) ?? null)), totalKnown: result.value.pagination.totalKnown,
         nextOffset: result.value.pagination.hasMore ? result.value.pagination.offset + result.value.pagination.returned : null };
     }
     const [result, artifacts, versions, sourceVersions, snapshots, snapshotItems] = await Promise.all([
@@ -78,7 +82,8 @@ export class ExperienceService {
     ]);
     if (!result.ok) this.materialsFailure(result);
     const reviewerByMaterial = mapReviewerArtifactsByMaterial({ courseId, artifacts, versions, sourceVersions, snapshots, snapshotItems });
-    return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewerByMaterial.get(row.id)?.id ?? null)), totalKnown: result.value.pagination.totalKnown,
+    const descriptions = await this.dependencies.repository.materialDescriptions?.(userId, courseId, result.value.sources.map(row => row.id));
+    return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewerByMaterial.get(row.id)?.id ?? null, descriptions?.get(row.id) ?? null)), totalKnown: result.value.pagination.totalKnown,
       nextOffset: result.value.pagination.hasMore ? result.value.pagination.offset + result.value.pagination.returned : null };
   }
   private materialsFailure(result: Extract<CanvasReviewerSourceResult<CanvasReviewerSourceList>, { ok: false }>): never {

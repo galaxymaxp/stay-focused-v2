@@ -16,6 +16,7 @@ export interface ExperienceRepository {
   librarySummary?(userId: string, id: string): Promise<LibraryArtifactSummary | null>;
   reviewerDetail?(userId: string, id: string): Promise<{ summary: LibraryArtifactSummary; payload: unknown; artifactId: string } | null>;
   materialReviewers?(userId: string, courseId: string, materialIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
+  materialDescriptions?(userId: string, courseId: string, materialIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
   exactRows?<T extends ExperienceTable>(table: T, userId: string, key: keyof ExperienceRow<T> & string, value: string): Promise<readonly ExperienceRow<T>[]>;
 }
 
@@ -34,6 +35,7 @@ export function trustedExperienceReadRepository(
     librarySummary: (_userId, id) => repository.librarySummary!(authenticatedUserId, id),
     reviewerDetail: (_userId, id) => repository.reviewerDetail!(authenticatedUserId, id),
     materialReviewers: (_userId, courseId, materialIds) => repository.materialReviewers!(authenticatedUserId, courseId, materialIds),
+    materialDescriptions: (_userId, courseId, materialIds) => repository.materialDescriptions!(authenticatedUserId, courseId, materialIds),
     exactRows: (table, _userId, key, value) => repository.exactRows!(table, authenticatedUserId, key, value),
     rows<T extends ExperienceTable>(table: T): Promise<readonly ExperienceRow<T>[]> {
       return repository.rows(table, authenticatedUserId);
@@ -54,6 +56,24 @@ export function experienceRepository(client: SupabaseClient<Database>): Experien
     return query;
   }
   return {
+    async materialDescriptions(userId, courseId, materialIds) {
+      const ids = [...new Set(materialIds)];
+      if (!ids.length) return new Map();
+      try {
+        if (ids.length > 100) throw new Error('description_page_invalid');
+        const result = await client.rpc('read_material_descriptions_v1', { p_user_id: userId, p_course_id: courseId, p_material_ids: ids });
+        if (result.error || !result.data || result.data.length > ids.length) throw new Error('description_read_unavailable');
+        const descriptions = new Map<string, string>();
+        for (const row of result.data) {
+          if (!ids.includes(row.material_id) || descriptions.has(row.material_id)) throw new Error('description_read_invalid');
+          if (row.description && Array.from(row.description).length <= 240) descriptions.set(row.material_id, row.description);
+        }
+        return descriptions;
+      } catch {
+        console.warn('material_description', { code: 'read_unavailable' });
+        return new Map();
+      }
+    },
     async libraryPage(userId, filters) {
       const offset = filters.offset ?? 0, limit = filters.limit ?? 50;
       if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new ExperienceFailure(400, 'invalid_request');

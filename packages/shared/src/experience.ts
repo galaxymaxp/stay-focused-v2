@@ -77,6 +77,7 @@ export interface MaterialPreparation {
   readonly reasonCode: 'preparation_failed' | 'preparation_cancelled' | 'attempt_limit' | 'preparation_paused' | null;
 }
 export interface LearningMaterial {
+  readonly description?: string | null;
   readonly id: string;
   readonly courseId: string;
   readonly title: string;

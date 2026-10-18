@@ -17,6 +17,19 @@ const attachmentFile = { id: 'file-row', user_id: 'owner', canvas_connection_id:
 const attachmentReference = { id: 'reference', user_id: 'owner', canvas_connection_id: 'connection', course_id: course.id, file_id: attachmentFile.id, canvas_assignment_id: assignment.canvas_assignment_id, reference_type: 'typed_attachment', reference_identity: 'private-reference', referenced_row_id: null };
 const descriptor: CanvasReviewerSourceDescriptor = { id: 'file:source', type: 'file', title: 'Cells.pdf', capability: 'ready', availability: 'available', unavailableReason: 'private OCR diagnostic', updatedAt: null, estimatedCharacters: 900, placement: { group: 'module', moduleTitle: 'Cells', modulePosition: 1, itemPosition: 1 }, file: { kind: 'pdf', preparationStatus: 'ready', canPrepare: false } };
 const sourceList: CanvasReviewerSourceList = { courseId: course.id, courseName: course.name, courseSync: { status: 'partial', completedAt: null, lastSuccessfulSyncAt: null, latestResultWasPartial: true, synchronizedSourcesAvailable: true, failureCategories: ['private diagnostics'] }, availableSourceCount: 1, unavailableSourceCount: 0, sources: [descriptor], pagination: { limit: 100, offset: 0, returned: 1, hasMore: false, totalKnown: 1 } };
+it('loads descriptions once for the material page and maps absent descriptions to null', async () => {
+  const descriptions = vi.fn(async () => new Map([[descriptor.id, 'Covers cell structure.']]));
+  const list = { ...sourceList, sources: [descriptor, { ...descriptor, id: 'file:other' }] };
+  const materials = vi.fn(async () => ({ ok: true as const, value: list }));
+  const { repo } = service({ canvas_courses: [course] });
+  repo.materialDescriptions = descriptions;
+  repo.materialReviewers = async () => new Map();
+  const api = new ExperienceService({ repository: repo, materials });
+  const result = await api.getCourseMaterials('owner', course.id);
+  expect(descriptions).toHaveBeenCalledExactlyOnceWith('owner', course.id, [descriptor.id, 'file:other']);
+  expect(result.items.map(row => row.description)).toEqual(['Covers cell structure.', null]);
+  expect(learningMaterial(descriptor, course.id).description).toBeNull();
+});
 const payload = { reviewer: { title: 'Cells', metadata: { provider_id: 'private', prompt: 'private' }, sections: [{ id: 's1', title: 'Cells', plannedSectionId: 'private', items: [{ id: 'i1', title: 'Cell', sourceCore: { explanation: 'Cells contain genetic material.', keyPoints: ['Cells are living units.'], evidence: [{ kind: 'formula', text: 'a + b' }, { kind: 'table', text: '| a | b |' }] }, enrichment: { note: 'private' } }] }] }, sourceSnapshotId: 'snapshot' };
 type TestData = Partial<{ [T in ExperienceTable]: readonly Partial<ExperienceRow<T>>[] }>;
 function service(data: TestData = {}, materials = vi.fn(async () => ({ ok: true as const, value: sourceList }))) {

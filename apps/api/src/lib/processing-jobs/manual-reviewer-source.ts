@@ -8,7 +8,8 @@ import { WorkerJobError } from "./processor";
 import { readProcessingJobState, updateProcessingJobProgress } from "./worker-repository";
 
 export async function attachManualReviewerSource(client: ProcessingJobServiceClient, job: ProcessingJobDatabaseRow,
-  workerId: string, text: string, blocks: readonly SourceNormalizationBlockInput[]): Promise<void> {
+  workerId: string, text: string, blocks: readonly SourceNormalizationBlockInput[],
+  dependencies: { description?: typeof import('../material-descriptions').describeManualMaterial } = {}): Promise<void> {
   if (!text.trim()) throw new WorkerJobError("no_text_detected", UNREADABLE_MANUAL_FILE_MESSAGE, false);
   if (text.length > 100_000) throw new WorkerJobError("source_too_large", "Choose a file with at most 100,000 text characters.", false);
   const { data, error } = await client.rpc("attach_manual_reviewer_source_v1", {
@@ -16,6 +17,12 @@ export async function attachManualReviewerSource(client: ProcessingJobServiceCli
     p_source_blocks: JSON.parse(JSON.stringify(blocks)) as Json,
   });
   if (error || !data?.[0]) throw new WorkerJobError("processing_job_source_attach_failed", "The file's text could not be saved. Try again.", true);
+  // Never await supplementary metadata on the critical generation path.
+  void Promise.resolve().then(async () => {
+    const description = dependencies.description ?? (await import('../material-descriptions')).describeManualMaterial;
+    await description(client, data[0]!);
+  })
+    .catch(() => console.warn('material_description', { code: 'post_attach_failed' }));
 }
 
 /** Every backend uses the same checkpointed PDF/image steps and Office extractor. */
