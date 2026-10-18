@@ -11,7 +11,7 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => tree?.unmount()); vi.unstubAllGlobals(); });
 async function mount(past = false, disabled = false) {
   const move = vi.fn();
-  await act(async () => { tree = create(createElement(CourseOptions, { past, disabled, onMove: move })); });
+  await act(async () => { tree = create(createElement(CourseOptions, { title: 'Test course', past, disabled, onMove: move })); });
   return move;
 }
 const trigger = () => tree.root.findAllByType('button')[0]!;
@@ -20,7 +20,8 @@ it('toggles its controlled disclosure and closes after the existing move action'
   expect(trigger().props['aria-expanded']).toBe(false);
   await act(async () => trigger().props.onClick());
   expect(trigger().props['aria-expanded']).toBe(true);
-  expect(tree.root.findByProps({ role: 'group' }).props.id).toBe(trigger().props['aria-controls']);
+  expect(trigger().props).toMatchObject({ 'aria-label': 'Course options for Test course', 'aria-haspopup': 'menu' });
+  expect(tree.root.findByProps({ role: 'menu' }).props.id).toBe(trigger().props['aria-controls']);
   const action = tree.root.findAllByType('button')[1]!;
   expect(action.props.children).toBe('Move to past courses');
   await act(async () => action.props.onClick());

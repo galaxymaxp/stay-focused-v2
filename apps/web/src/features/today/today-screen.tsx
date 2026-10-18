@@ -379,7 +379,7 @@ export function TodayScreen() {
           {today.error && !today.data ? (
             <div>
               <Notice error>{today.error}</Notice>
-              <button onClick={today.refresh}>Try again</button>
+              <button className="button retry-button" onClick={today.refresh}>Try again</button>
             </div>
           ) : today.loading && !today.data ? (
             <BookLoader label="Loading your day" />

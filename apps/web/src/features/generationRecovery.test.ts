@@ -35,7 +35,7 @@ it('shows Try again, real stage and safe-material copy with a single primary act
   await render();
   expect(retry()).toBeDefined();
   expect(JSON.stringify(rendered!.toJSON())).toContain('Stopped while building topics. Your material is safe.');
-  expect(rendered!.root.findAllByType('button').filter(node => node.props.className === 'primary')).toHaveLength(1);
+  expect(rendered!.root.findAllByType('button').filter(node => node.props.className?.split(/\s+/).includes('primary'))).toHaveLength(1);
 });
 it('suppresses duplicate taps and uses a fresh key when the accepted retry itself fails', async () => {
   let accept!: (value: unknown) => void;

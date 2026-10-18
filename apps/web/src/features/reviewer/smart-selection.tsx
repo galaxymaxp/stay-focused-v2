@@ -484,7 +484,7 @@ function RunContent({ run, retry, children }: { run: Run; retry?: () => void; ch
       <div className="stack">
         <p className="notice">{run.message}</p>
         {retry && (
-          <button className="subtle link-button" onClick={retry}>
+          <button className="button subtle retry-button" onClick={retry}>
             Try again
           </button>
         )}

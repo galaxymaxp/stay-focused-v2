@@ -98,18 +98,22 @@ type Loadable = {
   refreshing?: boolean;
 };
 /** One loader or error for a screen, however many requests it waits on. */
-export function State({ resource }: { resource: Loadable | readonly Loadable[] }) {
+export function State({ resource, status = true }: {
+  resource: Loadable | readonly Loadable[];
+  /** A screen with a combined status may suppress only snapshot status labels. */
+  status?: boolean;
+}) {
   const all = Array.isArray(resource) ? resource : [resource as Loadable];
   const failed = all.find((r) => r.error && r.data === null);
   if (failed)
     return (
       <div>
         <Notice error>{failed.error}</Notice>
-        <button onClick={() => all.forEach((r) => r.error && r.refresh())}>Try again</button>
+        <button className="button retry-button" onClick={() => all.forEach((r) => r.error && r.refresh())}>Try again</button>
       </div>
     );
   if (all.some((r) => r.loading && !r.data)) return <BookLoader />;
-  return <>{all.filter(r => r.data !== null).map((r, index) => <SnapshotStatus key={index} {...r} />)}</>;
+  return status ? <>{all.filter(r => r.data !== null).map((r, index) => <SnapshotStatus key={index} {...r} />)}</> : null;
 }
 /**
  * Content identity, as the app's ContentIcon: Reviewers, Quizzes, Drafts,

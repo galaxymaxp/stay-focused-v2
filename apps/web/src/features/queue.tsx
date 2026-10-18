@@ -157,7 +157,7 @@ export function QueueCard({
           )}
           {canRetry && (
             <button
-              className="subtle"
+              className="button subtle retry-button"
               disabled={!generationEnabled || action.busy}
               onClick={() =>
                 void action.run(async () => {
@@ -330,7 +330,7 @@ export function GenerationScreen({ id }: { id: string }) {
             )}
             {canRetry && (
               <button
-                className="primary"
+                className="button primary retry-button"
                 disabled={!generationEnabled || action.busy}
                 onClick={() =>
                   void action.run(async () => {

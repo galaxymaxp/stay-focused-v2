@@ -129,9 +129,9 @@ try {
     await page.getByRole('button', { name: 'Sync Independent practice', exact: true }).click();
     await page.waitForFunction(() => document.querySelector('button[aria-busy="true"]'));
     assert.equal(await page.getByText(/Syncing from Canvas/).count(), 0);
-    assert.equal(await page.getByText(/Syncing with Canvas/).count(), 1);
+    assert.equal(await page.getByText('Syncing…', { exact: true }).count(), 1);
     await check('generate');
-    const options = page.getByRole('button', { name: 'Course options', exact: true }).first();
+    const options = page.getByRole('button', { name: `Course options for ${long}`, exact: true }).first();
     const before = await page.locator('.generate-course-tile').first().boundingBox();
     await options.click();
     assert.equal(await options.getAttribute('aria-expanded'), 'true');
@@ -143,7 +143,7 @@ try {
     await page.getByRole('heading', { name: 'Generate', exact: true }).click();
     assert.equal(await options.getAttribute('aria-expanded'), 'false');
     await options.click();
-    await page.getByRole('button', { name: 'Move to past courses', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'Move to past courses', exact: true }).click();
     assert.equal(await options.getAttribute('aria-expanded'), 'false');
     await page.goto(`${origin}/generate/${course.id}`);
     await page.getByRole('button', { name: 'Generate all', exact: true }).waitFor();
@@ -164,7 +164,7 @@ try {
     // The final card's disclosure must escape list-card overflow clipping.
     const lastOptions = page.getByRole('button', { name: 'Course options', exact: true }).last();
     await lastOptions.click();
-    const move = page.getByRole('button', { name: 'Move to past courses', exact: true });
+    const move = page.getByRole('menuitem', { name: 'Move to past courses', exact: true });
     await move.scrollIntoViewIfNeeded();
     assert(await move.evaluate(element => {
       const rect = element.getBoundingClientRect();

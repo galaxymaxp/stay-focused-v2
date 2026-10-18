@@ -3,7 +3,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "./ui";
 
 /** A disclosure keeps course actions out of the card's navigation target. */
-export function CourseOptions({ past, disabled, onMove }: {
+export function CourseOptions({ title, labelled = false, past, disabled, onMove }: {
+  title: string;
+  labelled?: boolean;
   past: boolean;
   disabled: boolean;
   onMove: () => void;
@@ -12,8 +14,10 @@ export function CourseOptions({ past, disabled, onMove }: {
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const move = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
+    move.current?.focus();
     const outside = (event: Event) => {
       if (!root.current?.contains(event.target as Node)) setOpen(false);
     };
@@ -31,13 +35,20 @@ export function CourseOptions({ past, disabled, onMove }: {
       document.removeEventListener("keydown", escape);
     };
   }, [open]);
-  return <div className="course-options" ref={root}>
+  return <div className={`course-options${labelled ? '' : ' course-options-icon'}`} ref={root}
+    onKeyDown={event => {
+      if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+      event.preventDefault();
+      if (!open) setOpen(true);
+      else move.current?.focus();
+    }}>
     <button type="button" className="subtle" ref={trigger}
-      aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
-      Course options <Icon name="chevron-down" />
+      aria-label={labelled ? undefined : `Course options for ${title}`}
+      aria-haspopup="menu" aria-expanded={open} aria-controls={id} onClick={() => setOpen(value => !value)}>
+      {labelled ? <>Course options <Icon name="chevron-down" /></> : <Icon name="ellipsis" />}
     </button>
-    {open && <div className="course-options-popover" id={id} role="group" aria-label="Course options">
-      <button type="button" className="subtle" disabled={disabled} onClick={() => {
+    {open && <div className="course-options-popover" id={id} role="menu" aria-label={`Course options for ${title}`}>
+      <button type="button" role="menuitem" className="subtle" ref={move} disabled={disabled} onClick={() => {
         setOpen(false);
         trigger.current?.focus();
         onMove();

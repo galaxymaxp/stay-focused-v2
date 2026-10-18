@@ -103,7 +103,7 @@ export function OwnMaterialScreen() {
           <span>Uploading source? {Math.round(progress * 100)}%</span><progress max={1} value={progress} aria-label="Upload progress" />
           <span className="meta">Keep this page open until the server accepts the job.</span>
         </div>}
-        {error && pick.current && <button disabled={busy} onClick={() => void readFile(pick.current!)}>Try again</button>}
+        {error && pick.current && <button className="button retry-button" disabled={busy} onClick={() => void readFile(pick.current!)}>Try again</button>}
       </div>}
       {error && <Notice error>{error}</Notice>}
     </section><aside className="surface stack own-material-side">

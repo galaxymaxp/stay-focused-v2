@@ -53,7 +53,7 @@ function CourseRow({ course, selected, dirty, busy, onMove, onSelectionChange, o
           </span>
         </span>
       </label>
-      <CourseOptions disabled={busy} onMove={onMove}
+      <CourseOptions title={course.displayName} labelled disabled={busy} onMove={onMove}
         past={course.courseState === 'past' || (!course.courseState && course.classification === 'past_or_concluded')} />
       {course.selected && (
         <div className="row wrap canvas-course-actions">

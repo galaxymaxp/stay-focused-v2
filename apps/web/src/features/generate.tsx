@@ -1,6 +1,7 @@
 "use client";
 import { useSavedMaterialPages } from "../lib/use-saved-material-pages";
 import { CourseBatchControls } from './course-batch';
+import { snapshotUpdatedLabel } from "@stay-focused/shared";
 import type {
   CourseMaterials,
   GenerateCourseList,
@@ -42,12 +43,54 @@ import {
   State,
 } from "../components/ui";
 import { CanvasRefreshStatus, useCanvasRefresh } from "../lib/canvas-refresh";
-import { performCanvasRefresh } from "../lib/canvas-refresh-core";
+import { performCanvasRefresh, type RefreshPhase } from "../lib/canvas-refresh-core";
 import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
 import { preparationPresentation } from "../app-model/materialPreparationPresentation";
 type Resource<T> = ReturnType<typeof useResource<T>>;
 type CourseSyncRun = "syncing" | "synced" | "partial" | "failed";
+
+/** One status for Canvas and the saved course list; active work wins over stale errors. */
+export function selectGenerateSyncStatus(
+  phase: RefreshPhase,
+  courses: { refreshing?: boolean; error?: string | null; savedAt?: string | null },
+  now = Date.now(),
+) {
+  if (phase === "syncing" || courses.refreshing)
+    return { phase: "syncing", label: "Syncing…" } as const;
+  if (phase === "failed" || phase === "partial" || courses.error)
+    return { phase: "failed", label: "Canvas sync didn’t finish" } as const;
+  if (phase === "unconfirmed")
+    return { phase, label: "Sync status unavailable. Accepted jobs may still be running." } as const;
+  if (phase === "not_connected")
+    return { phase, label: "Connect Canvas to sync courses" } as const;
+  const updated = snapshotUpdatedLabel(courses.savedAt ?? null, now);
+  if (updated || phase === "synced")
+    return { phase: "updated", label: updated || "Up to date with Canvas" } as const;
+  return { phase: "idle", label: "Canvas" } as const;
+}
+
+function GenerateSyncStatus({ refresh, resource }: {
+  refresh: ReturnType<typeof useCanvasRefresh>;
+  resource: Resource<GenerateCourseList>;
+}) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => tick(value => value + 1), 60_000);
+    return () => clearInterval(timer);
+  }, []);
+  const status = selectGenerateSyncStatus(refresh.phase, resource);
+  return <span className={`canvas-refresh ${status.phase}`} role="status">
+    {status.phase === "syncing"
+      ? <span className="tile-spinner" aria-hidden="true" />
+      : <Icon name="refresh-cw" />}
+    <span>{status.label}</span>
+    {status.phase !== "syncing" && <button className="link-button subtle" onClick={() => {
+      resource.refresh();
+      void refresh.sync();
+    }}>Sync now</button>}
+  </span>;
+}
 /**
  * Synced courses open their materials, grouped by term as in the app. Courses
  * that are not synced (or whose last sync did not finish) never open an empty
@@ -98,6 +141,7 @@ export function GenerateScreen() {
   }
 
   const options = (c: GenerateCourseSummary) => <CourseOptions
+    title={courseIdentity(c).title}
     past={c.courseState === 'past' || (!c.courseState && c.period === 'previous')}
     disabled={action.busy}
     onMove={() => void action.run(async () => {
@@ -143,10 +187,16 @@ export function GenerateScreen() {
             Connection and sync
           </Link>
         </div>
-        <CanvasRefreshStatus refresh={canvas} />
-        <State resource={courses} />
+        <GenerateSyncStatus refresh={canvas} resource={courses} />
+        <State resource={courses} status={false} />
         {action.message && <Notice>{action.message}</Notice>}
-        <div className="course-grid">
+        {groups.map((group) => (
+          <section key={group.key} className="stack course-group" aria-label={group.title}>
+            <h2 className="kicker">{group.title}</h2>
+            <div className="course-grid">{group.items.map(card)}</div>
+          </section>
+        ))}
+        <div className="course-grid own-material-group">
           <Link href="/generate/new" className="course-card own">
             <span className="content-icon">
               <Icon name="file-text" />
@@ -158,12 +208,6 @@ export function GenerateScreen() {
             <Icon name="chevron-right" />
           </Link>
         </div>
-        {groups.map((group) => (
-          <section key={group.key} className="stack course-group" aria-label={group.title}>
-            <h2 className="kicker">{group.title}</h2>
-            <div className="course-grid">{group.items.map(card)}</div>
-          </section>
-        ))}
         {unsynced.length > 0 && (
           <section className="stack course-group unsynced-group" aria-label="Not synced">
             <button
@@ -201,7 +245,7 @@ export function GenerateScreen() {
                           </span>
                         </span>
                         <button
-                          className="primary"
+                          className="button"
                           disabled={run === "syncing"}
                           aria-busy={run === "syncing"}
                           aria-label={`Sync ${identity.title}`}
@@ -565,7 +609,7 @@ export function MaterialScreen({ id }: { id: string }) {
       {lookupError && (
         <div>
           <Notice error>{lookupError}</Notice>
-          <button onClick={course.refresh}>Try again</button>
+          <button className="button retry-button" onClick={course.refresh}>Try again</button>
         </div>
       )}
       {searched && !material && !lookupError && (

@@ -52,7 +52,7 @@ export function SharedQuizPractice({ quiz, signIn }: { quiz: SharedQuiz; signIn:
     </form>
     {result && <div className="stack" role="status"><h3>{result.percentage}% · {result.earnedPoints} of {result.possiblePoints} points</h3>
       <Link href={signIn} className="button primary">Sign in to save your score</Link>
-      <button onClick={() => { setResult(null); setAnswers({}); }}>Try again</button>
+      <button className="button retry-button" onClick={() => { setResult(null); setAnswers({}); }}>Try again</button>
     </div>}
   </section>;
 }
