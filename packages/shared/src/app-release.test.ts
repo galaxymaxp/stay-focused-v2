@@ -9,6 +9,14 @@ const github = {
 };
 const latest = toLatestRelease(github)!;
 describe('public release metadata', () => {
+  it('accepts the UC3 v2.2.0+6 publishing fixture with optional minimum support', () => {
+    expect(parseReleaseTag('v2.2.0+6')).toEqual({ versionName: '2.2.0', versionCode: 6 });
+    for (const minSupported of [null, 6]) {
+      const body = `versionCode: 6\nruntime: 2.2.0-sdk57\n${minSupported === null ? '' : `minSupported: ${minSupported}\n`}\nCalmer study days.\n`;
+      expect(parseReleaseBody(body)).toEqual({ versionCode: 6, runtimeVersion: '2.2.0-sdk57', minSupportedVersionCode: minSupported, notes: 'Calmer study days.' });
+      expect(toLatestRelease({ ...github, tag_name: 'v2.2.0+6', body })).toMatchObject({ versionName: '2.2.0', versionCode: 6, runtimeVersion: '2.2.0-sdk57', minSupportedVersionCode: minSupported });
+    }
+  });
   it('parses whitespace, optional lines and plain notes', () => {
     expect(parseReleaseBody('  versionCode : 7  \r\n runtime: native-7 \r\nminSupported: 6\r\n\r\nNotes')).toEqual({ versionCode: 7, runtimeVersion: 'native-7', minSupportedVersionCode: 6, notes: 'Notes' });
     expect(parseReleaseBody('Notes')).toEqual({ versionCode: null, runtimeVersion: null, minSupportedVersionCode: null, notes: 'Notes' });
