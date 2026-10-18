@@ -75,7 +75,9 @@ export function commonsCandidates(payload: unknown, excluded: readonly string[] 
     const width=info.thumbwidth;const height=info.thumbheight;const fileTitle=page.title;
     if(!license || !url || !image || !sourceUrl?.startsWith('https://commons.wikimedia.org/wiki/File:') ||
       typeof fileTitle!=='string' || !fileTitle.startsWith('File:') || fileTitle.length>500 || seen.has(fileTitle) ||
-      !['image/png','image/jpeg','image/gif','image/webp','image/svg+xml'].includes(String(info.mime)) ||
+      // Android's default Image pipeline has no animated GIF Fresco support.
+      !['image/png','image/jpeg','image/webp','image/svg+xml'].includes(String(info.mime)) ||
+      /\.gif$/i.test(new URL(image).pathname) ||
       (info.mime==='image/svg+xml' && !new URL(image).pathname.endsWith('.png')) ||
       typeof width!=='number' || !Number.isInteger(width) || width<1 || width>COMMONS_IMAGE_WIDTH ||
       typeof height!=='number' || !Number.isInteger(height) || height<1 || height>10000) continue;

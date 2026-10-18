@@ -6,6 +6,18 @@ export const candidatePage=(license='CC BY-SA 4.0',licenseUrl='https://creativec
 const payload=(page=candidatePage())=>({query:{pages:{'1':page}}});
 afterEach(()=>vi.useRealTimers());
 describe('bounded Commons search',()=>{
+  it('skips GIF candidates in favour of supported raster thumbnails',()=>{
+    const gif=candidatePage();gif.title='File:Animated.gif';gif.imageinfo[0]!.mime='image/gif';
+    gif.imageinfo[0]!.thumburl='https://upload.wikimedia.org/animated.gif';
+    const raster=candidatePage();raster.index=2;
+    expect(commonsCandidates({query:{pages:{'1':gif,'2':raster}}}).map(c=>c.fileTitle)).toEqual(['File:Cell.png']);
+    gif.imageinfo[0]!.mime='image/png'; // Reject a selected GIF URL even with inconsistent source metadata.
+    expect(commonsCandidates(payload(gif))).toEqual([]);
+  });
+  it.each(['image/png','image/jpeg','image/webp','image/svg+xml'])('retains supported %s candidates and their thumbnail dimensions',mime=>{
+    const page=candidatePage();page.imageinfo[0]!.mime=mime;
+    expect(commonsCandidates(payload(page))[0]).toMatchObject({image:page.imageinfo[0]!.thumburl,width:1200,height:800});
+  });
   it('builds deterministic heading/key-term queries without search operators',()=>{
     const text='The cell contains mitochondria. Mitochondria produce energy.';
     expect(buildCommonsQuery('Cell structure',text)).toBe(buildCommonsQuery('Cell structure',text));
