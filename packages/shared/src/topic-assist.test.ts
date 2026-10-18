@@ -1,11 +1,18 @@
 import { expect, it, vi } from 'vitest';
 import { createTopicAssist, isTopicResult, selectTopic, topicCacheKey, topicLevelAction, TOPIC_ACTIONS, TOPIC_PROMPT_VERSION, type TopicResult } from './topic-assist';
+import { TOPIC_LEVELS, TOPIC_LABELS, TOPIC_SHORT_LABELS, EXPOUND_LABEL } from './index';
 import type { ReviewerReaderModel } from './experience';
 
 const reviewer: ReviewerReaderModel = { id: 'artifact:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', title: 'Cells', course: null, source: { id: 's', title: 'Lesson' }, generatedAt: '2026-10-16T00:00:00Z', freshness: 'current',
   sections: [{ id: 's', title: 'Cells', blocks: [{ id: 'b', title: 'Nucleus', explanation: 'The nucleus contains DNA.', keyPoints: ['Preserve this point.'], evidence: [] }] }] };
 const selection = selectTopic(reviewer, 's')!;
 const result = (action: typeof TOPIC_ACTIONS[number]): TopicResult => ({ reviewerId: reviewer.id, sectionId: 's', action, contentHash: selection.contentHash, promptVersion: TOPIC_PROMPT_VERSION, grounding: 'source', text: 'Lead\n- **DNA** is inside.', createdAt: '2026-10-16T00:00:00Z' });
+it('exports compact labels for every level without changing full names or adding an Expound level', () => {
+  expect(TOPIC_LEVELS.map(level => TOPIC_SHORT_LABELS[level])).toEqual(['Original', 'Simpler', 'Simplest']);
+  expect(TOPIC_LEVELS.map(level => TOPIC_LABELS[level])).toEqual(['Original', 'Simplify', 'Explain simply']);
+  expect(EXPOUND_LABEL).toBe('Expound');
+  expect(TOPIC_LEVELS).toEqual(['original', 'simplify', 'explain_simply']);
+});
 it('Original has no model action; hash covers every section body field and no other topic', () => {
   expect(topicLevelAction('original')).toBeNull(); expect(topicLevelAction('simplify')).toBe('topic_simplify');
   expect(topicLevelAction('explain_simply')).toBe('topic_explain_simply');

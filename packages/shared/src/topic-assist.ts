@@ -8,6 +8,8 @@ export type TopicAction = typeof TOPIC_ACTIONS[number];
 export type TopicLevel = 'original' | 'simplify' | 'explain_simply';
 export const TOPIC_LEVELS = ['original', 'simplify', 'explain_simply'] as const;
 export const TOPIC_LABELS: Record<TopicLevel, string> = { original: 'Original', simplify: 'Simplify', explain_simply: 'Explain simply' };
+export const TOPIC_SHORT_LABELS: Record<TopicLevel, string> = { original: 'Original', simplify: 'Simpler', explain_simply: 'Simplest' };
+export const EXPOUND_LABEL = 'Expound';
 export const topicLevelAction = (level: TopicLevel): TopicAction | null => level === 'original' ? null : `topic_${level}`;
 export interface TopicRequest { readonly reviewerId: string; readonly sectionId: string; readonly action: TopicAction }
 export interface TopicSelection {
