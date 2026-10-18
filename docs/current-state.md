@@ -1,5 +1,32 @@
 # Current State
 
+## WG3b Generate home complete locally - PASS (2026-10-18)
+
+WG3 is done via WG3b; this supersedes the docs-only preflight stop at
+`1e53edd`. Unattended STEP 0-7, tests, required fresh serial gates, docs and
+local commits are complete. Implementation: **0eb0aaa** on
+`overnight/2026-10-15_feedback`, baseline `4bd0d91`. Current courses precede
+own material, collapsed Not synced and collapsed Past; search retains own
+material. Accessible corner menus use desktop hover/focus and narrow/touch
+visibility; Canvas retains its labelled menu. Sync is secondary. Generate
+shows one combined status with active work before failure before freshness.
+All nine website Try again actions restore standard 12px/16px padding.
+
+**FRESH PASS:** root forced typecheck **8/8**, lint **8/8**, both **0 cached**;
+web tests **265/265**, **42/42 files**; API build **1/1**, **35/35** static
+pages; diff/staged-diff checks. Intercepted fictional browser **35/35** checks
+at 1440/1024/768/390 px plus wide touch, zero unexpected requests/errors.
+Six existing lint warnings; failed first attempts retained in
+[WG3b acceptance](ai/acceptance/wg3b-generate-home.md). No nondeterministic
+flake. Mobile implementation unchanged; mobile build/tests NOT APPLICABLE.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Owner RB6/fullsend website deployment from main, then real-account
+desktop/phone browser review. Production revision, database rows, Scheduler
+and real-account behavior **UNVERIFIED (owner to confirm)**. No remote service
+call, deployment, migration, environment-file edit or push. Unrelated work is
+preserved. WG3b is the finite endpoint; no later task started.
+
 ## RV1 reviewer header complete locally - PASS (2026-10-18)
 
 **PASS for unattended STEP 0-5, tests, fresh serial local gates, docs and local

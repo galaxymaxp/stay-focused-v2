@@ -4857,3 +4857,105 @@ Exact commands, counts, failed attempts and local logs:
 
 RV1 is the finite endpoint. Current state, roadmap and sprint are reconciled;
 RX1 layout is explicitly superseded. WG3's STOP remains independent.
+
+---
+
+## WG3b unattended website Generate home - PASS (2026-10-18)
+
+**Status: PASS for STEP 0-7, tests, required fresh serial gates, docs and local
+commits. WG3 is done via WG3b**, superseding the docs-only preflight stop at
+`1e53edd`. Baseline `4bd0d91`, branch `overnight/2026-10-15_feedback`;
+`9dae76f` is an ancestor. Resumed after interruption by reading the overriding
+UNATTENDED prompt, progress, log/status/diff and inspecting pending work.
+No WG3b implementation was already committed, so none was repeated. The
+referenced overnight roadmap is absent (already recorded by WG1); the complete
+WG3b prompt provides the finite scope. No later task or branch switch.
+
+Current course groups precede own material, collapsed Not synced and collapsed
+Past; own material stays visible under search. Generate uses accessible
+per-course corner ellipsis menus with desktop hover/focus and narrow/touch
+visibility, Escape/focus return, arrows, Tab/outside dismissal. Canvas keeps
+its labelled menu and move action. Card space prevents trigger/title/chevron
+overlap. Not-synced Sync is secondary; the home has no primary action.
+Generate alone suppresses State's snapshot labels and uses a tested pure
+selector: in-progress before failed before updated, retaining disconnected
+and unconfirmed states. Other callers keep their default snapshot behavior,
+and initial loading/error recovery is preserved.
+
+**Try again padding cause:** desktop density CSS replaces base `12px 16px`
+padding with `0 14px`; Smart Selection also used compact `link-button`
+`2px 4px` with no minimum height. All nine website action sites now use
+`retry-button` to restore `12px 16px` and a 48px minimum. Existing tones,
+handlers, retry eligibility and duplicate/busy guards are unchanged. No mobile
+or API implementation, new dependency, migration, reusable architecture or ADR.
+
+### Commits
+
+- `0eb0aaa` feat(web): simplify Generate home and recovery actions
+- Closure: `docs: close WG3b Generate home` (final hash in Git and
+  `tmp/overnight/WG3b.status`; no self-hash amendment).
+
+Both commits use `galaxymaxp <omgraythekid@gmail.com>` via `--author`. No push.
+Only WG3b-owned web paths and documentation are staged. Original untracked
+`UI/`, `apps/mobile/.gitignore` and `supabase/.temp/` remain untouched. The
+pre-existing WG3b sprint header and acceptance draft were completed, preserving
+other runs' content. Generated API Next declarations were inspected and
+restored. Screenshots, validation output, tmp and private fixtures are excluded.
+
+### Gate counts
+
+**FRESH PASS, serial:**
+
+- `npm run typecheck -- --force`: **8/8 tasks, 0 cached**.
+- `npm run lint -- --force`: **8/8 tasks, 0 cached**, zero errors,
+  six existing warnings (web 1, mobile 5).
+- `npm test --workspace @stay-focused/web`: **265/265 tests, 42/42 files**,
+  including Generate, generate-reviewer-state and generation recovery.
+- `npm run build --workspace @stay-focused/api`: **1/1**, **35/35** static
+  pages. No API implementation changes or remote service operation.
+- `git diff --check` and `git diff --cached --check`: **PASS** for scoped
+  implementation and documentation closure.
+- `node apps/web/scripts/wg3-layout-check.mjs`: **35/35** page/viewport
+  checks at 1440/1024/768/390 px plus 1440 px touch; **275** intercepted API
+  requests, **5** checked move PATCH requests, **0** unexpected requests and
+  **0** runtime errors. Fictional data only, fail-closed interception. Checks
+  order/search/collapse, labels, primary count, menu keyboard/focus/visibility,
+  single status and stale-failure priority, actual retry padding/recovery,
+  Canvas compatibility and card/text geometry. Desktop/phone screenshots
+  inspected; `.local/wg3/` remains uncommitted.
+- Both browser harnesses' `node --check`: **2/2 PASS**.
+
+First attempts retained: focused tests **32 passed / 2 failed**, corrected to
+**34/34** (test-only counting/circular-child assertions); browser **0 complete /
+1 failed** (checker treated text behind an opaque popover as a collision),
+then **2 complete / timeout** (copied fixture job IDs), corrected to **35/35**;
+typecheck **5/8 tasks** (one TS2739, new fixture missing two fields), explicit
+nulls restored strict typing, final **8/8**; web **264 passed / 1 failed**,
+41/42 files (exact className assertion), CSS-token assertion retains the
+exactly-one-primary check, final **265/265**. No nondeterministic flake.
+Existing non-failing Vite config-loader warning retained. Final chain restarted
+serially after the last test edit and interruption. Exact evidence/log paths:
+[WG3b acceptance](acceptance/wg3b-generate-home.md).
+
+Mobile/Android build and tests: **NOT APPLICABLE**, website-only scope.
+API tests: **NOT RUN**, API unchanged and outside requested suites.
+Live provider/workflow probes: **NOT APPLICABLE**. Root build not required by
+the WG3b gate list. No Supabase, Vercel, Google Cloud, Canvas or Resend call,
+deployment, remote SQL/migration, Scheduler operation, email, environment-file
+edit or push. Production revision, database rows, Scheduler and real-account
+browser/device behavior: **UNVERIFIED (owner to confirm)**.
+
+### Owner steps remaining
+
+1. Rollout **NOT RUN**, skipped entirely: owner website deployment through
+   RB6/fullsend and Vercel production from main. No WG3b migration.
+2. Device checks **NOT RUN**, skipped entirely: after rollout review Generate
+   with a real account at desktop and phone widths, including course order,
+   hover/focus/touch menu, sync/failure/freshness line and recovery padding.
+3. Confirm production revision, database/Scheduler state and real-account
+   behavior; these remain **UNVERIFIED (owner to confirm)**.
+4. Vercel CLI is not installed. Strongly recommend `npm i -g vercel` for later
+   owner-controlled environment, deployment and log work; not run here.
+
+Current state, roadmap and sprint are reconciled. WG3b is the finite endpoint;
+no next roadmap item is authorized by this run.

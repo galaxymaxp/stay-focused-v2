@@ -1,5 +1,31 @@
 # Roadmap
 
+## WG3 done via WG3b - PASS locally (2026-10-18)
+
+WG3b supersedes WG3's docs-only preflight stop at `1e53edd`. Website Generate
+home STEP 0-7, tests, required fresh serial gates, docs and local commits are
+complete on `overnight/2026-10-15_feedback`; implementation **0eb0aaa**.
+Current courses come first, then own material, collapsed Not synced and Past.
+Corner ellipsis menus preserve Canvas's labelled caller, Sync is secondary,
+one combined sync line prioritizes active work over failure over freshness,
+and all nine website Try again actions regain standard padding. Search keeps
+own material visible. No API/mobile implementation, dependency or migration.
+
+**FRESH PASS:** root forced typecheck/lint **8/8 tasks each, 0 cached**;
+web **265/265 tests, 42/42 files**; API build **1/1**, **35/35** static pages;
+diff/staged-diff checks. Fictional intercepted browser **35/35** at four widths
+plus wide touch; zero unexpected requests/errors. Six existing lint warnings;
+failed first attempts and evidence in
+[WG3b acceptance](ai/acceptance/wg3b-generate-home.md). Mobile build/tests
+NOT APPLICABLE. No nondeterministic flake observed.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely; RB6/fullsend website deployment from main and real-account
+desktop/phone browser review. Production revision, database rows, Scheduler
+and real-account behavior **UNVERIFIED (owner to confirm)**. No remote service
+call, deployment, remote SQL, Scheduler change, environment-file edit or push.
+Unrelated work is preserved. Stop at WG3b; no later roadmap task started.
+
 ## RV1 reviewer header complete locally - PASS (2026-10-18)
 
 **PASS for unattended STEP 0-5, tests, fresh serial local gates, docs and local
