@@ -1,7 +1,8 @@
 import type { Quiz, QuizAnswerKey, QuizAttempt, QuizResult, QuizQuestion } from "@stay-focused/shared";
+import { quizQuestionStates } from "@stay-focused/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { TextInput, View } from "react-native";
+import { Pressable, TextInput, View } from "react-native";
 
 import { useAuth } from '../../auth';
 import { Action, Copy, Notice, Page, Surface, SkeletonCards, Sheet } from "../../design/primitives";
@@ -371,7 +372,11 @@ export function QuizScreen() {
         <>
           {!answerKey && <Notice>Practice and scoring need a connection. These are the questions saved on this device.</Notice>}
           {savedQuiz.questions[index] ? <Surface key={savedQuiz.questions[index]!.id}>
-            <Copy muted size="caption">Question {index + 1} of {savedQuiz.questionCount}</Copy>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Question ${index + 1} of ${savedQuiz.questions.length}, show all questions`}
+              disabled={busy || sliderDragging} onPress={() => setOverviewOpen(true)}
+              style={{ minHeight: 44, justifyContent: 'center' }}>
+              <Copy muted size="caption">Question {index + 1} of {savedQuiz.questions.length}</Copy>
+            </Pressable>
             <Copy size="h3">{savedQuiz.questions[index]!.prompt}</Copy>
             {savedQuiz.questions[index]!.leftItem ? <Copy>{savedQuiz.questions[index]!.leftItem}</Copy> : null}
             {savedQuiz.questions[index]!.options.map((option) => <Copy key={option.id} muted>• {option.text}</Copy>)}
@@ -384,7 +389,7 @@ export function QuizScreen() {
             <Action secondary disabled={busy || index === 0} onPress={() => void run(() => moveTo(index - 1))}>Previous</Action>
             <Action secondary disabled={busy || index + 1 >= quizData!.questions.length} onPress={() => void run(() => moveTo(index + 1))}>Next</Action>
           </View>
-          <QuestionSlider current={index} count={savedQuiz.questions.length} onSettle={setIndex} onDragActiveChange={setSliderDragging} />
+          <QuestionSlider current={index} count={savedQuiz.questions.length} onSettle={setIndex} onDragActiveChange={setSliderDragging} onPressLabel={() => setOverviewOpen(true)} />
           {localReady && <Action onPress={() => {
             const value = newOfflineAttempt(savedQuiz.id, newRequestKey());
             setAttempt(value); setResult(null); setIndex(0); setSelected([]); setDirty(true);
@@ -423,7 +428,6 @@ export function QuizScreen() {
           {offline && <Action secondary disabled={busy} onPress={() => void run(reconnectPractice)}>Sync progress</Action>}
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <Copy muted size="caption">{attempt.answers.filter(answer => answer.finalizedAt).length} answered · {quizData!.questions.length - attempt.answers.filter(answer => answer.finalizedAt).length} unanswered</Copy>
-            <Action secondary onPress={() => setOverviewOpen(true)}>Questions</Action>
           </View>
           <Surface>
             <Copy size="h2">{question.prompt}</Copy>
@@ -491,7 +495,7 @@ export function QuizScreen() {
             <Action secondary disabled={busy || index === 0} onPress={() => void run(() => moveTo(index - 1))}>Previous</Action>
             <Action secondary disabled={busy || index + 1 >= quizData!.questions.length} onPress={() => void run(() => moveTo(index + 1))}>Next</Action>
           </View>
-          <QuestionSlider current={index} count={quizData!.questions.length} disabled={busy} onSettle={next => void run(() => moveTo(next))} onDragActiveChange={setSliderDragging} />
+          <QuestionSlider current={index} count={quizData!.questions.length} disabled={busy} onSettle={next => void run(() => moveTo(next))} onDragActiveChange={setSliderDragging} onPressLabel={() => setOverviewOpen(true)} />
           <Action
               disabled={busy || offline && !answerKey}
               onPress={() =>
@@ -500,13 +504,24 @@ export function QuizScreen() {
             >Finish quiz</Action>
         </>
       )}
-      {overviewOpen && attempt && quizData && <Sheet title="Questions" onClose={() => setOverviewOpen(false)}>
-        <Copy muted>Choose any question. Answers stay with this attempt.</Copy>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-          {quizData.questions.map((item, position) => {
-            const answer = attempt.answers.find(entry => entry.questionId === item.id);
-            const state = position === index ? 'Current' : attempt.revealedQuestionIds.includes(item.id) ? 'Revealed' : answer?.finalizedAt ? 'Answered' : 'Unanswered';
-            return <Action key={item.id} secondary={position !== index} label={`Question ${position + 1}, ${state}`} onPress={() => { setOverviewOpen(false); void run(() => moveTo(position)); }}>{position + 1} · {state}</Action>;
+      {overviewOpen && !result && quizData && <Sheet title="Questions" onClose={() => setOverviewOpen(false)}>
+        <Copy muted size="caption">Answered · Unanswered · Revealed</Copy>
+        <View style={{ flexDirection: attempt ? 'row' : 'column', flexWrap: attempt ? 'wrap' : 'nowrap', gap: 8 }}>
+          {quizQuestionStates(quizData.questions, attempt, index).map((state, position) => {
+            const current = state === 'current';
+            const label = `Question ${position + 1}, ${state[0]!.toUpperCase()}${state.slice(1)}`;
+            if (!attempt) return <Action key={quizData.questions[position]!.id} secondary={!current} label={label}
+              onPress={() => { setOverviewOpen(false); setIndex(position); }}>{position + 1} · {current ? 'Current' : 'Unanswered'}</Action>;
+            const color = current ? colors.onAccent : state === 'answered' ? colors.success : state === 'revealed' ? colors.warning : colors.textMuted;
+            return <Pressable key={quizData.questions[position]!.id} accessibilityRole="button"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: current, disabled: busy }} disabled={busy}
+              onPress={() => { setOverviewOpen(false); void run(() => moveTo(position)); }}
+              style={{ width: 48, minHeight: 48, borderRadius: 12, borderWidth: current ? 2 : 1,
+                borderColor: current ? colors.accent : color, borderStyle: state === 'unanswered' ? 'dashed' : 'solid',
+                backgroundColor: current ? colors.accent : colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center' }}>
+              <Copy color={color} style={{ fontWeight: current ? '700' : '500' }}>{position + 1}</Copy>
+            </Pressable>;
           })}
         </View>
       </Sheet>}

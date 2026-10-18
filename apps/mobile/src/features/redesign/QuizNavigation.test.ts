@@ -82,6 +82,64 @@ beforeEach(() => {
 afterEach(async () => { if (tree) await act(async () => tree.unmount()); });
 
 describe('minimal Quiz navigation', () => {
+  it('opens Questions from the progress label and navigates exactly once from a number chip', async () => {
+    await mount();
+    expect(tree.root.findAllByType('Sheet' as ElementType)).toHaveLength(0);
+    const label = tree.root.findByProps({ accessibilityLabel: 'Question 10 of 30, show all questions' });
+    expect(label.props.accessibilityRole).toBe('button');
+    expect(label.props.style.minHeight).toBeGreaterThanOrEqual(44);
+    await act(async () => label.props.onPress());
+    expect(tree.root.findByType('Sheet' as ElementType).props.title).toBe('Questions');
+    const chip = tree.root.findByProps({ accessibilityLabel: 'Question 20, Unanswered' });
+    expect(chip.findByType('Copy' as ElementType).children).toEqual(['20']);
+    await act(async () => chip.props.onPress());
+    expect(tree.root.findAllByType('Sheet' as ElementType)).toHaveLength(0);
+    expect(track().props.accessibilityValue.now).toBe(20);
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+    expect(mocks.request.mock.calls[0]![2].body).toEqual({ action: 'navigate', position: 19 });
+    expect(tree.root.findAllByType('Action' as ElementType).flatMap(node => node.children)).not.toContain('Questions');
+  });
+  it('does not open the overview during an active drag, including a stale label callback', async () => {
+    await mount();
+    const press = tree.root.findByProps({ accessibilityLabel: 'Question 10 of 30, show all questions' }).props.onPress;
+    track().props.onResponderGrant(event(100));
+    await act(async () => track().props.onResponderMove(event(140)));
+    expect(tree.root.findByProps({ accessibilityLabel: 'Question 10 of 30, show all questions' }).props.disabled).toBe(true);
+    await act(async () => press());
+    expect(tree.root.findAllByType('Sheet' as ElementType)).toHaveLength(0);
+    expect(mocks.request).not.toHaveBeenCalled();
+    await act(async () => track().props.onResponderTerminate());
+    await act(async () => tree.root.findByProps({ accessibilityLabel: 'Question 10 of 30, show all questions' }).props.onPress());
+    expect(tree.root.findAllByType('Sheet' as ElementType)).toHaveLength(1);
+  });
+  it('keeps all 100 chips available and announces current, revealed, answered and unanswered', async () => {
+    mocks.quiz = { ...mocks.quiz!, questionCount: 100, questions: Array.from({ length: 100 }, (_, index) => ({ ...mocks.quiz!.questions[0]!, id: `q${index + 1}` })) };
+    mocks.practice = { ...mocks.practice!, attempt: { ...mocks.remote!, revealedQuestionIds: ['q2'], answers: [{ questionId: 'q3', selectedOptionIds: ['a'], finalizedAt: 'checked' }] } };
+    await mount();
+    await act(async () => tree.root.findByProps({ accessibilityLabel: 'Question 10 of 100, show all questions' }).props.onPress());
+    const sheet = tree.root.findByType('Sheet' as ElementType);
+    expect(sheet.findAllByType('Pressable' as ElementType)).toHaveLength(100);
+    for (const label of ['Question 10, Current', 'Question 2, Revealed', 'Question 3, Answered', 'Question 100, Unanswered']) expect(sheet.findByProps({ accessibilityLabel: label })).toBeDefined();
+    await act(async () => sheet.props.onClose());
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it('opens the saved-only caption list and jumps locally without an attempt or request', async () => {
+    mocks.offline = true; mocks.practice = null;
+    await mount();
+    const labels = tree.root.findAllByProps({ accessibilityLabel: 'Question 1 of 30, show all questions' });
+    await act(async () => labels[0]!.props.onPress());
+    const sheet = tree.root.findByType('Sheet' as ElementType);
+    await act(async () => sheet.findByProps({ label: 'Question 25, Unanswered' }).props.onPress());
+    expect(tree.root.findAllByType('Sheet' as ElementType)).toHaveLength(0);
+    expect(track().props.accessibilityValue.now).toBe(25);
+    expect(mocks.request).not.toHaveBeenCalled();
+  });
+  it('keeps the optional label inert when QuestionSlider has no callback', async () => {
+    await mount();
+    await act(async () => tree.update(createElement(QuestionSlider, { current: 0, count: 2, onSettle: vi.fn() })));
+    expect(tree.root.findAllByType('Pressable' as ElementType)).toHaveLength(2);
+    expect(tree.root.findAllByType('Text' as ElementType).some(node => node.children.includes('Question 1 of 2'))).toBe(true);
+  });
   it.each(['identification', 'modified_true_false'] as const)('keeps checked %s feedback to the verdict until final review', async type => {
     mocks.quiz = { ...mocks.quiz!, questions: mocks.quiz!.questions.map((q, index) => index === 9 ? { ...q, type } : q) };
     const feedback = { questionId: 'q10', selectedOptionIds: ['a'], correctOptionIds: ['secret-key'], correctAnswerText: 'Accepted term',

@@ -5,9 +5,10 @@ import { useTheme } from '../../design/theme';
 import { sliderGestureIntent, sliderQuestionIndexFromPageX, type SliderIntent } from './questionSliderModel';
 
 /** A question-position scrubber. The question itself changes only on release. */
-export function QuestionSlider({ current, count, onSettle, onDragActiveChange, disabled = false }: {
+export function QuestionSlider({ current, count, onSettle, onDragActiveChange, onPressLabel, disabled = false }: {
   current: number; count: number; onSettle: (index: number) => void;
   onDragActiveChange?: (active: boolean) => void; disabled?: boolean;
+  onPressLabel?: () => void;
 }) {
   const { colors } = useTheme();
   const width = useRef(1);
@@ -41,9 +42,17 @@ export function QuestionSlider({ current, count, onSettle, onDragActiveChange, d
   };
   const settle = () => { setDragActive(false); if (!disabled) onSettle(preview.current); };
   return <View style={{ paddingVertical: 12 }}>
-    <Text style={{ color: colors.textMuted, textAlign: 'center', marginBottom: 4 }}>
+    {onPressLabel ? <Pressable accessibilityRole="button"
+      accessibilityLabel={`Question ${current + 1} of ${count}, show all questions`}
+      accessibilityState={{ disabled: disabled || dragging }} disabled={disabled || dragging}
+      onPress={() => { if (!disabled && !dragActive.current) onPressLabel(); }}
+      style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+      <Text style={{ color: colors.textMuted }}>
+        {dragging ? `Question ${previewIndex + 1} / ${count}` : `Question ${current + 1} of ${count}`}
+      </Text>
+    </Pressable> : <Text style={{ color: colors.textMuted, textAlign: 'center', marginBottom: 4 }}>
       {dragging ? `Question ${previewIndex + 1} / ${count}` : `Question ${current + 1} of ${count}`}
-    </Text>
+    </Text>}
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
       <Pressable accessibilityRole="button" accessibilityLabel="Go one question left"
         accessibilityState={{ disabled: disabled || current <= 0 }} disabled={disabled || current <= 0}
