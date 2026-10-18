@@ -1,5 +1,34 @@
 # Roadmap
 
+## WG2/N6 complete locally - PASS; owner RB5 remains (2026-10-18)
+
+Finite WG2 STEP 0-2, tests, gates, docs and local commits are complete. Generate
+rows use the existing server `reviewerArtifactId` for Reviewer ready (including
+the accessible name). Detail actions are Open reviewer and confirmed Remake;
+the saved Reviewer remains accessible during submission/failure. Ready facts,
+acceptance/return refresh and later-page revalidation are covered. Existing Quiz
+and no-Reviewer generation remain. No API, mobile, dependency or schema change.
+
+**generating state per material: not available from existing data**. General
+job DTOs have no material ID, and batch-only mappings cannot determine the latest
+job for arbitrary direct remakes. The permitted fallback uses saved state only.
+
+**FRESH PASS:** forced root typecheck/lint/build **8/8 each, 0 cached**; web
+**224/224** (38 files), shared **350/350** (40 files); standalone API/web builds
+**1/1 each**, **35/35** and **19/19** pages; Android/iOS/web exports, 68 assets;
+diff/staged-diff hygiene PASS. Six existing lint warnings. Corrected initial
+test-fixture typecheck/lint failures are retained in acceptance. Implementation
+**0eaffa9**; tests **bb2395f**.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Publish/review RB5 on phone and resized desktop. Deployment, owner
+acceptance and live DB/Scheduler state are **UNVERIFIED (owner to confirm)**.
+No remote service call, deployment, remote SQL/migration, Scheduler action,
+email, environment-file edit or push. The absent overnight roadmap is recorded;
+the full WG2 prompt supplied scope. Stop here; WV1/MD1 were not started.
+
+[WG2 acceptance](ai/acceptance/wg2-generated-reviewer-state.md).
+
 ## FX1b image repair complete locally (2026-10-18)
 
 **PASS for the finite unattended code scope; device acceptance remains pending.**

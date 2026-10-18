@@ -1,3 +1,36 @@
+# WG2 finite unattended code scope complete locally
+
+**PASS - WG2/N6 only**, branch `overnight/2026-10-15_feedback`, baseline
+`b750224` including WG1 `653e8d8`. STEP 0-2, mocked web/shared tests, fresh
+serial gates, documentation and local commits are complete. Implementation
+**0eaffa9**; tests **bb2395f**. No later roadmap task was started.
+
+Rows show Reviewer ready in the existing meta line and accessible name; detail
+shows Open reviewer, confirmed Remake and a Ready fact. Confirmation has
+Cancel/Escape focus return, owner/material identity and duplicate-submit locks.
+The saved Reviewer remains accessible after failure. Existing course/material
+resources refresh after acceptance and on return/focus, including later pages.
+Quiz/no-Reviewer flows remain. No new endpoint, contract or migration.
+
+**generating state per material: not available from existing data**. General
+jobs lack a material ID; partial batch mappings cannot identify the latest
+arbitrary direct remake. Use the authorized saved-state fallback.
+
+**FRESH PASS:** forced root typecheck/lint/build **8/8 each, 0 cached**; web
+**224/224** (38 files), shared **350/350** (40 files); API/web builds **1/1 each**,
+**35/35** and **19/19** pages; root Android/iOS/web exports, 68 assets;
+diff/staged-diff hygiene PASS. Six existing lint warnings remain. Initial
+typecheck and lint fixture failures were fixed; serial gates restarted and
+failure counts retained in [WG2 acceptance](acceptance/wg2-generated-reviewer-state.md).
+
+**Owner steps remaining:** Rollout/Device checks **NOT RUN**, skipped entirely.
+Publish the reviewed website change and perform RB5 on phone/resized desktop.
+Deployed revision, owner acceptance and live database/Scheduler state are
+**UNVERIFIED (owner to confirm)**. The referenced overnight roadmap is absent;
+the full prompt defined scope. No remote service call, environment-file edit,
+deployment, remote SQL/migration, Scheduler action, email or push occurred.
+Unrelated untracked work is preserved. This finite run ends at WG2.
+
 # FX1b finite unattended repair complete locally; live acceptance pending
 
 ## FX1b image repair complete locally (2026-10-18)

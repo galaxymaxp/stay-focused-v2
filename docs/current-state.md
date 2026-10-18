@@ -1,5 +1,39 @@
 # Current State
 
+## WG2 Generate saved Reviewer state complete locally - PASS (2026-10-18)
+
+**PASS for unattended WG2/N6 STEP 0-2, tests, fresh serial gates, documentation
+and local commits.** Website material rows show one Reviewer ready label in
+the existing meta line and accessible name when `reviewerArtifactId` exists.
+The detail pane offers primary Open reviewer, secondary confirmed Remake, and
+a Ready Reviewer fact. Cancel/Escape return focus; duplicate submissions lock;
+failed submission retains the saved Reviewer. Quiz and no-Reviewer flows remain.
+Accepted submission and return/focus revalidate existing course/material reads,
+including saved later pages. No new endpoint, contract, dependency or migration.
+
+General job DTOs lack a material ID; batch-only mappings cannot establish the
+latest arbitrary material job. **generating state per material: not available
+from existing data**. Rows use saved Reviewer evidence only.
+
+**FRESH PASS:** forced root typecheck/lint/build **8/8 tasks each, 0 cached**;
+web **224/224** tests (38 files), shared **350/350** (40 files); standalone
+API/web builds **1/1 each**, **35/35** and **19/19** pages; root mobile exports
+Android/iOS/web with 68 assets. Diff/staged-diff hygiene PASS. Six existing lint
+warnings remain. Initial typecheck and lint errors in the new test fixture were
+fixed and the serial gates restarted; exact failures are retained in acceptance.
+Implementation **0eaffa9**; tests **bb2395f**.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Publish the reviewed website change and perform RB5 Generate checks
+for Reviewer ready / Open reviewer / confirmed Remake on phone/resized desktop.
+Deployed revision, owner acceptance and live database/Scheduler state are
+**UNVERIFIED (owner to confirm)**. No remote call, deployment, SQL/migration,
+Scheduler action, email, environment-file edit or push occurred. The referenced
+overnight roadmap is absent; the complete prompt supplied scope. This run ends
+at WG2; unrelated untracked paths and earlier release limitations are preserved.
+
+[WG2 acceptance](ai/acceptance/wg2-generated-reviewer-state.md).
+
 ## FX1b image repair complete locally (2026-10-18)
 
 **PASS for the finite unattended code scope; device acceptance remains pending.**

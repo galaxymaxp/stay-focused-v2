@@ -4326,3 +4326,75 @@ Scheduler/native causes are UNVERIFIED; zero ADB devices means log evidence is
 BLOCKED. No deployment, remote service/SQL, migration, Scheduler, email,
 environment-file edit or push occurred. The dated roadmap is absent and skipped.
 Finite FX1b endpoint reached; no later roadmap work started.
+
+## WG2/N6 unattended handoff - PASS (2026-10-18)
+
+**Status: PASS for the finite code scope.** Baseline `b750224`, branch
+`overnight/2026-10-15_feedback`; WG1 `653e8d8` verified as an ancestor. Completed
+STEP 0-2, tests, fresh serial gates, docs and local commits. Initial tracked tree
+was clean; only the allowed untracked UI/, apps/mobile/.gitignore and
+supabase/.temp/ remain. The referenced overnight roadmap is absent (also noted
+by WG1/FX1b); the full prompt supplies scope without a code contradiction.
+
+Rows now show Reviewer ready in the existing meta line and accessible name for
+the same server `reviewerArtifactId` mobile uses. Detail has primary Open
+reviewer with the encoded Library artifact route, secondary confirmed Remake,
+the exact requested confirmation copy and Ready fact. Cancel/Escape focus
+return, owner/material identity, busy locking, retained saved reading on failure
+and retry are covered. Generate without a Reviewer and Quiz remain unchanged.
+Acceptance/return/focus revalidate existing resources, including saved later
+material pages. No API, shared DTO, mobile, dependency, schema or migration change.
+
+**generating state per material: not available from existing data**. General
+ProcessingJobStatusView/source metadata/GenerationView have no material ID;
+sourceVersionId is a different identifier. Optional batch requests map only
+batch submissions and cannot establish the latest arbitrary direct remake.
+The authorized fallback shows saved Reviewer state, without guessing by title.
+
+**Commits**, author `galaxymaxp <omgraythekid@gmail.com>`:
+
+- `0eaffa9 feat(web): show saved Reviewer state on Generate`
+- `bb2395f test(web): cover generated Reviewer actions and refresh`
+- `docs: close WG2` is the closing documentation commit; its final hash and all
+  run commits are recorded in ignored `tmp/overnight/WG2.status`.
+
+**Final gates, all FRESH and serial**, tested application tree committed above:
+
+- `npm run typecheck -- --force`: PASS, **8/8 tasks, 0 cached**.
+- `npm run lint -- --force`: PASS, **8/8 tasks, 0 cached**, zero errors and six
+  existing warnings (five mobile import-order, one web Library unused import).
+- `npm run test --workspace @stay-focused/web`: PASS, **224/224**, **38/38 files**;
+  includes 13 WG2 regressions and unchanged WG1/course-batch tests.
+- `npm run test --workspace @stay-focused/shared`: PASS, **350/350**, **40/40 files**.
+- `npm run build --workspace @stay-focused/api`: PASS, **1/1**, **35/35** pages.
+- `npm run build --workspace @stay-focused/web`: PASS, **1/1**, **19/19** pages.
+- AUTOPILOT `npm run build -- --force`: PASS, **8/8 tasks, 0 cached**;
+  API/web **35/35** and **19/19** pages; Android/iOS/web exports, **68 assets**.
+- `git diff --check` and `git diff --cached --check`: PASS.
+
+First typecheck failed with TS18046 in the new focus node mock, exit 2,
+**4 successful/6 scheduled tasks, 0 cached**; fixed using an explicit props
+type guard. Its rerun passed 8/8. First lint failed on the test's inline
+children prop, exit 1, **5 successful/8 tasks, 0 cached**, one new error and one
+existing web warning; fixed with a typed props fixture and restarted the serial
+gates. Focused development tests passed **20/20**, then **21/21** after adding
+Quiz coverage. No nondeterministic flake or skipped test in the required suites.
+Existing Vite CommonJS/config-loader and build color-environment notices remain.
+
+API/mobile unit suites and provider/workflow/live tests: NOT APPLICABLE to the
+unchanged paths, NOT RUN. Logs/progress/status are ignored under tmp/overnight/.
+Inspected and restored generated Next ambient declarations; no generated
+artifacts, credentials or private fixtures are committed. Root export used
+EXPO_OFFLINE=1; build telemetry was disabled.
+
+### Owner steps remaining
+
+**Rollout and Device checks - NOT RUN, skipped entirely.** Publish the reviewed
+website change and perform RB5 Generate for Reviewer ready / Open reviewer /
+confirmed Remake on phone and resized desktop. Deployed revision, live owner
+acceptance, database and Scheduler state remain **UNVERIFIED (owner to confirm)**.
+No remote service call, deployment, SQL/migration application, Scheduler action,
+email, environment-file edit or push occurred. Unrelated work is preserved.
+Finite endpoint WG2 reached; WV1/MD1 and other later work were not started.
+
+Acceptance: [WG2 generated Reviewer state](acceptance/wg2-generated-reviewer-state.md).
