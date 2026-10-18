@@ -1,13 +1,6 @@
 # Current State
 
-TC1 / BACKLOG P15 (2026-10-18): **STOPPED at STEP 0**, baseline `bb14b88`.
-The planner accepts overnight ISO ranges, but the existing Today snapshot ends
-at midnight and omits the next morning's sessions/current/next when selecting
-the window's start date. Prompt STEP 0.3 requires a stop before choosing a
-server projection extension or client composition of two dates. FRESH local
-diagnostic proof 5/5; prompt gates 1/9 PASS (diff hygiene), 8 NOT RUN. No runtime
-changes; TC1 remains open. Rollout/device checks skipped; remote state
-UNVERIFIED (owner to confirm). [TC1 preflight](ai/acceptance/tc1-today-clock-preflight.md).
+TC1b / BACKLOG P15 (2026-10-18): **PASS for the finite code scope**, superseding TC1's preflight STOP using the owner-approved server Today extension. Shared overnight math, planning/store/Schedule support, wrapped ring/drag, date ownership with boundary refresh, and mobile/web Clock options with typed time fields are complete locally. FRESH PASS 9/9 prompt gates (1462 mobile, 325 web, 489 shared, 2369 API / 3 intentional live skips); forced typecheck/lint 8/8, 0 cached. Rollout/device checks NOT RUN; production/device state UNVERIFIED (owner to confirm). ADR-047 resolves the ownership decision; no migration/RPC/SQL change. Endpoint TC1b only. [Acceptance](ai/acceptance/tc1b-today-clock.md).
 
 IF2 / BACKLOG N11 (2026-10-18): complete locally in `5b7c41e`; HEAD already retained external viewers on errors, and IF2 adds mobile/web pending-card loading feedback plus regression proof. FRESH PASS 8/8 expanded prompt gates (1439 mobile, 2351 API / 3 live skips, 309 web tests), plus forced root build 8/8, 0 cached. Actual phone HTTP/decode cause UNVERIFIED (owner to confirm); RB6/N9 rollout and Realme checks remain owner steps. [IF2 evidence](ai/acceptance/if2-external-image.md).
 

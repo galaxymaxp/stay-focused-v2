@@ -6395,3 +6395,125 @@ deployment, migration application, remote SQL, Scheduler operation, email or
   `npm i -g vercel` is strongly recommended. No installation or CLI call ran.
 
 Endpoint: TC1 STOPPED at preflight; no TC1 runtime changes or later item.
+
+
+---
+
+## TC1b / BACKLOG P15 - PASS for finite code scope (2026-10-18)
+
+Baseline `9430e20`, branch `overnight/2026-10-15_feedback` (unchanged).
+Read the entire TC1b prompt and followed its unattended overrides. STEP 0-6,
+local tests/gates/docs/commits only; no later roadmap item started. TC1's old
+STOP is resolved by the supplied owner answer and ADR-047. Reused the original
+TC1 preflight diagnostics as CACHED 5/5 without rerunning them; repository code
+still accepts overnight planner ranges without migration or RPC changes.
+
+**What changed:** shared start-date ownership and wrap math; exact ISO planning
+ranges extending only through the wrapped morning; mobile/web storage and web
+Schedule acceptance; clockwise arc, hit testing and handle/whole-block dragging;
+validated optional server Today window bounds and one projection for timeline,
+current/next/later/progress. Both clients read the previous date's existing key,
+select yesterday before its wrapped end and today's trimmed snapshot afterward,
+and switch while open at midnight/the end and on foreground/focus. Pending
+preview responses cannot republish after their owning date changes.
+
+The sole corner control is now a 44px Clock options ellipsis. Its existing lock
+callback/key controls dragging and step adjustment; typed free-time fields use
+the same commit/storage/planning callback even when locked. Mobile reuses the
+reviewer measured-Modal pattern with typed hour/minute and device-locale AM/PM;
+web reuses popover tokens and browser time inputs with Escape/focus restoration.
+Equal/empty/invalid input stays inline without saving. Up next retains actual
+source times; wrapped preview bars lift morning blocks and keep positive widths.
+No new native dependency, migration, RPC/SQL, auth, provider or orb/halo change.
+
+The approved next-date `startsAt=04:00` example controls the date-anchor rule:
+the previous morning may be trimmed from the new date. Requiring every override
+to include midnight would contradict that explicit owner example; ADR-047
+records the interpretation and bounds. No client merges two snapshots.
+
+### Gates and commits
+
+**FRESH PASS: 9/9 prompt gate commands, 0 final failures.**
+
+| Command | Result |
+| --- | --- |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors, six existing warnings |
+| `npm run test --workspace @stay-focused/mobile` | 1462/1462, 148 files |
+| `npm run test --workspace @stay-focused/web` | 325/325, 48 files |
+| `npm run test --workspace @stay-focused/shared` | 489/489, 47 files, including existing compiled test copies |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | 2369 passed / 3 intentional live-provider skips, 205 files; two workers bound local DB-test memory |
+| `npm run build --workspace @stay-focused/api` | PASS, 35/35 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | PASS, one local Android bundle |
+| `git diff --check` / staged / baseline-to-HEAD checks | PASS after correcting one trailing space; 0 final whitespace errors |
+
+Additional AUTOPILOT gate `npm run build -- --force --env-mode=loose`:
+**FRESH PASS 8/8 tasks, 0 cached**, including API/web builds and local mobile
+Android/iOS/web exports. On resume at `11f9afa`, these completed gate logs were
+inspected as **CACHED** evidence; no committed code or passing suite was redone.
+Remaining work was documentation closure, restoration of inspected generated
+Next declarations and fresh diff/link checks. The React review confirmed
+effect/listener cleanup, strict props and labelled typed controls; physical
+interaction remains owner acceptance.
+Resume closure checks: **FRESH PASS**, 9/9 TC1b local documentation links
+resolve; working-tree, staged and baseline-to-implementation diff checks have
+0 whitespace errors. Generated Next declarations are restored to tracked content.
+Workflow/provider contract suites are NOT APPLICABLE: no workflow runtime,
+provider or generation boundary changed; API build compiles the existing workflow.
+All gates ran locally with the socket guard and process-local offline/no-telemetry
+flags. Live provider cases were disabled process-locally; no environment-file edit.
+
+**Failed first attempts, repaired:** Python unavailable (no edit ran); initial
+shared-test preload path failed before collection, corrected to quoted absolute
+forward slashes (13/13 passed). Initial root typecheck 5/8 tasks: a CRLF marker
+omitted clock model suffixes and a web hook edit missed; suffixes restored from
+Git and hook repaired. Second typecheck 6/8: alert role moved from nonforwarding
+Copy to its native View. Subsequent checks pass 8/8. Initial focused API run
+49 passed / 10 failed on early-read assertions; moved validation ahead of bundle
+reads, retry 59/59. Initial mobile preview/boundary run 3 passed / 1 failed because
+a selector also matched a divider; limited it to percentage-width blocks. Initial
+web full suite 323 passed / 2 mirror consistency failures; synchronized mirrors,
+final 325/325. First lint passed with 11 warnings; removed introduced duplicate
+directives/imports, final six existing warnings. Staged diff found one trailing
+space in a new mobile test; scoped cleanup and complete implementation diff pass.
+No nondeterministic flake, weakened validation, suppressed assertion or deleted
+acceptance test. Existing Vite configuration and Metro color warnings remain.
+
+Commits, author `galaxymaxp <omgraythekid@gmail.com>`:
+
+```text
+d60b7d5 feat(shared): support start-date-owned overnight free time
+2fd78d3 feat(api): extend Today read windows for overnight plans
+862f193 feat(mobile): add overnight Today clock and options menu
+65a2502 feat(web): support overnight clock planning and options
+11f9afa style(mobile): clean clock ownership test whitespace
+docs: close TC1b overnight clock (this footer; final hash in Git/status)
+```
+
+Planning files reconciled; [TC1b acceptance](acceptance/tc1b-today-clock.md) and
+[ADR-047](../architecture/ADR-047-overnight-today-clock.md). TC1 preflight is
+explicitly resolved while its historical findings remain. Build-generated
+Next declarations are inspected/restored; temporary logs/scripts/status/progress,
+exports and generated outputs are excluded from commits. Unrelated untracked
+`UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` preserved.
+
+**UNVERIFIED (owner to confirm):** installed/deployed revisions, production
+DB rows/applied migrations, Cloud Scheduler state, remote-ref freshness and real
+phone/browser appearance/keyboard behavior. No Supabase, Vercel, Google Cloud,
+Canvas or Resend call, deployment, migration application/remote SQL, Scheduler
+operation, email, environment-file edit, branch switch or push.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** Preview OTA and website preview via
+  the existing owner release process. No new native dependency/APK requirement.
+- **Device checks - NOT RUN, skipped entirely:** Realme and web 22:00-04:00
+  and 23:30-00:30 by dragging and typing, 12/24-hour device setting, plan and
+  Up next past midnight, Today at 01:00, automatic switch at wrapped end, lock
+  preventing drags and typed edits while locked. Confirm physical menu layout,
+  keyboard, scrolling/handles and retained OR1b glow on the phone.
+- Vercel CLI is absent; for future owner rollout tooling, installing
+  `npm i -g vercel` is strongly recommended. No installation or CLI call ran.
+
+Endpoint: TC1b local code scope complete; rollout/device acceptance stays with
+owner. No further roadmap item started.

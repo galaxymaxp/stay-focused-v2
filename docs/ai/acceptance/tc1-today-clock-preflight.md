@@ -1,5 +1,8 @@
 # TC1 / BACKLOG P15: cross-midnight Today clock preflight
 
+**RESOLVED by TC1b and [ADR-047](../../architecture/ADR-047-overnight-today-clock.md), 2026-10-18.** The owner approved the server Today projection extension; local implementation and verification are in [TC1b acceptance](tc1b-today-clock.md). The original preflight findings and failed first attempt below are retained as historical evidence. The owner contract question no longer blocks TC1.
+
+
 **STOPPED at STEP 0 (2026-10-18).** Baseline `bb14b88` on
 `overnight/2026-10-15_feedback`; local tracking state 73 ahead / 0 behind
 `github/main`, without fetching. The complete TC1 prompt and its unattended
