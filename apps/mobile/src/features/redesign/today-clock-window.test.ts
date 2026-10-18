@@ -14,7 +14,7 @@ beforeEach(() => {
  vi.setSystemTime(new Date(2026, 9, 18, 1, 30));
  state.entries.set('sf.today.free-time.2026-10-17', JSON.stringify({ start: 1320, end: 240 }));
  state.entries.set('sf.today.free-time.2026-10-18', JSON.stringify({ start: 540, end: 660 }));
- 
+
 });
 afterEach(async () => { if(tree) await act(async () => tree!.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); });
 async function mount() { await act(async () => { tree = create(createElement(Harness)); }); }
