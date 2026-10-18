@@ -22,7 +22,7 @@ export function parseReleaseTag(tag: string): { versionName: string; versionCode
 }
 
 export function parseReleaseBody(body: string) {
-  const read = (key: string) => body.match(new RegExp(`^\\s*${key}\\s*:\\s*([^\\r\\n]*)$`, 'im'))?.[1]?.trim();
+  const read = (key: string) => body.match(new RegExp(`^[ \\t]*${key}[ \\t]*:[ \\t]*([^\\r\\n]*)$`, 'im'))?.[1]?.trim();
   const integer = (value: string | undefined) => value && /^\d+$/.test(value) && positiveInteger(Number(value)) ? Number(value) : null;
   return {
     versionCode: integer(read('versionCode')),

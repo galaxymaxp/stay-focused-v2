@@ -13,6 +13,7 @@ describe('public release metadata', () => {
     expect(parseReleaseBody('  versionCode : 7  \r\n runtime: native-7 \r\nminSupported: 6\r\n\r\nNotes')).toEqual({ versionCode: 7, runtimeVersion: 'native-7', minSupportedVersionCode: 6, notes: 'Notes' });
     expect(parseReleaseBody('Notes')).toEqual({ versionCode: null, runtimeVersion: null, minSupportedVersionCode: null, notes: 'Notes' });
     expect(parseReleaseBody('versionCode: 3.5\nminSupported: -1').versionCode).toBeNull();
+    expect(parseReleaseBody('versionCode: 7\nruntime: \n\nNotes').runtimeVersion).toBeNull();
   });
   it('parses tags and rejects invalid codes', () => {
     expect(parseReleaseTag(' v2.3.0+7 ')).toEqual({ versionName: '2.3.0', versionCode: 7 });
