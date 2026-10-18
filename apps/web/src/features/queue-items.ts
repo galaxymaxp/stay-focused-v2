@@ -42,6 +42,7 @@ export function useQueueSource(open = false, hidden: readonly string[] = []) {
     error: string | null;
   }>({ owner, data: null, error: null });
   const [seen, setSeen] = useState<ReadonlySet<string>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
   const detailId = useRef<string | null>(null);
   const wakeRef = useRef<(() => void) | null>(null);
   const refresh = useCallback(() => wakeRef.current?.(), []);
@@ -79,6 +80,7 @@ export function useQueueSource(open = false, hidden: readonly string[] = []) {
       let next = IDLE_POLL_MS;
       if (document.visibilityState === "visible") {
         busy = true;
+        setRefreshing(true);
         try {
           const requested = detailId.current;
           stateDetail = requested;
@@ -98,6 +100,7 @@ export function useQueueSource(open = false, hidden: readonly string[] = []) {
             }));
         } finally {
           busy = false;
+          if (live) setRefreshing(false);
         }
       }
       if (live)
@@ -140,6 +143,7 @@ export function useQueueSource(open = false, hidden: readonly string[] = []) {
     error,
     refresh,
     watchDetail,
+    refreshing,
     markSeen,
     sections: queueItems(jobs, hidden),
     ...countActiveJobs(jobs),

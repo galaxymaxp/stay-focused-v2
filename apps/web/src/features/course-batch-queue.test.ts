@@ -17,3 +17,14 @@ it('shows saved preparation intent and batch progress; Cancel and Retry use owne
   expect(mocks.api).toHaveBeenLastCalledWith('/api/experience/batch-requests/failed/retry',{method:'POST'});
   expect(mocks.refresh).toHaveBeenCalledTimes(2);
 });
+it('hides finished summaries and keeps partial progress plus attention actions', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  mocks.data.courseBatches.summaries.push({ batchKey: 'finished', done: 4, total: 4 });
+  try {
+    await act(async () => { tree = create(createElement(CourseBatchQueue)); });
+    const progress = tree.root.findAllByType('p').filter(node => Array.isArray(node.props.children) && node.props.children.includes(' of '));
+    expect(progress).toHaveLength(1);
+    expect(progress[0]!.props.children).toEqual([6, ' of ', 14, ' done']);
+    expect(tree.root.findAllByType('button')).toHaveLength(3);
+  } finally { mocks.data.courseBatches.summaries.pop(); }
+});

@@ -1,10 +1,12 @@
 "use client";
+import { queueIsIdle } from '@stay-focused/shared';
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QueueCard } from "../features/queue";
 import { CourseBatchQueue } from '../features/course-batch-queue';
 import { useQueueItems } from "../features/queue-items";
 import { useListPreferences } from "../lib/list-preferences";
+import { Icon } from './ui';
 export { countActiveJobs } from "../features/queue-items";
 
 export function QueueButton() {
@@ -67,6 +69,7 @@ export function QueueButton() {
   const count = queue.generating;
   const active = count + queue.queued > 0;
   const sections = queue.sections;
+  const refreshing = queue.loading || queue.refreshing;
   return (
     <div className="queue-control" ref={root}>
       <button
@@ -113,21 +116,28 @@ export function QueueButton() {
               close();
           }}
         >
-          <div className="row between">
+          <div className="row queue-popover-header">
             <h2>Queue</h2>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Refresh queue"
+              aria-busy={refreshing}
+              disabled={refreshing}
+              onClick={() => { if (!refreshing) queue.refresh(); }}
+            >
+              {refreshing ? <span className="tile-spinner" aria-hidden="true" /> : <Icon name="refresh-cw" />}
+            </button>
             <button onClick={close} aria-label="Close Queue">
               Close
             </button>
           </div>
-          <button className="subtle" onClick={queue.refresh}>
-            Refresh
-          </button>
           {queue.error ? <p role="status">{queue.error}</p> : null}
           <CourseBatchQueue />
           {queue.loading ? (
             <p role="status">Loading your generations...</p>
           ) : null}
-          {queue.data && sections.length === 0 && !queue.data.courseBatches?.requests.some(row => ['waiting', 'quota', 'failed'].includes(row.state)) ? (
+          {queue.data && !queue.loading && !queue.error && queueIsIdle({ jobs: sections.flatMap(group => group.jobs), pending: [], courseBatches: queue.data.courseBatches }) ? (
             <p className="muted">Nothing generating right now.</p>
           ) : null}
           {sections.map((group) => (

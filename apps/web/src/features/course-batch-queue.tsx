@@ -1,4 +1,5 @@
 "use client";
+import { activeBatchSummaries } from '@stay-focused/shared';
 import { useRef, useState } from 'react';
 import { useAuth } from '../components/providers';
 import { useQueueItems } from './queue-items';
@@ -14,7 +15,7 @@ export function CourseBatchQueue() {
   }
   const data = queue.data?.courseBatches;
   return <div className="stack">
-    {data?.summaries.map(group => <p className="meta" key={group.batchKey}>{group.done} of {group.total} done</p>)}
+    {activeBatchSummaries(data).map(group => <p className="meta" key={group.batchKey}>{group.done} of {group.total} done</p>)}
     {data?.requests.filter(row => ['waiting', 'quota', 'failed'].includes(row.state)).map(row => <div className="surface stack" key={row.id}>
       <h3>{row.title}</h3><p className="meta">{row.state === 'waiting' ? 'Waiting for preparation' : row.state === 'failed' ? 'Could not start this reviewer' : row.nextAvailableAt ? `Waiting for quota · retry after ${new Date(row.nextAvailableAt).toLocaleString()}` : 'Waiting for generation capacity'}</p>
       <div className="row">{row.state === 'failed' ? <button onClick={() => void act(row.id, 'retry')}>Retry</button> : null}

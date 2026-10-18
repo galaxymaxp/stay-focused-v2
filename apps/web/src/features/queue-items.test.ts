@@ -76,7 +76,10 @@ it("uses one visible-only adaptive poller, deduplicates wakes and stops after un
     win.dispatchEvent(new Event("focus"));
   });
   expect(mocks.api).toHaveBeenCalledTimes(3);
+  expect(source.refreshing).toBe(true);
+  expect(source.loading).toBe(false);
   await act(async () => resolve({ jobs: [], nextCursor: null }));
+  expect(source.refreshing).toBe(false);
   await act(async () => {
     await vi.advanceTimersByTimeAsync(29999);
   });

@@ -2,11 +2,13 @@ vi.mock('../features/course-batch-queue', () => ({ CourseBatchQueue: () => null 
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { job } from '../testSupport/queueJob';
 const mocks = vi.hoisted(() => ({
   data: {
-    sections: [],
-    data: { jobs: [], nextCursor: null },
+    sections: [] as { key: string; title: string; jobs: import('@stay-focused/shared').ProcessingJobStatusView[] }[],
+    data: { jobs: [], nextCursor: null, courseBatches: undefined as import('@stay-focused/shared').CourseBatchQueue | undefined },
     loading: false,
+    refreshing: false,
     error: null,
     generating: 0,
     queued: 0,
@@ -52,6 +54,10 @@ beforeEach(() => {
   mocks.data.generating = 0;
   mocks.data.queued = 0;
   mocks.data.unseenError = false;
+  mocks.data.sections = [];
+  mocks.data.data.courseBatches = undefined;
+  mocks.data.loading = false;
+  mocks.data.refreshing = false;
   mocks.router.replace.mockImplementation((path: string) => {
     mocks.search = new URLSearchParams(path.split("?")[1]?.split("#")[0]);
   });
@@ -108,6 +114,7 @@ it("closes on an outside pointer and when focus leaves the popover", async () =>
   await act(async () => button.props.onClick());
   await act(async () => { doc.dispatchEvent(new Event("pointerdown")); });
   expect(button.props["aria-expanded"]).toBe(false);
+  expect(mocks.buttonFocus).toHaveBeenCalled();
   await act(async () => button.props.onClick());
   const dialog = root.findAll((n) => n.props.role === "dialog")[0]!;
   await act(async () => dialog.props.onBlur({ relatedTarget: {} }));
@@ -129,6 +136,7 @@ it("shows a running-only badge, an unseen failure dot, and the exact idle empty 
   mocks.data.generating = 2;
   mocks.data.queued = 5;
   mocks.data.unseenError = true;
+  mocks.data.sections = [{ key: 'running', title: 'Generating', jobs: [job({ status: 'running' })] }];
   const root = await render();
   expect(
     root.findAll((n) => n.props.className === "queue-count shown")[0]!.props
@@ -138,12 +146,13 @@ it("shows a running-only badge, an unseen failure dot, and the exact idle empty 
     root.findAll((n) => n.props.className === "queue-error-dot"),
   ).toHaveLength(1);
   await act(async () => root.findAllByType("button")[0]!.props.onClick());
-  expect(root.findAllByType("p")[0]!.props.children).toBe(
-    "Nothing generating right now.",
-  );
+  expect(JSON.stringify(rendered!.toJSON())).not.toContain('Nothing generating right now.');
   mocks.data.generating = 0;
+  mocks.data.queued = 0;
   mocks.data.unseenError = false;
+  mocks.data.sections = [];
   await act(async () => rendered!.update(createElement(QueueButton)));
+  expect(root.findAllByType('p')[0]!.props.children).toBe('Nothing generating right now.');
   expect(
     root.findAll((n) => n.props.className === "queue-count shown"),
   ).toHaveLength(0);
@@ -154,4 +163,46 @@ it("shows a running-only badge, an unseen failure dot, and the exact idle empty 
 it("redirects the old web Queue route to Today with the popover intent", () => {
   QueuePage();
   expect(mocks.redirect).toHaveBeenCalledWith("/today?queue=open");
+});
+
+it('uses an icon refresh in the header and ignores taps while loading or refreshing', async () => {
+  const root = await render();
+  await act(async () => root.findAllByType('button')[0]!.props.onClick());
+  mocks.data.refresh.mockClear();
+  const refresh = () => root.findByProps({ 'aria-label': 'Refresh queue' });
+  expect(refresh().props.className).toBe('icon-button');
+  expect(refresh().parent!.props.className).toContain('queue-popover-header');
+  expect(refresh().findByType('span').props.style.maskImage).toBe('url(/icons/refresh-cw.svg)');
+  await act(async () => refresh().props.onClick());
+  expect(mocks.data.refresh).toHaveBeenCalledOnce();
+  for (const state of ['loading', 'refreshing'] as const) {
+    mocks.data[state] = true;
+    await act(async () => rendered!.update(createElement(QueueButton)));
+    expect(refresh().props.disabled).toBe(true);
+    expect(refresh().props['aria-busy']).toBe(true);
+    await act(async () => refresh().props.onClick());
+    expect(mocks.data.refresh).toHaveBeenCalledOnce();
+    mocks.data[state] = false;
+  }
+});
+it('finished batches allow idle while partial summaries alone prevent it', async () => {
+  mocks.data.data.courseBatches = { requests: [], summaries: [{ batchKey: 'batch', done: 4, total: 4 }] };
+  const root = await render();
+  await act(async () => root.findAllByType('button')[0]!.props.onClick());
+  expect(JSON.stringify(rendered!.toJSON())).toContain('Nothing generating right now.');
+  mocks.data.data.courseBatches = { requests: [], summaries: [{ batchKey: 'batch', done: 3, total: 4 }] };
+  await act(async () => rendered!.update(createElement(QueueButton)));
+  expect(JSON.stringify(rendered!.toJSON())).not.toContain('Nothing generating right now.');
+});
+it.each(['running', 'queued', 'failed', 'expired', 'cancellation_requested', 'cancelled', 'succeeded'] as const)('idle considers visible %s jobs even with other sections', async status => {
+  mocks.data.sections = [{ key: 'section', title: 'Section', jobs: [job({ status })] }];
+  const root = await render();
+  await act(async () => root.findAllByType('button')[0]!.props.onClick());
+  expect(JSON.stringify(rendered!.toJSON()).includes('Nothing generating right now.')).toBe(status === 'succeeded');
+});
+it.each(['waiting', 'quota', 'failed'] as const)('a %s batch request prevents idle independently of sections', async state => {
+  mocks.data.data.courseBatches = { summaries: [], requests: [{ id: 'r', batchKey: 'b', courseId: 'c', materialId: 'm', title: 'Lesson', state, jobId: null, nextAvailableAt: null }] };
+  const root = await render();
+  await act(async () => root.findAllByType('button')[0]!.props.onClick());
+  expect(JSON.stringify(rendered!.toJSON())).not.toContain('Nothing generating right now.');
 });
