@@ -2,27 +2,92 @@
 
 QZ1 (2026-10-18): mobile/web progress labels open question jump controls, sharing current/revealed/answered/unanswered states; saved-only mobile questions jump locally. Prompt gates FRESH PASS 9/9 (shared 470, mobile 1406, web 304 tests; forced typecheck/lint and API/Android/web builds). Implementation: `3eb0be0`, `8df68cc`, `0880274`. Rollout/device checks are owner steps; production/device state UNVERIFIED (owner to confirm); flagged intentionally absent. [QZ1 acceptance](ai/acceptance/qz1-question-jump.md).
 
-## MD1 material descriptions - STOPPED at preflight (2026-10-18)
+## MD1 material descriptions complete via MD1b - PASS locally (2026-10-18)
 
-MD1 was read in full and checked against baseline `665c156` on
-`overnight/2026-10-15_feedback`. The mandatory STEP 0 confirmation found two
-Canvas post-commit figure hooks, whereas the prompt requires three. Manual
-uploads also generate immediately after extraction inside an accepted
-reviewer job (ADR-037), with no selectable pre-generation material detail
-pane. The exact scope question is recorded in the acceptance report; no
-unattended question was sent. UNATTENDED rule 4 requires stopping here.
+MD1b resolves and supersedes the historical preflight STOP at `8bf6b2d`.
+Finite unattended STEP 0-6, tests/gates/docs/local commits are complete from
+baseline `b7ff2d2` on `overnight/2026-10-15_feedback`. No later slice started.
 
-Only preflight/checkpoint documentation changed. No description feature,
-migration file or ADR was implemented; MD1 remains unfinished. Gate counts:
-**FRESH PASS 1/10** (diff hygiene); **9/10 NOT RUN**, including all tests and
-builds, because of the preflight STOP. Rollout and Device checks were skipped
-entirely. Production/database/Scheduler/device state is **UNVERIFIED (owner
-to confirm)**. No remote action, environment-file edit or push was performed.
-Unrelated untracked work is preserved. Resume only with the recorded
-preflight assumptions resolved; no later roadmap slice was started.
+Canvas preparation generates a source-only description once per exact revision
+after its result commits, at both existing figure-hook sites. Separate safe
+owner metadata leaves private prepared payloads immutable/service-only. Atomic
+reservations prevent repeated charges; empty extraction records skipped_empty,
+failures retain failed, and guards/exhausted quotas skip supplementary work.
+Only 6,000 source characters, low reasoning effort, 600 output tokens, an
+eight-second provider timeout and zero retries are allowed; descriptions are
+plain text, one or two sentences, at most 240 Unicode code points.
 
-[MD1 acceptance](ai/acceptance/md1-material-description.md) records the
-baseline, exact owner question, findings and Owner steps remaining.
+One owner-bound material-page lookup validates revision and original bytes;
+missing/outage metadata maps to null. Mobile bodySmall and the web muted
+paragraph render above Generate only when present, using existing tokens and
+without changing availability. Manual uploads start nonblocking best-effort
+metadata after attachment and retain immediate generation; existing personal
+Library cards display it beneath source filenames through one batched lookup.
+ADR-046 records the
+storage/model/cap/quota decisions; the new migration is a FILE ONLY.
+
+Implementation commits:
+
+- `0f2e2d8 feat(db): add material description cache migration file`
+- `7ef8fa5 feat(api): describe exact material revisions after extraction`
+- `5865036 feat(mobile): show material descriptions above Generate`
+- `2afa3bb feat(web): show material descriptions above Generate`
+- `efd2883 feat: show manual material descriptions in Library`
+
+**FRESH PASS: 10/10 prompt gate commands**, executed serially against the
+final implementation:
+
+| Command | FRESH result |
+| --- | --- |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors, 6 existing warnings |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | 2350 passed / 3 skipped, 204 files; live cases disabled process-locally |
+| `npm run test --workspace @stay-focused/shared` | 476/476 passed, 46 files (existing compiled test copies included) |
+| `npm run test --workspace @stay-focused/web` | 308/308 passed, 44 files |
+| `npm run test --workspace @stay-focused/mobile` | 1410/1410 passed, 143 files |
+| `npm run build --workspace @stay-focused/api` | 1/1 build, 35/35 static pages |
+| `npm run build --workspace @stay-focused/web` | 1/1 build, 19/19 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | 1/1 local export, 1 Android bundle; EXPO_OFFLINE=1 |
+| `git diff --check` | PASS, 0 whitespace errors; staged check also PASS |
+
+Additional AUTOPILOT `npm run build -- --force --env-mode=loose`:
+**FRESH PASS, 8/8 tasks, 0 cached**, including Android/iOS/web exports.
+Loose mode preserves process-local offline/no-telemetry flags in child builds.
+Additional provider contract: **FRESH PASS 20/20, 0 failed (fake provider clients only)**. Workflow regression:
+**NOT APPLICABLE: no Workflow runtime/step changes; no tracked workflow test sources exist; changed attachment hook covered by API/manual/worker regressions**. Neither calls a live provider.
+
+**UNVERIFIED (owner to confirm):** production revisions, database rows/applied
+migrations, Scheduler state, remote-ref freshness and real browser/phone/provider
+behavior. No remote service operation, deployment, remote SQL/migration,
+Scheduler change, email, environment-file edit or push was performed.
+Unrelated untracked `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` are
+preserved. Temporary logs, generated build outputs and validation artifacts are
+excluded from commits; Next-generated declarations were inspected/restored.
+
+**Owner steps remaining**
+
+- **Rollout - NOT RUN, skipped entirely:** apply
+  `packages/db/migrations/20261018000200_material_descriptions.sql`, optionally
+  set `MATERIAL_DESCRIPTION_MODEL`, deploy API / Google worker / web, and
+  publish mobile OTA/APK in the next owner fullsend. The Vercel CLI is missing;
+  installing `npm i -g vercel` is strongly recommended for the owner's later
+  deployment tooling. No installation or CLI use occurred here.
+- Existing prepared materials need worker redelivery/re-preparation to acquire
+  metadata. Broad existing-material coverage needs an owner backfill decision;
+  no backfill was written or run. Normal Generate reads never call the model.
+- **Device checks - NOT RUN, skipped entirely:** phone/browser prepared
+  PDF/PPTX/Canvas-page description above Generate; missing description adds
+  nothing; Generate still works; completed manual uploads show cached descriptions
+  beneath their existing personal Library filenames. Provider quality/latency and physical/browser
+  behavior remain owner acceptance.
+- Manual uploads retain ADR-037 immediate generation. Existing personal Library
+  cards show cached descriptions beneath the original filename on mobile/web.
+  Optional manual metadata is started without awaiting it and may be lost when
+  a worker exits; no background completion guarantee is claimed.
+- Future only: cross-student reuse for identical files; owner isolation remains.
+
+
+[MD1 acceptance](ai/acceptance/md1-material-description.md) records exact evidence.
 
 ## WD1 draft activity instructions complete locally - PASS (2026-10-18)
 
