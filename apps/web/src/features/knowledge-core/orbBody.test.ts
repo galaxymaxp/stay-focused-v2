@@ -43,3 +43,19 @@ describe("orb body", () => {
     expect(material).toHaveBeenCalledOnce();
   });
 });
+
+it('defaults bulge to zero and resets idle overrides before a generation state', () => {
+  const body = createOrbBody();
+  body.update(frame);
+  const base = body.uniforms.uBase.value.clone();
+  expect(body.uniforms.uBulgeAmount.value).toBe(0);
+  body.update({ ...frame, idleColor: '#F4C542', bulgeDir: { x: 1, y: 0, z: 0 }, bulgeAmount: 0.8 });
+  expect(body.uniforms.uBase.value.equals(base)).toBe(false);
+  expect(body.uniforms.uBulgeAmount.value).toBe(0.8);
+  expect(body.uniforms.uBulgeDir.value.x).toBe(1);
+  expect((body.mesh.material as ShaderMaterial).vertexShader).toContain('position + normal * height');
+  body.update(frame);
+  expect(body.uniforms.uBase.value.equals(base)).toBe(true);
+  expect(body.uniforms.uBulgeAmount.value).toBe(0);
+  body.dispose();
+});

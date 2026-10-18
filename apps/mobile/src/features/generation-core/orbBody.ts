@@ -3,12 +3,19 @@ import * as THREE from "three";
 export const ORB_RADIUS = 0.95;
 
 const VERTEX = `
+uniform vec3 uBulgeDir;
+uniform float uBulgeAmount;
 varying vec3 vNormal;
 varying vec3 vWorldPosition;
 void main() {
-  vec4 world = modelMatrix * vec4(position, 1.0);
+  float alignment = max(dot(normal, uBulgeDir), 0.0);
+  float height = 0.18 * uBulgeAmount * pow(alignment, 12.0);
+  vec3 displaced = position + normal * height;
+  vec3 slope = (uBulgeDir - normal * alignment) * (2.16 * uBulgeAmount * pow(alignment, 11.0));
+  vec3 surfaceNormal = normalize(normal - slope / (length(position) + height));
+  vec4 world = modelMatrix * vec4(displaced, 1.0);
   vWorldPosition = world.xyz;
-  vNormal = normalize(mat3(modelMatrix) * normal);
+  vNormal = normalize(mat3(modelMatrix) * surfaceNormal);
   gl_Position = projectionMatrix * viewMatrix * world;
 }`;
 
@@ -100,6 +107,10 @@ const TONES = {
 } as const;
 
 export interface OrbBodyFrame {
+  readonly bulgeDir?: { readonly x: number; readonly y: number; readonly z: number };
+  readonly bulgeAmount?: number;
+  /** Pass only for idle: generation states retain their authoritative appearance. */
+  readonly idleColor?: string;
   readonly time: number;
   readonly life: number;
   readonly stir: number;
@@ -123,6 +134,7 @@ export function createOrbBody() {
     uBase: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uGlowColor: { value: new THREE.Color() },
     uEnvFloor: { value: new THREE.Color() }, uEnvSky: { value: new THREE.Color() },
     uLight: { value: new THREE.Vector3() },
+    uBulgeDir: { value: new THREE.Vector3(0, 0, 1) }, uBulgeAmount: { value: 0 },
   };
   const geometry = new THREE.SphereGeometry(ORB_RADIUS, 96, 64);
   const material = new THREE.ShaderMaterial({
@@ -131,26 +143,20 @@ export function createOrbBody() {
   });
   const mesh = new THREE.Mesh(geometry, material);
   mesh.renderOrder = 1;
-  let mode: "light" | "dark" | null = null;
 
   return {
     mesh,
     uniforms,
     update(frame: OrbBodyFrame) {
-      if (mode !== frame.mode) {
-        mode = frame.mode;
-        const tones = TONES[mode];
-        uniforms.uBase.value.set(tones.base);
-        uniforms.uDeep.value.set(tones.deep);
-        uniforms.uGlowColor.value.set(tones.glow);
-        uniforms.uEnvFloor.value.set(tones.envFloor);
-        uniforms.uEnvSky.value.set(tones.envSky);
-      }
-      if (frame.tones) {
-        uniforms.uBase.value.set(frame.tones.base);
-        uniforms.uDeep.value.set(frame.tones.deep);
-        uniforms.uGlowColor.value.set(frame.tones.glow);
-      }
+      const tones = frame.tones ?? TONES[frame.mode];
+      uniforms.uBase.value.set(frame.idleColor ?? tones.base);
+      uniforms.uDeep.value.set(tones.deep);
+      uniforms.uGlowColor.value.set(frame.idleColor ?? tones.glow);
+      uniforms.uEnvFloor.value.set(TONES[frame.mode].envFloor);
+      uniforms.uEnvSky.value.set(TONES[frame.mode].envSky);
+      const dir = frame.bulgeDir;
+      uniforms.uBulgeDir.value.set(dir?.x ?? 0, dir?.y ?? 0, dir?.z ?? 1);
+      uniforms.uBulgeAmount.value = frame.bulgeAmount ?? 0;
       if (frame.light) uniforms.uLight.value.set(frame.light.x, frame.light.y, frame.light.z);
       uniforms.uTime.value = frame.time;
       uniforms.uLife.value = frame.life;
