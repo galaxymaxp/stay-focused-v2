@@ -11,15 +11,16 @@ vi.mock('@/lib/reviewer-source-status', () => ({ readReviewerSourceStatus: mocks
 import { advanceCourseRequest, createCourseBatch, mutateCourseRequest, previewCourseBatch, resumeCourseRequests } from './service';
 import { revisionFingerprint } from '@/lib/canvas-preparation/repository';
 import { ExperienceFailure } from '@/lib/experience/errors';
+import { readCourseBatchQueue } from './read';
 const evidence = [{ type: 'page' as const, id: 'lesson', revision: 'a'.repeat(64) }];
 function row(id = 'request'): CourseReviewerRequestRow { return { id, user_id: 'owner', course_id: 'past-course', canvas_connection_id: 'connection', material_id: 'page:lesson', revision: revisionFingerprint(evidence), batch_key: 'b'.repeat(64), batch_keys: [], title: 'Lesson', state: 'waiting', job_id: null, next_available_at: null, created_at: '2026-10-16', updated_at: '2026-10-16' }; }
-function store(initial: CourseReviewerRequestRow[] = [row()], current = false) {
+function store(initial: CourseReviewerRequestRow[] = [row()], current = false, processingJobs: { id: string; user_id: string; status: string }[] = []) {
   const rows = initial;
   const client = { rpc: vi.fn(async () => ({ data: '2026-10-17T00:00:00Z', error: null })), from: (table: string) => {
     const tests: ((r: Record<string, unknown>) => boolean)[] = []; let patch: Record<string, unknown> | null = null;
     const result = () => {
       const fixtures: Record<string, Record<string, unknown>[]> = { generated_artifacts: [{id:'artifact',user_id:'owner',latest_version_id:'version',artifact_type:'reviewer',deleted_at:null}], generated_artifact_versions:[{id:'version',artifact_id:'artifact',user_id:'owner',source_version_id:'source'}],source_versions:[{id:'source',user_id:'owner',metadata:{reviewerSourceSnapshotId:'snapshot'}}],reviewer_source_snapshots:[{id:'snapshot',user_id:'owner',course_id:'past-course'}],reviewer_source_snapshot_items:[{source_snapshot_id:'snapshot',user_id:'owner',course_id:'past-course',source_type:'page',source_row_id:'lesson'}] };
-      const values: Record<string, unknown>[] = current && fixtures[table] ? fixtures[table] : table === 'course_reviewer_requests' ? rows : table === 'canvas_courses' ? [{ id: 'past-course', user_id: 'owner', canvas_connection_id: 'connection' }] : [];
+      const values: Record<string, unknown>[] = current && fixtures[table] ? fixtures[table] : table === 'course_reviewer_requests' ? rows : table === 'processing_jobs' ? processingJobs : table === 'canvas_courses' ? [{ id: 'past-course', user_id: 'owner', canvas_connection_id: 'connection' }] : [];
       const selected = values.filter(r => tests.every(test => test(r)));
       if (patch) selected.forEach(r => Object.assign(r, patch));
       return { data: selected, error: null };
@@ -108,4 +109,30 @@ it('an explicit selected set excludes all other materials', async () => {
   mocks.list.mockResolvedValue({ ok: true, value: { sources: [{id:'page:lesson',title:'Lesson',type:'page'},{id:'page:second',title:'Second',type:'page'}], pagination: {hasMore:false} } });
   await createCourseBatch(s.client, 'owner', 'past-course', ['page:second']);
   expect(s.rows.map(row => row.material_id)).toEqual(['page:second']);
+});
+
+it('reads real 4 of 4 completion once per batch membership, excluding another owner', async () => {
+  const key = row().batch_key;
+  const rows = Array.from({ length: 4 }, (_, i) => ({ ...row(`r${i}`), batch_keys: [key, 'other-batch', key], state: 'admitted' as const, job_id: `j${i}` }));
+  const s = store([...rows, { ...row('foreign'), user_id: 'other' }], false, rows.map(r => ({ id: r.job_id, user_id: 'owner', status: 'succeeded' })));
+  const queue = await readCourseBatchQueue(s.client, 'owner');
+  expect(queue.requests).toHaveLength(4);
+  expect(queue.summaries).toEqual([{ batchKey: key, done: 4, total: 4 }, { batchKey: 'other-batch', done: 4, total: 4 }]);
+});
+it('settles terminal attempts, keeps waiting active, and reopens progress on retry', async () => {
+  const s = store([
+    { ...row('cancelled-request'), state: 'cancelled' },
+    { ...row('cancelled-job'), state: 'admitted', job_id: 'cancelled-job' },
+    { ...row('skipped'), state: 'skipped' },
+    { ...row('failed'), state: 'failed' },
+    { ...row('failed-job'), state: 'admitted', job_id: 'failed-job' },
+    row('waiting'),
+  ], false, [{ id: 'cancelled-job', user_id: 'owner', status: 'cancelled' }, { id: 'failed-job', user_id: 'owner', status: 'failed' }]);
+  expect((await readCourseBatchQueue(s.client, 'owner')).summaries).toEqual([{ batchKey: row().batch_key, done: 5, total: 6 }]);
+  s.rows.find(request => request.id === 'failed')!.state = 'waiting';
+  expect((await readCourseBatchQueue(s.client, 'owner')).summaries).toEqual([{ batchKey: row().batch_key, done: 4, total: 6 }]);
+});
+it.each(['queued', 'running', 'cancellation_requested', 'succeeded', 'failed', 'expired', 'cancelled'] as const)('batch progress accounts for a %s job', async status => {
+  const s = store([{ ...row(), state: 'admitted', job_id: 'job' }], false, [{ id: 'job', user_id: 'owner', status }]);
+  expect((await readCourseBatchQueue(s.client, 'owner')).summaries).toEqual([{ batchKey: row().batch_key, done: ['succeeded', 'failed', 'expired', 'cancelled'].includes(status) ? 1 : 0, total: 1 }]);
 });

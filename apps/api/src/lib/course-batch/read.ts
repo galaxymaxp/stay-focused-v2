@@ -1,4 +1,4 @@
-import type { CourseBatchQueue } from '@stay-focused/shared';
+import { isTerminalProcessingJobStatus, type CourseBatchQueue } from '@stay-focused/shared';
 import type { PreparationClient } from '@/lib/canvas-preparation/repository';
 import { ExperienceFailure } from '@/lib/experience/errors';
 
@@ -18,14 +18,15 @@ export async function readCourseBatchQueue(client: PreparationClient, userId: st
   for (let offset = 0; offset < ids.length; offset += 100) {
     const jobs = await client.from('processing_jobs').select('id,status').eq('user_id', userId).in('id', ids.slice(offset, offset + 100));
     if (jobs.error || !jobs.data) throw new ExperienceFailure(503, 'unavailable');
-    jobs.data.filter(job => job.status === 'succeeded').forEach(job => done.add(job.id));
+    jobs.data.filter(job => isTerminalProcessingJobStatus(job.status)).forEach(job => done.add(job.id));
   }
   const groups = new Map<string, { batchKey: string; done: number; total: number }>();
   for (const row of requests) {
     for (const key of new Set([row.batch_key, ...row.batch_keys])) {
       const group = groups.get(key) ?? { batchKey: key, done: 0, total: 0 };
       group.total++;
-      if (row.state === 'skipped' || (row.job_id && done.has(row.job_id))) group.done++;
+      // Terminal attempts settle progress; failures keep their attention UI.
+      if (row.state === 'skipped' || row.state === 'cancelled' || row.state === 'failed' || (row.job_id && done.has(row.job_id))) group.done++;
       groups.set(key, group);
     }
   }
