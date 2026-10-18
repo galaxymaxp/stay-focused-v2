@@ -1,3 +1,26 @@
+<!-- OS1 begin -->
+## OS1 source option rows preflight - STOPPED (2026-10-18)
+
+Finite scope: OS1 STEP 0 through local implementation/tests/gates/docs and
+local commits only; Rollout and Device checks excluded. Baseline `c6584b5`,
+branch `overnight/2026-10-15_feedback`. No implementation started.
+
+STEP 0 contradicts OS1's assumed RowLink pressed tint: the current row
+only changes opacity and scale (`primitives.tsx:399-459`), with no tint or
+`testID` prop. Unattended rules 3/4 require STOPPED. Owner question and full
+line references are in the OS1 handoff footer. Resume requires corrected
+instructions authorizing a local source-row pressed tint implementation.
+
+Mobile's chooser and in-mode buttons match the expected filled controls.
+Web has white/filled selection in `apps/web/app/globals.css:606` plus
+`:1159` shadow, so its conditional scoped change remains pending too.
+Acceptance: preflight contradiction **FRESH, STOPPED**; mobile rows/tests,
+web toggle/icons/tests **NOT RUN**; implementation gates **NOT RUN**, 0/8;
+documentation diff/staged-diff **FRESH PASS**, 2/2. Rollout/Device checks
+**NOT RUN** and live state **UNVERIFIED (owner to confirm)**. No application
+code, environment-file, remote service, deployment, SQL or push operation.
+<!-- OS1 end -->
+
 <!-- SH2 begin -->
 ## SH2 mobile hide-on-scroll complete locally - PASS (2026-10-18)
 

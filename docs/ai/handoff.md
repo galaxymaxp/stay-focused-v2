@@ -5311,3 +5311,98 @@ email, environment-file edit or push. Unrelated `UI/`,
 `apps/mobile/.gitignore`, `supabase/.temp/` and ignored temporary work are
 preserved. Current state, roadmap and sprint are reconciled. SH2b is the
 finite endpoint; no later roadmap work was started.
+
+## OS1 Other source rows - STOPPED at STEP 0 (2026-10-18)
+
+**Status: STOPPED, not implemented.** Baseline `c6584b5` on
+`overnight/2026-10-15_feedback`; HEAD is after `ef79f23` and includes SH2b.
+Local upstream tracking is `github/main`, ahead 41 at preflight; remote
+freshness is **UNVERIFIED (owner to confirm)**. Initial dirty paths were
+only unrelated untracked `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/`;
+all preserved. No branch switch, application edit or later task.
+
+**Stop authority:** `tmp/overnight/prompts/OS1.md`, unattended rule 3:
+"It is a STOP if the code itself contradicts what the prompt assumes."
+Rule 4 requires a safe commit, handoff question, STOPPED status and end.
+STEP 1 assumes an existing RowLink pressed surface tint that can be reused.
+Actual `apps/mobile/src/design/primitives.tsx:399-459` has only pressed
+opacity (`:451`, 0.7 versus 1) and scale (`usePressMotion`, `:96-114`),
+with no background tint. A plain reuse cannot meet the specified tint.
+Its props also lack `testID`; accessible button role/label and disabled/
+selected state exist. This is a code contradiction, not a live-access block.
+
+**Exact question for the owner (recorded, no answer requested overnight):**
+May the resumed OS1 use a local source-row component with the existing
+surface/text tokens, 48pt minimum target, icon before label, button role,
+accessible label, original testIDs/handlers/disabled behavior, and a new
+subtle pressed surface tint, since RowLink currently has opacity/scale
+feedback only and no testID prop?
+
+STEP 0 source findings (FRESH local inspection):
+
+- `ReviewerGenerateScreen.tsx:116`: Other source Sheet. `:122-125`:
+  chooser with three secondary Buttons, original text/camera/file testIDs,
+  `changeMode("paste")`, `pick("camera")`, `pick("file")`; busy disables
+  Camera/File. `:138-140`: default Buttons for Take photo / Choose photo /
+  Choose PDF, DOCX or PPTX. Footer actions `:118-120` and Try again `:146`
+  remain untouched.
+- `Button.tsx:31`: default primary; `:112-118`: accent background and
+  accentText. `:122-128`: secondary cardElevated background/textPrimary.
+  `theme.tsx:106-112` and `tokens.ts:7-13` map those to surfaceElevated,
+  accent/onAccent and textPrimary. `themeTokens.ts:6-13` light:
+  secondary white `#FFFFFF` / text `#111111`, primary `#171717` / white;
+  `:36-43` dark: secondary `#2C2C2E` / white, primary `#F5F5F5` / `#111111`.
+  Thus light secondary and dark primary explain the filled white controls.
+  Global Button remains unchanged.
+- `RowLink` details above; `tokens.ts:66-67` defines hitTarget.min = 48.
+  Existing lucide dependency and primitives imports are present.
+- Web `own-material.tsx:85-87`: Source group, Paste text / Upload a file,
+  aria-pressed from mode. Actual CSS is `apps/web/app/globals.css`, not
+  `apps/web/src/app/globals.css` (harmless path drift). Shared `.segments`
+  at `:589-611` uses transparent buttons and selected `var(--elevated)`;
+  light `--elevated: #fff` at `:5`, dark `#2c2c2e` at `:57`. `:1159-1161`
+  adds selected shadow. White/filled highlight confirmed; conditional web
+  change is applicable but not started because STEP 0 stopped. Future
+  override must use `.own-material .segments`. Existing Icon is
+  `src/components/ui.tsx:6`; local `text-align-start.svg` and `file-text.svg`
+  assets exist.
+
+Acceptance / gate counts:
+
+- Preflight assumption check: **FRESH, STOPPED**, 1 contradiction.
+- Mobile chooser/in-mode rows, behavior/icon/busy tests, conditional web
+  icons/selection tests: **NOT RUN**, no implementation.
+- `npm run typecheck -- --force`, `npm run lint -- --force`, shared/mobile/
+  web workspace tests, API build, Android export, web build: **NOT RUN**,
+  **0/8 implementation gate commands**, stopped before editing code.
+- `git diff --check`, `git diff --cached --check`: **FRESH PASS**, **2/2**,
+  zero whitespace errors for this documentation checkpoint.
+- No test failures or flakes; lookup attempts at OS1's stale CSS path and
+  guessed theme/Icon/pressMotion/SH2 report paths were resolved by source
+  discovery. No build or test attempt occurred. No cached result claimed.
+
+Local commit: `docs: record OS1 preflight stop`, author
+`galaxymaxp <omgraythekid@gmail.com>`, contains only current-state, roadmap,
+current_sprint and this footer. Its final hash and subject are recorded in
+`tmp/overnight/OS1.status` and `tmp/overnight/OS1.progress` after commit;
+no tmp artifact is staged. No implementation commit was made.
+
+### Owner steps remaining
+
+1. Resolve the recorded RowLink assumption and issue corrected resume
+   instructions; implement mobile rows and conditional scoped web treatment,
+   then run every required fresh serial gate before claiming OS1 complete.
+2. **Rollout - NOT RUN, skipped entirely:** Fely's mobile OTA/APK and any
+   web deployment after implementation and acceptance.
+3. **Device checks - NOT RUN, skipped entirely:** Realme light/dark Other
+   source Text/Camera/Local File icon rows, subtle pressed tint without
+   white fill; matching Take photo / Choose photo rows; Text opens editor.
+4. Production revisions, database rows, Scheduler state and actual device/
+   real-account behavior are **UNVERIFIED (owner to confirm)**. No live
+   checks attempted. For later owner Vercel work, strongly recommend
+   installing its absent CLI with `npm i -g vercel`; nothing installed here.
+
+No remote service call, deployment, remote SQL/migration, Scheduler action,
+email, environment-file edit or push. All three planning files reconcile
+OS1 as STOPPED/pending. No ADR needed. Finite unattended endpoint reached
+by the mandatory preflight stop; no implementation step was crossed.

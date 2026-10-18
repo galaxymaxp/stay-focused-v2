@@ -1,5 +1,22 @@
 # Roadmap
 
+## OS1 source option rows preflight - STOPPED (2026-10-18)
+
+OS1 is pending, not complete. STEP 0 at `c6584b5` found that the existing
+`RowLink` has opacity/scale pressed feedback, no assumed surface tint to
+reuse, and no `testID` prop (`primitives.tsx:399-459`). OS1 unattended rule
+3/4 requires stopping on a code contradiction. No application changes.
+
+Owner decision: approve a local source-row implementation with existing
+tokens, 48pt targets, accessible buttons, testIDs and pressed tint. Web's
+own-material toggle also needs the conditional treatment when resumed:
+shared `.segments` selects `--elevated` (white in light mode) and a shadow
+in the actual `apps/web/app/globals.css:606,1159`; scope any future override
+to `.own-material .segments`. Exact findings/question are in the OS1
+handoff footer. Implementation gates **NOT RUN**, 0/8; documentation diff
+checks **FRESH PASS**, 2/2. Rollout and Device checks remain owner steps;
+production state **UNVERIFIED (owner to confirm)**. No later task started.
+
 ## SH2 mobile hide-on-scroll complete locally - PASS (2026-10-18)
 
 SH2 is done via SH2b: the corrected Page/native RefreshControl facts resolve

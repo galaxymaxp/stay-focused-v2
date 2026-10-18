@@ -1,5 +1,28 @@
 # Current State
 
+## OS1 source option rows preflight - STOPPED (2026-10-18)
+
+OS1 stopped at STEP 0 on baseline `c6584b5`, branch
+`overnight/2026-10-15_feedback`, under its unattended rule 3/4: code
+contradicts the assumed reusable pressed surface tint. `RowLink` in
+`apps/mobile/src/design/primitives.tsx:399` uses only pressed opacity
+(`:451`) and scale motion, with no background tint. It also has no
+`testID` prop. Mobile chooser and in-mode filled buttons remain unchanged.
+
+Web does have a filled selected source toggle: the actual stylesheet is
+`apps/web/app/globals.css:606` (`--elevated`, white in light mode), with
+shadow at `:1159`. The stylesheet path in OS1 has harmless directory drift.
+Web changes are pending with the rest of OS1; this slice is not done.
+
+**Owner decision recorded in handoff:** authorize a local source-row
+implementation using existing tokens, 48pt targets, accessible buttons,
+testIDs and subtle pressed tint rather than relying on an existing RowLink
+tint. **FRESH PASS:** documentation diff/staged-diff hygiene, 2/2 checks.
+Implementation gates **NOT RUN**, 0/8 commands, due to the preflight stop.
+Live state **UNVERIFIED (owner to confirm)**. Rollout and Device checks
+**NOT RUN**, owner steps remaining. No application code or environment-file
+change, remote call, deployment, migration or push.
+
 ## SH2 mobile hide-on-scroll complete locally - PASS (2026-10-18)
 
 SH2 is done via SH2b: the corrected Page/native RefreshControl facts resolve
