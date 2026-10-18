@@ -1,5 +1,14 @@
 # Roadmap
 
+TC1 / BACKLOG P15 (2026-10-18): **STOPPED at STEP 0**, not implemented.
+Current Today projection is limited to the selected calendar date, so choosing
+yesterday cannot show its wrapped morning plan as current. The prompt's day
+model stop applies. Owner decision needed: extend server Today projection or
+approve client composition of two dates. FRESH diagnostic proof 5/5; prompt
+gates 1/9 PASS (diff hygiene), 8 NOT RUN. TC1's code/menu/ADR and owner
+rollout/device acceptance remain open; no later item started.
+[TC1 evidence and recorded question](ai/acceptance/tc1-today-clock-preflight.md).
+
 IF2 / BACKLOG N11 (2026-10-18): complete locally with `5b7c41e` pending-card feedback and external image failure regressions; existing viewer-retention repair confirmed. FRESH PASS 8/8 expanded prompt gates (1439 mobile / 2351 API with 3 live skips / 309 web tests), plus forced root build 8/8, 0 cached. Endpoint IF2 only; next RB6/N9 fullsend/Realme acceptance remains owner work, NOT RUN; historical image failure UNVERIFIED (owner to confirm). [IF2 evidence](ai/acceptance/if2-external-image.md).
 
 OR1b / BACKLOG P14 (2026-10-18): code complete locally in `8eca072`; owner-approved static Today halo resolves the previous OR1 preflight STOP without changing shared/web shaders or native dependencies. FRESH PASS 7/7 prompt gates (1446 mobile / 476 shared tests), plus forced root build 8/8, 0 cached; first test-only typecheck failure retained in evidence. Next: owner Preview OTA and Realme dark/light, handles/scrolling, Reduce Motion and power acceptance, all NOT RUN. Actual phone cause and remote state UNVERIFIED (owner to confirm). Endpoint OR1b only; OR2 not started. [OR1b evidence](ai/acceptance/or1b-today-orb-glow.md).

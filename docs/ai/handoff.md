@@ -6305,3 +6305,93 @@ physical visual parity. No code blocker remains within OR1b's finite scope.
 
 [OR1b implementation and local acceptance](acceptance/or1b-today-orb-glow.md).
 Endpoint: OR1b code scope complete; no OR2 or further task started.
+
+---
+
+## TC1 / BACKLOG P15 - STOPPED at STEP 0 (2026-10-18)
+
+Baseline `bb14b88`, branch `overnight/2026-10-15_feedback` (unchanged).
+Read `tmp/overnight/prompts/TC1.md` in full and followed its unattended
+overrides. Frozen scope was TC1 STEP 0-6/tests/gates/docs/local commits only.
+No runtime work was started past the mandatory preflight stop; OR1b preserved.
+
+**Finding:** the planner validator accepts overnight ISO ranges and tracked SQL
+has no 24-hour/same-date restriction. However, the current Today day model
+ends at midnight: `apps/api/src/lib/experience/mappers.ts:63` returns
+`start + 86_400_000`; `composeToday` filters sessions against that boundary
+(line 129), then derives current/next/later from the filtered timeline
+(lines 138-139, 147). The route/service offer date and UTC offset, with no
+extended read-window parameter. Changing Today to yesterday's date does not
+include yesterday's plan sessions that start after midnight.
+
+Local synthetic counterexample: October 17 window 22:00-04:00, October 18
+01:30 current time, planned session 01:00-02:00 (UTC+08). Yesterday's Today
+snapshot has no timeline/current/next; the next calendar date contains it.
+TC1 STEP 0.3 requires STOP on this day-model incompatibility; unattended rule
+4 requires committing the safe checkpoint and recording the owner question.
+No server projection extension or client two-date composition was implemented.
+
+**Exact question for the owner:** May TC1 extend the server Today read model
+to include the wrapped end while preserving start-date ownership, or should
+it instead compose two existing calendar-date snapshots in each client?
+Please approve the approach and its treatment of current/next/later/progress
+before resuming TC1. Recorded for morning; no unattended question was sent.
+
+Verification, all local:
+
+| Gate / check | Result |
+| --- | --- |
+| `node node_modules/vitest/vitest.mjs run --config tmp/overnight/TC1.vitest.config.ts` | FRESH PASS: 1 file, 5/5 diagnostic tests (two planner validator cases, midnight boundary, prior-date omission, next-date current/next) |
+| `npm run typecheck -- --force` | NOT RUN: STEP 0 STOP |
+| `npm run lint -- --force` | NOT RUN: STEP 0 STOP |
+| `npm run test --workspace @stay-focused/mobile` | NOT RUN: STEP 0 STOP |
+| `npm run test --workspace @stay-focused/web` | NOT RUN: STEP 0 STOP |
+| `npm run test --workspace @stay-focused/shared` | NOT RUN: STEP 0 STOP |
+| `npm run test --workspace @stay-focused/api` | NOT RUN: STEP 0 STOP; diagnostics are not a full API-suite run |
+| `npm run build --workspace @stay-focused/api` | NOT RUN: STEP 0 STOP |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | NOT RUN: STEP 0 STOP |
+| `git diff --check` and `git diff --cached --check` | FRESH PASS: 0 whitespace errors |
+
+Prompt gates **1/9 FRESH PASS, 8/9 NOT RUN, 0 failed**; additional AUTOPILOT
+forced root build NOT RUN (documentation-only stopped checkpoint). The five
+diagnostic checks establish the blocker, not feature completion. Initial
+diagnostic launch exited 1 before collection because the absolute guard path
+in NODE_OPTIONS lost Windows backslashes; repository-relative preload fixed
+it and the retry passed. No assertion failures, skips or flakes. Existing
+Vite ESM/CommonJS warning retained. Source-discovery misses were resolved
+with rg; no code or validation output committed.
+
+Commits, author `galaxymaxp <omgraythekid@gmail.com>`:
+
+```text
+docs: record TC1 Today model preflight stop (this checkpoint; final hash in Git and tmp/overnight/TC1.status)
+```
+
+Planning files reconciled to STOPPED/open. Acceptance report:
+[TC1 Today clock preflight](acceptance/tc1-today-clock-preflight.md).
+STEP 0 partial; STEPS 1-6/tests/implementation gates and ownership ADR remain
+unimplemented. No later roadmap work started. tmp progress/status, synthetic
+test/config and logs remain uncommitted. Unrelated `UI/`,
+`apps/mobile/.gitignore`, `supabase/.temp/` preserved. Tracking comparison
+73 ahead / 0 behind at baseline; no fetch, branch change or push.
+
+**UNVERIFIED (owner to confirm):** installed/deployed revisions, production
+DB rows/applied migrations, Scheduler state, remote-ref freshness and actual
+device behavior. No Supabase, Vercel, Google Cloud, Canvas or Resend call,
+deployment, migration application, remote SQL, Scheduler operation, email or
+`.env*` edit. Diagnostic process used a non-loopback socket guard.
+
+### Owner steps remaining
+
+- Resolve the recorded Today contract decision before resuming TC1; implement
+  wrap helpers, planning/store/Schedule acceptance, ring behavior, date
+  ownership, clock options menu, labels/tests/gates and ownership ADR.
+- **Rollout - NOT RUN, skipped entirely:** Preview OTA and website preview
+  after implementation and verification through the owner's release process.
+- **Device checks - NOT RUN, skipped entirely:** Realme/web 22:00-04:00
+  by dragging and typing, 12/24h device setting, plan beyond midnight, Today
+  at 01:00, lock preventing drags and typed edits while locked.
+- Vercel CLI is absent; for future owner rollout tooling, installing
+  `npm i -g vercel` is strongly recommended. No installation or CLI call ran.
+
+Endpoint: TC1 STOPPED at preflight; no TC1 runtime changes or later item.

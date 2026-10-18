@@ -1,5 +1,14 @@
 # Current State
 
+TC1 / BACKLOG P15 (2026-10-18): **STOPPED at STEP 0**, baseline `bb14b88`.
+The planner accepts overnight ISO ranges, but the existing Today snapshot ends
+at midnight and omits the next morning's sessions/current/next when selecting
+the window's start date. Prompt STEP 0.3 requires a stop before choosing a
+server projection extension or client composition of two dates. FRESH local
+diagnostic proof 5/5; prompt gates 1/9 PASS (diff hygiene), 8 NOT RUN. No runtime
+changes; TC1 remains open. Rollout/device checks skipped; remote state
+UNVERIFIED (owner to confirm). [TC1 preflight](ai/acceptance/tc1-today-clock-preflight.md).
+
 IF2 / BACKLOG N11 (2026-10-18): complete locally in `5b7c41e`; HEAD already retained external viewers on errors, and IF2 adds mobile/web pending-card loading feedback plus regression proof. FRESH PASS 8/8 expanded prompt gates (1439 mobile, 2351 API / 3 live skips, 309 web tests), plus forced root build 8/8, 0 cached. Actual phone HTTP/decode cause UNVERIFIED (owner to confirm); RB6/N9 rollout and Realme checks remain owner steps. [IF2 evidence](ai/acceptance/if2-external-image.md).
 
 OR1b / BACKLOG P14 (2026-10-18): **PASS for the finite code scope**, superseding OR1's preflight STOP with the supplied owner answers. `8eca072` adds a static mobile-only SVG halo behind both GL and PNG, using minute-memoized day aura tint, dark/light tuning and unchanged glass/host/frame-loop behavior. FRESH PASS 7/7 prompt gates (1446 mobile / 476 shared tests), plus forced root build 8/8, 0 cached. First test-only typecheck failure was corrected and recorded. Realme appearance/compositing/power and remote state remain UNVERIFIED (owner to confirm); rollout/device checks NOT RUN. Endpoint OR1b only; OR2 not started. [OR1b evidence](ai/acceptance/or1b-today-orb-glow.md).
