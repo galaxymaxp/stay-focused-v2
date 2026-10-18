@@ -1,9 +1,38 @@
 # Current State
 
+<!-- UC3 begin -->
+UC3 / APK release pipeline (2026-10-19): **PASS** for the finite local code
+scope, baseline `0037a3a`, branch `overnight/2026-10-15_feedback` retained.
+Endpoint: STEP 0-4, tests/gates/docs/local commits only. The update-checker
+roadmap's UC1/UC2/UC3 code scope is complete; **RB7 is Fely's rollout**.
+The publisher defaults to a side-effect-free dry run, imports the exact shared
+release parsers, guards app.json mismatches, and tests publishing through
+injected operations only. Runbook covers fullsend native APK versus OTA,
+verified built versionCode under EAS remote versioning, and minSupported.
+Implementation commits: `7e6f274` (script), `ece3721` (tests), `1dc1c20`
+(runbook/ADR-051, linked from mobile device runbook and ADR-050).
+FRESH PASS: **8/8 prompt gates**; Node publisher 27/27, shared 590/590 (56
+files, existing emitted copies included), API 2404 passed / 3 intentional live
+skips (210 files, two workers). Forced typecheck/lint each 8/8 tasks, zero
+cached, six existing lint warnings and zero errors. API build 36/36 pages;
+empty named APK dry run exits 0 with v2.2.0+6 argv; diff hygiene passes.
+Additional forced root build passes 8/8 tasks, zero cached, including API/web
+and local Android/iOS/web exports. No failed gates or nondeterministic flakes.
+Rollout and Device checks NOT RUN, skipped entirely. Real publish mode NOT RUN;
+no real gh runner, service call, deployment, remote SQL, Scheduler operation,
+environment-file edit or push. Live release/artifact, EAS actual built metadata,
+deployed revisions, remote-ref freshness, database/Scheduler and device state
+remain **UNVERIFIED (owner to confirm)**. No mobile implementation, version,
+runtime, dependency or migration change. Generated declarations are restored;
+expected owner paths remain untouched. Next: owner RB7 and first use of the
+publisher at a real native release, with no fake test release.
+[Acceptance](ai/acceptance/uc3-apk-release.md); [runbook](dev/android-release-runbook.md).
+<!-- UC3 end -->
+
 <!-- UC2 begin -->
 UC2 / public Android download page (2026-10-19): **PASS** for the finite local
 code scope, baseline `c958cc1`, branch `overnight/2026-10-15_feedback` retained.
-Endpoint: UC2 STEP 0-5, tests/gates/docs/local commits; UC3 is not started.
+Endpoint: UC2 STEP 0-5, tests/gates/docs/local commits; UC3 completion is recorded above.
 Public `/download` validates UC1 API metadata and shows version, UTC date,
 plain notes, one APK action, local QR and installation steps. `/release`
 redirects; auth entry points and the existing account menu link to download.
@@ -21,8 +50,7 @@ Rollout and Device checks NOT RUN, skipped entirely; live production/release,
 remote-ref freshness, database/Scheduler and physical-device behavior remain
 **UNVERIFIED (owner to confirm)**. No deployment, production-service call,
 remote SQL, Scheduler action, environment-file edit or push. Owner rollout,
-Realme/QR/native-share checks and showcase push/PR remain. Next separate slice:
-UC3 release automation. [Acceptance](ai/acceptance/uc2-download-page.md); ADR-050 amended.
+Realme/QR/native-share checks and showcase push/PR remain. UC3 release automation is complete above; RB7 is Fely's rollout. [Acceptance](ai/acceptance/uc2-download-page.md); ADR-050 amended.
 <!-- UC2 end -->
 
 <!-- UC1 begin -->
@@ -45,7 +73,7 @@ Rollout and Device checks NOT RUN, skipped entirely. Live release, production,
 remote refs and phone behavior UNVERIFIED (owner to confirm); no remote service
 operation, deployment, SQL, Scheduler change, environment-file edit or push.
 Owner rollout/device acceptance remains separate; UC2 status is recorded above.
-UC3 release automation is the next separately scoped slice, not started. [Acceptance](ai/acceptance/uc1-update-checker.md); ADR-050 in `docs/adr/`.
+UC3 release automation completion is recorded above. [Acceptance](ai/acceptance/uc1-update-checker.md); ADR-050 in `docs/adr/`.
 <!-- UC1 end -->
 
 PAR1b / web-mobile parity audit (2026-10-19): **PASS for the finite docs-only source audit**, baseline `796e312` on `overnight/2026-10-15_feedback`, endpoint PAR1b only. Completed 54 source-backed feature rows and 16 gaps ranked by student impact; both platforms have file:line evidence, with partial behavior and roadmap mismatches explicit. Expected untracked owner paths remain untouched. FRESH PASS: `git diff --check` (1/1 prompt gate, 0 errors), docs-only scope (1/1, five docs paths), source-link/line validation; build/typecheck/lint/application tests NOT APPLICABLE. One local commit `docs: complete web vs mobile parity audit`; exact hash in Git and `tmp/overnight/PAR1b.status`. Rollout/Device checks NOT RUN, skipped entirely; live/deployed/migration/provider/Scheduler/device state UNVERIFIED (owner to confirm). Supersedes the prior PAR1 preflight-only record; owner exception is resolved. Next: Claude and Fely use Gaps for the next roadmap; no later slice started. [Audit](ai/parity-web-mobile-20261018.md).

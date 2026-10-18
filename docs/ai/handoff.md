@@ -7143,3 +7143,80 @@ gh pr create --repo galaxymaxp/stay-focused-showcase --head download-link --base
 No command in this owner section was executed.
 
 Final UC2 checkpoint/status is in ignored `tmp/overnight/UC2.*`.
+
+## UC3 - APK release pipeline - PASS locally (2026-10-19)
+
+Status: **PASS** for finite STEP 0-4, tests/gates/docs/local commits, baseline
+`0037a3a` on `overnight/2026-10-15_feedback`. UC1/UC2 commits, shared parser,
+app.json 2.2.0 / 6 / 2.2.0-sdk57, preview APK profile and EAS remote versioning
+matched preflight. No tracked owner edits were present. The update-checker
+roadmap's code scope is complete; **RB7 is Fely's rollout**. No later slice.
+
+What changed: Node ESM publisher with no new dependencies, dry run by default,
+strict flags/defaults/mismatch override, exact shared-parser import/round-trip,
+plain generated notes and JSON argv preview. Publish logic uses execFile,
+refuses existing/uncertain tags, streams HTTPS-only redirects with bounded time,
+preserves existing local artifacts/notes, rejects empty bytes and sanitizes
+provider errors. Tests inject all publishing operations; **no real gh runner
+or real publish mode executed**. New Android fullsend runbook covers OTA versus
+APK, actual built versionCode under EAS remote versioning, minSupported and
+owner verification. Mobile device runbook and ADR-050 link to the runbook/new
+ADR-051; number checked across both ADR folders. No mobile/API/web behavior,
+version/runtime, dependency or migration changed.
+
+Commits (author `galaxymaxp <omgraythekid@gmail.com>`):
+
+- `7e6f274 feat(scripts): publish APK releases to the public releases repo`
+- `ece3721 test(scripts): cover APK release publishing`
+- `1dc1c20 docs: android release runbook and distribution ADR`
+- `docs: complete UC3 release pipeline handoff` is this documentation checkpoint;
+  its final hash is in Git and `tmp/overnight/UC3.status` after committing.
+
+**FRESH PASS: 8/8 prompt gates.** Forced root typecheck/lint each pass 8/8 tasks,
+zero cached; six existing lint warnings and zero errors. Publisher tests 27/27,
+zero skips; shared 590/590 in 56 files (existing emitted copies included);
+API 2404 passed / 3 intentional live skips in 210 files with two workers. Exact
+API build passes, 36/36 static pages. Required empty named APK dry run exits 0,
+printing v2.2.0+6 argv and metadata; no publication or download. Diff/staged diff
+hygiene pass. Additional forced root build passes 8/8 tasks, zero cached,
+including API/web and local Android/iOS/web exports. Both scripts pass Node
+syntax checks. [Exact commands and acceptance](acceptance/uc3-apk-release.md).
+
+No failed first gate/test attempts or nondeterministic flakes. Initial and final
+27/27 Node tests pass; targeted refinements cover Node 22 warning tolerance and
+download cancellation cleanup. One final documentation patch failed atomic
+validation on a table label and was corrected without file changes; this was
+not a gate failure. Existing Vite config/build color warnings remain in logs.
+Tests use repository-local TEMP/TMP, disabled live flags and an outbound
+HTTP/fetch guard; builds use offline/no-telemetry settings. Generated Next
+declarations were restored to baseline. No APK, output, credential or tmp file
+is committed. Owner paths `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/`
+remain untouched and unstaged.
+
+**UNVERIFIED (owner to confirm):** public release/tag/APK availability, real APK
+manifest/runtime/signing, deployed API/website/checker revisions, remote-ref
+freshness, production database/Scheduler state and device behavior. No
+Supabase, Vercel, Google Cloud, Canvas or Resend call; no remote SQL, migration
+application, Scheduler action, email, deployment, environment-file edit or push
+ran. Production-state limitations did not stop code work. Current state,
+roadmap and sprint are reconciled; UC3 is the endpoint.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** RB7 API/website deployment and mobile
+  checker OTA remain Fely's work. At the next real native release, follow
+  [the Android release runbook](../dev/android-release-runbook.md), inspect the
+  actual built code/runtime, review dry-run output, then use `--publish`.
+  OTA-only changes create no GitHub release; never publish a fake test release.
+- **Device checks - NOT RUN, skipped entirely:** on the real signed APK, verify
+  API metadata, `/download`/QR, data-preserving install, Settings About,
+  older-install banner/download and any deliberate minSupported sheet; retain
+  offline Library access.
+- Confirm the UNVERIFIED live states above. Complete UC2's remaining showcase
+  branch push/PR and rollout/device checks as separately recorded.
+- For later owner Vercel deployment/log/env workflows, installing the missing
+  CLI with `npm i -g vercel` is strongly recommended; it was not installed or
+  invoked here.
+
+Final UC3 checkpoint/status is in ignored `tmp/overnight/UC3.*`. Stop at UC3;
+no rollout, publication or later work is authorized by this handoff.
