@@ -6,7 +6,7 @@ import { imageDirectory, imagesNeedConnection, imagesReady } from './imageManife
 import { localReviewerImages, preferLocalReviewerImages } from './offlineImagePresentation';
 import { openNodeSqlite, OWNER_A, OWNER_B, reviewerDetail } from './localLibrary.testSupport';
 import { migrateLocalLibrary, LOCAL_LIBRARY_SCHEMA_VERSION } from './schema';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 
 const mocks = vi.hoisted(() => ({ request: vi.fn(), readFigures: vi.fn(), readSnapshot: vi.fn(), remove: vi.fn() }));
@@ -193,7 +193,9 @@ describe('offline reviewer images', () => {
     expect(imageDirectory('file:///documents/', '../owner', '../artifact')).not.toContain('/../');
   });
   it('persists a failed manifest across an actual database close/reopen', async () => {
-    const directory = mkdtempSync(resolve('../../tmp/overnight/oi1-restart-'));
+    const testTemp = resolve('../../.local/test-temp');
+    mkdirSync(testTemp, { recursive: true });
+    const directory = mkdtempSync(join(testTemp, 'oi1-restart-'));
     const path = join(directory, 'library.db');
     try {
       const h = await setup(1, path);
