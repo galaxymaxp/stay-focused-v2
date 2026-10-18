@@ -1,13 +1,12 @@
 import { ASSIST_TYPES, isReviewerShareToken, reviewerSharePath, selectAssistBlock, type AssistResult, type ReviewerReaderModel, type ReviewerShareLink } from '@stay-focused/shared';
 import { experienceRequest, type ExperienceClient } from './experienceApi';
 import { studyAssist } from './studyAssist';
+import { websiteOrigin } from './publicWebsite';
 
 /** Browser destination is independent from the API origin. No private paths. */
-export function reviewerShareUrl(token: string, origin = process.env.EXPO_PUBLIC_WEBSITE_URL ?? 'https://stay-focused-ten.vercel.app'): string {
+export function reviewerShareUrl(token: string, origin?: string): string {
   if (!isReviewerShareToken(token)) throw new Error('invalid_share_link');
-  const url = new URL(origin);
-  if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('invalid_website_origin');
-  return `${url.origin}${reviewerSharePath(token)}`;
+  return `${websiteOrigin(origin)}${reviewerSharePath(token)}`;
 }
 export async function collectSharedAssists(owner: string, reviewer: ReviewerReaderModel): Promise<AssistResult[]> {
   if (!owner) return [];
