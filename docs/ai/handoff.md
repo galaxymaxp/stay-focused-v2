@@ -5620,3 +5620,47 @@ environment-file edit. No credentials/private fixtures/outputs committed.
 Acceptance: [GN1/GN1b](acceptance/gn1-grace-navigation.md). Exact logs and
 progress/status remain ignored under `tmp/overnight/GN1b*`. Endpoint reached;
 no follow-on roadmap work is authorized by this run.
+
+## WL1 - website Library compact Sort menu - PASS (2026-10-18)
+
+Status: **PASS for the finite unattended code scope**. STEP 0-4, tests,
+fresh serial gates, docs and local commits are done. No later slice started.
+Branch `overnight/2026-10-15_feedback`, baseline `341cf62`.
+
+Commits:
+
+- `ea9ffa9 feat(web): library sort menu button`
+- `docs: close WL1` (this documentation commit; final hashes are recorded in
+  `tmp/overnight/WL1.status`). Both use the requested galaxymaxp author.
+
+The native Library select is replaced by a compact icon + Sort button and
+checked menu, preserving grid/course filtering, scope keys and persistence.
+The menu reuses reviewer interactions and existing account-popover styling,
+with a right-aligned viewport width cap; reviewer implementation is untouched.
+Official SVG paths came from installed lucide-react-native; lucide-static
+is absent. No shared extraction, ADR, dependency, API/schema or mobile change.
+
+**FRESH PASS: 7/7 prompt gate commands:** forced root typecheck **8/8 tasks,
+0 cached**; forced lint **8/8, 0 cached**, six existing warnings; web
+**289/289** (42 files); shared **464/464** (44 files); API build **1/1,
+35/35** pages; web build **1/1, 19/19** pages; `git diff --check` PASS.
+Additional API tests **2315 passed, 3 skipped** (201 files, 2 workers,
+live flags disabled); AUTOPILOT forced root build **8/8, 0 cached**;
+staged diff PASS. Focused Library/reviewer tests **21/21** (2 files).
+First typecheck: **FRESH FAIL**, 4 successful/6 total tasks, 0 cached,
+three test-only TS2345 mock lookups; fixed with typed predicates, then
+full fresh retry PASS. No test failure/flake. Next-generated declarations
+were restored; validation outputs and unrelated baseline paths stay excluded.
+See [acceptance](acceptance/wl1-library-sort-menu.md) for exact commands.
+
+**UNVERIFIED (owner to confirm):** production revisions, database rows,
+Scheduler state, remote-ref freshness and browser/device behavior. No remote
+service operation, deployment, SQL/migration, Scheduler change, email,
+environment-file edit or push was run.
+
+**Owner steps remaining**
+
+- Rollout: Fely's website deployment - **NOT RUN**, skipped entirely.
+- Device checks: browser **1440 / 768 / 360px**, Library grid and course:
+  menu opens, correct checked choice, choice persists after reload, keyboard
+  Escape closes/refocuses - **NOT RUN**, skipped entirely.

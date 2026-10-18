@@ -1,5 +1,41 @@
 # Roadmap
 
+## WL1 website Library sort menu complete locally - PASS (2026-10-18)
+
+WL1's finite unattended website code scope is complete: STEP 0-4, local tests,
+fresh serial gates, docs and local commits. Baseline `341cf62`, branch
+`overnight/2026-10-15_feedback`; implementation `ea9ffa9`. No later roadmap
+slice started. Reviewer code, mobile, API/schema and dependencies are unchanged.
+
+Both Library views now use one compact icon + Sort button with a checked
+radio menu. The existing web list still mirrors mobile's options and context
+filtering. Menu choices retain the existing scope keys and persistence.
+First-item focus, arrows/Home/End, Escape, outside dismissal, Tab blur and
+selection focus follow the reviewer pattern; outside dismissal restores focus.
+The right-aligned menu reuses account-popover tokens with a viewport width cap.
+No shared component was extracted and no ADR was needed.
+
+**FRESH PASS: 7/7 prompt gate commands.** Forced root typecheck/lint each
+**8/8 tasks, 0 cached**; web **289/289** (42 files), shared **464/464**
+(44 files); API build **1/1, 35/35** pages; web build **1/1, 19/19** pages;
+diff and staged-diff hygiene PASS. Additional API suite **2315 passed,
+3 skipped** (201 files, 2 workers); AUTOPILOT forced root build **8/8 tasks,
+0 cached**. Focused Library/reviewer tests **21/21**. Six existing lint
+warnings remain. First typecheck failed with three new test mock type errors
+(4 successful/6 total tasks); corrected before the full fresh passing retry.
+No test flake. Build-generated Next declarations were restored.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Fely owns website deployment and browser checks at 1440/768/360px
+for Library grid/course: menu opening, checked choice, persistence after
+reload and keyboard Escape. Production revisions, database rows, Scheduler,
+remote-ref freshness and browser/device behavior are **UNVERIFIED (owner to
+confirm)**. No remote service operation, deployment, SQL/migration, Scheduler
+change, email, environment-file edit or push was run.
+
+[WL1 acceptance](ai/acceptance/wl1-library-sort-menu.md) records the baseline, source findings, matrix and all
+commands/results, including the failed first attempt.
+
 ## GN1 mobile grace navigation complete via GN1b - PASS (2026-10-18)
 
 GN1b completes the finite unattended mobile code scope, superseding GN1's
