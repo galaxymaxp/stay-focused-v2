@@ -6,6 +6,17 @@ export const candidatePage=(license='CC BY-SA 4.0',licenseUrl='https://creativec
 const payload=(page=candidatePage())=>({query:{pages:{'1':page}}});
 afterEach(()=>vi.useRealTimers());
 describe('bounded Commons search',()=>{
+  it('returns a PNG thumbnail for an SVG original without selecting its oversized original URL',async()=>{
+    const page=candidatePage();
+    const original='https://upload.wikimedia.org/wikipedia/commons/a/a1/Cell.svg';
+    const thumbnail='https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Cell.svg/1200px-Cell.svg.png';
+    const svg={...page,title:'File:Cell.svg',imageinfo:[{...page.imageinfo[0],mime:'image/svg+xml',url:original,width:12000,height:8000,thumburl:thumbnail}]};
+    const fetcher=vi.fn<typeof fetch>(async()=>Response.json({query:{pages:{'1':svg}}}));
+    const [result]=await searchCommons('cell',[],fetcher);
+    expect(result).toMatchObject({fileTitle:'File:Cell.svg',image:thumbnail,width:1200,height:800});
+    expect(result?.image).not.toBe(original);
+    expect(fetcher).toHaveBeenCalledOnce();
+  });
   it('skips GIF candidates in favour of supported raster thumbnails',()=>{
     const gif=candidatePage();gif.title='File:Animated.gif';gif.imageinfo[0]!.mime='image/gif';
     gif.imageinfo[0]!.thumburl='https://upload.wikimedia.org/animated.gif';

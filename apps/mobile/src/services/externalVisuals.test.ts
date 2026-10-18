@@ -13,6 +13,13 @@ describe('external visual DTO',()=>{
     expect(parseExternalVisual(found)).toEqual(found);
     for(const patch of [{label:undefined},{label:'From source'},{image:'https://other.test/image.png'},{sourceUrl:'https://commons.wikimedia.org/other'},{license:'CC BY-NC'},{width:1201},{attemptCount:3}])expect(()=>parseExternalVisual({...found,...patch})).toThrow('visual_invalid');
   });
+  it('accepts normalized Commons thumbnails without allowing a redirect host or local file in API data',()=>{
+    const thumbnail='https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Cell.svg/1200px-Cell.svg.png';
+    expect(parseExternalVisual({...found,image:thumbnail})).toMatchObject({image:thumbnail});
+    for(const image of [thumbnail.replace('upload.wikimedia.org','thumb.wikimedia.org'),'https://commons.wikimedia.org/image.png','file:///documents/offline-images/external.png']) {
+      expect(()=>parseExternalVisual({...found,image})).toThrow('visual_invalid');
+    }
+  });
   it('validates the honest no-result copy',()=>{
     expect(parseExternalVisual({status:'none',message:'No reliable visual found',attemptCount:2})).toEqual({status:'none',message:'No reliable visual found',attemptCount:2});
     expect(()=>parseExternalVisual({status:'none',message:'weak match',attemptCount:1})).toThrow();

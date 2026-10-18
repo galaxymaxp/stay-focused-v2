@@ -23,6 +23,7 @@ export function SectionVisual({ artifactId, sectionId, visual, eagerCount = 0, r
   const path = `/api/reviewers/${encodeURIComponent(artifactId)}/sections/${encodeURIComponent(sectionId)}`;
   const external = replacement ?? visual?.external ?? initialExternal;
   const [failedImage, setFailedImage] = useState<string | null>(null), [retry, setRetry] = useState(0);
+  const [loadedImage, setLoadedImage] = useState<string | null>(null);
   const imageKey = (src: string) => `${src}:${retry}`;
   function imageFailed(src: string) { setFailedImage(imageKey(src)); console.warn('reviewer.external_image_failed'); }
   function retryImage() { setFailedImage(null); setRetry(n => n + 1); }
@@ -99,8 +100,9 @@ export function SectionVisual({ artifactId, sectionId, visual, eagerCount = 0, r
     {online && !hasSource && external && <figure className="surface stack" style={{ margin: 0 }}>
       <span className="muted" style={caption}>{external.label}</span>
       {/* Commons candidates are validated by the owner-scoped API. */}
-      {failedImage === imageKey(external.image) ? <ExternalImageError sourceUrl={external.sourceUrl} onRetry={retryImage} /> : <button type="button" aria-label={`Enlarge ${external.title}`} onClick={() => open(external.image, external.title, externalImage, 'external_visual')} style={frame}>
-        <img loading={eagerCount > 0 ? "eager" : "lazy"} decoding="async" key={imageKey(external.image)} src={external.image} alt={external.title} onError={() => imageFailed(external.image)} style={{ display: "block", width: "100%", height: "100%", maxHeight: 380, objectFit: "contain" }} />
+      {failedImage === imageKey(external.image) ? <ExternalImageError sourceUrl={external.sourceUrl} onRetry={retryImage} /> : <button type="button" aria-label={`Enlarge ${external.title}`} aria-busy={loadedImage !== imageKey(external.image)} onClick={() => open(external.image, external.title, externalImage, 'external_visual')} style={{...frame,position:'relative'}}>
+        <img loading={eagerCount > 0 ? "eager" : "lazy"} decoding="async" key={imageKey(external.image)} src={external.image} alt={external.title} onLoad={() => setLoadedImage(imageKey(external.image))} onError={() => imageFailed(external.image)} style={{ display: "block", width: "100%", height: "100%", maxHeight: 380, objectFit: "contain" }} />
+        {loadedImage !== imageKey(external.image) && <span role="status" className="muted" style={{position:'absolute',inset:0,display:'grid',placeItems:'center',pointerEvents:'none'}}>Loading image…</span>}
       </button>}
       <AskImageButton image={externalImage} online={online} onAsk={onAsk} />
       {external.attemptCount < 2 && <button disabled={busy} onClick={() => void another()} style={{ fontSize: 12 }}>{busy ? "Finding…" : "Show a different one"}</button>}

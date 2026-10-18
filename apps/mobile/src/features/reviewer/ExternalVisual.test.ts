@@ -1,7 +1,7 @@
-import { createElement } from 'react';
+import { Children, createElement, isValidElement, type ComponentProps } from 'react';
 import { act,create,type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach,describe,expect,it,vi } from 'vitest';
-import { Image,Pressable,Text } from 'react-native';
+import { ActivityIndicator,Image,Modal,Pressable,Text } from 'react-native';
 import { ImageViewer } from './ImageViewer';
 import { ExternalVisual } from './ExternalVisual';
 import { SaveImageButton } from './SaveImageButton';
@@ -9,8 +9,12 @@ import { EXTERNAL_IMAGE_HEADERS, EXTERNAL_VISUAL_LABEL, type ExternalReferenceVi
 import { apiFoundVisual } from '../../services/externalVisuals.testSupport';
 vi.mock('lucide-react-native', () => ({ Download: 'Download' }));
 vi.mock('expo-constants',()=>({default:{expoConfig:{version:'2.2.0'}}}));
-const mocks=vi.hoisted(()=>({find:vi.fn(),link:vi.fn(async()=>{})}));
-vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',Modal:'Modal',ScrollView:'ScrollView',Animated:{View:'AnimatedView',Value:class {setValue(){} stopAnimation(){}},spring:()=>({start(){}})},Linking:{openURL:mocks.link},useWindowDimensions:()=>({width:360,height:800})}));
+const mocks=vi.hoisted(()=>({find:vi.fn(),close:vi.fn(),link:vi.fn(async()=>{})}));
+vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',ActivityIndicator:'ActivityIndicator',Pressable:'Pressable',Modal:'Modal',ScrollView:'ScrollView',Animated:{View:'AnimatedView',Value:class {setValue(){} stopAnimation(){}},spring:()=>({start(){}})},Linking:{openURL:mocks.link},useWindowDimensions:()=>({width:360,height:800})}));
+vi.mock('./ImageViewer',async load=>{
+  const actual=await load<typeof import('./ImageViewer')>();
+  return {ImageViewer:(props:ComponentProps<typeof actual.ImageViewer>)=>createElement(actual.ImageViewer,{...props,onClose:()=>{mocks.close();props.onClose();}})};
+});
 vi.mock('react-native-safe-area-context',()=>({SafeAreaView:'SafeAreaView'}));
 vi.mock('../../design/primitives',()=>({Sheet:({children,...props}:{children:unknown})=>createElement('Sheet',props,children as never)}));
 vi.mock('../../design/theme',async()=>{const tokens=await import('../../design/themeTokens');return {useTheme:()=>({colors:tokens.palettes.light,reducedMotion:true})};});
@@ -22,10 +26,42 @@ const found:ExternalReferenceVisual={status:'found',image:'https://upload.wikime
 const props={...baseProps,visual:found};
 let tree:ReactTestRenderer|undefined;
 const button=(name:string)=>tree!.root.findAllByType(Pressable).find(n=>(n.props.accessibilityLabel===name || (name==='View external reference' && n.props.accessibilityLabel?.startsWith('View external reference:'))))!;
+const cardImageKey=()=>{
+  const image=Children.toArray(button('View external reference').props.children).find(node=>isValidElement(node) && node.type===Image);
+  return isValidElement(image)?image.key:null;
+};
 const text=()=>tree!.root.findAllByType(Text).map(n=>[n.props.children].flat().join(''));
 async function mount(override:Partial<typeof props> & {reviewerTitle?:string;sectionTitle?:string}={}){await act(async()=>{tree=create(createElement(ExternalVisual,{...props,...override}));});}
 afterEach(async()=>{if(tree)await act(async()=>tree!.unmount());tree=undefined;vi.clearAllMocks();});
 describe('automatic separate external card',()=>{
+  it('shows loading until the card decodes and again when its URL changes',async()=>{
+    await mount();
+    expect(tree!.root.findByType(ActivityIndicator).props.accessibilityLabel).toBe('Loading external image');
+    expect(button('View external reference').props.accessibilityState.busy).toBe(true);
+    await act(async()=>tree!.root.findByType(Image).props.onLoad());
+    expect(tree!.root.findAllByType(ActivityIndicator)).toHaveLength(0);
+    expect(button('View external reference').props.accessibilityState.busy).toBe(false);
+    await act(async()=>tree!.update(createElement(ExternalVisual,{...props,visual:{...found,image:'https://upload.wikimedia.org/other.png'}})));
+    expect(tree!.root.findAllByType(ActivityIndicator)).toHaveLength(1);
+  });
+  it('replaces a failed card with Retry before opening, then starts a new image attempt',async()=>{
+    vi.spyOn(console,'warn').mockImplementation(()=>{});
+    await mount();
+    const original=tree!.root.findByType(Image);
+    const originalKey=cardImageKey();
+    await act(async()=>original.props.onLoad());
+    await act(async()=>original.props.onError());
+    expect(tree!.root.findAllByType(Image)).toHaveLength(0);
+    expect(tree!.root.findAllByType(ImageViewer)).toHaveLength(0);
+    expect(text()).toContain("Image couldn't load");
+    expect(button('Retry external image')).toBeDefined();
+    await act(async()=>button('Retry external image').props.onPress());
+    expect(tree!.root.findByType(Image)).not.toBe(original);
+    expect(cardImageKey()).not.toBe(originalKey);
+    expect(tree!.root.findAllByType(ActivityIndicator)).toHaveLength(1);
+    expect(mocks.close).not.toHaveBeenCalled();
+    expect(mocks.find).not.toHaveBeenCalled();
+  });
   it('keeps grounding visible and reveals attribution and license only after opening',async()=>{
     await mount({visual:apiFoundVisual});
     expect(tree!.root.findByType(Image).props.source).toEqual({uri:apiFoundVisual.image,headers:EXTERNAL_IMAGE_HEADERS});
@@ -58,18 +94,42 @@ describe('automatic separate external card',()=>{
     const warning=vi.spyOn(console,'warn').mockImplementation(()=>{});
     try {
       await mount();await act(async()=>button('View external reference').props.onPress());
+      const viewer=tree!.root.findByType(ImageViewer), modal=tree!.root.findByType(Modal);
+      const cardKey=cardImageKey();
+      const zoomed=tree!.root.findByType('ZoomablePage' as never);
       const target=surface==='card'?tree!.root.findByType(Image):tree!.root.findByType('ZoomablePage' as never);
       await act(async()=>target.props.onError({nativeEvent:{error:'HTTP 403 loading https://upload.wikimedia.org/private-title.png'}}));
-      expect(warning).toHaveBeenCalledExactlyOnceWith('reviewer.external_image_failed');
       expect(tree!.root.findAllByType(ImageViewer)).toHaveLength(1);
+      expect(tree!.root.findByType(ImageViewer)).toBe(viewer);
+      expect(tree!.root.findByType(Modal)).toBe(modal);
+      expect(modal.props.visible).toBe(true);
+      expect(mocks.close).not.toHaveBeenCalled();
+      expect(warning).toHaveBeenCalledExactlyOnceWith('reviewer.external_image_failed');
       expect(text()).toContain("Image couldn't load");
       await act(async()=>button('Open on Commons').props.onPress());expect(mocks.link).toHaveBeenCalledWith(found.sourceUrl);
       await act(async()=>button('Retry external image').props.onPress());
       expect(text()).not.toContain("Image couldn't load");
       expect(tree!.root.findByType(Image).props.source).toEqual({uri:found.image,headers:EXTERNAL_IMAGE_HEADERS});
       expect(tree!.root.findByType('ZoomablePage' as never).props.url).toBe(found.image);
+      expect(tree!.root.findByType('ZoomablePage' as never)).not.toBe(zoomed);
+      expect(cardImageKey()).not.toBe(cardKey);
       expect(mocks.find).not.toHaveBeenCalled();
     }finally{warning.mockRestore();}
+  });
+  it('resets viewer zoom on its own Retry while retaining the same Modal',async()=>{
+    vi.spyOn(console,'warn').mockImplementation(()=>{});
+    await mount();await act(async()=>button('View external reference').props.onPress());
+    const modal=tree!.root.findByType(Modal);
+    const zoomed=tree!.root.findByType('ZoomablePage' as never);
+    await act(async()=>zoomed.props.onZoomChange(2));
+    expect(tree!.root.findByType('ScrollView' as never).props.scrollEnabled).toBe(false);
+    await act(async()=>zoomed.props.onError());
+    const retry=tree!.root.findAllByType(Pressable).filter(node=>node.props.accessibilityLabel==='Retry external image').at(-1)!;
+    await act(async()=>retry.props.onPress());
+    expect(tree!.root.findByType(Modal)).toBe(modal);
+    expect(tree!.root.findByType('ScrollView' as never).props.scrollEnabled).toBe(true);
+    expect(tree!.root.findByType('ZoomablePage' as never).props.url).toBe(found.image);
+    expect(mocks.close).not.toHaveBeenCalled();
   });
   it.each([{online:false},{hasSourceVisual:true}])('hides actions and images for %j',async override=>{
     await mount(override);expect(tree!.root.findAllByType(Pressable).filter(node=>!node.props.disabled)).toHaveLength(0);expect(mocks.find).not.toHaveBeenCalled();
@@ -126,6 +186,19 @@ it('renders a saved external reference offline with its attribution and label', 
   expect(button('Show a different one')).toBeUndefined();
   await act(async () => button('View external reference').props.onPress());
   expect(text().some(value => value.includes(local.credit) && value.includes(local.license))).toBe(true);
+  expect(mocks.find).not.toHaveBeenCalled();
+});
+
+it('keeps the offline viewer open when a saved file fails to decode',async()=>{
+  vi.spyOn(console,'warn').mockImplementation(()=>{});
+  const local={...found,image:'file:///documents/offline-images/external.png'};
+  await mount({online:false,visual:local});
+  await act(async()=>button('View external reference').props.onPress());
+  const modal=tree!.root.findByType(Modal);
+  await act(async()=>tree!.root.findByType('ZoomablePage' as never).props.onError());
+  expect(tree!.root.findByType(Modal)).toBe(modal);
+  expect(text()).toContain("Image couldn't load");
+  expect(mocks.close).not.toHaveBeenCalled();
   expect(mocks.find).not.toHaveBeenCalled();
 });
 
