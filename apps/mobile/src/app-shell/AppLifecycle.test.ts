@@ -3,10 +3,12 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppLifecycle } from './AppLifecycle';
 
-const fake = vi.hoisted(() => ({ active: true, owner: 'owner', catchUp: vi.fn(), stop: vi.fn(), listener: vi.fn(), push:vi.fn(), notify:vi.fn(), restoring:false, rootReady:true, pathname:'/today' }));
+const fake = vi.hoisted(() => ({ active: true, owner: 'owner', catchUp: vi.fn(), stop: vi.fn(), listener: vi.fn(), push:vi.fn(), notify:vi.fn(), restoring:false, rootReady:true, pathname:'/today', offline:false, updateCheck:vi.fn(), updateSuspend:vi.fn(), updateOnline:vi.fn(), unsupported:false }));
+vi.mock('../services/useAppUpdate', () => ({ appUpdateStore: { check: fake.updateCheck, suspend: fake.updateSuspend, refreshOnline: fake.updateOnline }, useAppUpdate: () => ({ unsupported: fake.unsupported }) }));
+vi.mock('../features/redesign/AppUpdateNotice', () => ({ AppUpdateRequired: () => null }));
 vi.mock('expo-router', () => ({ router: { push: fake.push, replace: vi.fn() }, usePathname: () => fake.pathname, useRootNavigationState:()=>fake.rootReady?{key:'root'}:undefined }));
 vi.mock('react-native', () => ({ AppState: { currentState: 'active', addEventListener: fake.listener } }));
-vi.mock('../auth', () => ({ useAuth: () => ({ isRestoring:fake.restoring, session: fake.owner ? { user: { id: fake.owner }, accessToken: 'token' } : null }) }));
+vi.mock('../auth', () => ({ useAuth: () => ({ isRestoring:fake.restoring, session: fake.owner ? { user: { id: fake.owner }, accessToken: 'token', offline:fake.offline } : null }) }));
 vi.mock('../config/apiBaseUrl', () => ({ getApiBaseUrl: () => 'https://example.test' }));
 vi.mock('../design/theme', () => ({ useTheme: () => ({ active: fake.active }) }));
 vi.mock('../services/localLibrary/offlineCatchUp', () => ({ runOfflineCatchUp: fake.catchUp, stopOfflineCatchUp: fake.stop }));
@@ -17,6 +19,7 @@ vi.mock('../services/generationRecovery', () => ({ resumeAutomaticGenerations: v
 let rendered: ReactTestRenderer | undefined;
 beforeEach(() => {
   vi.clearAllMocks(); vi.useFakeTimers(); fake.active = true; fake.owner = 'owner';
+  fake.offline=false; fake.unsupported=false;
   fake.listener.mockReturnValue({ remove() {} });fake.notify.mockReturnValue({remove:vi.fn()});fake.restoring=false;fake.rootReady=true;fake.pathname='/today';
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
@@ -26,7 +29,7 @@ describe('app-wide offline catch-up lifecycle', () => {
   it('catches up on sign-in and foreground using the existing shared active signal', async () => {
     await render();
     expect(fake.catchUp).toHaveBeenCalledWith('owner', { baseUrl: 'https://example.test', accessToken: 'token' });
-    // The sole direct listener is the existing outbox listener; O1 adds none.
+    // Update checks share the existing outbox foreground listener.
     expect(fake.listener).toHaveBeenCalledTimes(1);
     fake.active = false; await act(async () => rendered!.update(createElement(AppLifecycle)));
     expect(fake.catchUp).toHaveBeenCalledTimes(1);
@@ -42,6 +45,24 @@ describe('app-wide offline catch-up lifecycle', () => {
     await act(async () => rendered!.update(createElement(AppLifecycle)));
     expect(fake.stop).toHaveBeenCalledWith('owner');
     expect(fake.catchUp).toHaveBeenLastCalledWith('other', { baseUrl: 'https://example.test', accessToken: 'token' });
+  });
+});
+
+describe('app update lifecycle', () => {
+  it('checks at launch/resume using one listener, suspends in background and removes the listener', async () => {
+    const remove = vi.fn(); fake.listener.mockReturnValue({ remove });
+    await render(); expect(fake.updateCheck).toHaveBeenCalledExactlyOnceWith({ offline: false });
+    const change = fake.listener.mock.calls[0]![1];
+    await act(async () => change('background')); expect(fake.updateSuspend).toHaveBeenCalledOnce();
+    await act(async () => change('active')); expect(fake.updateCheck).toHaveBeenCalledTimes(2);
+    await act(async () => rendered!.unmount()); rendered=undefined;
+    expect(remove).toHaveBeenCalledOnce();
+  });
+  it('passes offline restoration through and probes only while the required sheet is showing', async () => {
+    fake.offline=true; await render(); expect(fake.updateCheck).toHaveBeenLastCalledWith({ offline:true });
+    await act(async () => { vi.advanceTimersByTime(10000); }); expect(fake.updateOnline).not.toHaveBeenCalled();
+    fake.offline=false;fake.unsupported=true;await act(async () => rendered!.update(createElement(AppLifecycle)));
+    await act(async () => { vi.advanceTimersByTime(10000); }); expect(fake.updateOnline).toHaveBeenCalledOnce();
   });
 });
 

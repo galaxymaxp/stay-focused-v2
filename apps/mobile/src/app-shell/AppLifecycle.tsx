@@ -16,6 +16,8 @@ import { readCanvasReviewerRecovery } from "../services/canvasReviewerRecoverySt
 import { subscribeToProcessingNotificationResponses } from "../services/completionNotifications";
 import { reconcileReviewerProcessingOutbox } from "../services/processingOutboxReconciliation";
 import { resumeAutomaticGenerations } from "../services/generationRecovery";
+import { appUpdateStore, useAppUpdate } from '../services/useAppUpdate';
+import { AppUpdateRequired } from '../features/redesign/AppUpdateNotice';
 
 const OUTBOX_RECONCILIATION_INTERVAL_MS = 10_000;
 
@@ -24,13 +26,21 @@ const OUTBOX_RECONCILIATION_INTERVAL_MS = 10_000;
  * switcher: durable processing outbox reconciliation and notification-response
  * navigation.
  *
- * It renders nothing and is mounted once by the root layout, so the listeners
- * exist exactly once for the session rather than being re-registered by
- * whichever screen happens to be showing. Both effects stay gated on an active
- * session, matching the previous behavior of only running behind the auth gate.
+ * Mounted once by the root layout so listeners are independent of the current
+ * screen. Owner work stays session-gated; public release checks share the
+ * foreground listener and render at most one required-update sheet.
  */
 export function AppLifecycle() {
   const { session, isRestoring } = useAuth();
+  const appUpdate = useAppUpdate();
+  const offline = session?.offline === true;
+  useEffect(() => {
+    if (!appUpdate.unsupported) return;
+    // Release a required sheet promptly after connectivity is lost, without
+    // fetching release metadata again or adding a native network module.
+    const interval = setInterval(() => { void appUpdateStore.refreshOnline(); }, 10_000);
+    return () => clearInterval(interval);
+  }, [appUpdate.unsupported]);
   const accessToken = session?.accessToken;
   const ownerUserId = session?.user.id;
   const pathname = usePathname();
@@ -68,22 +78,26 @@ export function AppLifecycle() {
   useEffect(() => () => { admissionOwner.current = null; }, []);
 
   useEffect(() => {
-    if (!ownerUserId) return;
     const triggerReconciliation = () => {
-      void reconcileOutbox().catch(() => undefined);
+      if (ownerUserId) void reconcileOutbox().catch(() => undefined);
     };
-    triggerReconciliation();
+    const foreground = (state: string) => {
+      if (state === 'active') {
+        void appUpdateStore.check({ offline });
+        triggerReconciliation();
+      } else appUpdateStore.suspend();
+    };
+    foreground(AppState.currentState);
     const interval = setInterval(() => {
       if (AppState.currentState === "active") triggerReconciliation();
     }, OUTBOX_RECONCILIATION_INTERVAL_MS);
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") triggerReconciliation();
-    });
+    const subscription = AppState.addEventListener("change", foreground);
     return () => {
       clearInterval(interval);
       subscription.remove();
+      appUpdateStore.suspend();
     };
-  }, [ownerUserId, reconcileOutbox]);
+  }, [ownerUserId, reconcileOutbox, offline]);
 
   useEffect(() => {
     setPendingNotification(null);
@@ -135,5 +149,5 @@ export function AppLifecycle() {
     };
   }, [ownerUserId, pathname]);
 
-  return null;
+  return <AppUpdateRequired />;
 }
