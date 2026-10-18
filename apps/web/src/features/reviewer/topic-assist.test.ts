@@ -16,9 +16,34 @@ beforeEach(() => { Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; });
 const props = { reviewer, sectionId: 's', owner: 'owner', client: (async () => undefined) as import("../../lib/api").Api, online: true, children: 'CANONICAL_BODY' };
 async function mount(online = true) { await act(async () => { tree = create(createElement(TopicAssist, { ...props, online })); }); }
-function button(label: string) { return tree!.root.findAllByType('button').find(node => node.props.children === label)!; }
+function button(label: string) { return tree!.root.findAllByType('button').find(node => (node.props['aria-label'] ?? node.props.children) === label)!; }
 async function press(label: string) { await act(async () => button(label).props.onClick()); }
 const body = () => JSON.stringify(tree!.toJSON());
+it('keeps the three level buttons and independent expandable button in one pill', async () => {
+  await mount();
+  const pill = tree!.root.findByProps({ className: 'segmented' });
+  const levels = pill.findByProps({ role: 'group', 'aria-label': 'Topic level' });
+  expect(pill.findAllByType('button')).toHaveLength(4);
+  expect(levels.findAllByType('button')).toHaveLength(3);
+  expect(pill.findAllByType('button').includes(button('Expound'))).toBe(true);
+  expect(button('Expound').props.className).toBeUndefined();
+  for (const label of ['Original', 'Simplify', 'Explain simply']) expect(button(label).props['aria-pressed']).toBe(label === 'Original');
+  expect(button('Expound').props['aria-expanded']).toBe(false);
+  await press('Simplify'); await press('Expound');
+  expect(button('Simplify').props['aria-pressed']).toBe(true);
+  expect(button('Original').props['aria-pressed']).toBe(false);
+  expect(button('Expound').props['aria-expanded']).toBe(true);
+  expect(button('Expound').props['aria-pressed']).toBeUndefined();
+  expect(body()).toContain('topic_expound');
+  await press('Explain simply');
+  expect(button('Expound').props['aria-expanded']).toBe(true);
+  await press('Expound');
+  expect(button('Explain simply').props['aria-pressed']).toBe(true);
+  expect(button('Expound').props['aria-expanded']).toBe(false);
+  expect(body()).not.toContain('topic_expound');
+  expect(button('Explain simply').findByProps({ className: 'topic-label-full' }).props.children).toBe('Explain simply');
+  expect(button('Explain simply').findByProps({ className: 'topic-label-short' }).props.children).toBe('Simplest');
+});
 it('Original renders instantly without generation; each topic has one compact level control and Expound', async () => {
   await mount(); expect(body()).toContain('CANONICAL_BODY'); expect(mocks.run).not.toHaveBeenCalled();
   for (const label of ['Original', 'Simplify', 'Explain simply', 'Expound']) expect(button(label)).toBeDefined();

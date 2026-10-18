@@ -29,9 +29,25 @@ it('renders the read-only reviewer, terms, existing assists, text citations and 
 it('every AI control routes to sign-in with an exact local return link and makes zero calls', async () => {
   await act(async () => { rendered = create(createElement(SharedReviewerReader, { token, snapshot })); });
   for (const action of [...SHARED_AI_ACTIONS, 'Original', 'Simplify', 'Explain simply', 'Expound']) {
-    const anchor = rendered!.root.findAllByType('a').find(node => node.props.children === action)!;
+    const anchor = rendered!.root.findAllByType('a').find(node => (node.props['aria-label'] ?? node.props.children) === action)!;
     expect(anchor.props.href).toBe(reviewerShareSignIn(token)); expect(anchor.props.onClick).toBeUndefined();
   }
+  expect(fetcher).not.toHaveBeenCalled();
+});
+it('uses the same four-part pill and responsive labels for signed-out sign-in links', async () => {
+  await act(async () => { rendered = create(createElement(SharedReviewerReader, { token, snapshot })); });
+  const pill = rendered!.root.findByProps({ className: 'segmented' });
+  const levels = pill.findByProps({ role: 'group', 'aria-label': 'Topic level' });
+  expect(levels.findAllByType('a')).toHaveLength(3);
+  const links = pill.findAllByType('a');
+  expect(links.map(node => node.props['aria-label'])).toEqual(['Original', 'Simplify', 'Explain simply', 'Expound']);
+  for (const link of links) {
+    expect(link.props.href).toBe(reviewerShareSignIn(token));
+    expect(link.props.className).toBe('button');
+    expect(link.props['aria-pressed']).toBeUndefined(); expect(link.props['aria-expanded']).toBeUndefined();
+  }
+  expect(levels.findAllByProps({ className: 'topic-label-short' }).map(node => node.props.children)).toEqual(['Original', 'Simpler', 'Simplest']);
+  expect(pill.findByProps({ className: 'topic-level-divider' }).props['aria-hidden']).toBe('true');
   expect(fetcher).not.toHaveBeenCalled();
 });
 it('scores in memory without a network write or storage and offers sign-in to save', async () => {

@@ -1,5 +1,5 @@
 "use client";
-import { TOPIC_ACTIONS, TOPIC_LEVELS, TOPIC_LABELS, STUDY_OFFLINE, STUDY_GROUNDING_LABELS, selectTopic, topicLevelAction,
+import { TOPIC_ACTIONS, TOPIC_LEVELS, TOPIC_LABELS, TOPIC_SHORT_LABELS, EXPOUND_LABEL, STUDY_OFFLINE, STUDY_GROUNDING_LABELS, selectTopic, topicLevelAction,
   type ReviewerReaderModel, type TopicAction, type TopicLevel, type TopicResult } from '@stay-focused/shared';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Api } from '../../lib/api';
@@ -63,11 +63,16 @@ function TopicAssistContent({ reviewer, sectionId, owner, client, online, childr
     : <p role="status">Creating your explanation?</p>;
   return <div className="stack topic-assist">
     <div className="topic-level-row no-select">
-      <div className="segmented" role="group" aria-label="Topic level">
-        {TOPIC_LEVELS.map(item => { const a = topicLevelAction(item); return <button key={item} type="button" aria-pressed={level === item}
-          disabled={!!a && !canUse(a)} onClick={() => choose(item)}>{TOPIC_LABELS[item]}</button>; })}
+      <div className="segmented">
+        <div className="topic-level-options" role="group" aria-label="Topic level">
+          {TOPIC_LEVELS.map(item => { const a = topicLevelAction(item); return <button key={item} type="button" aria-label={TOPIC_LABELS[item]} aria-pressed={level === item}
+            disabled={!!a && !canUse(a)} onClick={() => choose(item)}>
+            <span className="topic-label-full" aria-hidden="true">{TOPIC_LABELS[item]}</span><span className="topic-label-short" aria-hidden="true">{TOPIC_SHORT_LABELS[item]}</span>
+          </button>; })}
+        </div>
+        <span className="topic-level-divider" aria-hidden="true" />
+        <button type="button" aria-label={EXPOUND_LABEL} aria-expanded={expanded} disabled={!expanded && !canUse('topic_expound')} onClick={toggleExpound}>{EXPOUND_LABEL}</button>
       </div>
-      <button type="button" className="subtle" aria-expanded={expanded} disabled={!expanded && !canUse('topic_expound')} onClick={toggleExpound}>Expound</button>
     </div>
     {!online && <p className="meta">{STUDY_OFFLINE}</p>}
     <StudyAnswerArea id={bodyId}>{level === 'original' ? children : renderEntry(current, () => action && run(action, bodyId))}</StudyAnswerArea>

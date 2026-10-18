@@ -1,7 +1,7 @@
 "use client";
 /* Wikimedia images must retain their attribution and never use private image APIs. */
 /* eslint-disable @next/next/no-img-element */
-import { ASSIST_RESULT_LABELS, gradeAttempt, gradeQuestion, reviewerShareSignIn, isReviewerShareToken,
+import { ASSIST_RESULT_LABELS, TOPIC_LEVELS, TOPIC_LABELS, TOPIC_SHORT_LABELS, EXPOUND_LABEL, gradeAttempt, gradeQuestion, reviewerShareSignIn, isReviewerShareToken,
   type ReviewerShareSnapshot, type SharedQuiz, type QuizResult } from '@stay-focused/shared';
 import { StudyText } from './reviewer/study-text';
 import Link from 'next/link';
@@ -70,8 +70,16 @@ export function SharedReviewerReader({ snapshot, token }: { snapshot: ReviewerSh
       <article className="reviewer-article">
         {snapshot.sections.map((s, i) => <section key={i} id={`topic-${i + 1}`} className="reviewer-topic">
           <header className="topic-head"><span className="kicker">Topic {i + 1}</span><h2>{s.title}</h2></header>
-          <div className="topic-level-row" aria-label="Topic level">
-            {['Original', 'Simplify', 'Explain simply', 'Expound'].map(label => <Link key={label} className="button subtle" href={signIn}>{label}</Link>)}
+          <div className="topic-level-row">
+            <div className="segmented">
+              <div className="topic-level-options" role="group" aria-label="Topic level">
+                {TOPIC_LEVELS.map(level => <Link key={level} className="button" href={signIn} aria-label={TOPIC_LABELS[level]}>
+                  <span className="topic-label-full" aria-hidden="true">{TOPIC_LABELS[level]}</span><span className="topic-label-short" aria-hidden="true">{TOPIC_SHORT_LABELS[level]}</span>
+                </Link>)}
+              </div>
+              <span className="topic-level-divider" aria-hidden="true" />
+              <Link className="button" href={signIn} aria-label={EXPOUND_LABEL}>{EXPOUND_LABEL}</Link>
+            </div>
           </div>
           {s.citations.map(label => <p className="meta" key={label}>{label}</p>)}
           {snapshot.visuals.filter(v => v.section === i).map((v, j) => <figure className="surface stack" key={j}>
