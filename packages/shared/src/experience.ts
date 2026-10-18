@@ -141,6 +141,7 @@ export interface ActivityAttachment {
   readonly size: number | null;
 }
 export interface ActivityDetail extends ActivitySummary {
+  readonly pointsPossible?: number | null;
   readonly latestDraftId?: string | null;
   readonly instructions: string | null;
   readonly resources: readonly ActivityResource[];

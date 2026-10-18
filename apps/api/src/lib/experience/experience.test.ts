@@ -276,6 +276,13 @@ describe('Learn and Activity details', () => {
     expect(detail.courseMaterials?.items).toHaveLength(1);
     expect(detail.generation.activityAssistance.status).toBe('available'); expect(detail.outputs).toEqual([]);
   });
+  it('returns existing assignment points including zero, and null for local tasks or ungraded assignments', async () => {
+    for (const points of [25, 0, null]) {
+      const { api } = service({ canvas_courses: [course], canvas_assignments: [{ ...assignment, points_possible: points }], tasks: [{ ...task, notes: 'Local requirements' }] });
+      expect((await api.getActivityDetail('owner', 'canvas:assignment')).pointsPossible).toBe(points);
+      expect(await api.getActivityDetail('owner', 'task:task')).toMatchObject({ pointsPossible: null, instructions: 'Local requirements' });
+    }
+  });
   it('joins synchronized assignment attachments, deduplicates file references, and exposes safe metadata only', async () => {
     const { api } = service({ canvas_courses: [course], canvas_assignments: [assignment], canvas_files: [attachmentFile], canvas_file_references: [attachmentReference, { ...attachmentReference, id: 'reference-description', reference_type: 'assignment' }] });
     const detail = await api.getActivityDetail('owner', 'canvas:assignment');

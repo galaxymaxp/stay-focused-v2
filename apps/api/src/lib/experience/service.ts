@@ -121,6 +121,7 @@ export class ExperienceService {
     }
     const drafts = (await this.activityDraftRecords(userId)).filter(r => r.summary.activityId === activityId);
     return { ...activity, hasGeneratedDraft: drafts.length > 0, latestDraftId: drafts[0]?.draft.id ?? null, instructions: assignment ? normalizeCanvasHtmlToText(assignment.description_html) || null : task?.notes ?? null,
+      pointsPossible: assignment?.points_possible ?? null,
       resources: assignment ? assignmentResources(assignment.description_html).filter(resource => !isCanvasFileUrl(resource.url)) : [], attachments: attachments.map(({ canvasFileId: _canvasFileId, ...attachment }) => attachment), courseMaterials, generation: { ...generationCapability(false), activityAssistance: assignment && activity.course ? { status: 'available' } : { status: 'unavailable', reasonCode: 'unsupported_material' } }, outputs: drafts.map(d => d.summary) };
   }
   /** Re-resolve an attachment against owner-scoped synced assignment/file rows before download. */
