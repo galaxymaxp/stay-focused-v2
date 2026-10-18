@@ -1,5 +1,7 @@
 # Roadmap
 
+IF2 / BACKLOG N11 (2026-10-18): complete locally with `5b7c41e` pending-card feedback and external image failure regressions; existing viewer-retention repair confirmed. FRESH PASS 8/8 expanded prompt gates (1439 mobile / 2351 API with 3 live skips / 309 web tests), plus forced root build 8/8, 0 cached. Endpoint IF2 only; next RB6/N9 fullsend/Realme acceptance remains owner work, NOT RUN; historical image failure UNVERIFIED (owner to confirm). [IF2 evidence](ai/acceptance/if2-external-image.md).
+
 OR1 / BACKLOG P14 (2026-10-18): **STOPPED at STEP 0; remains open.** Existing mobile/web GL aura source matches; the reported device cause is UNVERIFIED and the referenced testing roadmap is missing. No speculative halo or later OR2 work started. FRESH diff hygiene PASS; six code gates NOT RUN. Next: owner resolves the recorded preflight question before OR1 resumes; rollout/device checks remain owner steps. [OR1 evidence](ai/acceptance/or1-today-orb-glow.md).
 
 IF1 / BACKLOG N10 (2026-10-18): complete locally with `bcd9ad6` cache-URI filename repair and six native-contract regressions; FRESH PASS 6/6 prompt gates (1434 mobile tests), plus forced root build 8/8, 0 cached. Endpoint IF1 only; RB6/N9 rollout and Realme saves remain owner steps, NOT RUN; historical phone exception UNVERIFIED (owner to confirm). [IF1 acceptance](ai/acceptance/if1-save-image.md).

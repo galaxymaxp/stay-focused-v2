@@ -6103,3 +6103,104 @@ Scheduler state and remote-ref freshness. Physical visual parity is not claimed.
   comparison, immediate ring handles, scrolling and Reduce Motion acceptance.
 
 Endpoint: OR1 preflight STOP only; no further code step or roadmap slice started.
+
+## IF2 / BACKLOG N11 unattended handoff - PASS (2026-10-18)
+
+**Status: PASS for the finite code scope.** Completed STEP 0-4, tests, gates,
+docs and local commits from baseline `7a70262` on
+`overnight/2026-10-15_feedback`. No later slice started. Verified `0d7bfed`,
+`a10642b2` and `37fcd169` are ancestors; all six requested main-to-HEAD paths
+and the FX1/FX1b handoffs were inspected. No material rendering-path surprise.
+
+Main's external card and viewer error callbacks explicitly close the viewer.
+HEAD already replaces those callbacks with retained error UI. Main also already
+uses bounded raster Commons thumbnails; the later API commit adds GIF filtering.
+The missing pending-card feedback remained on both clients: IF2 adds a native
+existing-token indicator and a web muted loading status, keyed to the same
+URI/Retry attempt. Successful load clears it, errors replace it with the
+existing Retry/Commons controls, and Retry/new URI restores loading feedback.
+Sourcing, allowlist, attribution, source priority and design architecture stay
+as implemented; no ADR or native/schema/dependency change is required.
+
+### Candidate-cause table
+
+| Cause | Evidence | Fixed on HEAD by / verdict | Test |
+| --- | --- | --- | --- |
+| SVG/non-raster/oversized original | `0d7bfed:apps/api/src/lib/external-visuals/commons.ts:73,75,79` already selects thumburl/dimensions and PNG for SVG. | Already guarded on main; actual returned bytes UNVERIFIED. | Explicit SVG original to PNG thumbnail regression; raw SVG/oversize guards. |
+| Unsupported GIF | Current `commons.ts:78-81`; main allowed GIF. | `37fcd169` excludes new GIF candidates, not a rewrite of cached rows; phone cause unproved. | Existing GIF MIME/path cases. |
+| Wikimedia header rejection | Main already passed User-Agent; current `externalVisuals.ts:8`, `ExternalVisual.tsx:41,55`. | FX1b updates configured version; header presence predates main. Actual HTTP rejection UNVERIFIED. | Configured-version/contact and card/viewer header assertions. |
+| Redirect host rejected | `externalVisuals.ts:29`, shared `reviewer-images.ts:56,80`, API `commons.ts:49,99`. | Existing thumb-to-upload normalization/strict allowlist; native redirects do not use the metadata parser. Invalid metadata omits the card. | Normalized thumbnail acceptance, alternate/local host rejection; existing API normalization. |
+| Empty/wrong-MIME local copy | Main external offline path hidden; current `studyImageFile.ts:19-27`, `localLibrary/offlineImages.ts:108,160,181-186`. | OI1 validates before local publication/reconciles empty files. Later corruption possible, unproved; no cache-policy change. | Existing offline validation and new saved-file decode error retaining viewer. |
+| Error clears open/result | `0d7bfed:ExternalVisual.tsx:36,46` closes on error; current lines 22-24 and 51-55 retain open/result. ImageViewer lines 55/61 only gesture/back dismissal; ZoomablePage line 178 forwards supplied onError. | `a10642b2`; no error-to-null external result remains. Intentional identity/source/offline/Ask closes retained. | Same Modal/no onClose on card/viewer error, Retry remount/new key and viewer zoom reset. Main counterfactual fails on actual unmount. |
+| Silent pending card | Baseline ExternalVisual/SectionVisual render Image/img without loading feedback. | `5b7c41e` IF2 mobile/web attempt-keyed pending UI. | Loading/decode/new URI/retry cases; baseline counterfactual probes fail. |
+
+Cached found rows retain their stored image URLs (`external-visuals/service.ts:21,58`).
+No claim is made that every historical stored file is newly GIF-filtered or
+decodable. This run preserves sourcing rules and makes pending/error states
+visible; it does not infer the actual phone response from a possible format.
+
+### Gates and commits
+
+**FRESH PASS: 8/8 expanded prompt gate commands, 0 failed.**
+
+| Command | Result |
+| --- | --- |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached. |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors, 6 pre-existing warnings. |
+| `npm test --workspace @stay-focused/mobile` | 1439/1439, 143 files. |
+| `npm test --workspace @stay-focused/api -- --maxWorkers=2` | 2351 passed, 3 existing live skips, 204 files. |
+| `npm test --workspace @stay-focused/web` | 309/309, 44 files. |
+| `npm run build --workspace @stay-focused/api` | PASS; 35/35 static pages. |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | PASS; one Android bundle, 4266 modules. |
+| `git diff --check` | PASS; staged-diff hygiene also PASS. |
+
+Additional AUTOPILOT `npm run build -- --force`: **FRESH PASS, 8/8 tasks,
+0 cached**, including web/API builds and Expo exports. Gates ran serially;
+live flags disabled and process-local external socket guard/offline export
+preserved through Turbo build children. No remote calls sent. Generated
+next-env changes were restored; validation outputs remain uncommitted.
+Standalone shared/workflow/provider suites are NOT APPLICABLE to unchanged
+boundaries. Device/rollout acceptance is NOT RUN.
+
+Focused checks: mobile component/service 37/37, web SectionVisual 7/7,
+API Commons 24/24. Intentional counterfactual reds: main viewer 2 failed /
+18 skipped at the actual viewer-unmount assertion; baseline pending feedback
+mobile 2 failed / 18 skipped and web 1 failed / 6 skipped. Restored current
+implementation passes. First tooling attempts needed Windows preload path
+normalization and Node instead of the absent Python launcher; the first
+counterfactual probe's single-child key assumption was corrected before the
+valid unmount proof. No nondeterministic flake observed. Existing Vite/Expo
+environment warnings remain; details are in the acceptance report.
+
+Commits:
+
+```text
+5b7c41e fix(reviewer): show loading for external reference images
+docs: close IF2 (this footer; final hash in Git and tmp/overnight/IF2.status)
+```
+
+Author `galaxymaxp <omgraythekid@gmail.com>` for both local commits. No push,
+branch switch, deployment, migration/remote SQL, Supabase/Vercel/Google Cloud/
+Canvas/Resend call, Scheduler operation, email or environment-file edit.
+Unrelated untracked `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` preserved;
+no `tmp/` path is committed. Planning files and the fullsend follow-up are
+reconciled, preserving the recorded fullsend FAIL/NOT RUN results.
+
+**UNVERIFIED (owner to confirm):** actual failed image URL/HTTP status/redirect
+chain/decode bytes, problematic stored row, installed APK contents and native
+behavior, production revisions/database rows/Scheduler state and remote-ref
+freshness. Local tests establish error/loading behavior, not physical acceptance.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** include reviewed changes in the next
+  BACKLOG RB6/N9 fullsend, new APK or owner-authorized OTA; account for existing
+  FX1b API GIF/web changes as applicable.
+- **Device checks - NOT RUN, skipped entirely:** on Realme topic 2 verify the
+  external image loads or shows Retry, pending loading is visible and image
+  failure retains the viewer with Retry/Open on Commons. Recheck long viewer
+  overflow for row 2b. Capture the actual failing response/decode evidence if
+  loading still fails; do not infer an HTTP/format cause from this analysis.
+
+[IF2 diagnosis, full diff notes and local evidence](acceptance/if2-external-image.md).
+Endpoint: IF2 code scope complete; no further roadmap task started.

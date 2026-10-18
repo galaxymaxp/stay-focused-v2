@@ -1,5 +1,7 @@
 # Current State
 
+IF2 / BACKLOG N11 (2026-10-18): complete locally in `5b7c41e`; HEAD already retained external viewers on errors, and IF2 adds mobile/web pending-card loading feedback plus regression proof. FRESH PASS 8/8 expanded prompt gates (1439 mobile, 2351 API / 3 live skips, 309 web tests), plus forced root build 8/8, 0 cached. Actual phone HTTP/decode cause UNVERIFIED (owner to confirm); RB6/N9 rollout and Realme checks remain owner steps. [IF2 evidence](ai/acceptance/if2-external-image.md).
+
 OR1 / BACKLOG P14 (2026-10-18): **STOPPED at STEP 0**, baseline `4517181`. Mobile already contains the matching web GL outer-aura implementation; no concrete mobile-only cause was established, and the referenced testing roadmap is absent. No runtime/test changes. FRESH diff hygiene PASS; six code gates NOT RUN due to the required preflight stop. Owner must resolve the recorded render-path/static-halo question; rollout/device checks NOT RUN. [OR1 evidence](ai/acceptance/or1-today-orb-glow.md).
 
 IF1 / BACKLOG N10 (2026-10-18): `bcd9ad6` repairs unescaped image-cache filename URIs that can prevent Android MIME detection before album creation; retains fresh owner reads, safe failure stages, decoded names and Stay Focused destination. FRESH PASS 6/6 prompt gates (1434 mobile tests), plus forced root build 8/8, 0 cached. Historical Realme cause UNVERIFIED (owner to confirm); rollout/device checks remain owner steps. [IF1 acceptance](ai/acceptance/if1-save-image.md).
