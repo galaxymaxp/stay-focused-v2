@@ -576,6 +576,11 @@ export type CanvasAutoReviewerCandidateRow = {
   status: 'baseline' | 'pending' | 'admitted' | 'skipped_existing' | 'deferred_quota' | 'failed';
   processing_job_id: string | null; failure_code: string | null; attempt_count: number; created_at: string; updated_at: string;
 };
+export type MaterialDescriptionRow = {
+  id: string; user_id: string; preparation_id: string | null; source_version_id: string | null;
+  revision_fingerprint: string; description: string | null; description_model: string | null;
+  description_created_at: string | null; description_status: 'ready' | 'skipped_empty' | 'failed'; created_at: string;
+};
 export type CanvasMaterialPreparationRow = {
   id: string; user_id: string; course_id: string; canvas_connection_id: string; material_id: string;
   source_type: 'file' | 'page' | 'page-attachment'; revision_fingerprint: string;
@@ -605,6 +610,12 @@ export type CourseReviewerRequestRow = {
 export interface Database {
   public: {
     Tables: {
+      material_descriptions: {
+        Row: MaterialDescriptionRow;
+        Insert: Pick<MaterialDescriptionRow,'user_id'|'revision_fingerprint'|'description_status'> & Partial<MaterialDescriptionRow>;
+        Update: Partial<MaterialDescriptionRow>;
+        Relationships: [];
+      };
       course_reviewer_requests: {
         Row: CourseReviewerRequestRow;
         Insert: Pick<CourseReviewerRequestRow,'user_id'|'course_id'|'canvas_connection_id'|'material_id'|'revision'|'batch_key'|'title'> & Partial<CourseReviewerRequestRow>;
@@ -4373,6 +4384,9 @@ export interface Database {
       };
     };
     Functions: {
+      claim_material_description_v1: { Args: { p_user_id: string; p_preparation_id: string | null; p_source_version_id: string | null; p_model: string; p_empty: boolean }; Returns: MaterialDescriptionRow[] };
+      finish_material_description_v1: { Args: { p_id: string; p_user_id: string; p_description: string }; Returns: boolean };
+      read_material_descriptions_v1: { Args: { p_user_id: string; p_course_id: string; p_material_ids: string[] }; Returns: { material_id: string; description: string }[] };
       link_course_reviewer_batch_v1: { Args: { p_user_id: string; p_request_id: string; p_batch_key: string }; Returns: boolean };
       course_reviewer_next_available_v1: { Args: { p_user_id: string }; Returns: string | null };
       mutate_reviewer_share_v1: {
