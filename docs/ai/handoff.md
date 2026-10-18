@@ -4717,3 +4717,63 @@ Rollout and Device checks are **NOT RUN**, skipped entirely.
    later owner-controlled environment/deployment/log workflow; not run here.
 
 MR3 is the finite endpoint. Planning files are reconciled; no later task started.
+
+---
+
+## WG3 unattended Generate home - STOPPED at STEP 0 (2026-10-18)
+
+**Status: STOPPED; no WG3 implementation was started.** The complete prompt
+`tmp/overnight/prompts/WG3.md` was read. Its UNATTENDED rule 4 requires stopping
+at a STOP condition, and STEP 0.1 requires a clean tree apart from `tmp/`.
+The initial checkout contains unrelated untracked `UI/README.md`, twenty
+`UI/screenshots/{dark,light}/` images, `apps/mobile/.gitignore`, and
+`supabase/.temp/cli-latest`. All were preserved without reading their contents,
+staging, moving, deleting or committing them.
+
+The actual branch is `overnight/2026-10-15_feedback`, whereas WG3 names
+`overnight/2026-10-13_0132` and says to stay on it. Initial HEAD is
+`9dae76f docs: record MR3 recovery and owner steps`; local ancestry confirms
+WV1 `181c4b6` is included. No branch switch was attempted. Repository policy,
+AUTOPILOT and current planning context were inspected. Component verification
+and line-number collection in STEP 0.2 were NOT RUN after the stop condition.
+Steps 1-7 remain NOT RUN; WG3 is not marked done in the planning files.
+
+**Exact owner question for resumption:** Should WG3 run on the current
+`overnight/2026-10-15_feedback` branch, and may its clean-tree prerequisite be
+waived specifically for the preserved untracked `UI/`,
+`apps/mobile/.gitignore`, and `supabase/.temp/` paths, or will you provide the
+named branch with a tree clean apart from `tmp/`?
+
+### Commits
+
+Documentation-only checkpoint: `docs: record WG3 preflight stop`, author
+`galaxymaxp <omgraythekid@gmail.com>`. The final hash is recorded in
+`tmp/overnight/WG3.status` and local Git history; no self-hash amendment.
+No implementation commit, push or remote operation was performed.
+
+### Gate counts
+
+Four execution gates are **NOT RUN (0/4 executed)** due to the mandatory STEP 0
+stop: forced root typecheck, forced root lint, web tests and standalone API
+build. Unit tests and Playwright are **NOT RUN (0 executed)**. The fifth gate,
+`git diff --check`, is **FRESH PASS** for this documentation-only change;
+`git diff --cached --check` is also checked before the checkpoint commit.
+These hygiene checks establish no implementation acceptance. No failed test
+attempt, skipped test, cached result or flake is claimed.
+
+The Try-again padding cause is **UNVERIFIED**: the audit was not reached.
+Production revision, database rows, Scheduler state, browser/device behavior
+and all other live state are **UNVERIFIED (owner to confirm)**. No deployment,
+remote SQL/migration, provider call, Scheduler change, email, environment-file
+edit or push was performed.
+
+### Owner steps remaining
+
+1. Resolve the branch/clean-tree question above, then rerun WG3 beginning with
+   the incomplete STEP 0. No code step or acceptance gate is complete.
+2. Rollout is **NOT RUN**, skipped entirely: owner website deployment through
+   the approved fullsend/Vercel production-from-main workflow (RB6).
+3. Device checks are **NOT RUN**, skipped entirely: owner browser review of
+   Generate home at desktop and phone widths after implementation and rollout.
+4. Vercel CLI is not installed. Strongly recommend `npm i -g vercel` for the
+   later owner-controlled environment, deployment and log workflow; not run here.
