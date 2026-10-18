@@ -7,6 +7,8 @@ import type {
   QuizResult,
 } from "@stay-focused/shared";
 import Link from "next/link";
+import { quizQuestionStates } from "@stay-focused/shared";
+import { QuestionGrid, QuestionJump } from "./quiz-navigation";
 import { useEffect, useRef, useState } from "react";
 import { CountUp, SpringProgress } from "../components/count-up";
 import { useAuth } from "../components/providers";
@@ -199,7 +201,7 @@ export function QuizScreen({ id }: { id: string }) {
     if (!attempt) return;
     const onKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
-      if (target?.closest("input, textarea, select")) return;
+      if (target?.closest("input, textarea, select, dialog")) return;
       if (event.key === "ArrowRight") moveTo(index + 1);
       if (event.key === "ArrowLeft") moveTo(index - 1);
     };
@@ -313,10 +315,8 @@ export function QuizScreen({ id }: { id: string }) {
       {valid && attempt && question && !result && (
         <div className="quiz-layout">
           <div className="stack quiz-main">
-            <section className="surface stack question-card" key={question.id}>
-              <span className="meta">
-                Question {index + 1} of {questions.length}
-              </span>
+            <section className="surface stack question-card">
+              <QuestionJump index={index} states={quizQuestionStates(questions, attempt, index)} disabled={action.busy} onSelect={moveTo} />
               <h2>{question.prompt}</h2>
               <p className="muted">{question.selectionInstruction}</p>
               <QuestionInput
@@ -380,32 +380,9 @@ export function QuizScreen({ id }: { id: string }) {
                 value={answered}
               />
             </div>
-            <nav className="question-grid" aria-label="Questions">
-              {questions.map((q, position) => {
-                const state =
-                  position === index
-                    ? "current"
-                    : attempt.revealedQuestionIds.includes(q.id)
-                      ? "revealed"
-                      : attempt.answers.some(
-                            (a) => a.questionId === q.id && a.finalizedAt,
-                          )
-                        ? "answered"
-                        : "open";
-                return (
-                  <button
-                    key={q.id}
-                    className={`question-dot ${state}`}
-                    aria-current={position === index ? "step" : undefined}
-                    aria-label={`Question ${position + 1}, ${state === "open" ? "unanswered" : state}`}
-                    disabled={action.busy}
-                    onClick={() => moveTo(position)}
-                  >
-                    {position + 1}
-                  </button>
-                );
-              })}
-            </nav>
+            <div className="quiz-rail-questions">
+              <QuestionGrid states={quizQuestionStates(questions, attempt, index)} disabled={action.busy} onSelect={moveTo} />
+            </div>
             {finishing ? (
               <div className="stack finish-confirm" role="alert">
                 <p>

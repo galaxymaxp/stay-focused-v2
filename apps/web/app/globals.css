@@ -1725,6 +1725,43 @@ details[open] > :not(summary) {
   color: var(--text);
   font-weight: 650;
 }
+.quiz-jump-trigger {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 8px;
+  border-color: transparent;
+  background: transparent;
+}
+.quiz-jump-trigger .icon {
+  width: 14px;
+  height: 14px;
+}
+.quiz-jump-dialog {
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(70dvh, 600px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--elevated);
+  color: var(--text);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.quiz-jump-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.32);
+}
+.quiz-jump-content {
+  padding: 20px;
+}
+.quiz-jump-dialog .question-grid {
+  grid-template-columns: repeat(auto-fill, minmax(44px, 1fr));
+}
+.quiz-jump-dialog .question-dot {
+  min-height: 44px;
+}
 .finish-confirm {
   padding: 12px;
   border-radius: var(--radius-control);
@@ -1780,6 +1817,11 @@ details[open] > :not(summary) {
 @media (max-width: 600px) {
   .match-columns {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (width < 1000px) {
+  .quiz-rail-questions {
+    display: none;
   }
 }
 
