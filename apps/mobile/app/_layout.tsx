@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppLifecycle } from "../src/app-shell/AppLifecycle";
 import { AuthProvider } from "../src/auth";
 import { ThemeProvider, useTheme } from "../src/design/theme";
+import { ProfileAvatarProvider } from '../src/design/ProfileAvatarProvider';
 
 /**
  * Navigators paint their own container behind every screen while it moves.
@@ -41,8 +42,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider><NavigationTheme><AuthProvider>
-        <AppLifecycle />
-        <RootStack />
+        <ProfileAvatarProvider><AppLifecycle /><RootStack /></ProfileAvatarProvider>
       </AuthProvider></NavigationTheme></ThemeProvider>
     </SafeAreaProvider>
   );

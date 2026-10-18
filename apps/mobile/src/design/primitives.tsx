@@ -24,6 +24,8 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { useAuth } from "../auth";
 import { haptic } from "./haptics";
 import { QueueButton } from "./QueueButton";
+import { Avatar } from './Avatar';
+import { useProfileAvatar } from './ProfileAvatarProvider';
 import { useSheetDrag } from "./sheetDrag";
 import { motion, useTheme } from "./theme";
 import { useHideOnScroll } from "./useHideOnScroll";
@@ -750,17 +752,13 @@ export function SearchField({
   );
 }
 
-function initialOf(email: string | null | undefined) {
-  const letter = email?.trim()[0];
-  return letter ? letter.toLocaleUpperCase() : "·";
-}
-
 /**
  * The account entry point on primary screens. It replaces the old overflow
  * menu: the only things that belong here are the account itself, Canvas sync
  * and Settings. Refreshing is pull-to-refresh on each screen.
  */
 export function ProfileButton() {
+  const photo = useProfileAvatar();
   const { colors } = useTheme();
   const { session } = useAuth();
   const [open, setOpen] = useState(false);
@@ -781,12 +779,12 @@ export function ProfileButton() {
         }}
         style={({ pressed }) => ({ minWidth: hitTarget.min, minHeight: hitTarget.min, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.6 : 1 })}
       >
-        <Avatar initial={initialOf(email)} size={density.utilitySize} />
+        <Avatar uri={photo.url} initial={photo.initial} size={density.utilitySize} />
       </Pressable>
       {open ? (
         <Sheet onClose={() => setOpen(false)}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[3], paddingBottom: spacing[2] }}>
-            <Avatar initial={initialOf(email)} size={44} />
+            <Avatar uri={photo.url} initial={photo.initial} size={44} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Copy size="h3" numberOfLines={1}>{email ?? "Your account"}</Copy>
               <Copy muted size="caption">Signed in to Stay Focused</Copy>
@@ -810,19 +808,6 @@ export function ProfileButton() {
 function RowIcon({ children }: { children: ReactNode }) {
   const { colors } = useTheme();
   return <View style={{ width: 32, height: 32, borderRadius: radius.control - 4, backgroundColor: colors.blueSoft, alignItems: "center", justifyContent: "center" }}>{children}</View>;
-}
-
-function Avatar({ initial, size }: { initial: string; size: number }) {
-  const { colors } = useTheme();
-  return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.blueSoft, borderWidth: 1, borderColor: colors.separator, alignItems: "center", justifyContent: "center" }}
-    >
-      <Copy color={colors.blue} style={{ fontSize: size * 0.44, lineHeight: size * 0.56, fontWeight: "600" }}>{initial}</Copy>
-    </View>
-  );
 }
 
 /**

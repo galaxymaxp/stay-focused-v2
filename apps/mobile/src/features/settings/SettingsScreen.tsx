@@ -15,6 +15,9 @@ import { NotificationSettings } from "./NotificationSettings";
 import { CompletionNotificationSettings } from "./CompletionNotificationSettings";
 import { OfflineStorageSettings } from "./OfflineStorageSettings";
 import { AutoReviewerSettings } from "./AutoReviewerSettings";
+import { Avatar } from '../../design/Avatar';
+import { useProfileAvatar } from '../../design/ProfileAvatarProvider';
+import { ProfilePhotoSettings } from './ProfilePhotoSettings';
 
 const modes: readonly { value: ThemePreference; label: string }[] = [
   { value: "system", label: "Automatic" },
@@ -49,6 +52,7 @@ const PROVIDERS: readonly {
  * people open Settings for; Canvas lives under Sync in the profile menu.
  */
 export function SettingsScreen() {
+  const photo = useProfileAvatar();
   const { colors, preference, setPreference, family, setFamily, reducedMotion } = useTheme();
   const { isSigningOut, session, signOut } = useAuth();
   const [linkBusy, setLinkBusy] = useState(false);
@@ -78,7 +82,8 @@ export function SettingsScreen() {
     <Page title="Settings" back>
       <Section title="Account">
         <Surface style={{ gap: 0, paddingVertical: spacing[1] }}>
-          <Row icon={<Avatar initial={email?.trim()[0]?.toLocaleUpperCase() ?? "·"} />} title={email ?? "Your account"} caption="Signed in to Stay Focused" />
+          <Row icon={<Avatar uri={photo.url} initial={photo.initial} />} title={email ?? "Your account"} caption="Signed in to Stay Focused" />
+          <ProfilePhotoSettings />
           {PROVIDERS.map(({ provider, supabaseName, name, background, border, text, Logo }) => {
             const isLinked = linked.has(supabaseName);
             return (
@@ -205,19 +210,6 @@ function Chip({ background, border, children }: { background: string; border?: s
   return (
     <View style={{ width: 32, height: 32, borderRadius: radius.control - 4, backgroundColor: background, borderWidth: border ? 1 : 0, borderColor: border, alignItems: "center", justifyContent: "center" }}>
       {children}
-    </View>
-  );
-}
-
-function Avatar({ initial }: { initial: string }) {
-  const { colors } = useTheme();
-  return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.blueSoft, borderWidth: 1, borderColor: colors.separator, alignItems: "center", justifyContent: "center" }}
-    >
-      <Copy color={colors.blue} style={{ fontSize: 15, lineHeight: 20, fontWeight: "600" }}>{initial}</Copy>
     </View>
   );
 }
