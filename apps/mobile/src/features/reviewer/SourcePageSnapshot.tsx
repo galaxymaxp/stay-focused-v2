@@ -126,7 +126,11 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
           </View>}
         </View>
         {ready ? <AskImageButton image={image} offline={offline} onAsk={target => {setOpen(false);onAsk?.(target);}} /> : null}
-        {ready ? <SaveImageButton offline={offline} image={{ uri: ready.url, reviewerTitle, sectionTitle, kind: 'page_snapshot' }} /> : null}
+        {ready ? <SaveImageButton offline={offline} image={{ uri: ready.url, reviewerTitle, sectionTitle, kind: 'page_snapshot' }} refreshUri={async()=>{
+          const fresh=await readPageSnapshot(client,artifactId,sectionId,false);
+          if(!ready.id || !fresh.available || !('url' in fresh) || fresh.id!==ready.id || fresh.page!==ready.page || fresh.labelKind!==ready.labelKind)throw new Error('snapshot_unavailable');
+          return fresh.url;
+        }} /> : null}
         <Text style={{ color: colors.textPrimary, textAlign: 'center', padding: spacing[4] }}>
           {ready ? `${ready.sourceLabel} · ${captionUnit} ${ready.page}` : `${captionUnit} ${snapshot.page}`}
         </Text>

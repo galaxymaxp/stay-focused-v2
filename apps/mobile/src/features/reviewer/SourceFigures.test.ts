@@ -41,6 +41,16 @@ describe('in-place source figure sheet',()=>{
     expect(button('Save image').props.disabled).toBe(false);
     expect(tree!.root.findByType(SaveImageButton).props.image).toEqual({uri:figure.url,reviewerTitle:'Biology',sectionTitle:'Cells',kind:'figure'});
   });
+  it('refreshes only the selected figure through the owner-scoped read before save',async()=>{
+    mocks.read.mockResolvedValue([figure]);await mount();
+    await act(async()=>button('Enlarge Diagram from page 2').props.onPress());
+    const refresh=tree!.root.findByType(SaveImageButton).props.refreshUri;
+    mocks.read.mockResolvedValue([{...figure,url:'https://image.test/fresh'}]);
+    expect(await refresh()).toBe('https://image.test/fresh');
+    expect(mocks.read).toHaveBeenLastCalledWith(client,'artifact','s');
+    mocks.read.mockResolvedValue([{...figure,id:'different'}]);
+    await expect(refresh()).rejects.toThrow('figure_unavailable');
+  });
   it('asks about each exact figure inline and in zoom, closing the viewer first',async()=>{
     const onAsk=vi.fn();mocks.read.mockResolvedValue([figure]);
     await act(async()=>{tree=create(createElement(SourceFigures,{...props,onAsk}));});

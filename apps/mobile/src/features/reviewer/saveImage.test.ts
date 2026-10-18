@@ -6,6 +6,7 @@ vi.mock('expo-file-system/legacy', () => ({ cacheDirectory: 'file:///cache/', ma
 const { saveImage } = await import('./saveImage');
 const image = { uri: 'https://image.test/page.png?private=token', reviewerTitle: 'Biology', sectionTitle: 'Cell', kind: 'page_snapshot' as const };
 beforeEach(() => {
+  vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.resetAllMocks(); mocks.os = 'android'; mocks.request.mockResolvedValue({ granted: true }); mocks.album.mockResolvedValue(null);
   mocks.info.mockResolvedValue({ exists: true, isDirectory: false, size: 1024 });
   mocks.download.mockResolvedValue({ status: 200, headers: { 'Content-Type': 'image/png' } }); mocks.remove.mockResolvedValue(undefined);
@@ -53,4 +54,59 @@ it('renames an opaque remote URI using its actual image MIME', async () => {
   mocks.download.mockResolvedValue({ status: 200, headers: { 'content-type': 'image/jpeg' } }); await saveImage({ ...image, uri: 'https://image.test/opaque' });
   expect(mocks.move).toHaveBeenCalledWith({ from: expect.stringMatching(/\.png$/), to: expect.stringMatching(/\.jpg$/) });
   expect(mocks.createAlbum.mock.calls[0]?.[3]).toMatch(/\.jpg$/);
+});
+
+it.each([
+  ['permission', () => mocks.request.mockRejectedValue(new Error('private native permission error'))],
+  ['download', () => mocks.download.mockRejectedValue(new Error('image_unavailable'))],
+  ['download_http_401', () => mocks.download.mockResolvedValue({status:401,headers:{}})],
+  ['download_http_403', () => mocks.download.mockResolvedValue({status:403,headers:{}})],
+  ['download_http_500', () => mocks.download.mockResolvedValue({status:500,headers:{}})],
+  ['not_image', () => mocks.download.mockResolvedValue({status:200,headers:{'content-type':'text/html'}})],
+  ['empty', () => mocks.info.mockResolvedValue({exists:false})],
+  ['empty', () => mocks.info.mockResolvedValue({exists:true,isDirectory:false,size:undefined})],
+  ['media_write', () => mocks.createAlbum.mockRejectedValue(new Error('private gallery error'))],
+  ['module_missing', () => mocks.request.mockRejectedValue(new Error("Cannot find native module 'ExpoMediaLibrary'"))],
+  ['module_missing', () => mocks.download.mockRejectedValue(Object.assign(new Error('private error'),{code:'ERR_UNAVAILABLE'}))],
+] as const)('returns and logs only the safe stage %s', async (stage, arrange) => {
+  arrange(); const result=await saveImage(image);
+  expect(result).toMatchObject({status:'failed',stage,message: stage==='module_missing'?'Update the app to save images':stage==='media_write'?"Couldn't write to your gallery":stage==='permission'?'Allow photo access in settings to save study images.':"Couldn't download the image"});
+  expect(console.warn).toHaveBeenCalledExactlyOnceWith('reviewer.save_image_failed',{stage});
+  expect(JSON.stringify(result)).not.toContain('private');
+});
+it('reports denied permission and never proceeds to download', async()=>{
+  mocks.request.mockResolvedValue({granted:false});
+  expect(await saveImage(image)).toMatchObject({status:'denied',stage:'permission'});
+  expect(console.warn).toHaveBeenCalledExactlyOnceWith('reviewer.save_image_failed',{stage:'permission'});
+  expect(mocks.download).not.toHaveBeenCalled();
+});
+it.each(['android','ios'])('awaits the %s native write before cache cleanup',async os=>{
+  mocks.os=os;let finish!:()=>void;
+  const write=os==='android'?mocks.createAlbum:mocks.save;
+  write.mockImplementation(()=>new Promise<void>(resolve=>{finish=resolve;}));
+  const saving=saveImage(image);
+  await vi.waitFor(()=>expect(write).toHaveBeenCalledOnce());
+  expect(mocks.remove).not.toHaveBeenCalled();finish();
+  expect((await saving).status).toBe('saved');expect(mocks.remove).toHaveBeenCalledOnce();
+  expect(mocks.info.mock.invocationCallOrder[0]).toBeLessThan(write.mock.invocationCallOrder[0]!);
+});
+it('reports an iOS write failure with add-only permission and cleans up',async()=>{
+  mocks.os='ios';mocks.save.mockRejectedValue(new Error('private Photos error'));
+  expect(await saveImage(image)).toMatchObject({status:'failed',stage:'media_write',message:"Couldn't write to your gallery"});
+  expect(mocks.request).toHaveBeenCalledWith(true,['photo']);expect(mocks.remove).toHaveBeenCalledOnce();
+});
+it('refreshes a signed URL after permission and before downloading without adding bearer headers to storage',async()=>{
+  const refresh=vi.fn(async()=>'https://image.test/fresh.png');
+  expect((await saveImage(image,refresh)).status).toBe('saved');
+  expect(mocks.request.mock.invocationCallOrder[0]).toBeLessThan(refresh.mock.invocationCallOrder[0]!);
+  expect(refresh.mock.invocationCallOrder[0]).toBeLessThan(mocks.download.mock.invocationCallOrder[0]!);
+  expect(mocks.download).toHaveBeenCalledWith('https://image.test/fresh.png',expect.any(String),{headers:undefined});
+});
+it('never falls back to the stale URL when the owner read fails',async()=>{
+  expect(await saveImage(image,async()=>{throw new Error('snapshot_unavailable');})).toMatchObject({status:'failed',stage:'download'});
+  expect(mocks.download).not.toHaveBeenCalled();expect(mocks.createAlbum).not.toHaveBeenCalled();
+});
+it('keeps a successful save when temporary-file cleanup fails',async()=>{
+  mocks.remove.mockRejectedValue(new Error('private cache path'));
+  expect((await saveImage(image)).status).toBe('saved');expect(console.warn).not.toHaveBeenCalled();
 });

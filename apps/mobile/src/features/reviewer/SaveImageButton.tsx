@@ -6,7 +6,7 @@ import { useTheme } from '../../design/theme';
 import { hitTarget, spacing } from '../../design/tokens';
 import { saveImage } from './saveImage';
 
-export function SaveImageButton({ image, offline }: { image: StudyImageDownload; offline: boolean }) {
+export function SaveImageButton({ image, offline, refreshUri }: { image: StudyImageDownload; offline: boolean; refreshUri?: () => Promise<string> }) {
   const { colors } = useTheme();
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
@@ -14,7 +14,7 @@ export function SaveImageButton({ image, offline }: { image: StudyImageDownload;
     if (pending.current || offline) return;
     pending.current = true; setBusy(true);
     try {
-      const result = await saveImage(image);
+      const result = await saveImage(image, refreshUri);
       Alert.alert(result.status === 'saved' ? 'Image saved' : 'Save image', result.message, result.status === 'denied'
         ? [{ text: 'Cancel', style: 'cancel' }, { text: 'Open settings', onPress: () => { void result.openSettings().catch(() => {}); } }]
         : [{ text: 'OK' }]);

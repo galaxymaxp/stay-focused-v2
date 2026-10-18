@@ -51,6 +51,17 @@ describe('source-page thumbnail and viewer', () => {
     expect(tree!.root.findByType(SaveImageButton).props.image).toEqual({uri:ready.url,reviewerTitle:'Biology',sectionTitle:'Cells',kind:'page_snapshot'});
     expect(tree!.root.findByType(Modal).findAllByType(Pressable).some(n=>n.props.accessibilityLabel==='Save image')).toBe(true);
   });
+  it('refreshes only the same snapshot via a read without rendering before save',async()=>{
+    const snapshot={...ready,id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'};
+    mocks.read.mockResolvedValue(snapshot);await mount();await act(async()=>buttons()[0]!.props.onPress());
+    const refresh=tree!.root.findByType(SaveImageButton).props.refreshUri;
+    mocks.read.mockResolvedValue({...snapshot,url:'https://image.test/fresh'});
+    expect(await refresh()).toBe('https://image.test/fresh');
+    expect(mocks.read).toHaveBeenLastCalledWith(props.client,props.artifactId,props.sectionId,false);
+    for(const value of [{available:false,reason:'unavailable'},{available:true,status:'rendering',page:snapshot.page},{...snapshot,id:'different'},{...snapshot,page:3}]) {
+      mocks.read.mockResolvedValue(value);await expect(refresh()).rejects.toThrow('snapshot_unavailable');
+    }
+  });
   it('asks about the exact ready snapshot from inline and zoom controls',async()=>{
     const onAsk=vi.fn();const data={...ready,id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'};mocks.read.mockResolvedValue(data);
     await act(async()=>{tree=create(createElement(SourcePageSnapshot,{...props,onAsk}));});
