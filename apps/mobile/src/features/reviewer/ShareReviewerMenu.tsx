@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Share, View, type StyleProp, type ViewStyle } from 'react-native';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Share, View } from 'react-native';
 import type { ReviewerReaderModel, ReviewerShareLink } from '@stay-focused/shared';
 import { useAuth } from '../../auth';
 import { Action, Copy, Notice, Sheet } from '../../design/primitives';
@@ -7,16 +7,21 @@ import { spacing } from '../../design/tokens';
 import { mutateReviewerShare, reviewerShareUrl } from '../../services/reviewerShares';
 import { experienceRequest, type ExperienceClient } from '../../services/experienceApi';
 
-export function ShareReviewerMenu({ artifactId, reviewer, client, offline, triggerStyle }: {
+export interface ShareReviewerTrigger {
+  disabled: boolean;
+  onPress: () => void;
+}
+
+export function ShareReviewerMenu({ artifactId, reviewer, client, offline, renderTrigger }: {
   artifactId: string; reviewer: ReviewerReaderModel; client: ExperienceClient; offline: boolean;
-  triggerStyle?: StyleProp<ViewStyle>;
+  renderTrigger?: (trigger: ShareReviewerTrigger) => ReactNode;
 }) {
   const { session } = useAuth();
-  return <OwnerShare key={`${session?.user.id}:${artifactId}`} owner={session?.user.id ?? ''} artifactId={artifactId} reviewer={reviewer} client={client} offline={offline} triggerStyle={triggerStyle} />;
+  return <OwnerShare key={`${session?.user.id}:${artifactId}`} owner={session?.user.id ?? ''} artifactId={artifactId} reviewer={reviewer} client={client} offline={offline} renderTrigger={renderTrigger} />;
 }
-function OwnerShare({ owner, artifactId, reviewer, client, offline, triggerStyle }: {
+function OwnerShare({ owner, artifactId, reviewer, client, offline, renderTrigger }: {
   owner: string; artifactId: string; reviewer: ReviewerReaderModel; client: ExperienceClient; offline: boolean;
-  triggerStyle?: StyleProp<ViewStyle>;
+  renderTrigger?: (trigger: ShareReviewerTrigger) => ReactNode;
 }) {
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [share, setShare] = useState<ReviewerShareLink | null>(null), [note, setNote] = useState<string | null>(null);
   const active = useRef(true);
@@ -60,7 +65,8 @@ function OwnerShare({ owner, artifactId, reviewer, client, offline, triggerStyle
     } finally { if (active.current) setBusy(false); }
   }
   return <>
-    <Action secondary style={triggerStyle} disabled={offline || !owner} onPress={() => void menu()}>Share</Action>
+    {renderTrigger ? renderTrigger({ disabled: offline || !owner, onPress: () => void menu() }) :
+      <Action secondary disabled={offline || !owner} onPress={() => void menu()}>Share</Action>}
     {open && <Sheet title="Share Reviewer" onClose={() => setOpen(false)}>
       <Copy muted>Anyone with the link can read this version and take its included quizzes. Study Assist saved on this device is included. Course images and account details are excluded.</Copy>
       <View style={{ gap: spacing[2] }}>

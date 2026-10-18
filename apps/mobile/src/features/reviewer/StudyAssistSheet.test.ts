@@ -11,7 +11,7 @@ vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: vi.fn(async
 const visuals=vi.hoisted(()=>({sections:{} as Record<string,import('../../services/externalVisuals').ExternalReferenceVisual>}));
 vi.mock('../../services/externalVisuals',async load=>({...await load<typeof import('../../services/externalVisuals')>(),useReviewerVisuals:(_client:unknown,_id:unknown,offline:boolean)=>offline?null:visuals.sections}));
 vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot' }));
-vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
+vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }) }));
 vi.mock('./ShareReviewerMenu', () => ({ ShareReviewerMenu: 'ShareReviewerMenu' }));
 const figures=vi.hoisted(()=>({available:new Set<string>(),online:false,snapshots:{} as Record<string,import('@stay-focused/shared').ReviewerSnapshot>}));
 vi.mock('../../services/reviewerImages',()=>({useReviewerImages:(_client:unknown,_id:unknown,offline:boolean)=>({
@@ -24,7 +24,7 @@ vi.mock('./SourceFigures',()=>({
   SourceFigures:(props:{hasFigures:boolean;offline:boolean})=>props.hasFigures&&!props.offline?createElement('SourceFigures',props):null,
   useFigureAvailability:(_client:unknown,_id:unknown,offline:boolean)=>Object.assign(offline?new Set():figures.available,{online:!offline&&figures.online}),
 }));
-vi.mock('react-native', () => ({ Platform: { OS: 'android' }, View: 'View', Image:'Image', Linking:{openURL:vi.fn()}, Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
+vi.mock('react-native', () => ({ Platform: { OS: 'android' }, View: 'View', Modal: 'Modal', Image:'Image', Linking:{openURL:vi.fn()}, Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
   Easing: { inOut: () => undefined, quad: undefined },
   Vibration: { vibrate: vi.fn() }, useWindowDimensions: () => ({ width: 360, height: 800 }),
   Animated: { View: 'AnimatedView', Value: class { setValue() {} stopAnimation() {} interpolate() { return 1; } },
@@ -32,8 +32,8 @@ vi.mock('react-native', () => ({ Platform: { OS: 'android' }, View: 'View', Imag
     loop: () => ({ start: () => {}, stop: () => {} }), sequence: () => ({}) },
 }));
 vi.mock('lucide-react-native', () => Object.fromEntries(['ChevronDown', 'ChevronUp', 'FileQuestion', 'CheckCircle2', 'Circle', 'Sparkles', 'X', 'AlertCircle',
-  'AlignLeft', 'ArrowLeftRight', 'Check', 'FlaskConical', 'Lightbulb', 'RotateCcw', 'Download'].map(name => [name, name])));
-vi.mock('../../design/primitives', () => ({ Action: 'Action', Copy: 'Copy', Notice: 'Notice', Page: 'Page', SearchField: 'SearchField', SegmentedControl: 'SegmentedControl', Sheet: 'Sheet', Surface: 'Surface', SkeletonBlock: 'SkeletonBlock' }));
+  'AlignLeft', 'ArrowLeftRight', 'Check', 'FlaskConical', 'Lightbulb', 'RotateCcw', 'Download', 'Ellipsis', 'Globe'].map(name => [name, name])));
+vi.mock('../../design/primitives', () => ({ Action: 'Action', IconAction: 'IconAction', Copy: 'Copy', Notice: 'Notice', Page: 'Page', SearchField: 'SearchField', SegmentedControl: 'SegmentedControl', Sheet: 'Sheet', Surface: 'Surface', SkeletonBlock: 'SkeletonBlock' }));
 vi.mock('../../design/haptics', () => ({ haptic: { tap: vi.fn(), select: vi.fn(), press: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() } }));
 vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));
 vi.mock('../../auth', () => ({ useAuth: () => ({ session: { user: { id: 'owner' }, accessToken: 'test' } }) }));
@@ -60,7 +60,7 @@ const reviewer = ('reviewer' in detail ? detail.reviewer : null)!;
 const selection = selectAssistBlock(reviewer, reviewer.sections[0]!.id, reviewer.sections[0]!.blocks[0]!.id)!;
 const target = { selection };
 describe('snapshot discovery for persisted reviewer headers', () => {
-  it.each([false,true])('keeps Android owner Share visible for online/saved reviewers (device copy %s)',async deviceCopy=>{
+  it.each([false,true])('keeps Android owner Share controller available for online/saved reviewers (device copy %s)',async deviceCopy=>{
     await act(async()=>{rendered=create(createElement(ReviewerReaderScreen,{artifact:detail.artifact,reviewer,deviceCopy}));});
     const menu=rendered!.root.findByType('ShareReviewerMenu' as never);
     expect(menu.props.artifactId).toBe(detail.artifact.id.slice('artifact:'.length));expect(menu.props.offline).toBe(deviceCopy);

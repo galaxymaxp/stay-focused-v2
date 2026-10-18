@@ -1,4 +1,4 @@
-import { snapshotUpdatedLabel } from "@stay-focused/shared";
+import { snapshotStatusLabel } from "@stay-focused/shared";
 import { useEffect, useState } from "react";
 import { Pressable } from "react-native";
 import { Copy } from "../../design/primitives";
@@ -11,6 +11,7 @@ export interface SnapshotStatusProps {
   refresh: () => void;
   updateAvailable?: boolean;
   applyUpdate?: () => void;
+  hideFreshLabel?: boolean;
   /** For status rows that already supply their own screen inset. */
   inset?: boolean;
 }
@@ -20,9 +21,7 @@ export function SnapshotStatus(props: SnapshotStatusProps) {
     const timer = setInterval(() => tick(value => value + 1), 60_000);
     return () => clearInterval(timer);
   }, []);
-  const updated = snapshotUpdatedLabel(props.savedAt);
-  const label = props.updateAvailable ? "Updated — tap to refresh" : props.error ?
-    `Couldn't refresh · Retry${updated ? ` · ${updated}` : ""}` : props.refreshing ? "Syncing…" : updated;
+  const label = snapshotStatusLabel(props);
   if (!label) return null;
   return <Pressable accessibilityRole="button" accessibilityLabel={label}
     onPress={props.updateAvailable ? props.applyUpdate : props.refresh} style={{ minHeight: hitTarget.min, paddingHorizontal: props.inset === false ? 0 : spacing[5], justifyContent: "center" }}>

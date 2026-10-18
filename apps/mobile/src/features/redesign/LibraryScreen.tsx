@@ -438,7 +438,7 @@ export function ArtifactScreen() {
   };
   const versions = useDraftVersions(detail && 'draft' in detail ? detail.draft : null, saveConfirmedDraft);
   if (detail && "reviewer" in detail) {
-    return <ReviewerReaderScreen artifact={detail.artifact} reviewer={detail.reviewer} deviceCopy={result.deviceCopy} openQuizInitially={quiz === "1"} snapshotStatus={<SnapshotStatus {...result} error={result.refreshError ?? result.error} />} />;
+    return <ReviewerReaderScreen artifact={detail.artifact} reviewer={detail.reviewer} deviceCopy={result.deviceCopy} openQuizInitially={quiz === "1"} snapshotStatus={<SnapshotStatus {...result} error={result.refreshError ?? result.error} hideFreshLabel />} />;
   }
   return (
     <KeyboardAvoidingView
