@@ -1,3 +1,5 @@
+import { clockTimeLabel } from "@stay-focused/shared";
+import { freeTimePlanningRange, freeTimeEnd, wrapMinute } from "@stay-focused/shared";
 import type { TodayItem } from "@stay-focused/shared";
 import type { StudyPlanningRequest } from "@stay-focused/shared/task-planning";
 
@@ -9,7 +11,7 @@ export function timelineSegments(items: readonly TodayItem[], date: string) {
   return items.flatMap((item) => {
     if (!item.startAt || !item.endAt || item.status === "skipped") return [];
     const from = Math.max(0, (new Date(item.startAt).getTime() - start) / 60000);
-    const to = Math.min(1440, (new Date(item.endAt).getTime() - start) / 60000);
+    const to = (new Date(item.endAt).getTime() - start) / 60000;
     return to > from
       ? [{ id: item.id, from, to, kind: item.kind, title: item.title }]
       : [];
@@ -26,7 +28,7 @@ export function freeTimeAround(
   segments: readonly { readonly from: number; readonly to: number }[],
   nowMinutes: number,
 ): { start: number; end: number } | null {
-  const upcoming = segments
+  const upcoming = segments.map(s => ({ from: s.from, to: freeTimeEnd(s.from, s.to) }))
     .filter((s) => s.to > nowMinutes)
     .sort((a, b) => a.from - b.from);
   if (upcoming.length === 0) return null;
@@ -36,8 +38,8 @@ export function freeTimeAround(
     last = Math.max(last, segment.to);
   }
   const start = Math.max(0, Math.floor(upcoming[0]!.from / 15) * 15);
-  const end = Math.min(1440, Math.ceil(last / 15) * 15);
-  return end > start ? { start, end } : null;
+  const end = Math.min(start + 1425, Math.ceil(last / 15) * 15);
+  return end > start ? { start: wrapMinute(start), end: end <= 1440 ? end : wrapMinute(end) } : null;
 }
 
 /**
@@ -50,14 +52,7 @@ export function planningRequest(
   start: number,
   end: number,
 ): StudyPlanningRequest {
-  if (end <= start) throw new Error("Choose an end time after the start time.");
-  const midnight = new Date(`${date}T00:00:00`);
-  const at = (minutes: number) =>
-    new Date(midnight.getTime() + minutes * 60000).toISOString();
-  return {
-    planningRange: { startsAt: at(0), endsAt: at(1440) },
-    availability: [{ startsAt: at(start), endsAt: at(end) }],
-  };
+  return freeTimePlanningRange(date, start, end);
 }
 
 /** "2 h 15 min", "45 min", "3 h". */
@@ -69,11 +64,7 @@ export function formatFreeTime(minutes: number) {
   return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 }
 
-export function clockLabel(minutes: number) {
-  const date = new Date(2000, 0, 1, 0, 0);
-  date.setMinutes(Math.round(minutes));
-  return date.toLocaleTimeString([], { hour: "numeric", hour12: true, minute: "2-digit" });
-}
+export const clockLabel = clockTimeLabel;
 
 export const PLAN_TONES = ["blue", "violet", "green", "orange"] as const;
 export type PlanTone = (typeof PLAN_TONES)[number];

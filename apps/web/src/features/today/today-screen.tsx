@@ -1,4 +1,6 @@
 "use client";
+import { freeTimeDuration } from "@stay-focused/shared";
+import { useTodayClockWindow } from "../day-clock/use-today-clock-window";
 import { SnapshotStatus } from "../../components/snapshot-status";
 import { CanvasRefreshStatus, useCanvasRefresh } from "../../lib/canvas-refresh";
 import type {
@@ -36,7 +38,6 @@ import { useResource } from "../../lib/hooks";
 import { setWorkDone } from "../../lib/complete-work";
 import { useListPreferences } from "../../lib/list-preferences";
 import { DayRingClock } from "../day-clock/DayRingClock";
-import { readFreeTime, writeFreeTime } from "../day-clock/free-time-store";
 import {
   clockLabel,
   formatFreeTime,
@@ -72,10 +73,13 @@ const store = {
 
 export function TodayScreen() {
   const { api, session } = useAuth(),
-    router = useRouter(),
-    date = localDate();
+    router = useRouter();
+  const clockWindow = useTodayClockWindow();
+  const date = clockWindow.date;
+  const activeDate = useRef(date);
+  activeDate.current = date;
   const today = useResource<TodayScreenData>(
-    `/api/today?date=${date}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
+    clockWindow.path,
     60000,
   );
   const capabilities = { ...today, data: today.data?.capabilities ?? null };
@@ -98,20 +102,20 @@ export function TodayScreen() {
   const [locked, setLocked] = useState(false);
   useEffect(() => {
     setLocked(store.get(CLOCK_LOCK_KEY) === "1");
-    const saved = readFreeTime(date);
+    const saved = clockWindow.window;
     setWindowKnown(!!saved);
-    if (saved) {
-      setStart(saved.start);
-      setEnd(saved.end);
-    }
-  }, [date]);
+    const fallback = Math.min(1410, Math.ceil((new Date().getHours() * 60 + new Date().getMinutes()) / 15) * 15);
+    setStart(saved?.start ?? fallback);
+    setEnd(saved?.end ?? Math.min(1440, fallback + 120));
+    setPreview(null); setPreviewRequest(null);
+  }, [date, clockWindow.window]);
   const planned = today.data?.timeline;
   useEffect(() => {
     if (windowKnown || !planned) return;
     const now = new Date();
     const around = freeTimeAround(
       timelineSegments(planned.filter((item) => item.status === "planned"), date),
-      now.getHours() * 60 + now.getMinutes(),
+      (now.getTime() - new Date(`${date}T00:00:00`).getTime()) / 60000,
     );
     if (around) {
       setStart(around.start);
@@ -133,7 +137,7 @@ export function TodayScreen() {
     setPreview(null);
     setPreviewRequest(null);
     setWindowKnown(true);
-    writeFreeTime(date, { start: from, end: to });
+    clockWindow.save({ start: from, end: to });
   };
   async function plan(from: number, to: number) {
     if (busyRef.current || !plannerReady) return;
@@ -143,13 +147,14 @@ export function TodayScreen() {
     setPreview(null);
     setPreviewRequest(null);
     try {
-      const request = planningRequest(date, from, to);
-      setPreview(
-        await api<DeterministicStudyPlan>("/api/experience/planner/preview", {
+      const requestDate = date;
+      const request = planningRequest(requestDate, from, to);
+      const result = await api<DeterministicStudyPlan>("/api/experience/planner/preview", {
           method: "POST",
           body: request,
-        }),
-      );
+        });
+      if (activeDate.current !== requestDate) return;
+      setPreview(result);
       setPreviewRequest(request);
     } catch (error) {
       setNote(error instanceof Error ? error.message : "Could not preview your plan.");
@@ -250,7 +255,7 @@ export function TodayScreen() {
   const proposed = preview
     ? preview.sessions.map((session) => {
         const at = new Date(session.startsAt);
-        const from = at.getHours() * 60 + at.getMinutes();
+        const from = (at.getTime() - new Date(`${date}T00:00:00`).getTime()) / 60000;
         return {
           id: session.proposalId,
           from,
@@ -304,51 +309,13 @@ export function TodayScreen() {
             />
             <p className="free-time-line">
               <span className="free-swatch" aria-hidden="true" />
-              {formatFreeTime(end - start)} free · {clockLabel(start)} – {clockLabel(end)}
+              {formatFreeTime(freeTimeDuration(start, end))} free · {clockLabel(start)} – {clockLabel(end)}
             </p>
             <p className="meta center">
               {locked
-                ? "The clock is locked. Unlock it to change your free time."
+                ? "The clock is locked. Use Clock options to type your free time."
                 : "Drag an end to resize your free time, or the middle to move it. A plan preview follows."}
             </p>
-            <details className="ring-settings">
-              <summary>Adjust available time</summary>
-              <div className="ring-controls">
-                <label>
-                  Available from
-                  <input
-                    aria-label="Available from"
-                    type="range"
-                    min="0"
-                    max="1425"
-                    step="15"
-                    value={start}
-                    aria-valuetext={clockLabel(start)}
-                    disabled={locked}
-                    onChange={(e) => change(Math.min(Number(e.target.value), end - 15), end)}
-                  />
-                  <span className="count-up">{clockLabel(start)}</span>
-                </label>
-                <label>
-                  Available until
-                  <input
-                    aria-label="Available until"
-                    type="range"
-                    min="15"
-                    max="1440"
-                    step="15"
-                    value={end}
-                    aria-valuetext={clockLabel(end)}
-                    disabled={locked}
-                    onChange={(e) => change(start, Math.max(Number(e.target.value), start + 15))}
-                  />
-                  <span className="count-up">{clockLabel(end)}</span>
-                </label>
-              </div>
-              <button disabled={busy || !plannerReady} onClick={() => void plan(start, end)}>
-                Preview plan
-              </button>
-            </details>
             {!plannerReady && capabilities.data && (
               <p className="meta center">Planning is not available right now.</p>
             )}

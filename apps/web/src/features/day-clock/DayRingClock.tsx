@@ -1,4 +1,6 @@
 "use client";
+import { ClockOptions } from "./clock-options";
+import { freeTimeDuration, freeTimeEnd, containsMinute } from "@stay-focused/shared";
 import type { TodayItem } from "@stay-focused/shared";
 import {
   useCallback,
@@ -24,6 +26,7 @@ import {
   hitTest,
   moveRange,
   ringPoint,
+  ringArc as arc,
   segmentAt,
   snapRange,
   snapTo,
@@ -57,11 +60,7 @@ const SNAP_MS = 180;
 const TWEEN_MS = 260;
 const easeOut = (t: number) => 1 - (1 - t) ** 3;
 
-function arc(from: number, to: number, radius: number) {
-  const a = ringPoint(from, radius),
-    b = ringPoint(Math.min(to, from + 1439.9), radius);
-  return `M ${a.x} ${a.y} A ${radius} ${radius} 0 ${to - from > 720 ? 1 : 0} 1 ${b.x} ${b.y}`;
-}
+
 
 /** Short eased transition, driven per frame only while it runs. */
 function tween(
@@ -275,7 +274,7 @@ export function DayRingClock({
     state.stopSnap?.();
     state.stopSnap = tween(
       [released.start, released.end],
-      [target.start, target.end],
+      [released.start + angularDelta(released.start, target.start), released.end + angularDelta(released.end, target.end)],
       SNAP_MS,
       ([a, b]) => setDraft({ start: a!, end: b! }),
       done,
@@ -391,7 +390,7 @@ export function DayRingClock({
 
   const shown = {
     start: fromMidnight(range.start),
-    end: fromMidnight(range.end),
+    end: fromMidnight(freeTimeEnd(range.start, range.end)),
   };
   const marker = ringPoint(fromMidnight(nowMinutes));
   const orbCanvas = (CLOCK.glass * 2) / DAY_ORB_FILL;
@@ -444,7 +443,7 @@ export function DayRingClock({
             </span>
             <span className="readout-sub">
               {adjusting === "move" ? `until ${clockLabel(range.end)} · ` : ""}
-              {formatFreeTime(range.end - range.start)}
+              {formatFreeTime(freeTimeDuration(range.start, range.end))}
             </span>
           </>
         ) : (
@@ -511,12 +510,12 @@ export function DayRingClock({
         {segments.map((segment) => (
           <path
             key={segment.id}
-            d={arc(fromMidnight(segment.from), Math.max(fromMidnight(segment.to), fromMidnight(segment.from) + 0.5), CLOCK.lane)}
+            d={arc(fromMidnight(segment.from), fromMidnight(segment.to), CLOCK.lane)}
             stroke={kindTone(segment.kind)}
             strokeWidth={6}
             fill="none"
             strokeLinecap="round"
-            opacity={proposed.length || segment.to <= range.start || segment.from >= range.end ? 0.28 : 0.92}
+            opacity={proposed.length || !containsMinute(range.start, range.end, (segment.from + segment.to) / 2) ? 0.28 : 0.92}
           >
             <title>{segment.title}</title>
           </path>
@@ -524,7 +523,7 @@ export function DayRingClock({
         {proposed.map((session) => (
           <path
             key={session.id}
-            d={arc(fromMidnight(session.from), Math.max(fromMidnight(session.to), fromMidnight(session.from) + 0.5), CLOCK.lane)}
+            d={arc(fromMidnight(session.from), fromMidnight(session.to), CLOCK.lane)}
             stroke={`var(--${session.tone})`}
             strokeWidth={6}
             strokeDasharray="5 4"
@@ -562,7 +561,7 @@ export function DayRingClock({
         [
           { key: "start", label: "Free time starts", at: range.start, value: start, text: clockLabel(start) },
           { key: "end", label: "Free time ends", at: range.end, value: end, text: clockLabel(end) },
-          { key: "move", label: "Free time block", at: (range.start + range.end) / 2, value: start, text: `${clockLabel(start)} to ${clockLabel(end)}` },
+          { key: "move", label: "Free time block", at: range.start + freeTimeDuration(range.start, range.end) / 2, value: start, text: `${clockLabel(start)} to ${clockLabel(end)}` },
         ] as const
       ).map((control) => {
         const p = ringPoint(control.at, CLOCK.ring);
@@ -583,22 +582,7 @@ export function DayRingClock({
           />
         );
       })}
-      {onToggleLock && (
-        <button
-          type="button"
-          className="day-clock-lock"
-          role="switch"
-          aria-checked={locked}
-          aria-label="Lock clock"
-          title={locked ? "Unlock to change your free time" : "Lock so your free time can't change by accident"}
-          onClick={onToggleLock}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <rect x="5" y="11" width="14" height="10" rx="2" />
-            <path d={locked ? "M8 11V7a4 4 0 0 1 8 0v4" : "M8 11V7a4 4 0 0 1 7.5-2"} />
-          </svg>
-        </button>
-      )}
+      {onToggleLock && <ClockOptions start={start} end={end} locked={locked} onToggleLock={onToggleLock} onCommit={onCommit} disabled={disabled} />}
     </div>
   );
 }

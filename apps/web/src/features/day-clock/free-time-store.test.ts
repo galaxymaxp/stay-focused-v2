@@ -33,3 +33,11 @@ describe("shared date-specific free time", () => {
     expect(fromTimeInput("")).toBeNaN();
   });
 });
+
+it('round-trips both wrapped windows through the same day key', () => {
+  const entries = new Map<string, string>();
+  vi.stubGlobal('localStorage', { getItem: (key: string) => entries.get(key) ?? null, setItem: (key: string, value: string) => entries.set(key, value) });
+  for (const value of [{ start: 1320, end: 240 }, { start: 1410, end: 30 }]) {
+    writeFreeTime('2026-10-17', value); expect(readFreeTime('2026-10-17')).toEqual(value);
+  }
+});

@@ -1,4 +1,5 @@
 "use client";
+import { validFreeTime, FREE_TIME_ERROR } from "@stay-focused/shared";
 import type { ActivitySummary } from "@stay-focused/shared";
 import type {
   StudySessionView,
@@ -32,7 +33,7 @@ export function ScheduleScreen() {
   const fromMinutes = fromTimeInput(from);
   // Today's clock allows the window to end at the next local midnight.
   const toMinutes = to === "00:00" ? 1440 : fromTimeInput(to);
-  const validWindow = Number.isFinite(fromMinutes) && Number.isFinite(toMinutes) && toMinutes > fromMinutes;
+  const validWindow = validFreeTime({ start: fromMinutes, end: toMinutes });
   function changeWindow(nextFrom: string, nextTo: string) {
     setFrom(nextFrom);
     setTo(nextTo);
@@ -323,7 +324,7 @@ export function ScheduleScreen() {
           </div>
           {sharedWindow && <p className="meta">Same free time as Today.</p>}
           {!validWindow && (
-            <p className="meta">Choose an end time after the start.</p>
+            <p className="meta">{FREE_TIME_ERROR}</p>
           )}
           {preview && (
             <div className="stack plan-proposal">

@@ -42,8 +42,8 @@ describe("glass clock ring input", () => {
     expect(followMinutes(600, 607.3)).toBeCloseTo(607.3);
     expect(followMinutes(600, 611.9)).toBeCloseTo(611.9);
     // Near midnight the nearest reading wins, so a range never flips inside out.
-    expect(followMinutes(1430, 5)).toBe(1440);
-    expect(followMinutes(10, 1435)).toBe(0);
+    expect(followMinutes(1430, 5)).toBe(1445);
+    expect(followMinutes(10, 1435)).toBe(-5);
   });
 
   it("snaps only on release, keeping a moved block's duration", () => {
@@ -54,10 +54,10 @@ describe("glass clock ring input", () => {
     expect(snapRange(700, 704, "end")).toEqual({ start: 705, end: 720 });
   });
 
-  it("moves a whole block without changing its length or leaving the day", () => {
+  it("moves a whole block without changing its length, wrapping across midnight", () => {
     expect(moveRange(600, 720, 45)).toEqual({ start: 645, end: 765 });
-    expect(moveRange(600, 720, -900)).toEqual({ start: 0, end: 120 });
-    expect(moveRange(600, 720, 2000)).toEqual({ start: 1320, end: 1440 });
+    expect(moveRange(600, 720, -900)).toEqual({ start: 1140, end: 1260 });
+    expect(moveRange(600, 720, 2000)).toEqual({ start: 1160, end: 1280 });
   });
 
   it("keeps a dragged edge from crossing the other", () => {

@@ -1,3 +1,4 @@
+import { validFreeTime as valid } from "@stay-focused/shared";
 // Minutes from local midnight, shared by Today's clock and Schedule's planner.
 export interface FreeTime {
   readonly start: number;
@@ -5,11 +6,6 @@ export interface FreeTime {
 }
 const key = (date: string) => `sf.today.free-time.${date}`;
 
-function valid(value: Partial<FreeTime> | null): value is FreeTime {
-  return !!value && typeof value.start === "number" && typeof value.end === "number" &&
-    Number.isInteger(value.start) && Number.isInteger(value.end) &&
-    value.start >= 0 && value.end <= 1440 && value.end > value.start;
-}
 
 export function readFreeTime(date: string): FreeTime | null {
   try {

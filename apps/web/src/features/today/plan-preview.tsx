@@ -1,4 +1,5 @@
 "use client";
+import { freeTimeEnd, minuteInWindow, clockTimeLabel } from "@stay-focused/shared";
 import type { DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
 import {
   formatFreeTime,
@@ -12,14 +13,7 @@ function minuteOfDay(iso: string) {
   const date = new Date(iso);
   return date.getHours() * 60 + date.getMinutes();
 }
-function hourLabel(minutes: number) {
-  const date = new Date(2000, 0, 1, 0, 0);
-  date.setMinutes(Math.round(minutes));
-  return date.toLocaleTimeString([], {
-    hour: "numeric", hour12: true,
-    minute: minutes % 60 ? "2-digit" : undefined,
-  });
-}
+const hourLabel = clockTimeLabel;
 
 /**
  * The planner's proposal drawn to scale across the free window: one block per
@@ -41,7 +35,8 @@ export function PlanPreview({
   onApply: () => void;
   onDiscard: () => void;
 }) {
-  const span = Math.max(15, to - from);
+  const until = freeTimeEnd(from, to);
+  const span = Math.max(15, until - from);
   const taskIds = planTaskIds(plan);
   const planned = plan.sessions.reduce((t, s) => t + s.durationMinutes, 0);
   const unscheduled = plan.unscheduledWork.reduce(
@@ -49,9 +44,9 @@ export function PlanPreview({
     0,
   );
   const hours = Array.from(
-    { length: Math.floor(to / 60) - Math.ceil(from / 60) + 1 },
+    { length: Math.floor(until / 60) - Math.ceil(from / 60) + 1 },
     (_, i) => (Math.ceil(from / 60) + i) * 60,
-  ).filter((m) => m > from && m < to);
+  ).filter((m) => m > from && m < until);
   return (
     <section className="surface stack plan-preview" aria-label="Proposed plan">
       <div className="row between">
@@ -89,7 +84,7 @@ export function PlanPreview({
           />
         ))}
         {plan.sessions.map((session, index) => {
-          const start = minuteOfDay(session.startsAt);
+          const start = minuteInWindow(minuteOfDay(session.startsAt), from);
           const tone = planToneFor(taskIds, session.taskId);
           const late = session.scheduledAfterDeadline;
           return (
@@ -99,7 +94,7 @@ export function PlanPreview({
               title={`${session.taskTitle} · ${session.durationMinutes} min`}
               style={{
                 left: `${(Math.max(0, start - from) / span) * 100}%`,
-                width: `${(Math.min(session.durationMinutes, to - start) / span) * 100}%`,
+                width: `${(Math.min(session.durationMinutes, until - start) / span) * 100}%`,
                 color: `var(--${tone})`,
                 background: `var(--${tone}-soft)`,
                 animationDelay: `${index * 45}ms`,
