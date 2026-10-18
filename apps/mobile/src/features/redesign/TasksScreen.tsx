@@ -51,11 +51,11 @@ export function TasksScreen() {
     <Page
       title="Tasks"
       onRefresh={tasks.refresh}
-      headerBelow={<SnapshotStatus {...tasks} />}
+      hideHeaderBelowOnScroll
+      headerBelow={<><SnapshotStatus {...tasks} /><View style={{ paddingHorizontal: spacing[5] }}><SyncStatus /></View></>}
       headerAction={<IconAction label="Add a task" onPress={() => router.push("/task")}><Plus size={18} color={colors.accent} /></IconAction>}
       actions={[{ label: "Manage personal & completed tasks", onPress: () => router.push("/personal-tasks") }]}
     >
-      <SyncStatus />
       {tasks.loading && !tasks.data ? <SkeletonCards rows={4} label="Loading your tasks" /> : null}
       {tasks.error && !tasks.data ? (
         <Surface><Copy size="h3">{tasks.errorCode?.endsWith("api_base_url") ? "App configuration error" : "Tasks could not be loaded"}</Copy><Copy muted>{tasks.errorCode?.endsWith("api_base_url") ? tasks.error.split("\n").slice(1).join("\n") : tasks.error}</Copy><Action secondary onPress={tasks.refresh}>Try again</Action></Surface>
@@ -121,7 +121,7 @@ export function TasksCourseScreen() {
     pin("today", item.id, on);
   };
   return (
-    <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={tasks.refresh} headerBelow={<SnapshotStatus {...tasks} />} headerLeading={<CourseMark identity={identity} size={34} />}>
+    <Page back title={identity.title} subtitle={identity.subtitle ?? undefined} onRefresh={tasks.refresh} hideHeaderBelowOnScroll headerBelow={<SnapshotStatus {...tasks} />} headerLeading={<CourseMark identity={identity} size={34} />}>
       {gradeCourse ? <RowLink label="Grades" onPress={() => router.push({ pathname: TASK_COURSE_GRADES_PATHNAME,
         params: { ...courseRouteParams({ courseId: gradeCourse.id, courseName: gradeCourse.name }), courseKey } })}>
         <Copy>Grades</Copy>

@@ -26,6 +26,7 @@ import { haptic } from "./haptics";
 import { QueueButton } from "./QueueButton";
 import { useSheetDrag } from "./sheetDrag";
 import { motion, useTheme } from "./theme";
+import { useHideOnScroll } from "./useHideOnScroll";
 import { density, hitTarget, radius, spacing, typography } from "./tokens";
 
 export function Copy({
@@ -210,6 +211,9 @@ export function Page({
   onScroll,
   overlay,
   headerBelow,
+  headerBelowFixed,
+  hideHeaderBelowOnScroll = false,
+  headerBelowAlwaysVisible = false,
   scrollEnabled = true,
   scrollTouch,
   refreshEnabled = true,
@@ -231,6 +235,11 @@ export function Page({
   overlay?: ReactNode;
   /** Pinned content between the header and the scroll area (e.g. find-in-page). */
   headerBelow?: ReactNode;
+  /** Controls that must stay available above the collapsible secondary content. */
+  headerBelowFixed?: ReactNode;
+  hideHeaderBelowOnScroll?: boolean;
+  /** Keep find-in-page available while focused or searching, including match jumps. */
+  headerBelowAlwaysVisible?: boolean;
   scrollEnabled?: boolean;
   /**
    * Raw touch observers on the scroll view. They bubble from any content and
@@ -243,6 +252,8 @@ export function Page({
   const { colors, mode } = useTheme();
   const auth = useAuth();
   const [pulling, setPulling] = useState(false);
+  const collapsing = hideHeaderBelowOnScroll && scroll;
+  const header = useHideOnScroll({ enabled: collapsing, forceVisible: headerBelowAlwaysVisible });
   // Screens nested inside a tab already sit above the tab bar.
   const insideTabs = useContext(BottomTabBarHeightContext) !== undefined;
   const pullToRefresh = onRefresh
@@ -299,12 +310,25 @@ export function Page({
       {auth?.session?.offline ? <View accessibilityRole="text" style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[2] }}>
         <Copy muted size="caption">Offline access · Saved work is available. Online features reconnect automatically.</Copy>
       </View> : null}
-      {headerBelow}
+      {headerBelowFixed}
+      {collapsing ? (
+        <Animated.View
+          testID="page-collapsible-header"
+          style={header.style}
+          accessibilityElementsHidden={!header.visible}
+          importantForAccessibility={header.visible ? "auto" : "no-hide-descendants"}
+          pointerEvents={header.visible ? "auto" : "none"}
+        >
+          <View onLayout={header.onLayout} style={header.contentStyle}>{headerBelow}</View>
+        </Animated.View>
+      ) : headerBelow}
       <View style={{ flex: 1 }}>
       {scroll ? (
         <ScrollView
           ref={scrollRef}
-          onScroll={onScroll}
+          onScroll={collapsing ? (event) => { header.onScroll(event); onScroll?.(event); } : onScroll}
+          onLayout={collapsing ? header.onViewportLayout : undefined}
+          onContentSizeChange={collapsing ? header.onContentSizeChange : undefined}
           scrollEnabled={scrollEnabled}
           // Android's pull-to-refresh wrapper ignores a child's "don't steal
           // this touch" request unless the scroll view nests. Without this a
@@ -312,7 +336,7 @@ export function Page({
           // the page is taken as a pull-to-refresh.
           nestedScrollEnabled
           {...scrollTouch}
-          scrollEventThrottle={onScroll ? 16 : undefined}
+          scrollEventThrottle={collapsing || onScroll ? 16 : undefined}
           keyboardShouldPersistTaps="handled"
           refreshControl={pullToRefresh ? <RefreshControl enabled={refreshEnabled} refreshing={pulling} onRefresh={pullToRefresh} tintColor={colors.textSecondary} colors={[colors.accent]} progressBackgroundColor={colors.surfaceElevated} /> : undefined}
           contentContainerStyle={{
@@ -682,6 +706,8 @@ export function SearchField({
   label,
   autoFocus = false,
   onSubmitEditing,
+  onFocus,
+  onBlur,
 }: {
   value: string;
   onChangeText: (value: string) => void;
@@ -689,6 +715,8 @@ export function SearchField({
   label: string;
   autoFocus?: boolean;
   onSubmitEditing?: () => void;
+  onFocus?: React.ComponentProps<typeof TextInput>["onFocus"];
+  onBlur?: React.ComponentProps<typeof TextInput>["onBlur"];
 }) {
   const { colors } = useTheme();
   return (
@@ -705,6 +733,8 @@ export function SearchField({
         autoCapitalize="none"
         returnKeyType="search"
         onSubmitEditing={onSubmitEditing}
+        onFocus={onFocus}
+        onBlur={onBlur}
         submitBehavior={onSubmitEditing ? "submit" : "blurAndSubmit"}
         style={{ flex: 1, minHeight: 40, color: colors.textPrimary, fontSize: 15, paddingVertical: 0 }}
       />

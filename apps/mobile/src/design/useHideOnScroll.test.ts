@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { LayoutChangeEvent, NativeScrollEvent, NativeSyntheticEvent } from "react-native";
+import { nextHeaderVisibility, useHideOnScroll, type HeaderVisibilityState } from "./useHideOnScroll";
 
 const state = vi.hoisted(() => ({ reducedMotion: true, timing: vi.fn(), stop: vi.fn() }));
 vi.mock("./theme", () => ({ motion: { small: 180 }, useTheme: () => ({ reducedMotion: state.reducedMotion }) }));
@@ -20,8 +21,6 @@ vi.mock("react-native", () => ({
     },
   },
 }));
-
-import { nextHeaderVisibility, useHideOnScroll, type HeaderVisibilityState } from "./useHideOnScroll";
 
 const metrics = { y: 0, headerHeight: 50, contentHeight: 2000, viewportHeight: 700 };
 const shown: HeaderVisibilityState = { visible: true, anchorY: 0 };
@@ -45,6 +44,17 @@ describe("nextHeaderVisibility", () => {
   });
   it("tracks the highest offset before an upward reversal", () => {
     expect(decide(decide(hidden, 150), 141).visible).toBe(true);
+  });
+  it("ignores bottom elastic rebound while still showing on a real upward drag", () => {
+    const bottom = decide(hidden, 1400);
+    expect(bottom.anchorY).toBe(1300);
+    expect(decide(bottom, 1300).visible).toBe(false);
+    expect(decide(bottom, 1290).visible).toBe(true);
+  });
+  it("does not reopen because collapsing the header enlarged the viewport at the bottom", () => {
+    const bottom = { visible: false, anchorY: 1300 };
+    const expanded = nextHeaderVisibility(bottom, { ...metrics, y: 1250, viewportHeight: 750 });
+    expect(expanded).toEqual({ visible: false, anchorY: 1250 });
   });
   it.each([0, -20])("shows at the top or pull-to-refresh overscroll (%s)", y => {
     expect(decide(hidden, y)).toEqual(shown);

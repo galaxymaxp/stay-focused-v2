@@ -116,6 +116,7 @@ export function ReviewerReaderScreen({
   const anchors = useMemo(() => reviewerAnchors(reviewer), [reviewer]);
 
   const [query, setQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const [quizOpen, setQuizOpen] = useState(openQuizInitially);
   const [exportOpen, setExportOpen] = useState(false);
   const { session } = useAuth();
@@ -314,6 +315,8 @@ export function ReviewerReaderScreen({
       subtitle={subtitle}
       scrollRef={scrollRef}
       onScroll={onScroll}
+      hideHeaderBelowOnScroll
+      headerBelowAlwaysVisible={searchFocused || query.length > 0 || deferredQuery.length > 0}
       scrollEnabled={scrollEnabled}
       scrollTouch={{
         onTouchStart: (event) => scrubber.current.touch?.onTouchStart(event),
@@ -325,6 +328,8 @@ export function ReviewerReaderScreen({
         {snapshotStatus}
         <ReviewerSearchBar
           query={query}
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
           onChangeQuery={setQuery}
           matches={matches}
           topicTitle={(index) => reviewer.sections[index]?.title ?? `Topic ${index + 1}`}
@@ -633,6 +638,8 @@ function ReviewerSearchBar({
   onSelect,
   onPrevious,
   onNext,
+  onFocus,
+  onBlur,
 }: {
   query: string;
   onChangeQuery: (value: string) => void;
@@ -642,6 +649,8 @@ function ReviewerSearchBar({
   onSelect: (matchIndex: number) => void;
   onPrevious: () => void;
   onNext: () => void;
+  onFocus: () => void;
+  onBlur: () => void;
 }) {
   const { colors } = useTheme();
   const searching = query.trim().length >= MIN_QUERY_LENGTH;
@@ -659,7 +668,7 @@ function ReviewerSearchBar({
   const activeSection = matches[active]?.sectionIndex;
   return (
     <View testID="reviewer-search" style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[2], gap: spacing[1] }}>
-      <SearchField value={query} onChangeText={onChangeQuery} placeholder="Search topics, terms, definitions" label="Search this Reviewer" onSubmitEditing={onNext} />
+      <SearchField value={query} onChangeText={onChangeQuery} placeholder="Search topics, terms, definitions" label="Search this Reviewer" onSubmitEditing={onNext} onFocus={onFocus} onBlur={onBlur} />
       {searching ? (
         <>
           <View style={{ flexDirection: "row", alignItems: "center", minHeight: 36 }}>

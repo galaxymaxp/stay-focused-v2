@@ -93,8 +93,8 @@ vi.mock("../../design/theme", async () => {
 vi.mock("../../design/primitives", () => ({
   Sheet: "Sheet",
   RowLink: "RowLink",
-  Page: (props: { children?: import("react").ReactNode; headerBelow?: import("react").ReactNode; headerAction?: import("react").ReactNode }) =>
-    createElement("Page", props, props.headerAction, props.headerBelow, props.children),
+  Page: (props: { children?: import("react").ReactNode; headerBelow?: import("react").ReactNode; headerBelowFixed?: import("react").ReactNode; headerAction?: import("react").ReactNode }) =>
+    createElement("Page", props, props.headerAction, props.headerBelowFixed, props.headerBelow, props.children),
   Action: "Action",
   Surface: "Surface",
   Notice: "Notice",
@@ -361,6 +361,21 @@ const ringAt = (minutes: number, offset = 0) => {
   return { x: 170 + (136 + offset) * Math.cos(angle), y: 170 + (136 + offset) * Math.sin(angle) };
 };
 describe("B25 screen interactions", () => {
+  it.each([TodayScreen, TasksScreen, TasksCourseScreen, LibraryCourseScreen])("opts the reading screen into secondary-header collapse: %s", async Screen => {
+    const root = await render(createElement(Screen));
+    const page = root.findAll(node => String(node.type) === "Page")[0]!;
+    expect(page.props.hideHeaderBelowOnScroll).toBe(true);
+    expect(page.props.headerBelowAlwaysVisible).not.toBe(true);
+    if (Screen === TodayScreen) {
+      expect(page.props.subtitle).toBeUndefined();
+      expect(copyText(root)).toContain(new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" }));
+    }
+    if (Screen === LibraryCourseScreen) {
+      expect(page.props.onScroll).toBeTypeOf("function");
+      expect(page.props.headerBelowFixed).toBeDefined();
+      expect(root.findAll(node => String(node.type) === "SegmentedControl").length).toBeGreaterThan(0);
+    }
+  });
   it("shows a configuration error instead of a sign-in prompt on Generate and Tasks", async () => {
     mocks.errors["/api/experience/courses"] = { code: "missing_api_base_url", message: "App configuration error\nThis version of Stay Focused is missing its server connection configuration." };
     const generate = await render(createElement(GenerateScreen));

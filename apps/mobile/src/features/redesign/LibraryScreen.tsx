@@ -301,10 +301,11 @@ export function LibraryCourseScreen() {
       onRefresh={library.refresh}
       scrollRef={organizer.scrollRef}
       onScroll={organizer.onScroll}
+      hideHeaderBelowOnScroll
       scrollEnabled={!organizer.dragging}
       refreshEnabled={!organizer.editing}
       headerLeading={identity ? <CourseMark identity={identity} size={34} /> : undefined}
-      headerBelow={
+      headerBelowFixed={
         <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[3] }}>
             <View style={{ flex: 1, minWidth: 0 }}><SnapshotStatus {...library} inset={false} /></View>
@@ -321,9 +322,9 @@ export function LibraryCourseScreen() {
               onToggleAll={organizer.toggleAll} onCancel={organizer.done}
             /> : <SegmentedControl segments={librarySegments} value={filter} onChange={(value) => { setFilter(value); setVisible(LOCAL_PAGE_SIZE); }} />}
           </View>
-          {offlineCaption ? <Copy muted size="caption" style={{ marginTop: spacing[2] }}>{offlineCaption}</Copy> : null}
         </View>
       }
+      headerBelow={offlineCaption ? <Copy muted size="caption" style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>{offlineCaption}</Copy> : null}
     >
       {offline ? <Notice>{OFFLINE_LIBRARY_NOTICE}</Notice> : null}
       {sort === "course" && sequence.loading && !sequence.data ? <Copy muted size="caption">Loading course order…</Copy> : null}

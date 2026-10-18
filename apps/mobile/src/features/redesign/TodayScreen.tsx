@@ -17,6 +17,7 @@ import { courseAccent, courseIdentity } from "../../design/courseIdentity";
 import { Action, Copy, Notice, Page, RowLink, Surface, ContentIcon, SkeletonBlock, SkeletonCards } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { useTheme } from "../../design/theme";
+import { spacing } from "../../design/tokens";
 import { sessionStore } from "../../auth/sessionStore";
 import { useAuth } from "../../auth";
 import { experienceRequest } from "../../services/experienceApi";
@@ -287,13 +288,16 @@ export function TodayScreen() {
   return (
     <Page
       title={`${greetingFor(new Date().getHours())}${firstName ? `, ${firstName}` : ""}`}
-      subtitle={new Date().toLocaleDateString([], {
+      hideHeaderBelowOnScroll
+      headerBelow={<>
+        <Copy muted size="caption" style={{ paddingHorizontal: spacing[5] }}>{new Date().toLocaleDateString([], {
         weekday: "long",
         month: "long",
         day: "numeric",
-      })}
-      headerBelow={<SnapshotStatus {...today} refreshing={today.refreshing || announcements.refreshing || activities.refreshing}
-        error={today.error ?? announcements.error ?? activities.error} refresh={() => { today.refresh(); }} />}
+      })}</Copy>
+        <SnapshotStatus {...today} refreshing={today.refreshing || announcements.refreshing || activities.refreshing}
+          error={today.error ?? announcements.error ?? activities.error} refresh={() => { today.refresh(); }} />
+      </>}
       scrollEnabled={!ringActive}
       scrollRef={scrollRef}
       scrollTouch={orbTouchPause}

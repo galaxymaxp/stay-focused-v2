@@ -23,9 +23,14 @@ export function nextHeaderVisibility(prev: HeaderVisibilityState, metrics: Heade
   if (![y, headerHeight, contentHeight, viewportHeight].every(Number.isFinite)) return prev;
   if (forceVisible || y <= 0 || contentHeight <= viewportHeight) return { visible: true, anchorY: Math.max(0, y) };
   if (viewportHeight <= 0 || headerHeight <= 0) return prev;
-  const anchorY = prev.visible ? Math.min(prev.anchorY, y) : Math.max(prev.anchorY, y);
-  if (prev.visible && y > headerHeight + 24 && y - anchorY > 8) return { visible: false, anchorY: y };
-  if (!prev.visible && anchorY - y > 8) return { visible: true, anchorY: y };
+  // Collapsing expands the viewport. At the bottom, native offset correction
+  // (or elastic rebound) must not look like the student scrolling back up.
+  const maximumY = Math.max(0, contentHeight - viewportHeight);
+  const offset = Math.min(y, maximumY);
+  const previousAnchor = Math.min(prev.anchorY, maximumY);
+  const anchorY = prev.visible ? Math.min(previousAnchor, offset) : Math.max(previousAnchor, offset);
+  if (prev.visible && offset > headerHeight + 24 && offset - anchorY > 8) return { visible: false, anchorY: offset };
+  if (!prev.visible && anchorY - offset > 8) return { visible: true, anchorY: offset };
   return { visible: prev.visible, anchorY };
 }
 

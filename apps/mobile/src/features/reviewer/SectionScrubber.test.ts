@@ -32,7 +32,9 @@ vi.mock("react-native", () => ({
 vi.mock("lucide-react-native", () => Object.fromEntries(["ChevronDown", "ChevronUp", "FileQuestion", "CheckCircle2", "Circle", "Sparkles", "X", "AlertCircle",
   "AlignLeft", "ArrowLeftRight", "Check", "FlaskConical", "Lightbulb", "RotateCcw"].map((name) => [name, name])));
 vi.mock("../../design/primitives", () => ({
-  Action: "Action", Copy: "Copy", Notice: "Notice", Page: "Page", SearchField: "SearchField", SegmentedControl: "SegmentedControl", Sheet: "Sheet", Surface: "Surface", SkeletonBlock: "SkeletonBlock",
+  Action: "Action", Copy: "Copy", Notice: "Notice",
+  Page: (props: { children?: import("react").ReactNode; headerBelow?: import("react").ReactNode }) => createElement("Page", props, props.headerBelow, props.children),
+  SearchField: "SearchField", SegmentedControl: "SegmentedControl", Sheet: "Sheet", Surface: "Surface", SkeletonBlock: "SkeletonBlock",
 }));
 vi.mock("../../design/haptics", () => ({ haptic: { tap: vi.fn(), select: vi.fn(), press: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() } }));
 vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
@@ -85,6 +87,36 @@ const bubbleText = () =>
   rendered!.root.findAll((node) => String(node.type) === "Copy").map((node) => [node.props.children].flat().join("")).join(" | ");
 
 describe('Reviewer review-time header', () => {
+  it('pins search while focused or with any active query, including a downward match jump', async () => {
+    const artifact: LibraryArtifactSummary = { id: 'artifact:saved', type: 'reviewer', title: 'Cells', course: null,
+      sourceId: null, sourceTitle: 'Cells.pdf', activityId: null, createdAt: '2026-10-13', updatedAt: '2026-10-13',
+      lastOpenedAt: null, status: 'completed', relatedArtifactIds: [] };
+    const reviewer: ReviewerReaderModel = { id: artifact.id, title: artifact.title, course: null,
+      source: { id: null, title: 'Cells.pdf' }, generatedAt: artifact.createdAt, freshness: 'unknown',
+      sections: [{ id: 's1', title: 'Cells', blocks: [] }, { id: 's2', title: 'Cells again', blocks: [] }] };
+    const scrollTo = vi.fn();
+    await act(async () => { rendered = create(createElement(ReviewerReaderScreen, { artifact, reviewer, deviceCopy: false }), {
+      createNodeMock: () => ({ measureLayout: (_root: unknown, callback: (x: number, y: number) => void) => callback(0, 1200) }),
+    }); });
+    const page = () => rendered!.root.findByType('Page' as never);
+    const search = () => rendered!.root.findByType('SearchField' as never);
+    page().props.scrollRef.current = { scrollTo };
+    expect(page().props.hideHeaderBelowOnScroll).toBe(true);
+    expect(page().props.headerBelowAlwaysVisible).toBe(false);
+    await act(async () => search().props.onFocus());
+    expect(page().props.headerBelowAlwaysVisible).toBe(true);
+    await act(async () => search().props.onChangeText('C'));
+    await act(async () => search().props.onBlur());
+    expect(page().props.headerBelowAlwaysVisible).toBe(true);
+    await act(async () => search().props.onChangeText('Cells'));
+    expect(scrollTo).toHaveBeenCalledWith({ y: 1128, animated: false });
+    await act(async () => search().props.onSubmitEditing());
+    await act(async () => page().props.onScroll({ nativeEvent: { contentOffset: { y: 1128 }, contentSize: { height: 3000 }, layoutMeasurement: { height: 700 } } }));
+    expect(page().props.headerBelowAlwaysVisible).toBe(true);
+    expect(rendered!.root.findByProps({ testID: 'reviewer-search' })).toBeDefined();
+    await act(async () => search().props.onChangeText(''));
+    expect(page().props.headerBelowAlwaysVisible).toBe(false);
+  });
   it.each([
     { reviewMinutes: 10, origin: 'manual' as const, expected: '~10 min review' },
     { reviewMinutes: null, origin: 'manual' as const, expected: null },
