@@ -4173,3 +4173,69 @@ performs RB5 Generate at narrow phone-browser and resized desktop widths. Check
 search/link wrapping, breadcrumb/action separation, batch controls, course cards,
 Course options on Generate/Canvas, detail metadata and single sync progress.
 This run ends at WG1; no later roadmap task was started.
+
+
+## FX1 unattended checkpoint ? STOPPED (2026-10-18)
+
+**Status: STOPPED during STEP 0, before application edits.** FX1's unattended
+rule 3 requires a stop if code contradicts a prompt assumption. The proposed
+format/size explanation says the server stores original Commons files, but
+`commons.ts:73` already selects `info.thumburl`, line 75 uses thumbnail
+dimensions and line 91 requests 1200 px thumbnails. Existing tests assert raw
+SVG/oversize/foreign-host rejection and thumbnail-host normalization. This is
+code evidence, not proof that the device failure has been fixed. Both reported
+FULLSEND failures remain unresolved; no root cause is claimed.
+
+**Commits:** fetched expected `github/main` 0d7bfed and merged it without
+conflicts as **cb4df08** ? `merge: bring fullsend 2026-10-18 release fixes from main`.
+The subsequent `docs: record FX1 diagnostic stop` checkpoint contains this
+footer and reconciled current state/roadmap/sprint/FULLSEND acceptance. Its
+actual hash is recorded in `tmp/overnight/FX1.status` and Git history after
+commit, rather than recursively embedded here. Both use author galaxymaxp
+<omgraythekid@gmail.com>. No push. Unrelated UI/, apps/mobile/.gitignore and
+supabase/.temp/ remain untracked and untouched.
+
+**FRESH verification:** post-merge `npm ci` exit 0, **1,488 packages added,
+1,497 audited** with repo-local TEMP/TMP. npm reported **33 advisories
+(11 moderate, 22 high)** and deprecation warnings; no dependency repair was
+attempted. Documentation `git diff --check` and staged diff check pass
+(exit 0). Gate counts: **0/7 application commands run**; forced root
+typecheck/lint/build and shared/API/mobile/web suites are each **NOT RUN**
+because the mandatory earlier STOP overrides them. No test counts or fresh
+application acceptance are claimed. No test flake observed; suites did not run.
+First documentation-edit attempt could not start because Python is unavailable;
+the Node.js retry succeeded. No application checks failed.
+
+**Evidence and UNVERIFIED:** source-figure and snapshot image bytes use
+600-second signed storage URLs, with no bearer header needed for those bytes;
+external bytes use the allow-listed Commons image plus the stale 2.1.0
+User-Agent. Save hides HTTP/MIME/empty/module/native exceptions; its native
+write is awaited before cleanup. Android's current initial-file album path and
+iOS add-only decision are recorded in ADR-038. Actual failed HTTP response,
+stored historical image URL shape, native exception and APK module resolution
+are **UNVERIFIED (owner to confirm)**. `adb devices` found no phone; the
+requested read-only log dump waited for a device and was interrupted, yielding
+**zero records, BLOCKED**. This absence is not the STOP reason. Live deployed
+revision/database/Scheduler state is **UNVERIFIED (owner to confirm)**. No
+Supabase/Vercel/Google Cloud/Canvas/Resend request, remote SQL, migration,
+Scheduler action, deployment, email or environment-file edit occurred. The
+requested 2026-10-17 roadmap file was not found; no replacement was invented.
+
+**Exact owner question:** Given that current Commons selection already requests
+bounded thumbnails and stores thumburl, should FX1 resume under a revised scope
+that investigates the actual failed image response and save failure stage,
+preserves ADR-038's write-only/add-only permission constraints, and changes
+image selection or the Android media path only when evidence supports it?
+
+### Owner steps remaining
+
+Resolve that scope question, complete STEP 0 and both repairs, then execute
+all tests and fresh serial gates. **Rollout and Device checks were skipped
+entirely (NOT RUN).** After a reviewed JS/TS repair, run the preview-update
+preflight before separately authorized OTA to runtime 2.2.0-sdk57, plus API
+deployment if applicable. A native change needs a new APK with deliberate
+versionCode 7 (preview autoIncrement is false). On Realme, recheck saving
+figures, page snapshots and external images, plus external card/viewer loading.
+FULLSEND browser, overflowing-viewer and suitable-source Office checks remain.
+
+[FX1 file:line evidence and hypothesis verdicts](acceptance/fx1-image-diagnosis.md).

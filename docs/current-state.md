@@ -1,5 +1,31 @@
 # Current State
 
+## FX1 diagnosis stopped before implementation (2026-10-18)
+
+**STOPPED under FX1 unattended rule 3 during STEP 0.** The current server
+already requests Commons thumbnails at 1200 px, selects `info.thumburl` with
+thumbnail dimensions, and rejects raw SVG, TIFF and oversized thumbnails.
+This contradicts the prompt's original-file premise. Neither device failure
+is repaired and no root cause is claimed. Main release fixes from expected
+`github/main` **0d7bfed** were merged normally as **cb4df08**; the shipped release
+remains dc162de according to FULLSEND's historical evidence.
+
+All seven requested application gates are **NOT RUN (0/7 executed)** because
+the earlier STOP takes precedence. `adb devices` found no connected phone;
+the read-only log dump was interrupted while waiting, with zero records
+obtained (**BLOCKED**). Missing device access alone did not cause the STOP.
+Live revisions, failed image/response, native exception, module resolution,
+database and Scheduler state are **UNVERIFIED (owner to confirm)**.
+
+**Owner steps remaining:** resolve the exact scope question in the FX1 report,
+complete diagnosis and repairs, then run every fresh serial gate. Rollout and
+Device checks were skipped entirely (**NOT RUN**). No push, deployment,
+remote service call, database operation, migration change, Scheduler action,
+email or environment-file edit occurred. Unrelated untracked files remain.
+The requested 2026-10-17 roadmap file was not found; no replacement was created.
+
+[FX1 diagnosis and owner question](ai/acceptance/fx1-image-diagnosis.md).
+
 ## FULLSEND shipped; live acceptance PARTIAL (2026-10-18)
 
 The explicitly authorized release is on main and production: pinned WG1
