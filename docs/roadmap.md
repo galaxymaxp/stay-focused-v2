@@ -1,5 +1,29 @@
 # Roadmap
 
+<!-- UC1 begin -->
+UC1 / in-app update checker (2026-10-19): **PASS** for the finite local
+code scope, baseline `7506d51`, branch `overnight/2026-10-15_feedback`.
+Endpoint: UC1 STEP 0-6, tests/gates/docs/local commits only. Shared release
+parsing/runtime comparison and the public API route are complete; mobile has
+a persisted twelve-hour checker, one Today banner with version dismissal,
+online-only minimum-supported sheet and Settings About/manual checks/notes.
+No new native module, dependency, runtime or version-code change. Metadata
+fetches are bounded; server cache is ten minutes with stale/204 fallback.
+Implementation commits: `71e7a51`, `d24112c`, `e239af3`, `092fde0`,
+`e48b8c5`, `8375004`, `62085d3`, `1ffcd06`.
+FRESH PASS: shared 576/576 (source plus existing emitted copies), API 2404 passed /
+3 intentional live skips, mobile 1503/1503; final forced typecheck/lint 8/8 tasks
+each, zero cached, six existing lint warnings; API build 36/36 pages and Android
+local export. Additional forced root build passes 8/8 tasks, zero cached,
+including API/web and Android/iOS/web exports; final diff hygiene passes.
+Rollout and Device checks NOT RUN, skipped entirely. Live release, production,
+remote refs and phone behavior UNVERIFIED (owner to confirm); no remote service
+operation, deployment, SQL, Scheduler change, environment-file edit or push.
+Owner rollout/device acceptance remains separate; UC2 website download/showcase
+links and UC3 release automation are the next separately scoped slices, not
+started. [Acceptance](ai/acceptance/uc1-update-checker.md); ADR-050 in `docs/adr/`.
+<!-- UC1 end -->
+
 PAR1b / web-mobile parity audit (2026-10-19): **PASS for the finite docs-only source audit**, baseline `796e312` on `overnight/2026-10-15_feedback`, endpoint PAR1b only. Completed 54 source-backed feature rows and 16 gaps ranked by student impact; both platforms have file:line evidence, with partial behavior and roadmap mismatches explicit. Expected untracked owner paths remain untouched. FRESH PASS: `git diff --check` (1/1 prompt gate, 0 errors), docs-only scope (1/1, five docs paths), source-link/line validation; build/typecheck/lint/application tests NOT APPLICABLE. One local commit `docs: complete web vs mobile parity audit`; exact hash in Git and `tmp/overnight/PAR1b.status`. Rollout/Device checks NOT RUN, skipped entirely; live/deployed/migration/provider/Scheduler/device state UNVERIFIED (owner to confirm). Supersedes the prior PAR1 preflight-only record; owner exception is resolved. Next: Claude and Fely use Gaps for the next roadmap; no later slice started. [Audit](ai/parity-web-mobile-20261018.md).
 
 PF1b / profile photos (2026-10-19): **PASS for the finite local code scope**, baseline `1ad0039` on `overnight/2026-10-15_feedback`, endpoint PF1b only. Private service-managed avatar storage and owner-only RLS/grants, bounded image validation/cropping, shared uploaded/provider/initial resolution and memory-only expiry, plus web/mobile photo controls are committed in `14a10d5`, `74c07df`, `8ee9099`, `6574093`, `fc9a330`. FRESH PASS: all 10 prompt gates; shared 542/542, API 2397 passed/3 skipped live cases, web 353/353, mobile 1481/1481; forced typecheck/lint 8/8 tasks each, 0 cached, six existing lint warnings; API/web/Android builds and diff hygiene pass; additional forced root build 8/8, 0 cached. Failed fixture attempts are retained in the acceptance report. Migration `20261018000300_profile_avatars.sql` is a FILE ONLY; rollout/device checks NOT RUN, all remote actions excluded. Live provider/production/device state UNVERIFIED (owner to confirm). [Acceptance](ai/acceptance/pf1b-profile-avatars.md).

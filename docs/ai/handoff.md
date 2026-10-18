@@ -6964,3 +6964,91 @@ no network refresh established current remote state.
   `npm i -g vercel` is strongly recommended; no installation/invocation ran.
 
 The finite PAR1b endpoint is complete; no RB6 or later task was started.
+
+## UC1 in-app update checker - 2026-10-19
+
+**Status: PASS for the finite UC1 local code scope; all eight prompt gates
+and the additional forced root build pass.** Baseline `7506d51`, branch
+`overnight/2026-10-15_feedback`, endpoint UC1 only. Read the full UC1 prompt,
+overriding UNATTENDED rules, external update-checker roadmap, repository policy,
+AUTOPILOT and current planning files. Historical FS2/UC0 local records report
+PASS; their remote actions were neither repeated nor independently verified.
+The three expected untracked owner paths were preserved and never staged.
+
+Shared validation maps public GitHub releases, strips machine metadata from
+plain notes and compares runtime/native codes with minimum-supported priority.
+The public API route has a five-second fetch/body bound, ten-minute in-memory
+cache, coalesced refreshes, failure backoff, stale fallback/204 and public
+five-minute response caching. It requires no session and contains no user data.
+The existing protected-route JWT policy is unchanged. Health's hardcoded
+`2.1.0` is out of scope and unchanged.
+
+Mobile uses the installed expo-constants/expo-updates modules. The device store
+persists last attempt/success, validated release and dismissed version code;
+automatic metadata requests are throttled twelve hours, with manual bypass.
+Today has one optional native-update banner with Download/version dismissal.
+The online minimum-supported sheet disables all close gestures and releases on
+background/offline state or failed bounded health probes. Cached successful
+metadata needs a fresh health probe before it can block after restart; the
+periodic probe is ten seconds with a five-second timeout. Settings About shows
+version/code, OTA short ID or built-in, manual checks, last checked and plain
+release notes. No native module, dependency, runtime or build-number change.
+
+Local commits, all authored `galaxymaxp <omgraythekid@gmail.com>`:
+
+- `71e7a51 feat(shared): parse and compare public app releases`
+- `d24112c feat(api): serve cached public app release metadata`
+- `e239af3 feat(mobile): persist and throttle public update checks`
+- `092fde0 fix(shared): keep blank release runtime metadata absent`
+- `e48b8c5 fix(mobile): preserve update checks across lifecycle races`
+- `8375004 feat(mobile): show native update banner and required sheet`
+- `62085d3 feat(mobile): add version and update checks to Settings About`
+- `1ffcd06 feat(mobile): check app releases on launch and foreground`
+- `docs: complete UC1 update checker handoff` records this entry, ADR-050,
+  acceptance and reconciled planning files. Its exact hash is recorded after
+  commit in Git and `tmp/overnight/UC1.status`; no self-referential amendment.
+
+**FRESH PASS: 8/8 prompt gates.** Forced typecheck/lint each pass 8/8 tasks,
+zero cached; lint has six existing warnings, zero errors. Shared: 576/576 tests,
+55 files (source plus existing emitted copies). API: 2404 passed / 3 intentional
+live skips, 210 files, `--maxWorkers=2`. Mobile: 1503/1503, 157 files. API build:
+36/36 static pages, dynamic latest-release handler. Android: one local bundle,
+35 assets, no publication. `git diff --check`: zero whitespace errors.
+Additional AUTOPILOT forced root build: **FRESH PASS, 8/8 tasks, zero cached**,
+including API/web and local Android/iOS/web exports. Staged diff hygiene also
+passes. Exact commands/log names
+and acceptance rows: [UC1 acceptance](acceptance/uc1-update-checker.md).
+
+Failed first attempts retained: mobile typecheck's one maybe-async storage
+adapter error, then two test `act` callback return errors; first forced lint
+7/8 tasks with two test children-prop errors; first mobile suite 1 failed /
+156 passed files with 1406 tests passing, due to an unmocked native Expo import
+in broad screen tests. All were corrected, not suppressed. Mobile reruns pass
+1501 then 1503 tests after two added race regressions. No nondeterministic flake
+observed. Test TEMP/TMP stays inside the repository; live-test flags are disabled.
+Generated declarations are inspected/restored; outputs/logs stay ignored.
+
+**UNVERIFIED (owner to confirm):** current public release/tag/APK availability,
+deployed API/website/worker revisions, remote-ref freshness, applied production
+state, real OTA identity and phone/browser behavior. No Supabase, Vercel, Google
+Cloud, Canvas or Resend call, remote SQL/migration, Scheduler operation, email,
+deployment, environment-file edit or push ran. No unverified live requirement
+was used as a reason to skip the authorized code work.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** deploy API and ship mobile using the
+  existing OTA process; UC1 adds no native module. Reconfirm real UC0 metadata.
+- **Device checks - NOT RUN, skipped entirely:** Settings About version/code and
+  OTA identity; manual current-release up-to-date feedback; on a real future
+  native release, banner/download/dismissal/notes and minimum-supported online
+  gating with offline Library still accessible. Do not fake a release.
+- UC2 download page/showcase links and UC3 publishing/fullsend automation are
+  the next separately scoped slices; neither was started.
+- Process-local cache does not provide a global GitHub rate-limit guarantee.
+  Required-sheet release after a physical connection loss can take up to the
+  ten-second probe interval plus its bounded five-second request.
+- For later owner rollout tooling, installing the Vercel CLI with
+  `npm i -g vercel` is strongly recommended. No installation/invocation ran.
+
+Final UC1 checkpoint/status is recorded in ignored `tmp/overnight/UC1.*`.
