@@ -1,5 +1,7 @@
 # Current State
 
+QZ1 (2026-10-18): mobile/web progress labels open question jump controls, sharing current/revealed/answered/unanswered states; saved-only mobile questions jump locally. Prompt gates FRESH PASS 9/9 (shared 470, mobile 1406, web 304 tests; forced typecheck/lint and API/Android/web builds). Implementation: `3eb0be0`, `8df68cc`, `0880274`. Rollout/device checks are owner steps; production/device state UNVERIFIED (owner to confirm); flagged intentionally absent. [QZ1 acceptance](ai/acceptance/qz1-question-jump.md).
+
 ## MD1 material descriptions - STOPPED at preflight (2026-10-18)
 
 MD1 was read in full and checked against baseline `665c156` on

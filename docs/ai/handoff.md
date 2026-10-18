@@ -5813,3 +5813,55 @@ environment-file edit or push. Unrelated untracked `UI/`,
 [MD1 acceptance](acceptance/md1-material-description.md) records the complete
 baseline and retained preflight findings. MD1 remains unfinished; resume only
 with the recorded scope assumptions resolved.
+
+## QZ1 question-number jump - PASS locally (2026-10-18)
+
+**Status: PASS for the finite unattended code scope.** STEP 0-4, tests,
+gates, docs and local commits completed on `overnight/2026-10-15_feedback`
+from baseline `8bf6b2d`; no later slice started. Mobile's progress label now
+opens the existing scrollable Questions Sheet with compact state chips;
+saved-only questions use a local list. Web's progress button opens a native
+dialog, sharing dots with the desktop rail, with Escape/outside/Done dismissal
+and focus return. Active attempts still use moveTo. Scoring, attempt
+persistence and API behavior are unchanged. **Flagged: not implemented**
+(the quiz model has no flag state). No migration or ADR was needed.
+
+**Commits:** `3eb0be0 feat(shared): quiz question states helper`,
+`8df68cc feat(mobile): tap question number to jump`,
+`0880274 feat(web): question jump dialog`, and `docs: close QZ1` (this
+commit; final hash in Git and `tmp/overnight/QZ1.status`). All commits use
+`galaxymaxp <omgraythekid@gmail.com>`; no push.
+
+**Gates: FRESH PASS 9/9 prompt commands.** Forced root typecheck/lint each
+8/8 tasks, 0 cached; shared 470/470 tests (45 files), mobile 1406/1406
+(143 files), web 304/304 (44 files). API build 1/1, 35/35 static pages;
+Android export 1/1; web build 1/1, 19/19 static pages; diff/staged-diff
+hygiene 0 errors. Additional AUTOPILOT forced root build FRESH PASS 8/8
+tasks, 0 cached, including Android/iOS/web exports. Six existing lint
+warnings remain. Focused shared 6/6, mobile navigation/slider 39/39 and web
+7/7 passed. First focused web run had 2 pass / 5 fail from fixture/mock
+issues; first web typecheck had 2 test typing errors. Fixed and rerun green;
+no validation weakened. Documentation diff caught one EOF blank line,
+removed before the passing retry. Full suites/builds had no failures or
+flakes. Next-generated declarations were inspected and restored.
+
+**UNVERIFIED (owner to confirm):** production revisions, applied database
+state, Scheduler state, remote-ref freshness and real browser/phone behavior.
+No remote service operation, deployment, SQL/migration application, Scheduler
+change, email, environment-file edit or push. Unrelated `UI/`,
+`apps/mobile/.gitignore`, `supabase/.temp/` are preserved; tmp/logs/build
+artifacts are excluded from commits.
+
+**Owner steps remaining**
+
+- **Rollout - NOT RUN, skipped entirely:** ship in the next fullsend (RB6).
+  For later owner Vercel tooling, installing the missing CLI with
+  `npm i -g vercel` is strongly recommended; no install/CLI use in this run.
+- **Device checks - NOT RUN, skipped entirely:** on the Realme, open a 10+
+  question quiz, tap Question N of M, and jump to an unanswered question.
+  Repeat on the website at 390px and desktop; check dismissal/focus return
+  and scrolling through a long quiz. Native browser/physical behavior is
+  not established by the component tests.
+
+[QZ1 acceptance](acceptance/qz1-question-jump.md) records the baseline,
+acceptance matrix, exact commands/counts, failed first attempts and owner steps.

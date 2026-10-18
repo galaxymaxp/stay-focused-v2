@@ -1,5 +1,7 @@
 # Roadmap
 
+QZ1 / BACKLOG P13 (2026-10-18): mobile/web tap-to-jump code complete locally (`3eb0be0`, `8df68cc`, `0880274`), prompt gates FRESH PASS 9/9; no scoring/persistence/API change and no flagged state. Next fullsend RB6 rollout and Realme/390px/desktop checks remain owner steps, NOT RUN; production/device state UNVERIFIED (owner to confirm). No later slice started. [QZ1 acceptance](ai/acceptance/qz1-question-jump.md).
+
 ## MD1 material descriptions - STOPPED at preflight (2026-10-18)
 
 Baseline `665c156`; branch `overnight/2026-10-15_feedback`. STEP 0 cannot

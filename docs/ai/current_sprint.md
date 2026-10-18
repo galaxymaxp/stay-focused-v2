@@ -1,3 +1,5 @@
+QZ1 (2026-10-18): finite STEP 0-4 code scope completed on `overnight/2026-10-15_feedback` from `8bf6b2d`; commits `3eb0be0`, `8df68cc`, `0880274`; prompt gates FRESH PASS 9/9 (470 shared / 1406 mobile / 304 web tests). Rollout/device checks skipped entirely for owner; production state UNVERIFIED (owner to confirm), flagged intentionally not implemented. Endpoint QZ1 only. [Acceptance](acceptance/qz1-question-jump.md).
+
 <!-- MD1 begin -->
 ## MD1 material descriptions - STOPPED at preflight (2026-10-18)
 
