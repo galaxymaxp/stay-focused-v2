@@ -1,3 +1,31 @@
+<!-- OI1 begin -->
+## OI1 offline reviewer images complete locally - PASS (2026-10-18)
+
+Finite STEP 0-8, tests, fresh serial local gates, docs and local commits are
+complete from baseline 181c4b6 on overnight/2026-10-15_feedback. Implementation
+**c78e4b5** reuses FX1b owner reads; private image files and a SQLite v9 manifest
+provide automatic saving, two downloads, restart/retry, local rendering, cleanup,
+40 MiB/500 MiB caps and image-aware readiness/bytes. Labels and attribution remain.
+No native dependency, API or remote migration. Website offline: NOT APPLICABLE
+(PAR1), since the website has no offline mode.
+
+**FRESH PASS:** forced root typecheck/lint/build **8/8 each, 0 cached**; shared
+**362/362** (42 files), mobile **1301/1301** (137 files); standalone API build
+**1/1**, **35/35** pages; Android export **1/1**. Root build also exports iOS/web
+and builds website **19/19** pages. API tests NOT APPLICABLE. Both diff checks
+PASS; six existing lint warnings. First failures and an aborted resumed build
+are recorded in acceptance; no nondeterministic flake observed.
+
+**Owner steps remaining:** Rollout and Device checks NOT RUN, skipped entirely.
+Publish reviewed mobile code; check images in airplane mode/after restart and
+replacement/removal storage drops. Live deployment/native build, DB/Scheduler
+and device behavior are UNVERIFIED (owner to confirm). No live provider check,
+deployment, remote SQL/migration, Scheduler, email, environment-file edit or push.
+Unrelated untracked work is preserved. OI1 is complete; no later scope started.
+
+[OI1 acceptance](acceptance/oi1-offline-reviewer-images.md).
+<!-- OI1 end -->
+
 <!-- WV1 begin -->
 ## WV1/N7 reviewer image load complete locally - PASS (2026-10-18)
 

@@ -1,5 +1,37 @@
 # Roadmap
 
+## OI1 offline reviewer images complete locally - PASS (2026-10-18)
+
+Finite unattended STEP 0-8, tests, fresh local gates, docs and local commits
+are complete. Reviewer images save automatically to private document storage
+after the text, with a persistent SQLite v9 manifest, concurrency two, retries,
+fresh owner reads and atomic publication. All three image surfaces prefer local
+files and retain labels/attribution. Readiness and storage include image state
+and bytes. Caps retain a reading-order prefix (40 MiB per reviewer / 500 MiB
+app-wide) with Some images need a connection. Removal, supersession, replacement,
+source denial, clear and sign-out invalidate previews and reject late writes.
+Manual gallery saving remains; no native dependency, API or remote migration.
+**PAR1:** website has no offline mode; website offline work is NOT APPLICABLE.
+
+**FRESH PASS, serial:** forced root typecheck/lint/build **8/8 each, 0 cached**;
+shared **362/362** (42 files), mobile **1301/1301** (137 files); standalone API
+build **1/1**, **35/35** pages; Android export **1/1**. Root build also exports
+iOS/web and builds website **19/19** pages. API tests NOT APPLICABLE (unchanged).
+Diff/staged-diff PASS; six existing lint warnings. Failed first attempts and an
+aborted resumed build are retained in acceptance; no nondeterministic flake.
+Implementation **c78e4b5**.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Publish reviewed mobile code, check offline images after airplane
+mode/restart and verify replacement/removal storage cleanup. Live deployed/native
+revision, database/Scheduler state and device behavior are **UNVERIFIED (owner
+to confirm)**. No live provider check, deployment, remote SQL/migration,
+Scheduler action, email, environment-file edit or push was run. Preserve earlier
+release limitations and unrelated work; stop at OI1 without starting later scope.
+
+[OI1 acceptance](ai/acceptance/oi1-offline-reviewer-images.md) ·
+[ADR-043](adr/ADR-043-offline-reviewer-images.md).
+
 ## WV1/N7 reviewer image load complete locally - PASS (2026-10-18)
 
 **PASS for unattended STEP 0-5, tests, local gates, docs and commits.** Website

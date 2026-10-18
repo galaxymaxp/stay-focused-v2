@@ -1,5 +1,44 @@
 # Current State
 
+## OI1 offline reviewer images complete locally - PASS (2026-10-18)
+
+**PASS for unattended STEP 0-8, tests, local gates, docs and commits.** Saving
+a reviewer to the device now queues its snapshots, figures and stored external
+references automatically in private document storage. SQLite v9 persists image
+identity, version, attempts and retry clocks; two downloads run at a time.
+Fresh FX1b owner reads, MIME/size/status validation and temporary-file moves
+protect publication. Reviewer text remains readable while images save.
+
+The reader prefers local files with the original labels and attribution.
+Readiness counts every non-capped image; storage totals include image bytes.
+Caps are 40 MiB per reviewer and 500 MiB across the app, preserving reading
+order with one quiet Some images need a connection line. Removal, supersession,
+version replacement, source denial, clearing and sign-out invalidate previews;
+late writes cannot restore removed copies. Manual gallery Save image remains.
+No native dependency, API or remote migration changes. **PAR1:** the website
+has no offline mode; website offline work is NOT APPLICABLE.
+
+**FRESH PASS, serial:** forced root typecheck/lint/build **8/8 tasks each,
+0 cached**; shared **362/362** tests (42 files), mobile **1301/1301** (137 files);
+standalone API build **1/1**, **35/35** pages; Android export **1/1**.
+Root build also exports iOS/web and builds website **19/19** pages. API tests
+NOT APPLICABLE (unchanged API). Diff/staged-diff checks PASS. Six existing lint
+warnings remain. Failed first attempts and the aborted resumed build are
+recorded in acceptance; no nondeterministic flake observed. Implementation:
+**c78e4b5**.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Publish the reviewed mobile change and check snapshots, figures and
+an external reference in airplane mode, after restart, replacement and removal;
+confirm storage drops. Native/deployed revision, live database/Scheduler state
+and physical behavior are **UNVERIFIED (owner to confirm)**. No live provider
+check, deployment, remote SQL/migration, Scheduler action, email, environment-file
+edit or push was run. Unrelated untracked work is preserved. OI1 is the finite
+endpoint; no later task was started.
+
+[OI1 acceptance](ai/acceptance/oi1-offline-reviewer-images.md) ·
+[ADR-043](adr/ADR-043-offline-reviewer-images.md).
+
 ## WV1/N7 reviewer image load complete locally - PASS (2026-10-18)
 
 **PASS for unattended STEP 0-5, tests, local gates, docs and commits.** Website

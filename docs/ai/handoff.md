@@ -4462,3 +4462,125 @@ scope. The finite endpoint is WV1; no later task was started.
 
 Acceptance: [WV1](acceptance/wv1-reviewer-images.md).
 ADR: [ADR-042](../adr/ADR-042-reviewer-visuals-single-load.md).
+
+## OI1 unattended offline reviewer images - PASS (2026-10-18)
+
+Status: **PASS** for STEP 0-8, tests, fresh serial local gates, docs and local
+commits on overnight/2026-10-15_feedback, baseline 181c4b6. Recovery reread the
+UNATTENDED rules, progress and Git state. All OI1 implementation was still
+uncommitted; no committed FX1b/WV1 work was repeated. FX1b 37fcd16, dfbf466,
+a10642b and b750224 are ancestors. Both code-level STOP conditions were absent:
+the offline reviewer store and fresh owner-scoped image reads already exist.
+
+Saving reviewer text now schedules images automatically without a gallery tap.
+Private document files use stable owner/artifact/version keys, a SQLite v9
+manifest, temporary-file validation/moves and a two-download background queue.
+Failed work resumes with persisted backoff after restart. Text remains readable
+through failures. Local snapshots, figures and external references retain their
+labels and attribution. Readiness counts all non-capped images; bytes include
+stored images. Reading-order caps are 40 MiB per reviewer and 500 MiB app-wide,
+with one Some images need a connection line. Removal, explicit supersession,
+replacement, authenticated source denial, clear and sign-out invalidate previews;
+generation guards reject late publication. Failed discovery does not establish
+deletion. Manual gallery saving and its tests remain. No new native dependency,
+API, server auth/RLS or remote migration. **PAR1:** website has no offline mode;
+website offline work is NOT APPLICABLE.
+
+### STEP 0 inspection anchors
+
+These file:line references describe the final implementation. Paths are relative
+to the repository root. The existing text body remains
+library_artifacts.payload_json; image files and manifest rows follow its lifecycle.
+
+- `apps/mobile/src/features/reviewer/saveImage.ts:26` and `:51`: permission,
+  lazy legacy filesystem download and manual gallery save; shared validation is
+  `apps/mobile/src/services/studyImageFile.ts:14`. Fresh exact snapshot/figure
+  owner reads are extracted at `studyImageFile.ts:32` and `:39`.
+- `apps/mobile/src/features/reviewer/SourcePageSnapshot.tsx:14`, `:56`, `:134`:
+  batch/local URI input and fresh snapshot read for manual save;
+  `apps/mobile/src/features/reviewer/SourceFigures.tsx:44`, `:58`, `:98`: batch/local
+  figures and fresh exact figure read. `apps/mobile/src/features/reviewer/ExternalVisual.tsx:14`,
+  `:17`, `:54`: batch/replacement URI, local preference and attributed gallery
+  save. Offline external URLs come from the same owner-scoped combined GET.
+- `apps/mobile/src/services/localLibrary/artifactStore.ts:40`, `:47`, `:230`:
+  OfflineStats, LocalArtifactStore and image-aware offlineReady. `:308` / `:511`
+  save the body and initialize its manifest. `:474` handles a newer summary;
+  `:359`, `:400`, `:415` own remove, clearBodies and purgeOwner cleanup.
+- `apps/mobile/src/services/localLibrary/schema.ts:100`: appended v9 table;
+  `:111` derives the schema version. Existing migrations are unchanged.
+  `apps/mobile/src/services/localLibrary/localArtifactDatabase.ts:12`, `:32`:
+  lazy SQLite open/migrate and sign-out drain/purge;
+  `apps/mobile/src/services/localLibrary/localArtifactDatabase.web.ts:7`: no web store.
+- `apps/mobile/src/services/localLibrary/offlineCatchUp.ts:41`, `:86`: startup
+  catch-up and queue stop; `apps/mobile/src/services/localLibrary/librarySync.ts:41`,
+  `:115`: reconciliation and post-text notification;
+  `apps/mobile/src/services/localLibrary/deviceLibrary.ts:15`: schedules images
+  through onDetailStored. Existing `apps/mobile/src/app-shell/AppLifecycle.tsx:40`
+  triggers catch-up after session restore/foreground.
+- `apps/mobile/src/features/redesign/useLocalLibrary.ts:88`: reads stats and
+  subscribes to changes; `apps/mobile/src/features/redesign/LibraryScreen.tsx:190`,
+  `:393`: offline caption and accessible Saved offline state;
+  `apps/mobile/src/features/redesign/libraryPresentation.ts:18`: All N items
+  caption consumes the updated image-aware counts.
+- `apps/mobile/src/features/settings/OfflineStorageSettings.tsx:55`: stop work
+  before clearBodies; `packages/shared/src/image-download.ts:1`: unchanged
+  StudyImageDownload contract. New queue/cache entry points are
+  `apps/mobile/src/services/localLibrary/offlineImageQueue.ts:11` and
+  `apps/mobile/src/services/localLibrary/offlineImages.ts:63`.
+
+### Commits and verification
+
+- `c78e4b5 feat(mobile): save reviewer images with offline library`
+- `docs: close OI1` is the closing docs/handoff commit; the final hash and both
+  run commits are recorded in ignored tmp/overnight/OI1.status.
+
+Author: galaxymaxp <omgraythekid@gmail.com> via --author. No push.
+Final application tree: **c78e4b5**. All following gates are **FRESH**, serial:
+
+- `npm run typecheck -- --force`: PASS, **8/8 tasks, 0 cached**.
+- `npm run lint -- --force`: PASS, **8/8 tasks, 0 cached**, six existing warnings
+  (five mobile import-order and one web unused import), zero errors.
+- `npm run test --workspace @stay-focused/shared`: PASS, **362/362**, **42/42 files**.
+- `npm run test --workspace @stay-focused/mobile`: PASS, **1301/1301**, **137/137 files**;
+  includes unchanged saveImage tests, actual SQLite reopen, queue/concurrency,
+  caps, cleanup, readiness and three local-image component regressions.
+- `npm run test --workspace @stay-focused/api`: **NOT APPLICABLE**, unchanged API.
+- AUTOPILOT `npm run build -- --force`: PASS, **8/8 tasks, 0 cached**; API
+  **35/35** and website **19/19** pages; Android/iOS/web exports.
+- `npm run build --workspace @stay-focused/api`: PASS, **1/1**, **35/35** pages.
+- `npm run build --workspace @stay-focused/mobile -- --platform android`:
+  PASS, **1/1 Android export**.
+- `git diff --check` and `git diff --cached --check`: PASS.
+
+First attempts are retained in acceptance: focused **93 pass / 6 fail**, then
+**75 / 1**, corrected **137/137**; first mobile **1288 pass / 5 fail** across
+four failed files, corrected focused **81/81**; early strict-type fixture
+diagnostics **3, 3, 1**; final-review typecheck **7/8 tasks** with one TS18049,
+then fixed. Two final regressions increased mobile from 1299 to 1301. A shared
+run that overlapped lint was repeated serially. No nondeterministic flake.
+Existing Vite CommonJS/config-loader and build color notices remain.
+
+On recovery, one root-build invocation was deliberately aborted (exit 1, no
+final task counts) to restore the previous non-loopback socket blocker and
+Expo-offline/Turbo-telemetry flags. No provider operation was observed during
+that invocation; remote activity/state was not verified. The passing resumed
+builds use the blocker, offline flags, disabled telemetry and repo-local TEMP/TMP.
+Logs are ignored under tmp/overnight/OI1.gates; generated Next ambient changes
+were inspected/restored. No generated artifact, private fixture or credential
+is committed. Unrelated UI/, apps/mobile/.gitignore and supabase/.temp/ remain.
+
+### Owner steps remaining
+
+**Rollout and Device checks - NOT RUN, skipped entirely.** Publish reviewed
+mobile changes through the existing update process; no new native module or
+versionCode change is required by OI1. Save a reviewer with snapshots, figures
+and an external reference; use airplane mode, reopen and restart; verify all
+saved images and attribution. Replace/remove the reviewer and clear/sign out;
+confirm storage drops and previews disappear. Gallery copies remain independent.
+Deployed/native revision, live database rows, Scheduler and physical results
+are **UNVERIFIED (owner to confirm)**. No live provider check, deployment,
+remote SQL/migration, Scheduler action, email, environment-file edit or push
+was performed. The finite endpoint is OI1; no later task was started.
+
+Acceptance: [OI1](acceptance/oi1-offline-reviewer-images.md).
+ADR: [ADR-043](../adr/ADR-043-offline-reviewer-images.md).
