@@ -1,3 +1,4 @@
+import type { TodayWindowOverride } from "@stay-focused/shared";
 import { isPastStoredCourse } from '@/lib/course-state';
 import type { Quiz } from '@stay-focused/shared';
 import { estimateReviewerMinutes } from '@stay-focused/shared';
@@ -100,10 +101,10 @@ export class ExperienceService {
     const materials = await this.courseMaterialsForOwnedCourse(userId, courseId);
     return { course: { ...course, materialCount: materials.totalKnown }, materials, capabilities: experienceCapabilities() };
   }
-  private async activityContext(userId: string, date?: string, offset = 0, includeArchivedCourses = false) {
+  private async activityContext(userId: string, date?: string, offset = 0, includeArchivedCourses = false, window?: TodayWindowOverride) {
     const now = this.now;
     const requestedDate = date ?? new Date(now + offset * 60_000).toISOString().slice(0, 10);
-    const { end } = dayWindow(requestedDate, offset);
+    const { end } = dayWindow(requestedDate, offset, window);
     return { ...await readActivityContext(this.dependencies.repository, userId, now, end, includeArchivedCourses), now, date: requestedDate };
   }
   async getActivityList(userId: string, filters: { courseId?: string; status?: ActivitySummary['status']; offsetMinutes?: number } = {}): Promise<readonly ActivitySummary[]> {
@@ -156,12 +157,13 @@ export class ExperienceService {
     return [...byCanvasId.values()].sort((a, b) => a.filename.localeCompare(b.filename) || a.canvasFileId.localeCompare(b.canvasFileId))
       .map((item, index) => ({ key: `a${index}`, filename: item.filename, contentType: item.contentType, extension: attachmentExtension(item.filename), size: item.size, canvasFileId: item.canvasFileId }));
   }
-  async getTodayOverview(userId: string, date: string, offset = 0): Promise<TodayOverview> {
-    dayWindow(date, offset);
-    const [context, sessions, plans] = await Promise.all([this.activityContext(userId, date, offset), this.rows('study_sessions', userId), this.rows('study_plans', userId)]);
-    return composeToday({ userId, date, offset, now: context.now, activities: context.activities, tasks: context.tasks, sessions, plans });
+  async getTodayOverview(userId: string, date: string, offset = 0, window?: TodayWindowOverride): Promise<TodayOverview> {
+    dayWindow(date, offset, window);
+    const [context, sessions, plans] = await Promise.all([this.activityContext(userId, date, offset, false, window), this.rows('study_sessions', userId), this.rows('study_plans', userId)]);
+    return composeToday({ userId, date, offset, window, now: context.now, activities: context.activities, tasks: context.tasks, sessions, plans });
   }
-  async getTodayScreen(userId: string, date: string, offset = 0): Promise<TodayScreenData> {
+  async getTodayScreen(userId: string, date: string, offset = 0, window?: TodayWindowOverride): Promise<TodayScreenData> {
+    dayWindow(date, offset, window);
     // Cache promises only inside this verified request, including concurrent
     // reads. Never reuse identity, authorization or data between requests.
     const reads = new Map<ExperienceTable, Promise<readonly ExperienceRow<ExperienceTable>[]>>();
@@ -177,7 +179,7 @@ export class ExperienceService {
     const now = this.now;
     const service = new ExperienceService({ ...this.dependencies, repository, now: () => now });
     const [today, items, announcements] = await Promise.all([
-      service.getTodayOverview(userId, date, offset),
+      service.getTodayOverview(userId, date, offset, window),
       service.getActivityList(userId, { offsetMinutes: offset }),
       service.getAnnouncements(userId, { limit: 20 }),
     ]);

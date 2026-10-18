@@ -5,6 +5,9 @@ export class ExperienceFailure extends Error {
     super(code);
   }
 }
+export class TodayWindowFailure extends ExperienceFailure {
+  constructor() { super(400, 'invalid_request'); }
+}
 export function normalizeExperienceError(error: unknown): { status: number; error: ExperienceError } {
   const failure = error instanceof ExperienceFailure ? error : new ExperienceFailure(503, 'unavailable');
   const copy: Record<ExperienceError['code'], Omit<ExperienceError, 'code'>> = {
@@ -43,7 +46,7 @@ export function normalizeExperienceError(error: unknown): { status: number; erro
     study_answer_too_long: { title: 'Answer too long', message: 'Shorten your answer to the key idea and check it again.', retryable: false, action: 'none' },
     study_follow_up_limit: { title: 'Start a new question', message: 'This question has reached its follow-up limit. Start a new question.', retryable: false, action: 'none' },
   };
-  return { status: failure.status, error: { code: failure.code, ...copy[failure.code], ...(failure.code === 'quiz_source_capacity_exceeded' && Number.isInteger(failure.supportedMaximum) ? { supportedMaximum: failure.supportedMaximum } : {}) } };
+  return { status: failure.status, error: { code: failure.code, ...copy[failure.code], ...(failure instanceof TodayWindowFailure ? { message: 'Use ISO timestamps with offsets. The Today window must start within the requested date, end at or after its next midnight, and end no more than 24 hours after that midnight; end must follow start.' } : {}), ...(failure.code === 'quiz_source_capacity_exceeded' && Number.isInteger(failure.supportedMaximum) ? { supportedMaximum: failure.supportedMaximum } : {}) } };
 }
 export function requireFound<T>(value: T | null | undefined): T {
   if (value == null) throw new ExperienceFailure(404, 'not_found');

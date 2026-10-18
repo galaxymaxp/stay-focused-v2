@@ -232,3 +232,32 @@ describe('repository owner predicates and pagination', () => {
     expect(insert).not.toHaveBeenCalled(); expect(update).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenCalled();
   });
 });
+
+describe('Today read window validation', () => {
+  it.each([
+    'endsAt=bad', 'endsAt=', 'startsAt=',
+    'endsAt=2026-10-18T04:00:00',
+    'endsAt=2026-10-19T00:00:01%2B08:00',
+    'endsAt=2026-10-17T23:59:59%2B08:00',
+    'startsAt=2026-10-16T23:59:59%2B08:00',
+    'startsAt=2026-10-18T00:00:00%2B08:00',
+    'endsAt=2026-02-30T04:00:00%2B08:00',
+    'endsAt=2026-10-18T24:00:00%2B08:00',
+  ])('rejects invalid overrides: %s', async query => {
+    const result = await todayGet(new Request('https://app.example/api/today?date=2026-10-17&utcOffsetMinutes=480&' + query));
+    expect(result.status).toBe(400);
+    const body = await result.json();
+    expect(body.error.code).toBe('invalid_request'); expect(body.error.message).toContain('ISO');
+    expect(mocks.rows).not.toHaveBeenCalled();
+  });
+  it('passes the override through service projection with the same authenticated owner', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-18T01:30:00+08:00'));
+    try {
+      mocks.rows.mockImplementation(async (table: string) => table === 'study_sessions' ? [{ id: 'overnight', user_id: 'owner', task_id: 'task', status: 'planned', starts_at: '2026-10-18T01:00:00+08:00', ends_at: '2026-10-18T02:00:00+08:00' }] : []);
+      const result = await todayGet(new Request('https://app.example/api/today?date=2026-10-17&utcOffsetMinutes=480&endsAt=2026-10-18T04:00:00%2B08:00'));
+      expect(result.status).toBe(200); expect((await result.json()).data.current.id).toBe('session:overnight');
+      const trimmed = await todayGet(new Request('https://app.example/api/today?date=2026-10-18&utcOffsetMinutes=480&startsAt=2026-10-18T04:00:00%2B08:00'));
+      expect(trimmed.status).toBe(200); expect((await trimmed.json()).data.timeline).toEqual([]);
+    } finally { vi.useRealTimers(); }
+  });
+});

@@ -1,3 +1,5 @@
+import type { TodayWindowOverride } from "@stay-focused/shared";
+import { TodayWindowFailure } from "./errors";
 import { storedCourseState, isPastStoredCourse } from '@/lib/course-state';
 import type { CanvasAssignmentRow, CanvasAssignmentSubmissionRow, CanvasCourseRow, TaskRow, StudySessionRow, StudyPlanRow } from '@stay-focused/db';
 import type { ActivitySummary, CourseSummary, ExperienceCapabilities, GenerateCoursePeriod, GenerateCourseSummary, GenerateCourseSyncState, FeatureCapability, GenerationCapability, GenerationView, LearningMaterial, LibraryArtifactSummary, ProcessingJobStatusView, ReviewerReaderModel, TodayItem, TodayOverview } from '@stay-focused/shared';
@@ -55,12 +57,25 @@ export function learningMaterial(row: CanvasReviewerSourceDescriptor, courseId: 
   return { id: row.id, courseId, title: row.title, description, kind, readiness, preparation: row.preparation, count: null, sourceId: row.id, reviewerArtifactId,
     moduleTitle: row.placement.moduleTitle, generation: generationCapability(ready, readiness === 'unsupported', ready && reviewerArtifactId !== null) };
 }
-export function dayWindow(date: string, offset = 0) {
+export function dayWindow(date: string, offset = 0, override: TodayWindowOverride = {}) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(offset) || offset < -720 || offset > 840) throw new ExperienceFailure(400, 'invalid_request');
   const utc = Date.parse(`${date}T00:00:00.000Z`);
   if (!Number.isFinite(utc) || new Date(utc).toISOString().slice(0, 10) !== date) throw new ExperienceFailure(400, 'invalid_request');
   const start = utc - offset * 60_000;
-  return { start, end: start + 86_400_000 };
+  const midnight = start + 86_400_000;
+  const parse = (value: string | undefined, fallback: number) => {
+    if (value === undefined) return fallback;
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(value)) throw new TodayWindowFailure();
+    const time = Date.parse(value);
+    const parts = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(value)!;
+    const localDay = Date.parse(parts[1] + 'T00:00:00Z');
+    if (!Number.isFinite(time) || new Date(localDay).toISOString().slice(0, 10) !== parts[1] || Number(parts[2]) > 23 || Number(parts[3]) > 59 || Number(parts[4]) > 59) throw new TodayWindowFailure();
+    return time;
+  };
+  const from = parse(override.startsAt, start), until = parse(override.endsAt, midnight);
+  // A trimmed start explicitly transfers the previous date's morning tail.
+  if (from < start || from >= midnight || until < midnight || until > midnight + 86_400_000 || until <= from) throw new TodayWindowFailure();
+  return { start: from, end: until };
 }
 const rank = { high: 0, medium: 1, low: 2 };
 export function compareActivities(a: ActivitySummary, b: ActivitySummary): number {
@@ -119,9 +134,9 @@ export function isActionableCanvasAssignment(assignment: Pick<CanvasAssignmentRo
 }
 export function composeToday(input: {
   userId: string; date: string; offset: number; now: number; activities: readonly ActivitySummary[];
-  tasks: readonly TaskRow[]; sessions: readonly StudySessionRow[]; plans: readonly StudyPlanRow[];
+  tasks: readonly TaskRow[]; sessions: readonly StudySessionRow[]; plans: readonly StudyPlanRow[]; window?: TodayWindowOverride;
 }): TodayOverview {
-  const { start, end } = dayWindow(input.date, input.offset);
+  const { start, end } = dayWindow(input.date, input.offset, input.window);
   const asOf = input.now;
   const tasks = input.tasks.filter(t => t.user_id === input.userId);
   const byTask = new Map(input.activities.filter(a => a.taskId).map(a => [a.taskId!, a]));
