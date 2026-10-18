@@ -217,6 +217,9 @@ function AccountMenu({ email }: { email: string }) {
             <Icon name="settings" />
             Account settings
           </Link>
+          <Link role="menuitem" href="/download">
+            Get the Android app
+          </Link>
           <Link role="menuitem" href="/canvas">
             <Icon name="globe" />
             Canvas connection

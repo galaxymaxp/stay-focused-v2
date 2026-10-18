@@ -48,9 +48,9 @@ function browserClient() {
 }
 export function Providers({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  return pathname?.startsWith('/s/') ? <PublicTheme>{children}</PublicTheme> : <AuthenticatedProviders>{children}</AuthenticatedProviders>;
+  return pathname === '/download' || pathname === '/release' || pathname?.startsWith('/s/') ? <PublicTheme>{children}</PublicTheme> : <AuthenticatedProviders>{children}</AuthenticatedProviders>;
 }
-/** Public sharing never initializes auth, refreshes tokens or hydrates private caches. */
+/** Public pages never initialize auth, refresh tokens or hydrate private caches. */
 function PublicTheme({ children }: { children: ReactNode }) {
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)');

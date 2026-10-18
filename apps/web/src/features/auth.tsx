@@ -152,6 +152,7 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
             {signUp ? "Sign in" : "Create an account"}
           </Link>
         </p>
+        <p className="meta"><Link href="/download">Get the Android app</Link></p>
         <label className="theme-select">
           Appearance
           <select
