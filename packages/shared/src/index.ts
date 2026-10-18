@@ -257,3 +257,5 @@ export * from './library-sort';
 export * from "./free-time";
 
 export * from './orb-interaction';
+export * from './avatar';
+export * from './avatar-memory';
