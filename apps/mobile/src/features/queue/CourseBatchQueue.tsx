@@ -1,3 +1,4 @@
+import { activeBatchSummaries } from '@stay-focused/shared';
 import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import { Action, Copy, Notice, Surface } from '../../design/primitives';
@@ -17,7 +18,7 @@ export function CourseBatchQueue() {
   }
   const data = queue.data?.courseBatches;
   return <View style={{ gap: spacing[2] }}>
-    {data?.summaries.map(group => <Copy key={group.batchKey} size="caption">{group.done} of {group.total} done</Copy>)}
+    {activeBatchSummaries(data).map(group => <Copy key={group.batchKey} size="caption">{group.done} of {group.total} done</Copy>)}
     {data?.requests.filter(row => ['waiting', 'quota', 'failed'].includes(row.state)).map(row => <Surface key={row.id}>
       <Copy size="h3">{row.title}</Copy>
       <Copy muted size="caption">{row.state === 'waiting' ? 'Waiting for preparation' : row.state === 'failed' ? 'Could not start this reviewer' : row.nextAvailableAt ? `Waiting for quota · retry after ${new Date(row.nextAvailableAt).toLocaleString()}` : 'Waiting for generation capacity'}</Copy>

@@ -41,6 +41,7 @@ export function useQueueSource() {
     data: ProcessingJobListPage | null;
     error: string | null;
   }>({ owner, data: null, error: null });
+  const [refreshing, setRefreshing] = useState(false);
   const detailId = useRef<string | null>(null);
   const wakeRef = useRef<(() => void) | null>(null);
   const refresh = useCallback(() => wakeRef.current?.(), []);
@@ -84,6 +85,7 @@ export function useQueueSource() {
       let next = 30_000;
       if (AppState.currentState === "active") {
         busy = true;
+        setRefreshing(true);
         try {
           const requested = detailId.current;
           stateDetail = requested;
@@ -103,6 +105,7 @@ export function useQueueSource() {
             }));
         } finally {
           busy = false;
+          if (live) setRefreshing(false);
         }
       }
       if (live)
@@ -147,6 +150,7 @@ export function useQueueSource() {
     loading: !data && !error,
     refresh,
     watchDetail,
+    refreshing,
     ...countActiveJobs(jobs),
     open,
     anchor,

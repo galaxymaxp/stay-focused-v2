@@ -5,6 +5,9 @@ import { job } from "../../testSupport/queueJob";
 import { queueItems } from "./queuePresentation";
 const mocks = vi.hoisted(() => ({
   jobs: [] as import("@stay-focused/shared").ProcessingJobStatusView[],
+  courseBatches: undefined as import('@stay-focused/shared').CourseBatchQueue | undefined,
+  pending: [] as { key: string; title: string; type: string }[],
+  error: null as string | null,
   request: vi.fn(),
   close: vi.fn(),
   refresh: vi.fn(),
@@ -41,7 +44,8 @@ vi.mock("../redesign/useExperience", () => ({
 }));
 vi.mock("./useQueueItems", () => ({
   useQueueItems: () => ({
-    data: { jobs: mocks.jobs },
+    data: { jobs: mocks.jobs, courseBatches: mocks.courseBatches },
+    error: mocks.error,
     refresh: mocks.refresh,
     close: mocks.close,
   }),
@@ -51,7 +55,7 @@ vi.mock("./useQueueItems", () => ({
       sections,
       attention: sections.find((s) => s.key === "attention")?.jobs ?? [],
       completed: sections.find((s) => s.key === "completed")?.jobs ?? [],
-      visiblePending: [],
+      visiblePending: mocks.pending,
       needsAttention: false,
       clearAttention: vi.fn(),
       hide: vi.fn(),
@@ -62,11 +66,46 @@ vi.mock("./useQueueItems", () => ({
 }));
 const { QueueContents } = await import("./QueueContents");
 let rendered: ReactTestRenderer | undefined;
+function copyText() {
+  return rendered!.root.findAllByType('Copy' as never)
+    .flatMap(node => node.props.children)
+    .filter(value => typeof value === 'string' || typeof value === 'number').join(' ');
+}
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.courseBatches = undefined;
+  mocks.pending = [];
+  mocks.error = null;
   mocks.request.mockReset();
   mocks.key.mockReset().mockReturnValue('stable-retry-key');
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+});
+
+it('finished batches and completed outputs allow idle without batch progress; partial batches prevent it', async () => {
+  mocks.jobs = [job({ status: 'succeeded' })];
+  mocks.courseBatches = { requests: [], summaries: [{ batchKey: 'batch', done: 4, total: 4 }] };
+  await render();
+  expect(copyText()).toContain('Nothing generating right now.');
+  expect(copyText()).not.toContain(' of ');
+  mocks.courseBatches = { requests: [], summaries: [{ batchKey: 'batch', done: 3, total: 4 }] };
+  await act(async () => rendered!.update(createElement(QueueContents)));
+  expect(copyText()).not.toContain('Nothing generating right now.');
+  expect(copyText()).not.toContain('Reviewers and quizzes you generate');
+});
+it.each(['running', 'queued', 'failed', 'expired', 'cancellation_requested', 'cancelled'] as const)('never says idle with a visible %s job', async status => {
+  mocks.jobs = [job({ status })];
+  await render();
+  expect(copyText()).not.toContain('Nothing generating right now.');
+});
+it('pending intents and refresh failures prevent the idle message', async () => {
+  mocks.jobs = [];
+  mocks.pending = [{ key: 'intent', title: 'Unaccepted request', type: 'reviewer' }];
+  await render();
+  expect(copyText()).not.toContain('Nothing generating right now.');
+  mocks.pending = [];
+  mocks.error = 'Could not refresh Queue.';
+  await act(async () => rendered!.update(createElement(QueueContents)));
+  expect(copyText()).not.toContain('Nothing generating right now.');
 });
 afterEach(async () => {
   if (rendered) await act(async () => rendered!.unmount());

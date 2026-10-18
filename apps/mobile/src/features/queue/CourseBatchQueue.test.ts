@@ -19,3 +19,14 @@ it('shows waiting intent and batch progress; Cancel and Retry refresh server sta
   expect(mocks.request).toHaveBeenLastCalledWith({},'/api/experience/batch-requests/failed/retry',{method:'POST'});
   expect(mocks.refresh).toHaveBeenCalledTimes(2);
 });
+it('hides a finished summary while retaining partial progress and attention actions', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  mocks.data.courseBatches.summaries.push({ batchKey: 'finished', done: 4, total: 4 });
+  try {
+    await act(async () => { tree = create(createElement(CourseBatchQueue)); });
+    const progress = tree.root.findAllByType('Copy' as never).filter(node => Array.isArray(node.props.children) && node.props.children.includes(' of '));
+    expect(progress).toHaveLength(1);
+    expect(progress[0]!.props.children).toEqual([6, ' of ', 14, ' done']);
+    expect(tree.root.findAllByType('Action' as never)).toHaveLength(3);
+  } finally { mocks.data.courseBatches.summaries.pop(); }
+});

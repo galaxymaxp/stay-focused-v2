@@ -151,3 +151,17 @@ it('shares AppActivity and detail in one request and deduplicates simultaneous r
   await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
   expect(mocks.request).toHaveBeenCalledTimes(3);
 });
+
+it('exposes busy state for refreshes with cached data and deduplicates repeated taps', async () => {
+  mocks.request.mockResolvedValue({ jobs: [], nextCursor: null });
+  await act(async () => { rendered = create(createElement(Probe)); });
+  expect(source.refreshing).toBe(false);
+  let resolve!: (value: unknown) => void;
+  mocks.request.mockReturnValue(new Promise(r => { resolve = r; }));
+  await act(async () => { source.refresh(); source.refresh(); });
+  expect(source.refreshing).toBe(true);
+  expect(source.loading).toBe(false);
+  expect(mocks.request).toHaveBeenCalledTimes(2);
+  await act(async () => resolve({ jobs: [], nextCursor: null }));
+  expect(source.refreshing).toBe(false);
+});

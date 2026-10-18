@@ -3,7 +3,7 @@ import type {
   ProcessingJobStatusView,
 } from "@stay-focused/shared";
 import { router } from "expo-router";
-import { isProcessingJobRetryDenied, processingJobStoppedMessage } from "@stay-focused/shared";
+import { queueIsIdle, isProcessingJobRetryDenied, processingJobStoppedMessage } from "@stay-focused/shared";
 import { useRef, useState } from "react";
 import { View } from "react-native";
 import {
@@ -37,7 +37,7 @@ export function QueueContents() {
   const groups = visiblePending.length && !sections.some(section => section.key === "attention")
     ? [...sections.filter(section => section.key !== "completed"), {key: "attention", title: "Needs attention", jobs: []}, ...sections.filter(section => section.key === "completed")]
     : sections;
-  return <View style={{gap: spacing[3]}}>
+  return <View style={{gap: spacing[2]}}>
     <CourseBatchQueue />
     {queue.error ? <Notice>{queue.error}</Notice> : null}
     {error ? <Notice>{error}</Notice> : null}
@@ -55,7 +55,7 @@ export function QueueContents() {
       </Surface>) : null}
       {group.jobs.map(job => <QueueCard key={job.id} job={job} onRefresh={queue.refresh}/>)}
     </View>)}
-    {queue.data && jobs.length === 0 && visiblePending.length === 0 && !queue.data.courseBatches?.requests.some(row => ['waiting', 'quota', 'failed'].includes(row.state)) ? <Surface><Copy size="h3">Nothing generating right now.</Copy><Copy muted size="bodySmall">Reviewers and quizzes you generate appear here while they are made, then stay in Library.</Copy></Surface> : null}
+    {queue.data && !queue.loading && !queue.error && !error && queueIsIdle({ jobs, pending: visiblePending, courseBatches: queue.data.courseBatches }) ? <Surface><Copy size="h3">Nothing generating right now.</Copy><Copy muted size="bodySmall">Reviewers and quizzes you generate appear here while they are made, then stay in Library.</Copy></Surface> : null}
   </View>;
 }
 function QueueCard({
