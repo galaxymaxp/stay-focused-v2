@@ -4940,6 +4940,18 @@ mark.find-active {
 .draft-aside a {
   overflow-wrap: anywhere;
 }
+.draft-instructions .instructions {
+  white-space: pre-line;
+}
+.draft-instructions .instructions.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 8;
+  overflow: hidden;
+}
+.draft-instructions .subtle {
+  align-self: flex-start;
+}
 @media (max-width: 1099px) {
   .draft-layout {
     grid-template-columns: minmax(0, 1fr);

@@ -39,6 +39,7 @@ import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
 import { useListPreferences } from "../lib/list-preferences";
 import { useSavedLibrary } from '../lib/use-saved-library';
+import { DraftInstructions } from './draft-instructions';
 type Artifact = {
   artifact: LibraryArtifactSummary;
   reviewer?: ReviewerReaderModel;
@@ -643,9 +644,8 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
         ))}
       </div>
       <aside className="draft-aside stack">
-        <nav className="stack" aria-label="Draft outline">
+        <DraftInstructions activityId={draft.activityId} unavailable={content.sections.length + content.slides.length >= 2 ? <nav className="stack" aria-label="Draft outline">
           <h2>Outline</h2>
-          <a href="#draft-title">Draft title</a>
           {content.sections.map((section, index) => (
             <a key={section.id} href={`#draft-section-${index}`}>
               {section.heading ?? `Section ${index + 1}`}
@@ -654,7 +654,7 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
           {content.slides.map((slide) => (
             <a key={slide.number} href={`#draft-slide-${slide.number}`}>{slide.title}</a>
           ))}
-        </nav>
+        </nav> : null} />
         <p className="meta" role="status">{dirty ? "Unsaved changes" : "Saved draft"}</p>
         {draft.warnings.length > 0 && (
           <Notice>
