@@ -1,5 +1,6 @@
 "use client";
 import { useJobRead } from './queue-items';
+import { isProcessingJobRetryDenied, processingJobStoppedMessage } from '@stay-focused/shared';
 import type {
   GenerationView,
   ProcessingJobStatusView,
@@ -7,7 +8,7 @@ import type {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   generationCoreState,
   generationMessages,
@@ -52,6 +53,8 @@ export function QueueCard({
     router = useRouter(),
     action = useAction();
   const type = typeLabel(job);
+  const [retryDenied, setRetryDenied] = useState(false);
+  const canRetry = job.retryable && ["failed", "expired"].includes(job.status) && !retryDenied;
   const title = job.source.displayName || type;
   const stalled = stalledInQueue({
     status: job.status,
@@ -134,7 +137,7 @@ export function QueueCard({
         <span className={`queue-state ${tone}`} aria-hidden="true" />
       </button>
       {(stalled ||
-        (job.retryable && ["failed", "expired"].includes(job.status))) && (
+        canRetry) && (
         <div className="row queue-card-actions">
           {stalled && (
             <button
@@ -152,7 +155,7 @@ export function QueueCard({
               Cancel
             </button>
           )}
-          {job.retryable && ["failed", "expired"].includes(job.status) && (
+          {canRetry && (
             <button
               className="subtle"
               disabled={!generationEnabled || action.busy}
@@ -166,7 +169,10 @@ export function QueueCard({
                   const result = await api<ProcessingJobStatusView>(
                     `/api/jobs/${encodeURIComponent(job.id)}/retry`,
                     { method: "POST", key: key.key },
-                  );
+                  ).catch((cause: unknown) => {
+                    if (isProcessingJobRetryDenied(cause)) setRetryDenied(true);
+                    throw cause;
+                  });
                   key.accepted();
                   onRefresh();
                   onOpen();
@@ -174,11 +180,12 @@ export function QueueCard({
                 })
               }
             >
-              Retry
+              Try again
             </button>
           )}
         </div>
       )}
+      {job.status === "failed" ? <p className="meta">{processingJobStoppedMessage(job.stage)}{canRetry ? ". Your material is safe." : ""}</p> : null}
       {action.message && <Notice error>{action.message}</Notice>}
     </div>
   );
@@ -194,6 +201,7 @@ function GenerationStatus({ message }: { message: string }) {
 }
 
 export function GenerationScreen({ id }: { id: string }) {
+  const [retryDeniedId, setRetryDeniedId] = useState<string | null>(null);
   const { api, session } = useAuth(),
     router = useRouter(),
     shared = useJobRead(id),
@@ -211,7 +219,7 @@ export function GenerationScreen({ id }: { id: string }) {
   const stalled =
     !!data && stalledInQueue({ status: data.state, since: data.updatedAt });
   const canRetry =
-    !!job.data?.retryable && ["failed", "expired"].includes(job.data.status);
+    !!job.data?.retryable && ["failed", "expired"].includes(job.data.status) && retryDeniedId !== id;
   const message = !job.data
     ? "Connecting to your generation…"
     : stalled
@@ -272,7 +280,7 @@ export function GenerationScreen({ id }: { id: string }) {
                   ? preparingSource
                     ? "Return to Generate to create a study tool."
                     : "Opening it in your Library."
-                  : "Your source is safe. You can choose another material and try again."}
+                  : canRetry ? `${processingJobStoppedMessage(job.data.stage)}. Your material is safe.` : processingJobStoppedMessage(job.data.stage)}
           </p>
           {data?.progress && (
             <p className="meta">
@@ -283,7 +291,7 @@ export function GenerationScreen({ id }: { id: string }) {
           {data?.error && (
             <Notice error>
               {canRetry
-                ? "This didn’t pass its checks. Retry uses the same settings and topics."
+                ? "Try again with the same material and settings."
                 : data.error.code === "quiz_generation_failed"
                   ? "The quiz could not be completed. Try another material."
                   : data.error.message}
@@ -341,13 +349,16 @@ export function GenerationScreen({ id }: { id: string }) {
                         method: "POST",
                         key: key.key,
                       },
-                    );
+                    ).catch((cause: unknown) => {
+                      if (isProcessingJobRetryDenied(cause)) setRetryDeniedId(id);
+                      throw cause;
+                    });
                     key.accepted();
                     router.replace(`/generation/${result.id}`);
                   })
                 }
               >
-                Retry
+                Try again
               </button>
             )}
             <Link className="button" href="/queue">

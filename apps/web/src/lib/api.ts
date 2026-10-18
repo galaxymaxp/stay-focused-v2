@@ -20,6 +20,8 @@ const messages: Record<string, string> = {
   canvas_connection_not_found: "Connect Canvas to see your courses.",
   canvas_course_selection_required: "Choose the courses you want to sync.",
   rate_limited: "Please wait a moment before trying again.",
+  processing_job_not_retryable: "This job cannot be retried.",
+  quiz_source_capacity_exceeded: "Choose fewer questions for this material.",
 };
 export interface RequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
@@ -78,7 +80,10 @@ export function createApi(
               : "unavailable";
           throw new ApiError(
             code,
-            messages[code] ??
+            code === "quiz_source_capacity_exceeded" && isRecord(value) && isRecord(value.error) &&
+              typeof value.error.supportedMaximum === "number" && Number.isInteger(value.error.supportedMaximum) && value.error.supportedMaximum >= 0
+              ? `This material supports up to ${value.error.supportedMaximum} questions. Choose a shorter Quiz.`
+              : messages[code] ??
               "This action is unavailable right now. Please try again.",
           );
         }

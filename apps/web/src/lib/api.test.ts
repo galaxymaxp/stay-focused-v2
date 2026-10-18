@@ -3,6 +3,13 @@ import { createApi, safeUrl } from "./api";
 const response = (value: unknown, status = 200) =>
   new Response(JSON.stringify(value), { status });
 describe("shared bearer API boundary", () => {
+  it.each([
+    [409, 'processing_job_not_retryable', 'This job cannot be retried.'],
+    [422, 'quiz_source_capacity_exceeded', 'This material supports up to 43 questions. Choose a shorter Quiz.'],
+  ] as const)('shows the safe %s retry rejection without provider diagnostics', async (status, code, message) => {
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(response({ ok: false, error: { code, message: 'private provider detail', supportedMaximum: 43 } }, status));
+    await expect(createApi(async () => 'token', vi.fn(), fetcher)('/api/jobs/job/retry', { method: 'POST' })).rejects.toMatchObject({ code, message });
+  });
   it("refreshes once on 401, forwards JWT and keeps idempotency identity", async () => {
     const fetcher = vi
       .fn<typeof fetch>()

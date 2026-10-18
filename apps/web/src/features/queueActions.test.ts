@@ -49,6 +49,14 @@ async function render(j = job()) {
   return rendered!.root;
 }
 describe("web Queue actions", () => {
+  it.each(['processing_job_not_retryable', 'quiz_source_capacity_exceeded'])('removes Try again after %s', async code => {
+    mocks.api.mockRejectedValueOnce(Object.assign(new Error('Safe rejection.'), { code }));
+    const root = await render(job({ status: 'failed', retryable: true, stage: 'generating_sections' }));
+    expect(JSON.stringify(rendered!.toJSON())).toContain('Stopped while building topics');
+    await act(async () => root.findAllByType('button').find(node => node.props.children === 'Try again')!.props.onClick());
+    expect(root.findAllByType('button').some(node => node.props.children === 'Try again')).toBe(false);
+    expect(JSON.stringify(rendered!.toJSON())).toContain('Safe rejection.');
+  });
   it("double-tap Retry posts once with the existing owner/job key and opens its accepted job", async () => {
     let resolve!: (value: unknown) => void;
     mocks.api.mockReturnValue(
@@ -59,7 +67,7 @@ describe("web Queue actions", () => {
     const root = await render(job({ status: "failed", retryable: true }));
     const retry = root
       .findAllByType("button")
-      .find((n) => n.props.children === "Retry")!;
+      .find((n) => n.props.children === "Try again")!;
     await act(async () => {
       retry.props.onClick();
       retry.props.onClick();
@@ -81,7 +89,7 @@ describe("web Queue actions", () => {
     await act(async () =>
       root
         .findAllByType("button")
-        .find((n) => n.props.children === "Retry")!
+        .find((n) => n.props.children === "Try again")!
         .props.onClick(),
     );
     expect(mocks.accepted).not.toHaveBeenCalled();
@@ -89,7 +97,7 @@ describe("web Queue actions", () => {
     await act(async () =>
       root
         .findAllByType("button")
-        .find((n) => n.props.children === "Retry")!
+        .find((n) => n.props.children === "Try again")!
         .props.onClick(),
     );
     expect(mocks.api.mock.calls[1]![1].key).toBe("stable-key");
