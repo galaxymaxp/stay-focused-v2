@@ -6604,3 +6604,145 @@ non-loopback socket guard with offline/no-telemetry flags.
   npm i -g vercel is strongly recommended. No installation or CLI call ran.
 
 Endpoint: WGP1 local code scope complete; no later roadmap task started.
+
+---
+
+## OR2 / BACKLOG P14b unattended handoff - PASS for finite code scope (2026-10-18)
+
+**Status: PASS.** STEP 0-7, tests, all eight prompt gates, additional forced root
+build, docs and local commits complete from 67e9dc4 on
+`overnight/2026-10-15_feedback`; branch unchanged. Read OR2 in full and obeyed
+its unattended overrides. Rollout and Device checks skipped entirely. No later
+roadmap slice started; no new native module, APK requirement or dependency.
+
+### Implementation and STEP 0 findings
+
+Shared pure functions classify tap/250ms hold/early scroll; keep an early scroll
+sticky; step bounded two-axis momentum back to existing idle spin; project taps
+onto the front hemisphere; produce a 650ms damped bulge and smooth 600ms color
+fade (including rapid taps). The device key is `sf.orb.color`, using the existing
+mobile sessionStore and guarded web localStorage. Invalid values and storage
+failures are safe; late native reads cannot overwrite a new choice. Mounted
+surfaces share local color changes; web tabs receive storage events.
+
+Existing theme accent is neutral. The first palette gold therefore uses the
+existing light.findActive #F4C542 token, followed by existing calm dark
+green/violet/orange tokens, with no invented colors or theme changes.
+
+Both existing body vertex stages were extendable. Matching shader text adds
+optional uBulgeDir/uBulgeAmount and idle tint inputs; the zero-bulge fast path
+retains the original vertex/normal math and skips displacement calculations.
+The local deformation also adjusts its normal. Non-idle job states omit the
+idle tint, while taps still bulge and advance the remembered idle index.
+The four scenes sample ref state in their original loop; user rotation uses
+inverse liquid coordinates so visible movement follows the pointer. Today
+returns to its existing 80ms idle cadence after interaction. No second loop,
+render pass, blur, timer-driven model or new idle frame scheduling is added.
+
+**Touch ownership at preflight:** mobile
+`apps/mobile/src/features/redesign/DayOrb.tsx` has a pointerEvents=none visual
+wrapper; `DayRingClock.tsx` has a pointerEvents=none absolute orb host and
+readout. OR1b's SVG halo also has pointerEvents=none. The full-clock
+`day-ring-touch` View receives ring input; TodayScreen's touch handlers set
+`dayOrbTouch` to pause rendering. These visual wrappers/halo and the screen
+pause remain. A new ball-bounds responder is above the ring target, rejects
+outside-sphere points, and delegates the original PanResponder lifecycle in
+the overlapping 92..102 design-point band so ring/handles still win instantly.
+It yields termination to scrolling until rotation starts. Mobile KnowledgeCore
+previously used a full-frame imagebutton Pressable; it now has the same hidden,
+ball-only responder and shared model. No new accessible/focusable control.
+
+Web DayRingClock's host/readout/SVG previously passed through to the full-clock
+`day-clock-touch` overlay. It now has a circular cutout only inside the existing
+ring band, with the ball target below the ring target. Ball touch-action is
+pan-y; pointer capture starts only on rotation. A cleaned-up nonpassive touchmove
+listener suppresses panning only after a hold, before native scrolling commits.
+The deferred Today still keeps its no-WebGL Reduce Motion path until deliberate
+rotation requests a renderable still pose. Reduce Motion suppresses bulge and
+release inertia, switches color instantly, and creates no ambient scene loop.
+Generation/Queue generation views reuse KnowledgeCore; job lifecycle, navigation
+and Queue launch controls are unchanged. OR1b halo and TC1b clock options/wrap
+behavior are preserved.
+
+### Gates and commits
+
+**FRESH PASS: 8/8 prompt gate commands, 0 final failures.**
+
+| Command | Final result |
+| --- | --- |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors, six existing warnings |
+| `npm run test --workspace @stay-focused/shared` | 520/520 tests, 50 files; compiled copies included |
+| `npm run test --workspace @stay-focused/mobile` | 1473/1473 tests, 150 files |
+| `npm run test --workspace @stay-focused/web` | 348/348 tests, 51 files |
+| `npm run build --workspace @stay-focused/api` | PASS, 35/35 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | PASS, one local Android bundle |
+| `git diff --check` / staged / baseline-to-HEAD | PASS, 0 whitespace errors |
+
+Additional AUTOPILOT `npm run build -- --force --env-mode=loose`:
+**FRESH PASS 8/8 tasks, 0 cached**, including web 19/19 pages and local
+Android/iOS/web exports. Repeated after the final zero-bulge shader optimization;
+both executions pass. Forced typecheck/lint and full mobile/web suites were
+also rerun against final code. Shared initially passed 511/511 before build;
+the new nine-test compiled copy makes the post-build total 520/520. This count
+change is generated test duplication, not a flake. Focused model 9/9, mobile
+shader/halo/target 15/15, generation state/RM 6/6 and initial web shader/pointer/
+deferred 8/8 pass; all are included in full suites. Separate API full,
+workflow and provider suites NOT APPLICABLE: those boundaries are unchanged.
+
+Failed attempts retained: a local edit-script syntax error ran no edits, then
+its test command collected 0 tests (exit 1); corrected script created the test.
+Initial generation-renderer fixture 0 pass/6 fail because its mocked body
+omitted ORB_RADIUS used by the real aura; fixed mock export, retry 6/6.
+First full web 346 pass/1 fail because the new parity test compared complete
+files with existing formatting differences; compare exact shader text and the
+complete sampler as required, retry 347/347, final 348/348 after added direction
+coverage. First lint passed with 12 warnings; stable handles/complete hook
+dependencies removed six introduced warnings, leaving six existing warnings.
+No assertion weakening, suppressed rules, skipped required test or nondeterministic
+flake. Existing Vite config, React renderer deprecation and Metro color warnings
+remain. Final React review checked refs, dependencies, cleanup, state precedence,
+decorative accessibility and preserved deferred loading.
+
+Commits, author `galaxymaxp <omgraythekid@gmail.com>`:
+
+```text
+586e5bf feat(shared): add decorative orb interaction model
+6da7225 feat(orb): add localized bulge and idle color shader inputs
+5483726 feat(mobile): make Today and generation orbs interactive
+39acf35 feat(web): add shared orb gestures and persisted colors
+docs: close OR2 orb interaction (this checkpoint; final hash in Git/status)
+```
+
+Planning files reconciled. [OR2 acceptance](acceptance/or2-orb-interaction.md)
+and [ADR-048](../architecture/ADR-048-orb-interaction.md) record implementation,
+local evidence and tradeoffs. Generated Next declarations inspected/restored.
+Logs, scripts, exports, status/progress and all tmp paths remain uncommitted.
+Unrelated untracked `UI/`, `apps/mobile/.gitignore` and `supabase/.temp/` are
+preserved. Baseline local tracking 82 ahead/0 behind; no fetch or push.
+
+**UNVERIFIED (owner to confirm):** deployed/installed revisions, production
+DB rows/applied migrations, Cloud Scheduler state, remote-ref freshness,
+authenticated browser use, actual scrolling/gesture arbitration, shader
+appearance/compositing and physical power behavior. Local tests establish code
+behavior and lifecycle, not physical acceptance. No Supabase, Vercel, Google
+Cloud, Canvas or Resend call, deployment, migration application/remote SQL,
+Scheduler operation, email, environment-file edit, branch switch or push.
+Node children used the existing non-loopback socket guard and process-local
+offline/no-telemetry flags. Build scripts were inspected before execution.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** owner Preview OTA and website preview
+  through the existing release process. No new native module/APK requirement.
+- **Device checks - NOT RUN, skipped entirely:** on Realme and desktop Today,
+  generation and Queue generation view: tap color crossfade/bulge, 250ms
+  hold-drag/inertia, quick vertical swipe scroll, immediate overlapping ring
+  handles, Reduce Motion instant color/no bulge/no inertia, color persistence
+  after restart, running/failed/done state priority, background/foreground and
+  narrow layouts. Confirm actual glass deformation/shading and power.
+- Vercel CLI is absent; for later owner deployment tooling, installing
+  `npm i -g vercel` is strongly recommended. No installation or CLI call ran.
+
+Endpoint: OR2 finite local code scope complete. Rollout/device acceptance stays
+with the owner; no later roadmap item started.
