@@ -10,6 +10,8 @@
     "build": "turbo build",
     "dev": "turbo dev",
     "lint": "turbo lint",
+    "release:apk": "node scripts/publish-apk-release.mjs",
+    "test:publish-apk-release": "node --test scripts/publish-apk-release.test.mjs",
     "smoke:canvas-grades:web": "node scripts/canvas-grades-web-smoke.mjs",
     "smoke:ocr-pdf:web": "node scripts/ocr-pdf-web-smoke.mjs",
     "smoke:ocr:web": "node scripts/ocr-web-smoke.mjs",
