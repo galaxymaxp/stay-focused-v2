@@ -5546,3 +5546,77 @@ deployment, SQL/migration, Scheduler action, email, environment-file edit
 or push. Unrelated untracked `UI/`, `apps/mobile/.gitignore` and
 `supabase/.temp/` preserved. No tmp or .local artifact staged. All three
 planning files mark GN1 STOPPED/pending; no later task started.
+
+## GN1b mobile grace navigation - PASS (2026-10-18)
+
+Finite unattended code scope STEP 0-5, tests, fresh serial gates, docs and
+local commits is complete. Owner corrections supersede GN1's STOP at
+`8dffcd4`; no later slice started. Branch `overnight/2026-10-15_feedback`.
+
+Commits:
+
+- `a387c59 feat(mobile): add cancellable grace navigation hook`
+- `29bbe1d feat(mobile): open generation progress after grace period`
+- The accompanying `docs: close GN1 (GN1b)` commit closes planning/acceptance;
+  its exact hash is recorded after commit in ignored `tmp/overnight/GN1b.status`
+  and Git. All commits use author galaxymaxp <omgraythekid@gmail.com>.
+
+Reviewer Generate and confirmed single Library Remake schedule one two-second
+push after saved intent persistence. Blur, navigator/parent state changes,
+background/inactive, unmount, reschedule and opening the Queue Modal cancel.
+The callback checks mounted, focused and active before pushing. Existing note,
+Queue refresh and admission lifetime remain intact. Generate all/Select materials
+and their test remain unchanged and open Queue immediately; Quiz is immediate.
+ADR-045 records the shared mobile pattern.
+
+**STEP 0.3 route finding:** `start=1` calls `acceptGeneration`; delayed pushes
+use `/generation` with `intent` and **no start**. The destination re-reads local
+intent storage after Queue updates/focus until a job ID exists. A late admission
+therefore attaches without a second acceptance call. Tests prove exactly one
+originating admission and protect a manually retried ID from old saved intent
+reconciliation. `/generation-queue` still returns to the prior screen/Today
+and opens the existing QU1 popout.
+
+**FRESH verification; all 7/7 prompt gate commands PASS:**
+
+- `npm run typecheck -- --force`: 8/8 tasks, 0 cached.
+- `npm run lint -- --force`: 8/8 tasks, 0 cached; 0 errors, 6 existing warnings.
+- `npm run test --workspace @stay-focused/shared`: 464/464, 44 files.
+- `npm run test --workspace @stay-focused/mobile`: 1395/1395, 142 files.
+- `npm run build --workspace @stay-focused/api`: 1/1, 35/35 pages.
+- `npm run build --workspace @stay-focused/mobile -- --platform android`: 1/1,
+  one Android bundle.
+- `git diff --check`: PASS, zero whitespace errors; staged diff also PASS.
+
+Additional FRESH checks: API suite with `--maxWorkers=2`: 2315 passed,
+3 skipped, 201 files; AUTOPILOT forced root build: 8/8 tasks, 0 cached,
+API 35/35 and web 19/19 pages plus mobile Android/iOS/web exports. Initial
+API suite: 2314 passed/1 failed/3 skipped; unchanged local PGlite inventory
+revision test exceeded its 15000ms timeout. Full two-worker retry passed
+without timeout/assertion changes; resource contention is inferred. Initial
+focused suite: 112 passed/5 failed due to invalid new Remake fixture ID;
+corrected fixture yielded 117/117 (4 files). Later retry-ID regression is
+covered by the full mobile suite. No hidden failed attempt or cached gate.
+Existing Vite native/CommonJS and Expo color warnings remain. Minor inspection
+and documentation-helper errors and repairs are recorded in acceptance.
+
+Generated API/web Next declarations restored. Tracked tree clean after docs
+commit; unrelated `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` preserved.
+Local refs were ahead 46/behind 0 at baseline and will be ahead 49/behind 0
+at closure; remote freshness UNVERIFIED (owner to confirm), no fetch or push.
+No remote service call, deploy, SQL/migration, Scheduler operation, email or
+environment-file edit. No credentials/private fixtures/outputs committed.
+
+**Owner steps remaining**
+
+- **Rollout - NOT RUN, skipped entirely:** Fely's mobile OTA/APK.
+- **Device checks - NOT RUN, skipped entirely:** Realme Generate Reviewer,
+  stay two seconds, generation opens; Generate then another tab within two
+  seconds, remain there; Generate then home/background, no navigation on
+  return; Generate all still opens Queue immediately.
+- Production revisions, database rows, Scheduler, remote-ref freshness,
+  real-account and physical-device behavior: **UNVERIFIED (owner to confirm)**.
+
+Acceptance: [GN1/GN1b](acceptance/gn1-grace-navigation.md). Exact logs and
+progress/status remain ignored under `tmp/overnight/GN1b*`. Endpoint reached;
+no follow-on roadmap work is authorized by this run.

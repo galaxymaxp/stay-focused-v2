@@ -1,25 +1,40 @@
 # Roadmap
 
-## GN1 mobile grace navigation preflight - STOPPED (2026-10-18)
+## GN1 mobile grace navigation complete via GN1b - PASS (2026-10-18)
 
-GN1 remains pending. STEP 0 found that CourseBatchControls already opens
-Queue immediately after a successful batch response (`:38`, required by its
-existing test), a visible transition omitted from the prompt's baseline.
-The mandatory surprise stop applies before implementation. The current
-`/generation-queue` route opens QU1's popout over the prior screen/Today.
-The non-start intent route avoids admission but reads the intent only on
-effect dependency changes; slow-admission progress observation also needs
-explicit treatment. Full inventory and exact owner question:
-[GN1 preflight](ai/acceptance/gn1-grace-navigation.md).
+GN1b completes the finite unattended mobile code scope, superseding GN1's
+preflight STOP at `8dffcd4`. Baseline `8dffcd4`, branch
+`overnight/2026-10-15_feedback`. Implementation commits: `a387c59` (hook/ADR)
+and `29bbe1d` (screens/tests). No later roadmap slice started.
 
-No GN1 code step is complete; 1/7 gate commands run for documentation
-hygiene, the other 6/7 implementation gates **NOT RUN**.
-Next: owner resolves recorded baseline/observation questions, then corrected
-GN1 implementation, fake-timer/screen tests and every fresh serial gate.
-**Owner steps remaining:** mobile OTA/APK and Realme checks **NOT RUN**,
-skipped entirely. Production/database/Scheduler and physical-device state
-**UNVERIFIED (owner to confirm)**. No remote action, environment-file edit
-or push. Other roadmap slices were not started.
+Reviewer Generate and confirmed single Library Remake open the saved intent's
+generation page after two seconds. Blur, navigation (including parent tab/stack
+changes), background/inactive state, unmount, reschedule and Queue opening
+cancel the pending push. Admission continues independently. The delayed route
+omits `start`; GenerationScreen observes a late persisted job ID after Queue
+updates/focus without admitting again, and preserves a manually retried job ID.
+Generate all/Select materials keep their immediate Queue popout and unchanged
+test; Quiz and all other immediate paths retain their behavior. ADR-045 records
+the shared mobile pattern; no API/schema/dependency or accessibility change.
+
+**FRESH PASS:** all **7/7 prompt gate commands**. Forced root typecheck and
+lint **8/8 tasks each, zero cached** (six existing lint warnings); shared
+**464/464** (44 files), mobile **1395/1395** (142 files); API build **1/1**,
+**35/35** pages; Android export **1/1**; diff/staged-diff hygiene PASS.
+Additional API suite **2315 passed, 3 skipped** (201 files) with two workers;
+AUTOPILOT forced root build **8/8 tasks, zero cached**. First API attempt:
+2314 passed/1 timed out/3 skipped; reduced-worker full retry passes without
+changing assertions/timeouts. New Remake fixture failures (112 pass/5 fail)
+were fixed, then focused **117/117** passed. Acceptance records all attempts.
+Build-generated Next declarations were restored; unrelated work preserved.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely: Fely's mobile OTA/APK and Realme stay-two-seconds, navigate-away,
+home/background-return and immediate Generate-all Queue checks. Production
+revisions, database rows, Scheduler, remote-ref freshness and physical-device
+behavior are **UNVERIFIED (owner to confirm)**. No remote service call,
+deployment, SQL/migration, Scheduler change, email, environment-file edit or
+push. [GN1/GN1b acceptance](ai/acceptance/gn1-grace-navigation.md).
 
 ## OS1 source option rows complete via OS1b - PASS (2026-10-18)
 
