@@ -160,6 +160,19 @@ it('keeps direct Generate Reviewer and the existing Quiz availability without a 
   expect(posts()).toEqual([[generationsPath, { method: 'POST', body: { courseId: 'course', materialId: 'page:second' }, key: 'idempotency-key' }]]);
   expect(mocks.push).toHaveBeenCalledWith('/generation/job');
 });
+it.each([null, 'Covers cells and their energy needs.'])('renders the optional material description above Generate without changing availability: %s', async description => {
+  workspace = { ...workspace, materials: { ...workspace.materials,
+    items: workspace.materials.items.map((item, index) => index === 1 ? { ...item, description } : item) } };
+  await mount('page:second');
+  const paragraphs = tree!.root.findAllByType('p').filter(node => text(node) === description);
+  expect(paragraphs).toHaveLength(description ? 1 : 0);
+  expect(button('Generate Reviewer').props.disabled).toBe(false);
+  if (description) {
+    const serialized = JSON.stringify(tree!.toJSON());
+    expect(paragraphs[0]!.props.className).toBe('muted');
+    expect(serialized.indexOf(description)).toBeLessThan(serialized.indexOf('Generate Reviewer'));
+  }
+});
 
 it('requires the explicit inline confirmation and lets Cancel keep the current Reviewer', async () => {
   await mount();

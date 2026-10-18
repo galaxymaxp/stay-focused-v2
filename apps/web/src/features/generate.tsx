@@ -637,6 +637,7 @@ export function MaterialScreen({ id }: { id: string }) {
             <p className="muted">
               {[material.moduleTitle, courseName].filter(Boolean).join(" · ")}
             </p>
+            {material.description ? <p className="muted">{material.description}</p> : null}
             <div className="detail-actions">
               {material.preparation?.status === "failed" && online && (
                 <button
