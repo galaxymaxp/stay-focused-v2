@@ -19,7 +19,7 @@ describe('app update store', () => {
     expect(appUpdatePresentation(store.getSnapshot(), installed).banner).toBe(true);
     await store.dismiss(7); expect(appUpdatePresentation(store.getSnapshot(), installed).banner).toBe(false);
     const restarted = createAppUpdateStore(deps); await restarted.hydrate();
-    expect(restarted.getSnapshot()).toMatchObject({ dismissedVersionCode: 7, latest, lastCheckedAt: 1000, confirmed: false, online: false });
+    expect(restarted.getSnapshot()).toMatchObject({ dismissedVersionCode: 7, latest, lastCheckedAt: 1000, confirmed: true, online: false });
     deps.load.mockResolvedValue({ ...latest, versionCode: 8 });
     await restarted.check({ manual: true }); expect(appUpdatePresentation(restarted.getSnapshot(), installed).banner).toBe(true);
   });
@@ -35,6 +35,23 @@ describe('app update store', () => {
     deps.online.mockResolvedValue(false); expect(await store.check({ manual: true })).toBe('silent');
     expect(deps.load).not.toHaveBeenCalled(); expect(store.getSnapshot().lastCheckedAt).toBeNull();
   });
+  it('lets a manual check bypass a concurrent throttled resume probe', async () => {
+    const {store,deps}=setup();await store.check();
+    let connected!: (value:boolean) => void;
+    deps.online.mockImplementationOnce(() => new Promise(done => { connected=done; }));
+    const automatic=store.check();await vi.waitFor(() => expect(connected).toBeTypeOf('function'));
+    const manual=store.check({manual:true});connected(true);
+    expect(await manual).toBe('checked');await automatic;
+    expect(deps.load).toHaveBeenCalledTimes(2);
+  });
+  it('rechecks after resuming while the prior background request is still in flight', async () => {
+    const {store,deps}=setup();let resolve!: (value:LatestRelease) => void;
+    deps.load.mockImplementationOnce(() => new Promise(done => {resolve=done;}));
+    const first=store.check();await vi.waitFor(() => expect(deps.load).toHaveBeenCalled());
+    store.suspend();const resumed=store.check();resolve(latest);await first;
+    expect(await resumed).toBe('throttled');expect(store.getSnapshot().online).toBe(true);
+    await store.check({manual:true});expect(store.getSnapshot().latest).toEqual(latest);
+  });
   it('requires a successful online check to block; losing connectivity releases offline Library', async () => {
     const { store, deps } = setup(); deps.load.mockResolvedValue({ ...latest, minSupportedVersionCode: 7 });
     await store.check(); expect(appUpdatePresentation(store.getSnapshot(), installed)).toMatchObject({ unsupported: true, banner: false });
@@ -42,6 +59,9 @@ describe('app update store', () => {
     expect(appUpdatePresentation(store.getSnapshot(), installed).unsupported).toBe(false);
     const restarted = createAppUpdateStore(deps); await restarted.hydrate();
     expect(appUpdatePresentation(restarted.getSnapshot(), installed).unsupported).toBe(false);
+    deps.online.mockResolvedValue(true); await restarted.check();
+    expect(appUpdatePresentation(restarted.getSnapshot(), installed).unsupported).toBe(true);
+    expect(deps.load).toHaveBeenCalledTimes(1);
   });
   it('silences API errors, preserves dismissal and bounds automatic failed attempts', async () => {
     const { store, deps } = setup(); await store.dismiss(7); deps.load.mockRejectedValue(new Error('private detail'));
@@ -58,6 +78,11 @@ describe('app update store', () => {
   it('survives corrupt/unavailable local storage', async () => {
     const { deps } = setup(); deps.storage.getItem.mockResolvedValue('invalid'); deps.storage.setItem.mockRejectedValue(new Error('full'));
     const store = createAppUpdateStore(deps); await store.check(); expect(store.getSnapshot().latest).toEqual(latest);
+  });
+  it('treats 204 as silent and clears a previous result', async () => {
+    const { store, deps }=setup();await store.check();deps.load.mockResolvedValue(null);
+    expect(await store.check({manual:true})).toBe('silent');
+    expect(store.getSnapshot()).toMatchObject({latest:null,confirmed:false});
   });
   it('never shows a banner for the same runtime or an up-to-date build', () => {
     const state: AppUpdateState = { latest, online: true, confirmed: true, checking: false, lastCheckedAt: 1, lastAttemptAt: 1, dismissedVersionCode: null };

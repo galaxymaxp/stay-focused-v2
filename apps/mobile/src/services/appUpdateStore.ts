@@ -25,7 +25,7 @@ export function createAppUpdateStore(deps: {
   const emit = (patch: Partial<AppUpdateState>) => { state = { ...state, ...patch }; listeners.forEach(listener => listener()); };
   let writes = Promise.resolve();
   const persist = () => {
-    const value = JSON.stringify({ lastCheckedAt: state.lastCheckedAt, lastAttemptAt: state.lastAttemptAt, dismissedVersionCode: state.dismissedVersionCode, latest: state.latest });
+    const value = JSON.stringify({ lastCheckedAt: state.lastCheckedAt, lastAttemptAt: state.lastAttemptAt, dismissedVersionCode: state.dismissedVersionCode, latest: state.latest, confirmed: state.confirmed });
     writes = writes.then(() => deps.storage.setItem(APP_UPDATE_KEY, value)).catch(() => undefined);
     return writes;
   };
@@ -39,16 +39,25 @@ export function createAppUpdateStore(deps: {
       const timestamp = (item: unknown) => typeof item === 'number' && Number.isFinite(item) && item >= 0 ? item : null;
       emit({ lastCheckedAt: timestamp(saved.lastCheckedAt), lastAttemptAt: timestamp(saved.lastAttemptAt),
         dismissedVersionCode: typeof saved.dismissedVersionCode === 'number' && Number.isSafeInteger(saved.dismissedVersionCode) && saved.dismissedVersionCode > 0 ? saved.dismissedVersionCode : null,
-        latest: isLatestRelease(saved.latest) ? saved.latest : null });
+        latest: isLatestRelease(saved.latest) ? saved.latest : null,
+        confirmed: saved.confirmed === true && isLatestRelease(saved.latest) && timestamp(saved.lastCheckedAt) !== null });
     } catch { /* Corrupt/unavailable storage behaves like first launch. */ }
   })();
   let epoch = 0;
   let pending: Promise<'checked' | 'silent' | 'throttled'> | null = null;
-  const suspend = () => { epoch++; emit({ online: false, confirmed: false }); };
-  const check = (options: { manual?: boolean; offline?: boolean } = {}) => {
+  let pendingEpoch = 0;
+  let manualRequested = false;
+  const suspend = () => { epoch++; emit({ online: false }); };
+  const check = (options: { manual?: boolean; offline?: boolean } = {}): Promise<'checked' | 'silent' | 'throttled'> => {
     if (options.offline) { suspend(); return Promise.resolve('silent' as const); }
-    if (pending) return pending;
+    if (pending) {
+      if (pendingEpoch !== epoch) return pending.then(() => check(options));
+      manualRequested ||= options.manual === true;
+      return pending;
+    }
     const generation = epoch;
+    pendingEpoch = generation;
+    manualRequested = options.manual === true;
     pending = (async () => {
       await hydrate();
       if (epoch !== generation) return 'silent' as const;
@@ -57,13 +66,16 @@ export function createAppUpdateStore(deps: {
         if (!await deps.online()) { if (epoch === generation) suspend(); return 'silent' as const; }
         if (epoch !== generation) return 'silent' as const;
         emit({ online: true });
-        if (!options.manual && !shouldCheck(state.lastAttemptAt, now())) return 'throttled' as const;
+        if (!manualRequested && !shouldCheck(state.lastAttemptAt, now())) return 'throttled' as const;
         emit({ lastAttemptAt: now() }); await persist();
         const latest = await deps.load();
         if (epoch !== generation) return 'silent' as const;
         emit({ latest, confirmed: latest !== null, lastCheckedAt: now() }); await persist();
-        return 'checked' as const;
-      } catch { if (epoch === generation) suspend(); return 'silent' as const; }
+        return latest ? 'checked' as const : 'silent' as const;
+      } catch {
+        if (epoch === generation) { suspend(); emit({ confirmed: false }); await persist(); }
+        return 'silent' as const;
+      }
       finally { emit({ checking: false }); }
     })().finally(() => { pending = null; });
     return pending;

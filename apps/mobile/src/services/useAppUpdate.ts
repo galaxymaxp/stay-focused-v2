@@ -15,7 +15,7 @@ export const installedApp = {
 };
 
 export const appUpdateStore = createAppUpdateStore({
-  storage: sessionStore,
+  storage: { getItem: async key => sessionStore.getItem(key), setItem: async (key, value) => sessionStore.setItem(key, value) },
   online: async () => { const url = getApiBaseUrl(); return !!url && await appUpdateOnline(url); },
   load: async () => { const url = getApiBaseUrl(); if (!url) throw new Error('missing_api'); return loadAppUpdate(url); },
 });
