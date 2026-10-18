@@ -6517,3 +6517,90 @@ operation, email, environment-file edit, branch switch or push.
 
 Endpoint: TC1b local code scope complete; rollout/device acceptance stays with
 owner. No further roadmap item started.
+
+---
+
+## WGP1 / BACKLOG P16 - PASS for finite code scope (2026-10-18)
+
+Baseline c372b50 on overnight/2026-10-15_feedback, unchanged branch. Read the
+full WGP1 prompt and followed unattended overrides. STEP 0-5, local tests,
+gates, docs and commits complete; no later roadmap work.
+
+Layout A is web only: orb and one live status in the first pane; material
+name/page count, ordered real stages and actions in the second. Grid is
+1.3fr/1fr from 1024px and stacked below; orb is min(60% of pane,70vh) on
+desktop, with no old 300px cap in this page. Existing renderer, mobile,
+polling, cancel/preparation Continue, MR3 retry identity/denial behavior and
+1400ms saved-output navigation remain. Queue/leave links and explicit
+Open reviewer/quiz labels match the requested states; saved Draft is retained.
+
+STEP 0 found no OR2 commit/footer (current planning says not started); the
+actual KnowledgeCore was inspected and no OR2 renderer dependency or missing
+stage API was found. Shared extraction/reviewer stage orders are reused.
+Quiz/Draft lists filter to their actual worker stages, including storing_result.
+Progress indicates position of the reported stage, not an execution audit of
+optional OCR/retry branches. Source pageCount is available when supplied;
+course name and MD1 description cannot be resolved from this DTO (no material
+or course key), so are omitted per STEP 0.3 with no endpoint/API field added.
+
+### Gates and commits
+
+**FRESH PASS 7/7 prompt gates, 0 final failures.**
+
+| Gate | FRESH result |
+| --- | --- |
+| npm run typecheck -- --force | 8/8 tasks, 0 cached |
+| npm run lint -- --force | 8/8 tasks, 0 cached; 0 errors, 6 existing warnings |
+| npm run test --workspace @stay-focused/shared | 502/502 tests, 48 files; existing compiled copies included |
+| npm run test --workspace @stay-focused/web | 342/342 tests, 50 files |
+| npm run build --workspace @stay-focused/api | PASS, 35/35 static pages |
+| npm run build --workspace @stay-focused/web | PASS, 19/19 static pages |
+| git diff --check / staged / baseline-to-HEAD | PASS, 0 whitespace errors |
+
+Additional AUTOPILOT forced root build with --env-mode=loose: FRESH PASS
+8/8 tasks, 0 cached, including local Android/iOS/web exports. Final web lint
+also passes (one existing library warning). Focused tests: 17/17 PASS.
+A local synthetic CSS geometry probe passes 4/4 widths, 360/800/1024/1440:
+no overflow with long filenames, correct stacking/grid and desktop orb sizing.
+No app preview, authenticated job or device was opened; all requests blocked.
+Workflow/provider contract suites NOT APPLICABLE (no affected boundary).
+
+Failed first attempts retained: focused run 16 pass / 1 fail because a rejected
+API mock leaked into cancellation coverage; mock reset fixed isolation. Initial
+root typecheck stopped at 4/6 tasks on two TS2345 test-selector errors; valid
+mock host tags fixed them. Final forced typecheck 8/8 and web 342/342 pass.
+No nondeterministic flake, assertion weakening or runtime workaround. Existing
+Vite CJS, React renderer deprecation and Metro warnings retained.
+
+Commits, author galaxymaxp <omgraythekid@gmail.com>:
+
+- 7799ef8 feat(web): desktop generation page layout
+- docs: close WGP1 desktop generation layout (this footer; final hash in Git
+  and tmp/overnight/WGP1.status)
+
+Planning files reconciled. [WGP1 acceptance](acceptance/wgp1-desktop-generation.md).
+Generated Next declarations inspected/restored. Logs, scripts, layout fixtures,
+exports, progress/status and all tmp files excluded. Unrelated untracked UI/,
+apps/mobile/.gitignore and supabase/.temp/ preserved. Baseline tracking 80 ahead /
+0 behind from local refs; no fetch or push.
+
+**UNVERIFIED (owner to confirm):** deployed revisions, DB rows/applied migrations,
+Cloud Scheduler state, remote-ref freshness, authenticated browser behavior and
+physical appearance. No Supabase, Vercel, Google Cloud, Canvas or Resend call,
+deployment, remote SQL/migration application, Scheduler operation, email,
+environment-file edit, branch switch or push. Local processes used the existing
+non-loopback socket guard with offline/no-telemetry flags.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** website preview, running/failed/done
+  at 1440px and 800px; big orb left/details right on desktop, stacking below
+  1024px, Try again and Open reviewer/quiz working.
+- **Device checks - NOT RUN, skipped entirely:** physical narrow/browser,
+  keyboard and assistive behavior. CSS probe is not physical acceptance.
+- Course name/MD1 description require an existing response linkage or a
+  separately approved API change; no fabricated values are displayed.
+- Vercel CLI is absent; for future owner rollout tooling, installing
+  npm i -g vercel is strongly recommended. No installation or CLI call ran.
+
+Endpoint: WGP1 local code scope complete; no later roadmap task started.
