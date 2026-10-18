@@ -253,3 +253,5 @@ export * from './image-download';
 export * from './topic-assist';
 
 export * from './library-sort';
+
+export * from "./free-time";
