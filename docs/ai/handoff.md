@@ -6818,3 +6818,86 @@ SQL, Scheduler operation, email, environment-file edit or push.
 
 Endpoint: PF1 stopped before implementation under its explicit unattended
 stop rule. No later roadmap task started.
+
+## PF1b profile pictures - 2026-10-19
+
+**Status: PASS for the finite local code scope.** Resumed from baseline
+`1ad0039` on `overnight/2026-10-15_feedback`, after rereading the unattended
+rules, PF1/PF1b progress, current planning files, AUTOPILOT, Git history/status/
+diff and the existing migration/API/shared drafts. No implementation commit was
+redone. Endpoint: PF1b only. Expected owner files were preserved.
+
+Private `profile-avatars` Storage is service-managed through the existing
+server-verified bearer API. The FILE ONLY migration adds owner-row RLS,
+column grants, restrictive client Storage denial and service-only invoker RPCs.
+The API bounds wire bytes to 2 MiB, checks magic/MIME/dimensions, uses the
+existing canvas library to center-crop/resize/re-encode <=512px PNG, and returns
+only a 600-second signed URL/expiry. CAS plus durable retirement protects
+replacement/deletion across devices and retries failed cleanup. Shared source
+order is uploaded, provider avatar_url, provider picture, initials (HTTPS only).
+Web/mobile use one Avatar each, initials on image errors, Settings change/remove
+controls with confirmation and busy/error recovery, and owner-keyed memory
+which expires/reconciles and is discarded on sign-out. No auth/session format
+change or new native dependency. ADR-049 records the decisions and crash caveat.
+
+Local commits, author `galaxymaxp <omgraythekid@gmail.com>`:
+
+- `14a10d5 feat(db): add private profile avatar storage migration`
+- `74c07df feat(shared): resolve avatar sources and scope photo memory`
+- `8ee9099 feat(api): manage owner-scoped profile photos`
+- `6574093 feat(web): show and manage profile photos`
+- `fc9a330 feat(mobile): show and manage profile photos`
+- `docs: close PF1b profile photos` - final hash in Git and PF1b.status.
+
+**FRESH PASS: all 10 prompt gates.** Exact commands, first-attempt failures,
+limitations and the acceptance matrix are in
+[PF1b acceptance](acceptance/pf1b-profile-avatars.md).
+
+| Gate | FRESH result |
+| --- | --- |
+| Forced root typecheck | 8/8 tasks, 0 cached |
+| Forced root lint | 8/8 tasks, 0 cached; zero errors, six pre-existing warnings |
+| Shared tests | 542/542, 52 files |
+| API tests | 2397 passed / 3 skipped live cases, 209 files |
+| Web tests | 353/353, 54 files |
+| Mobile tests | 1481/1481, 154 files |
+| API build | 36/36 static pages; avatar route includes native canvas tracing |
+| Web build | 19/19 static pages |
+| Android build | One local bundle/export, offline Expo |
+| Diff hygiene | Zero whitespace errors, unstaged and staged |
+
+Additional AUTOPILOT forced root build (`--force --env-mode=loose`):
+**FRESH PASS 8/8, 0 cached**, including local Android/iOS/web exports.
+Final isolated API/security suite: **FRESH PASS 28/28, four files**.
+Workflow and provider-contract suites: NOT APPLICABLE (unchanged boundaries).
+Three new-fixture typecheck failures and one CORS preflight fixture failure
+were corrected and retained in acceptance evidence; no full-suite failure or
+nondeterministic flake. New import-order warnings were fixed; remaining six
+lint warnings predate PF1b. Logs/exports stay uncommitted under ignored tmp/dist;
+Next-generated ambient type changes were restored.
+
+**UNVERIFIED (owner to confirm):** live Google/Microsoft photo metadata,
+deployed API/web and installed mobile revisions, applied migrations/database
+rows, Scheduler state, remote-ref freshness and authenticated production/device
+behavior. No Supabase, Vercel, Google Cloud, Canvas or Resend calls, remote SQL,
+Scheduler operation, deployment, email, environment-file edit or push ran.
+All 23 expected owner files under `UI/`, `apps/mobile/.gitignore` and
+`supabase/.temp/` remain untouched and uncommitted.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** apply
+  `packages/db/migrations/20261018000300_profile_avatars.sql`, deploy API/web,
+  then ship mobile through the existing owner release process (no native module).
+- **Device checks - NOT RUN, skipped entirely:** Google/Microsoft provider photo;
+  upload, replace and confirmed removal on web/mobile; fallback to provider or
+  initials, image-error/offline behavior, expiry/reload, account switch/sign-out,
+  and cross-account read/write/delete denial for private Storage.
+- Storage and Postgres have no shared transaction. A crash/uncertain RPC may
+  leave an unreferenced private object. The code never deletes a possibly-current
+  photo on uncertain evidence; retired objects remain queued until cleanup
+  succeeds. Failed retirement returns a safe error and clients reconcile.
+- Vercel CLI is absent. Installing `npm i -g vercel` is strongly recommended for
+  later owner rollout tooling. No installation or Vercel CLI invocation ran.
+
+PF1b's finite local endpoint is complete. No PAR1 or later task was started.
