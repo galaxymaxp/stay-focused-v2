@@ -6902,60 +6902,65 @@ All 23 expected owner files under `UI/`, `apps/mobile/.gitignore` and
 
 PF1b's finite local endpoint is complete. No PAR1 or later task was started.
 
-## PAR1 website vs mobile parity audit - 2026-10-19
+## PAR1b website vs mobile parity audit - 2026-10-19
 
-**Status: STOPPED at STEP 0; audit not performed.** Read
-`tmp/overnight/prompts/PAR1.md` in full, including its overriding UNATTENDED
-rules; inspected repository policy, AUTOPILOT, current planning state, prior
-handoff footer and the external 2026-10-18 roadmap's PAR1 section. Baseline
-`cc30b16` on the required `overnight/2026-10-15_feedback` branch. Recent Git
-history was inspected locally; no remote refresh ran.
+**Status: PASS for the finite docs-only source audit.** Baseline `796e312`
+on `overnight/2026-10-15_feedback`; endpoint PAR1b only. Read
+`tmp/overnight/prompts/PAR1b.md` in full, including the overriding UNATTENDED
+rules, prior PAR1 progress/history, repository policy/AUTOPILOT, current planning
+records and the external 2026-10-18 roadmap. The owner explicitly resolved the
+prior preflight condition: expected untracked `UI/`,
+`apps/mobile/.gitignore` and `supabase/.temp/` were preserved exactly and
+never staged. No tracked owner edits existed. This completed entry replaces
+the prior PAR1 preflight-only footer from `796e312`.
 
-STEP 0 confirms all five requested app/shared directories exist. However,
-`git status --short` reports these pre-existing untracked paths:
+[Parity audit](parity-web-mobile-20261018.md): 54 feature rows with source
+file:line evidence on both platforms, behavioral differences and 16 gaps in
+high/medium/low student-impact order. Findings include web recovery/document
+exports/selective source preview, saved-Quiz reuse, mobile image-cap readiness,
+weekly Schedule/grace coverage, remake confirmation, quiz flags, notifications
+and remaining presentation differences. No fixes or cost estimates were added.
+Current state, roadmap and current sprint now reflect completed PAR1b.
 
-- `UI/`
-- `apps/mobile/.gitignore`
-- `supabase/.temp/`
+Local commit (author `galaxymaxp <omgraythekid@gmail.com>`):
 
-PAR1 STEP 0.3 says: "If the tree has uncommitted non-doc changes, STOP
-(don't commit them)." At least the mobile ignore file and Supabase temporary
-directory are non-doc paths. PF1b's historical permission to preserve owner
-files does not waive this run's explicit stop condition. No listed owner file
-was modified, staged or committed. No parity report, feature assertions or gap
-ranking was produced. Only the stopped-run planning/handoff records changed.
+- `docs: complete web vs mobile parity audit` — the five owned docs paths;
+  exact hash is recorded after commit in Git, `tmp/overnight/PAR1b.status`
+  and `tmp/overnight/PAR1b.progress`. No push.
 
-Local commit, author `galaxymaxp <omgraythekid@gmail.com>`:
+Verification:
 
-- `docs: web vs mobile parity audit` - records this preflight stop only;
-  exact hash is in Git and `tmp/overnight/PAR1.status`.
+- **FRESH PASS:** `git diff --check`, 0 whitespace errors, **1/1** prompt
+  gate. `git diff --cached --check` also passes before commit.
+- **FRESH PASS:** diff scope **1/1**, exactly five `docs/` paths; no code,
+  migration, credentials, generated outputs or owner paths staged.
+- **FRESH PASS:** local audit structure/reference validation, **54/54** rows
+  cite both platforms; all linked source files/line anchors exist. No live
+  assertions are inferred from historical reports.
+- **NOT APPLICABLE:** build, typecheck, lint and application tests (docs only).
+  No failed prompt-gate attempts or flakes. First supplementary structure
+  validation falsely rejected 54 rows: its helper expected six columns, not
+  five. Corrected helper then passed. Exploratory Python/read-path and oversized
+  shell-command failures were corrected with Node, actual paths and patching.
 
-Verification of the stopped-run documentation:
-
-- **FRESH PASS:** `git diff --check`, zero whitespace errors (1/1 required
-  prompt gate). Staged equivalent `git diff --cached --check` also passes.
-- **FRESH PASS:** `git diff --stat` and staged stat contain only four `docs/`
-  files (1/1 docs-only scope check). No code changes.
-- **BLOCKED:** the parity audit by the STEP 0 dirty-tree condition; zero
-  feature rows audited. Passing documentation checks do not complete PAR1.
-- **NOT APPLICABLE:** build, typecheck, lint and application test suites for
-  this docs-only stopped run. No failed gate attempts or flakes.
-
-**UNVERIFIED (owner to confirm):** deployed revisions, applied database state,
-Scheduler state, remote-ref freshness and production/device behavior. No
-Supabase, Vercel, Google Cloud, Canvas or Resend calls, deployment, remote SQL,
-Scheduler operation, email, environment-file edit or push ran.
+**UNVERIFIED (owner to confirm):** deployed revisions, applied migrations,
+actual description rows/provider metadata, notification delivery/Scheduler
+state, remote-ref freshness, production generation and browser/device behavior.
+No Supabase, Vercel, Google Cloud, Canvas or Resend call, deployment, remote SQL,
+Scheduler operation, email, environment-file edit or push ran. Stored tracking
+state reports this branch ahead of `github/main` by 95 before this commit;
+no network refresh established current remote state.
 
 ### Owner steps remaining
 
-- Exact owner question, recorded without waiting for an unattended reply:
-  "Will you resolve the untracked `UI/`, `apps/mobile/.gitignore` and
-  `supabase/.temp/` paths, or explicitly authorize PAR1 to preserve them as an
-  exception to STEP 0.3?" Then rerun PAR1 from STEP 0 against the current HEAD.
-- Complete the source-backed parity table and student-impact gap ranking;
-  Claude and Fely can then use the gaps for the next roadmap.
-- **Rollout - NOT RUN, skipped entirely:** none for PAR1 (docs only).
-- **Device checks - NOT RUN, skipped entirely:** none required by PAR1;
-  live/device behavior remains unverified.
+- Claude and Fely turn the audit's Gaps into the next owner-approved roadmap;
+  gap implementation is outside this docs-only run.
+- Confirm any live/release state needed for that roadmap. PF1/MD1 migration
+  application and prior feature rollout/device debt remain owner work.
+- **Rollout — NOT RUN, skipped entirely:** none for PAR1b itself (docs only).
+- **Device checks — NOT RUN, skipped entirely:** none required by PAR1b;
+  browser/phone behavior in the feature table remains unverified by this run.
+- Vercel CLI is absent. For later owner rollout tooling, installing
+  `npm i -g vercel` is strongly recommended; no installation/invocation ran.
 
-Endpoint: PAR1 stopped before the audit; no later roadmap task started.
+The finite PAR1b endpoint is complete; no RB6 or later task was started.
