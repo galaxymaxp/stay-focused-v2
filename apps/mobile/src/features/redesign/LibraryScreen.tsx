@@ -47,6 +47,7 @@ import { useListPreferences } from "./useListPreferences";
 import { ReviewerReaderScreen } from "../reviewer/ReviewerReader";
 import { ExportSheet } from '../export/ExportSheet';
 import { DraftInput } from "./DraftInput";
+import { DraftInstructions } from "./DraftInstructions";
 import { useOfflineDraftEditor, DRAFT_ATTENTION_NOTICE } from './useOfflineDraftEditor';
 import { useDraftVersions, DraftVersionsNotice, DraftVersionsSheet } from './DraftVersions';
 import { automaticLibraryLabel } from "./automationPresentation";
@@ -552,6 +553,7 @@ export function DraftEditor({ draft, onSaved, deviceCopy = false }: { draft: Act
   };
   return (
     <View style={{ gap: 16 }}>
+      <DraftInstructions key={draft.activityId} activityId={draft.activityId} />
       <DraftInput
         accessibilityLabel="Draft title"
         minHeight={52}

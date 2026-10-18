@@ -209,6 +209,7 @@ vi.mock("lucide-react-native", () => ({
   ArrowDownWideNarrow: "ArrowDownWideNarrow",
   FileText: "FileText",
   ChevronDown: "ChevronDown",
+  ChevronUp: "ChevronUp",
   ChevronRight: "ChevronRight",
   Plus: "Plus",
   Circle: "Circle",
@@ -1330,6 +1331,31 @@ describe("B38 saved assignment Draft", () => {
     generationId: "job", createdAt: "2026-09-29", updatedAt: "2026-09-29", editable: true, revision: 1, status: "draft",
   };
   const artifact: LibraryArtifactSummary = { ...savedQuiz, id: "activity:draft-one", type: "activity_output", title: draft.title, activityId: "assignment" };
+
+  it('places collapsed Instructions above the title and expands due, points and exact text', async () => {
+    mocks.params = { id: artifact.id }; mocks.artifact = { artifact, draft };
+    mocks.data['/api/experience/activities/assignment'] = { instructions: 'Use <b>the assigned scenario</b>', dueAt: '2026-10-20T08:00:00Z', pointsPossible: 25 };
+    const root = await render(createElement(ArtifactScreen));
+    const header = () => root.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Instructions')[0]!;
+    expect(header().props.accessibilityState).toEqual({ expanded: false });
+    expect(header().props.style({ pressed: false }).minHeight).toBeGreaterThanOrEqual(44);
+    const order = root.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Instructions' || String(node.type) === 'TextInput' && node.props.accessibilityLabel === 'Draft title');
+    expect(order.map(node => node.props.accessibilityLabel)).toEqual(['Instructions', 'Draft title']);
+    const copy = () => root.findAll(node => String(node.type) === 'Copy').map(node => String(node.props.children)).join(' ');
+    expect(copy()).not.toContain('Use <b>');
+    await act(async () => header().props.onPress());
+    expect(header().props.accessibilityState).toEqual({ expanded: true });
+    expect(copy()).toContain('Use <b>the assigned scenario</b>'); expect(copy()).toContain('25 pts'); expect(copy()).toContain('Due ');
+    await act(async () => header().props.onPress()); expect(copy()).not.toContain('Use <b>');
+  });
+
+  it('keeps the editor available and hides Instructions when the activity is unavailable', async () => {
+    mocks.params = { id: artifact.id }; mocks.artifact = { artifact, draft };
+    mocks.errors['/api/experience/activities/assignment'] = { message: 'Not found', code: 'not_found' };
+    const root = await render(createElement(ArtifactScreen));
+    expect(root.findAll(node => node.props.accessibilityLabel === 'Instructions')).toHaveLength(0);
+    expect(root.findAll(node => String(node.type) === 'TextInput' && node.props.accessibilityLabel === 'Draft title')).toHaveLength(1);
+  });
 
   it("shows the saved Draft editor without a separate Study Activity or worksheet", async () => {
     mocks.params = { id: artifact.id };
