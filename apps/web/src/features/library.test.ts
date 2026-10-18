@@ -54,6 +54,14 @@ async function choose(value: string) {
 }
 const courses=()=>tree!.root.findAllByType('a').filter(node=>String(node.props.href).startsWith('/library/course/')).map(node=>decodeURIComponent(node.props.href.split('/').pop()));
 const titles=()=>tree!.root.findAllByType('a').filter(node=>node.props.className==='library-card-open').map(node=>node.props['aria-label']);
+it.each([null, 'Covers cells and their energy needs.'])('shows a manual source description beneath the existing filename only when present: %s', async sourceDescription => {
+  mocks.items = [{ ...card('Notes reviewer', null, '2026-10-18'), sourceType: 'local_file', sourceTitle: 'Notes.pdf', sourceDescription }];
+  await mount('personal');
+  const descriptions = tree!.root.findAllByType('span').filter(node => node.props.children === sourceDescription);
+  expect(descriptions).toHaveLength(sourceDescription ? 1 : 0);
+  if (sourceDescription) expect(descriptions[0]!.props.className).toBe('meta');
+  expect(titles()).toEqual(['Reviewer: Notes reviewer']);
+});
 it('persists each PR #12 top-level option without refetching',async()=>{
   await mount();expect(trigger().props['aria-label']).toBe('Sort Library: Updated: newest first');expect(courses()).toEqual(['z','a']);
   for (const [value, expected] of [['updated_asc', ['a', 'z']], ['title_desc', ['a', 'z']], ['updated_desc', ['z', 'a']], ['title_asc', ['z', 'a']]] as const) {

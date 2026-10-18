@@ -220,6 +220,7 @@ export interface StudentAnnouncementList {
 export type LibraryArtifactType = 'reviewer' | 'quiz' | 'activity_output';
 export type GenerationState = 'queued' | 'preparing' | 'generating' | 'finalizing' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
 export interface LibraryArtifactSummary {
+  readonly sourceDescription?: string | null;
   /** Deterministic estimate from saved reviewer content; absent on older clients. */
   readonly reviewMinutes?: number | null;
   readonly origin?: "automatic" | "manual";

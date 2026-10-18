@@ -410,6 +410,7 @@ function LibraryCard({ item, pinned = false, swipeActions, organizing, selected,
         {secondaryLine ? <Copy muted size="caption">{secondaryLine}</Copy> : null}
         {item.offlineReady ? <Copy muted size="caption">Saved offline</Copy> : null}
         {!item.course && item.sourceType ? <Copy muted size="caption">{sourceTypeLabel(item.sourceType)}{item.sourceTitle ? ` · ${item.sourceTitle}` : ""}</Copy> : null}
+        {!item.course && item.sourceDescription ? <Copy muted size="bodySmall">{item.sourceDescription}</Copy> : null}
         <Copy muted size="caption">
           Updated {new Date(item.updatedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
           {item.quiz ? ` · ${item.quiz.questionCount} questions${item.quiz.bestScore !== null ? ` · Best ${item.quiz.bestScore}%` : ""}` : ""}

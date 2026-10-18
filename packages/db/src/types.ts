@@ -4387,6 +4387,7 @@ export interface Database {
       claim_material_description_v1: { Args: { p_user_id: string; p_preparation_id: string | null; p_source_version_id: string | null; p_model: string; p_empty: boolean }; Returns: MaterialDescriptionRow[] };
       finish_material_description_v1: { Args: { p_id: string; p_user_id: string; p_description: string }; Returns: boolean };
       read_material_descriptions_v1: { Args: { p_user_id: string; p_course_id: string; p_material_ids: string[] }; Returns: { material_id: string; description: string }[] };
+      read_manual_material_descriptions_v1: { Args: { p_user_id: string; p_source_version_ids: string[] }; Returns: { source_version_id: string; description: string }[] };
       link_course_reviewer_batch_v1: { Args: { p_user_id: string; p_request_id: string; p_batch_key: string }; Returns: boolean };
       course_reviewer_next_available_v1: { Args: { p_user_id: string }; Returns: string | null };
       mutate_reviewer_share_v1: {

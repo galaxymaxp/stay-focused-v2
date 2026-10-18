@@ -796,6 +796,14 @@ describe("B25 screen interactions", () => {
       expect(children.indexOf(copies[0]!)).toBeLessThan(children.indexOf(generate));
     }
   });
+  it.each([null, 'Covers cells and their energy needs.'])('shows a manual Library source description only when present: %s', async sourceDescription => {
+    mocks.params = { courseKey: 'personal' };
+    mocks.library.items = [{ ...savedQuiz, id: 'artifact:manual', type: 'reviewer', course: null, sourceType: 'local_file', sourceTitle: 'Notes.pdf', sourceDescription }];
+    const root = await render(createElement(LibraryCourseScreen));
+    const descriptions = root.findAll(node => String(node.type) === 'Copy' && node.props.children === sourceDescription);
+    expect(descriptions).toHaveLength(sourceDescription ? 1 : 0);
+    if (sourceDescription) expect(descriptions[0]!.props.size).toBe('bodySmall');
+  });
   it("keeps Retry quiet, single-flight, and rejoins it after returning to the material", async () => {
     const needsPreparation = { ...workspace.materials.items[0]!, preparation: {status:'failed' as const,reasonCode:'preparation_failed' as const} };
     mocks.data["/api/experience/courses/course"] = {

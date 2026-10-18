@@ -6,6 +6,27 @@ import type { LibraryArtifactSummary, LibraryArtifactType } from '@stay-focused/
 export interface LibraryFilters { readonly type?: LibraryArtifactType; readonly courseId?: string; readonly offset?: number; readonly limit?: number }
 export interface LibraryPage { readonly items: readonly LibraryArtifactSummary[]; readonly nextOffset: number | null; readonly supersededReviewerIds: readonly string[] }
 
+/** Reuse existing manual source labels; a missing cache must not block Library. */
+export async function withManualMaterialDescriptions(client: SupabaseClient<Database>, userId: string,
+  items: readonly LibraryArtifactSummary[]): Promise<readonly LibraryArtifactSummary[]> {
+  const ids = [...new Set(items.filter(item => item.type === 'reviewer' && !item.course && item.sourceId &&
+    /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(item.sourceId)).map(item => item.sourceId!))];
+  if (!ids.length) return items;
+  const descriptions = new Map<string, string>();
+  try {
+    if (ids.length > 100) throw new Error('description_page_invalid');
+    const result = await client.rpc('read_manual_material_descriptions_v1', { p_user_id: userId, p_source_version_ids: ids });
+    if (result.error || !result.data || result.data.length > ids.length) throw new Error('description_read_unavailable');
+    for (const row of result.data) {
+      if (!ids.includes(row.source_version_id) || descriptions.has(row.source_version_id)) throw new Error('description_read_invalid');
+      if (row.description && Array.from(row.description).length <= 240) descriptions.set(row.source_version_id, row.description);
+    }
+  } catch { descriptions.clear(); console.warn('material_description', { code: 'manual_read_unavailable' }); }
+  // Keep the established summary shape when optional metadata is unavailable.
+  return items.map(item => item.type === 'reviewer' && !item.course && item.sourceId && descriptions.has(item.sourceId)
+    ? { ...item, sourceDescription: descriptions.get(item.sourceId)! } : item);
+}
+
 // Allow-list deliberately excludes credentials, prompts and private storage tables.
 export type ExperienceTable = 'canvas_course_sync_preferences' | 'canvas_auto_reviewer_candidates' | 'quizzes' | 'quiz_attempts' | 'activity_drafts' | 'tasks' | 'canvas_courses' | 'canvas_assignments' | 'canvas_assignment_submissions' | 'canvas_announcements' | 'canvas_files' | 'canvas_file_references' | 'study_sessions' | 'study_plans' | 'reviewer_source_snapshots' | 'reviewer_source_snapshot_items' | 'source_versions' | 'generated_artifacts' | 'generated_artifact_versions' | 'processing_jobs' | 'processing_job_results';
 export type ExperienceRow<T extends ExperienceTable> = Database['public']['Tables'][T]['Row'];
@@ -95,7 +116,8 @@ export function experienceRepository(client: SupabaseClient<Database>): Experien
       ]);
       if (visible.error || !visible.data) fail(visible.error);
       const rows = visible.data.filter(row => row.user_id === userId);
-      return { items: rows.slice(0, limit).map(row => row.summary as unknown as LibraryArtifactSummary), nextOffset: rows.length > limit ? offset + limit : null, supersededReviewerIds: hidden };
+      const items = await withManualMaterialDescriptions(client, userId, rows.slice(0, limit).map(row => row.summary as unknown as LibraryArtifactSummary));
+      return { items, nextOffset: rows.length > limit ? offset + limit : null, supersededReviewerIds: hidden };
     },
     async librarySummary(userId, id) {
       const result = await client.from('experience_library_v1').select('summary,user_id').eq('user_id', userId).eq('id', id).maybeSingle();

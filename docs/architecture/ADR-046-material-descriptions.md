@@ -1,7 +1,7 @@
 # ADR-046: Source-grounded material descriptions
 
 Date: 2026-10-18
-Status: Implementing MD1b locally; migration and rollout remain owner steps.
+Status: Implemented MD1b locally; migration and rollout remain owner steps.
 
 Prepared payloads stay immutable and service-only. A separate owner-scoped
 `material_descriptions` table stores safe metadata for a preparation ID and
@@ -40,9 +40,10 @@ Web/mobile add optional nullable metadata and show nothing when absent.
 
 Manual uploads preserve ADR-037 immediate generation. Their attachment path
 starts bounded best-effort description work without awaiting it; no background
-completion guarantee is made for this optional metadata. No existing selectable
-manual-material detail/list surface exists: store the metadata only. Reviewer
-source titles remain titles, not a new manual material flow.
+completion guarantee is made for this optional metadata. Existing personal
+Library cards already show the original filename. One owner-scoped source-version
+lookup per Library page adds optional `sourceDescription` there, on mobile/web,
+matching the immutable source hash. No upload or pre-generation flow is added.
 
 Existing prepared revisions acquire descriptions only on preparation worker
 redelivery/re-preparation. Backfill needs an owner decision; none is included.

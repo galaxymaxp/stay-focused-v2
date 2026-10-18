@@ -122,9 +122,22 @@ begin
     );
   return found;
 end $$;
+-- Manual Library cards already show the original filename. Enrich a page in
+-- one owner-scoped read without exposing the immutable source text.
+create function public.read_manual_material_descriptions_v1(p_user_id uuid,p_source_version_ids uuid[])
+returns table(source_version_id uuid,description text)
+language sql security invoker set search_path = public,pg_temp as $$
+  select d.source_version_id,d.description from public.material_descriptions d
+    join public.source_versions v on v.id=d.source_version_id and v.user_id=d.user_id
+    where d.user_id=p_user_id and cardinality(p_source_version_ids)<=100
+      and d.source_version_id=any(p_source_version_ids) and d.description_status='ready'
+      and d.revision_fingerprint=v.content_sha256;
+$$;
 revoke all on function public.material_description_preparation_current_v1(uuid,uuid),
+  public.read_manual_material_descriptions_v1(uuid,uuid[]),
   public.finish_material_description_v1(uuid,uuid,text),public.claim_material_description_v1(uuid,uuid,uuid,text,boolean),
   public.read_material_descriptions_v1(uuid,uuid,text[]) from public,anon,authenticated;
 grant execute on function public.material_description_preparation_current_v1(uuid,uuid),
+  public.read_manual_material_descriptions_v1(uuid,uuid[]),
   public.finish_material_description_v1(uuid,uuid,text),public.claim_material_description_v1(uuid,uuid,uuid,text,boolean),
   public.read_material_descriptions_v1(uuid,uuid,text[]) to service_role;

@@ -119,4 +119,17 @@ describe('material description migration, executed only in local PGlite', () => 
     expect(await finish(receipt.id)).toBe(false);
     expect(await claim(false, owner, true)).toEqual([]);
   });
+  it('reads manual descriptions for only the owner and unchanged source hash', async () => {
+    await db.query('insert into source_versions values($1,$2,$3)', [version, owner, 'b'.repeat(64)]);
+    await db.query(`insert into processing_job_sources values($1,$2,'{"manualReviewerVersion":"manual-reviewer-v1"}')`, [version, owner]);
+    await db.query(`insert into processing_jobs(id,user_id,source_version_id,source_snapshot_id,status,job_type) values($1,$2,$1,$1,'succeeded','reviewer_generation')`, [version, owner]);
+    const receipt = (await claim(false, owner, true))[0]!; expect(await finish(receipt.id)).toBe(true);
+    const readManual = (user: string) => db.query('select * from read_manual_material_descriptions_v1($1,$2)', [user,[version]]);
+    expect((await readManual(owner)).rows).toEqual([{ source_version_id: version, description: 'Covers cells and energy.' }]);
+    expect((await readManual(other)).rows).toEqual([]);
+    await db.exec("update source_versions set content_sha256=repeat('c',64)");
+    expect((await readManual(owner)).rows).toEqual([]);
+    await db.exec('set role authenticated');
+    await expect(readManual(owner)).rejects.toThrow(/permission denied/);
+  });
 });

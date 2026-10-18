@@ -104,6 +104,7 @@ function LibraryCard({
               {item.sourceTitle ? ` · ${item.sourceTitle}` : ""}
             </span>
           )}
+          {!item.course && item.sourceDescription ? <span className="meta">{item.sourceDescription}</span> : null}
           <span className="meta">
             Updated {new Date(item.updatedAt).toLocaleDateString([], { month: "short", day: "numeric" })}
             {item.quiz
