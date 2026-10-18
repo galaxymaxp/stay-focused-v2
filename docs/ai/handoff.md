@@ -5406,3 +5406,76 @@ No remote service call, deployment, remote SQL/migration, Scheduler action,
 email, environment-file edit or push. All three planning files reconcile
 OS1 as STOPPED/pending. No ADR needed. Finite unattended endpoint reached
 by the mandatory preflight stop; no implementation step was crossed.
+
+
+## OS1b source option rows - unattended local completion (2026-10-18)
+
+**Status: PASS** for finite STEP 0-4, tests, fresh serial gates, documentation
+and local commits. Baseline `9613d00`, branch
+`overnight/2026-10-15_feedback`; OS1 progress and its historical STOP footer
+were read first. Owner correction resolves that STOP: RowLink's existing
+opacity/scale feedback is accepted, with no global pressed-style change.
+Preflight source/token references and acceptance matrix are in
+[OS1b acceptance](acceptance/os1b-source-option-rows.md).
+
+**Commits:** `26a8e69 feat(mobile): monotone icon rows in other-source sheet`;
+`a8484f6 fix(web): subtle own-material source toggle`; closing
+`docs: close OS1 (OS1b)` contains this footer and reconciled planning files.
+Its exact resulting hash and every run commit are recorded in Git and
+ignored `tmp/overnight/OS1b.status`/progress after commit, without self-hash
+amendment. All use author galaxymaxp <omgraythekid@gmail.com>. No push.
+
+Mobile chooser and in-mode picks now reuse RowLink with Type/Camera/FileUp
+and Camera/Image/FileUp icons, original labels, handlers, chooser testIDs and
+busy flags. Shared RowLink adds only optional testID forwarding; accessible
+48pt unfilled targets and feedback remain. Footer actions, Try again,
+Button.tsx, generation/upload logic and sheet chrome are unchanged.
+**Web finding:** actual `apps/web/app/globals.css:606,1159` selected a white
+elevated fill and shadow. Conditional work uses existing `--hover` for
+selected/active background and removes the shadow, scoped to
+`.own-material .segments`, with text-align-start/file-text icons. Other
+toggles retain their styles; aria-pressed mode switching is tested.
+
+**Gate counts (FRESH, serial):** forced root typecheck and lint **8/8 each,
+0 cached**; lint **0 errors, six existing warnings**; shared **447/447**
+(44 files, emitted copies included); mobile **1372/1372** (141 files); web
+**281/281** (42 files). API build **1/1, 35/35 pages**; local Android export
+**1/1**; web build **1/1, 19/19 pages**. AUTOPILOT forced root build **8/8,
+0 cached**. Diff and each staged-diff check **PASS**, zero whitespace errors.
+All **9/9 prompt gate commands** plus the additional root build/staged
+checks pass. Focused mobile/web **20/20** and **9/9**; local Chromium CSS
+**8/8** light/dark selected/forced-active/shadow/scope assertions, all
+network requests aborted. API/provider suites **NOT RUN / NOT APPLICABLE**.
+Next ambient files restored; generated artifacts remain ignored.
+
+Failed first attempts: forced lint **7/8** tasks, **one test error plus six
+existing warnings**, fixed by the established createElement props pattern;
+fresh typecheck/lint then passed. Initial pointer CSS helper failed one
+active-state assertion; forced CSS state now passes deterministically. One
+inline source-check helper failed PowerShell quoting before execution; local
+script comparison passed. The documentation helper initially stopped before
+writes on a UTF-16 log decoding assertion; BOM detection fixed it. No suite
+failure or flake. Existing Vite config and Expo terminal-color diagnostics
+remain. Full details and log names are
+in acceptance. All three planning files reconcile OS1 as done via OS1b;
+historical OS1 footer is preserved. No ADR or later roadmap slice.
+
+### Owner steps remaining
+
+1. **Rollout - NOT RUN, skipped entirely:** Fely's mobile OTA/APK and any
+   website deployment.
+2. **Device checks - NOT RUN, skipped entirely:** Realme light/dark Other
+   source Text/Camera/Local File monotone icon rows; no white filled
+   highlight; existing RowLink opacity/scale feedback per the owner answer;
+   Camera's Take photo/Choose photo rows match; Text opens the paste editor;
+   original camera/gallery/file flows still work.
+3. Production revisions, database rows, Scheduler state and actual device/
+   real-account behavior are **UNVERIFIED (owner to confirm)**. Local refs
+   initially showed ahead 42/behind 0; remote freshness unverified, no fetch.
+4. For later owner Vercel work, strongly recommend installing the absent CLI
+   with `npm i -g vercel`. No installation or Vercel command ran.
+
+No remote service call, deployment, SQL/migration, Scheduler action, email,
+environment-file edit or push. Unrelated untracked `UI/`,
+`apps/mobile/.gitignore`, `supabase/.temp/` remain preserved. Logs,
+helpers/progress/status and generated output are uncommitted and ignored.

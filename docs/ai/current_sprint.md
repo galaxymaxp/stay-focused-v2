@@ -1,24 +1,40 @@
 <!-- OS1 begin -->
-## OS1 source option rows preflight - STOPPED (2026-10-18)
+## OS1 source option rows complete via OS1b - PASS (2026-10-18)
 
-Finite scope: OS1 STEP 0 through local implementation/tests/gates/docs and
-local commits only; Rollout and Device checks excluded. Baseline `c6584b5`,
-branch `overnight/2026-10-15_feedback`. No implementation started.
+OS1 is done via OS1b. The owner correction resolves and supersedes the
+preflight STOP at `9613d00`: reuse RowLink's existing opacity/scale pressed
+feedback. Finite unattended STEP 0-4, tests, fresh serial gates, docs and
+local commits are complete on `overnight/2026-10-15_feedback`, baseline
+`9613d00`. Implementation: **26a8e69** (mobile), **a8484f6** (web).
 
-STEP 0 contradicts OS1's assumed RowLink pressed tint: the current row
-only changes opacity and scale (`primitives.tsx:399-459`), with no tint or
-`testID` prop. Unattended rules 3/4 require STOPPED. Owner question and full
-line references are in the OS1 handoff footer. Resume requires corrected
-instructions authorizing a local source-row pressed tint implementation.
+Mobile chooser and in-mode pick actions use monotone icon RowLinks with
+original labels, handlers, chooser testIDs and busy flags. The shared row
+only gains optional testID forwarding; its 48pt targets, accessible role/
+label and pressed feedback remain unchanged. Footer actions, Try again,
+global Button and sheet chrome are unchanged. Web preflight confirmed the
+white selected background; existing `--hover` now supplies a muted selected/
+active state scoped to `.own-material .segments`, with no selected shadow
+and text/file icons. Other toggles are unchanged.
 
-Mobile's chooser and in-mode buttons match the expected filled controls.
-Web has white/filled selection in `apps/web/app/globals.css:606` plus
-`:1159` shadow, so its conditional scoped change remains pending too.
-Acceptance: preflight contradiction **FRESH, STOPPED**; mobile rows/tests,
-web toggle/icons/tests **NOT RUN**; implementation gates **NOT RUN**, 0/8;
-documentation diff/staged-diff **FRESH PASS**, 2/2. Rollout/Device checks
-**NOT RUN** and live state **UNVERIFIED (owner to confirm)**. No application
-code, environment-file, remote service, deployment, SQL or push operation.
+**FRESH PASS:** forced root typecheck/lint **8/8 tasks each, 0 cached**;
+shared **447/447** (44 files), mobile **1372/1372** (141 files), web
+**281/281** (42 files); API build **1/1**, **35/35** pages; Android export
+**1/1**; web build **1/1**, **19/19** pages; AUTOPILOT forced root build
+**8/8 tasks, 0 cached**; diff/staged-diff hygiene **PASS**, zero whitespace
+errors. Focused mobile/web **20/20** and **9/9**; local browser CSS **8/8**.
+Six existing lint warnings remain. Initial test-lint and local helper
+failures and their repairs are recorded in the acceptance report; no suite
+flake. Build-generated Next declarations were restored.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Realme light/dark acceptance should confirm icon rows, no filled
+white highlight, existing RowLink opacity/scale feedback and the same source
+flows. Production revisions, database rows, Scheduler and device/real-account
+behavior are **UNVERIFIED (owner to confirm)**. No remote call, deployment,
+SQL/migration, Scheduler change, email, environment-file edit or push. No
+later roadmap slice started; no ADR needed.
+
+Exit criteria met for the finite code scope. [OS1b acceptance](acceptance/os1b-source-option-rows.md).
 <!-- OS1 end -->
 
 <!-- SH2 begin -->
