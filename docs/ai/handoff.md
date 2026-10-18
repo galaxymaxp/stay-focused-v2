@@ -6746,3 +6746,75 @@ offline/no-telemetry flags. Build scripts were inspected before execution.
 
 Endpoint: OR2 finite local code scope complete. Rollout/device acceptance stays
 with the owner; no later roadmap item started.
+
+---
+
+## PF1 profile pictures unattended handoff - STOPPED (2026-10-18)
+
+**Status: STOPPED at STEP 0.1.** Read `tmp/overnight/prompts/PF1.md` in full,
+root AGENTS.md, AUTOPILOT.md, current planning headers, the preceding handoff
+footer and the external 2026-10-18 roadmap. Baseline HEAD is `436128f` on
+`overnight/2026-10-15_feedback`; no branch switch. Local tracking refs show
+87 ahead / 0 behind, with remote-ref freshness unverified.
+
+The initial `git status --short --untracked-files=all` found 23 pre-existing
+untracked files: `UI/README.md`, 20 PNGs under `UI/screenshots/dark/` and
+`UI/screenshots/light/`, `apps/mobile/.gitignore`, and
+`supabase/.temp/cli-latest`. Tracked and staged diffs were empty. The OR2 footer
+also identifies these paths as unrelated preserved work. PF1 STEP 0.1 says:
+"If the tree has uncommitted owner edits, don't stash/commit them: STOP."
+Their presence therefore triggers the stop even though earlier slices
+preserved them. None was changed, removed, stashed or staged.
+
+**Exact question for the owner (recorded only; nobody was asked):** May PF1
+resume while preserving these 23 existing untracked files, or will you first
+commit or move your files so the checkout meets PF1's clean-tree prerequisite?
+
+STEP 0.2-0.7, implementation steps 1-6, migration file, ADR and avatar tests
+were NOT RUN after the mandatory stop. No completed implementation slice is
+claimed; current-state, roadmap and sprint implementation claims stay unchanged.
+
+### Gates and commits
+
+PF1 gate counts: **1/10 FRESH PASS, 9/10 NOT RUN, 0 failures**. Only handoff
+documentation changed. No implementation test results or prior cached results
+are claimed for this run.
+
+| Command | Result |
+| --- | --- |
+| `npm run typecheck -- --force` | NOT RUN: STEP 0 stop |
+| `npm run lint -- --force` | NOT RUN: STEP 0 stop |
+| `npm run test --workspace @stay-focused/shared` | NOT RUN: STEP 0 stop |
+| `npm run test --workspace @stay-focused/api` | NOT RUN: STEP 0 stop |
+| `npm run test --workspace @stay-focused/web` | NOT RUN: STEP 0 stop |
+| `npm run test --workspace @stay-focused/mobile` | NOT RUN: STEP 0 stop |
+| `npm run build --workspace @stay-focused/api` | NOT RUN: STEP 0 stop |
+| `npm run build --workspace @stay-focused/web` | NOT RUN: STEP 0 stop |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | NOT RUN: STEP 0 stop |
+| `git diff --check` | FRESH PASS: 0 whitespace errors on handoff-only diff |
+
+Local commit, author `galaxymaxp <omgraythekid@gmail.com>`:
+`docs: record PF1 preflight stop` (this footer; final hash in Git and
+`tmp/overnight/PF1.status`). Progress/status files remain uncommitted under tmp.
+
+**UNVERIFIED (owner to confirm):** deployed API/web and installed mobile
+revisions, provider session photo metadata, applied migrations/database rows,
+Cloud Scheduler state and remote-ref freshness. No Supabase, Vercel, Google
+Cloud, Canvas or Resend calls; no deployment, migration application, remote
+SQL, Scheduler operation, email, environment-file edit or push.
+
+### Owner steps remaining
+
+- Resolve the clean-tree stop or explicitly authorize preserving the listed
+  unrelated files, then resume PF1 from STEP 0.2 on the current HEAD.
+- **Rollout - NOT RUN, skipped entirely:** after PF1 implementation and green
+  local gates, apply the new avatar migration, deploy API/web and ship mobile
+  through the owner release process. No avatar migration exists from this run.
+- **Device checks - NOT RUN, skipped entirely:** after implementation/rollout,
+  confirm Google/Microsoft provider photos; upload, replace and remove on web
+  and mobile; initials/offline fallback; and cross-account storage denial.
+- Vercel CLI is absent; for later owner rollout tooling, installing
+  `npm i -g vercel` is strongly recommended. No installation or CLI call ran.
+
+Endpoint: PF1 stopped before implementation under its explicit unattended
+stop rule. No later roadmap task started.
