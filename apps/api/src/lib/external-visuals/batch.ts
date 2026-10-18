@@ -14,8 +14,8 @@ export type ReviewerVisual = { status: 'found'; id: string; image: string; title
   sourceUrl: string; label: typeof EXTERNAL_VISUAL_LABEL; width: number; height: number; attemptCount: number };
 export interface ReviewerVisuals { readonly sections: Record<string, ReviewerVisual>; readonly checked: number; readonly total: number; readonly running: boolean }
 
-async function savedReviewer(client: Client, userId: string, artifactId: string) {
-  const read = await readCanonicalReviewerRecord(client, userId, artifactId);
+async function savedReviewer(client: Client, userId: string, artifactId: string, readCanonical = readCanonicalReviewerRecord) {
+  const read = await readCanonical(client, userId, artifactId);
   if (!read.ok) throw new ExperienceFailure(503, 'unavailable');
   const saved = read.value;
   if (!saved || saved.artifact.user_id !== userId || saved.version.user_id !== userId || saved.artifact.deleted_at !== null) throw new ExperienceFailure(404, 'not_found');
@@ -25,8 +25,8 @@ async function savedReviewer(client: Client, userId: string, artifactId: string)
 }
 
 /** Every cached labeled visual for the reviewer's current version, in one read. */
-export async function readReviewerVisuals(client: Client, input: { userId: string; artifactId: string }): Promise<ReviewerVisuals> {
-  const { versionId, sectionIds } = await savedReviewer(client, input.userId, input.artifactId);
+export async function readReviewerVisuals(client: Client, input: { userId: string; artifactId: string }, dependencies: {read?:typeof readCanonicalReviewerRecord} = {}): Promise<ReviewerVisuals> {
+  const { versionId, sectionIds } = await savedReviewer(client, input.userId, input.artifactId, dependencies.read);
   const [rows, pending] = await Promise.all([
     client.from('section_external_visuals').select('*').eq('user_id', input.userId).eq('artifact_id', input.artifactId).eq('version_id', versionId),
     client.from('section_external_visual_requests').select('token', { count: 'exact', head: true }).eq('user_id', input.userId)

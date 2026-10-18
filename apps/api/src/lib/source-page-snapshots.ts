@@ -10,6 +10,47 @@ import { OFFICE_MIME, OFFICE_STRUCTURE_VERSION } from './activity-maker/office-e
 import { readOfficeConversion } from './office-conversion/store';
 
 export const SNAPSHOT_BUCKET = 'source-page-snapshots';
+
+/** Whole-reviewer discovery: resolve the exact original once, read rows once and sign each page once. */
+export async function readSourcePageSnapshots(client: SupabaseClient<Database>, saved: CanonicalReviewerRecord, userId: string,
+  sectionIds: readonly string[], dependencies: {resolve?:typeof resolveSnapshotPdfObject;eligible?:typeof eligibleSnapshotPdf} = {}): Promise<ReadonlyMap<string,SourcePageSnapshotResult>> {
+  if (saved.artifact.user_id!==userId || saved.version.user_id!==userId || saved.source.user_id!==userId || saved.artifact.deleted_at!==null)
+    throw new ExperienceFailure(404,'not_found');
+  const pages=new Map(sectionIds.map(id=>[id,lowestSectionPage(saved,id)]));
+  const pdf=await (dependencies.eligible??eligibleSnapshotPdf)(client,saved,userId);
+  const output=new Map<string,SourcePageSnapshotResult>();
+  if (!pdf) {for(const id of sectionIds)output.set(id,{available:false,reason:'not_canvas_pdf'});return output;}
+  const original=await (dependencies.resolve??resolveSnapshotPdfObject)(client,pdf.local
+    ? {userId,sourceVersionId:saved.source.id} : {userId,snapshotItemId:pdf.itemId!});
+  if (!original.available) {
+    for(const [id,page] of pages)output.set(id,{...original,...(pdf.local && page?{page}:{})});
+    return output;
+  }
+  const result=await client.from('source_page_snapshots').select('*').eq('user_id',userId).eq('source_version_id',saved.source.id).limit(101);
+  if(result.error || (result.data?.length??0)>100)throw new ExperienceFailure(503,'unavailable');
+  const rows=result.data??[];
+  if(new Set(rows.map(row=>row.page_number)).size!==rows.length || rows.some(row=>row.user_id!==userId || row.source_version_id!==saved.source.id ||
+    row.source_snapshot_item_id!==pdf.itemId || !Number.isSafeInteger(row.page_number) || row.page_number<1 || row.page_number>100))throw new ExperienceFailure(503,'unavailable');
+  const ready=new Map<number,SourcePageSnapshotResult>();
+  const label=pdf.labelKind==='slide'?{labelKind:'slide' as const}:{};
+  // The caller bounds section count to 100. No reservation RPC, dispatch or provider work here.
+  for(const [id,page] of pages) {
+    if(!page || (!pdf.local && (!pdf.pageCount || page>pdf.pageCount))) {output.set(id,{available:false,reason:'no_page_source'});continue;}
+    if(ready.has(page)) {output.set(id,ready.get(page)!);continue;}
+    const row=rows.find(row=>row.page_number===page);
+    let snapshot:SourcePageSnapshotResult;
+    if(!row) snapshot={available:true,status:'unrendered',page,...label};
+    else if(row.status==='failed') snapshot={available:false,reason:row.error_code??'render_failed',...(pdf.local?{page}:{})};
+    else if(row.status==='ready') {
+      if(!row.storage_path || !row.width || !row.height)throw new ExperienceFailure(503,'unavailable');
+      const signed=await client.storage.from(SNAPSHOT_BUCKET).createSignedUrl(row.storage_path,600);
+      if(signed.error || !signed.data?.signedUrl)throw new ExperienceFailure(503,'unavailable');
+      snapshot={available:true,id:row.id,url:signed.data.signedUrl,page,width:row.width,height:row.height,sourceLabel:pdf.sourceLabel,...label};
+    } else snapshot={available:true,status:'rendering',page,...label};
+    ready.set(page,snapshot);output.set(id,snapshot);
+  }
+  return output;
+}
 export type SourcePageSnapshotResult = (
   | { available: false; reason: 'not_canvas_pdf' | 'no_page_source' | 'source_revision_unavailable' | 'render_failed' | 'render_limit_reached'; page?: number }
   | { available: true; status: 'rendering'; page: number }

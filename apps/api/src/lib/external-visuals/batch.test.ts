@@ -6,9 +6,29 @@ vi.mock('../canonical-reviewers', () => ({
     artifact: { user_id: 'owner', deleted_at: null }, version: { id: 'v1', user_id: 'owner',
       payload: { reviewer: { sections: Array.from({ length: 7 }, (_, i) => ({ id: `s${i}` })) } } } } })),
 }));
-import { prepareReviewerVisuals, REVIEWER_VISUAL_CONCURRENCY } from './batch';
+import { prepareReviewerVisuals, readReviewerVisuals, REVIEWER_VISUAL_CONCURRENCY } from './batch';
+import { readCanonicalReviewerRecord, type CanonicalReviewerRecord } from '../canonical-reviewers';
+import type { Database } from '@stay-focused/db';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 describe('reviewer visual batch', () => {
+  it('uses the same accepted canonical version as the combined load instead of rereading a newer version',async()=>{
+    vi.mocked(readCanonicalReviewerRecord).mockClear();
+    const saved={artifact:{user_id:'owner',deleted_at:null},version:{id:'accepted-version',user_id:'owner',payload:{sections:[{id:'accepted-section'}]}}} as unknown as CanonicalReviewerRecord;
+    const read=vi.fn(async()=>({ok:true as const,value:saved}));
+    const filters:[string,unknown][]=[];
+    class Query {
+      select(){return this;}
+      eq(key:string,value:unknown){filters.push([key,value]);return this;}
+      gt(){return this;}
+      then(resolve:(value:{data:never[];count:number;error:null})=>unknown){return Promise.resolve({data:[] as never[],count:0,error:null}).then(resolve);}
+    }
+    const client={from:()=>new Query()} as unknown as SupabaseClient<Database>;
+    const result=await readReviewerVisuals(client,{userId:'owner',artifactId:'a'},{read});
+    expect(result).toEqual({sections:{},checked:0,total:1,running:false});
+    expect(read).toHaveBeenCalledExactlyOnceWith(client,'owner','a');expect(readCanonicalReviewerRecord).not.toHaveBeenCalled();
+    expect(filters.filter(([key])=>key==='version_id')).toEqual([['version_id','accepted-version'],['version_id','accepted-version']]);
+  });
   it('checks every section with bounded concurrency and never stops on a section failure', async () => {
     let active = 0, peak = 0;
     const find = vi.fn(async (_c: unknown, input: { sectionId: string }) => {

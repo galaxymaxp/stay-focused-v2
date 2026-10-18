@@ -1,0 +1,12 @@
+import { beforeEach, expect, it, vi } from 'vitest';
+import { ExperienceFailure } from '@/lib/experience/errors';
+const mocks=vi.hoisted(()=>({verify:vi.fn(),read:vi.fn()}));
+vi.mock('@/lib/auth',()=>({verifyBearerToken:mocks.verify}));
+vi.mock('@/lib/canvas-db',()=>({createCanvasServiceClient:()=>({})}));
+vi.mock('@/lib/reviewer-images',()=>({readReviewerImages:mocks.read}));
+import { GET } from './route';
+const id='11111111-1111-4111-8111-111111111111',context={params:Promise.resolve({id})};
+beforeEach(()=>{vi.clearAllMocks();mocks.verify.mockResolvedValue({id:'owner'});mocks.read.mockResolvedValue({sections:[],external:{checked:0,total:0,running:false}});});
+it('verifies the bearer before private reads',async()=>{mocks.verify.mockResolvedValue(null);expect((await GET(new Request('https://api.example.test/figures'),context)).status).toBe(401);expect(mocks.read).not.toHaveBeenCalled();});
+it('binds the verified owner and returns private no-store data',async()=>{const response=await GET(new Request('https://api.example.test/figures'),context);expect(response.status).toBe(200);expect(response.headers.get('cache-control')).toContain('no-store');expect(mocks.read).toHaveBeenCalledWith({},{userId:'owner',artifactId:id});});
+it('safely returns 404 for another owner without provider details',async()=>{mocks.read.mockRejectedValue(new ExperienceFailure(404,'not_found'));const response=await GET(new Request('https://api.example.test/figures'),context);expect(response.status).toBe(404);expect(JSON.stringify(await response.json())).not.toContain('private');});
