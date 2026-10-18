@@ -21,6 +21,7 @@ import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction } from "../lib/hooks";
 import { queueProgress } from "./queue-presentation";
 import { jobCoreState } from "./knowledge-core/coreModel";
+import { generationSteps } from "./generation-steps";
 
 // Web counterparts of QueueScreen and GenerationScreen in
 // apps/mobile/src/features/redesign/GenerationScreen.tsx.
@@ -206,7 +207,7 @@ export function GenerationScreen({ id }: { id: string }) {
     router = useRouter(),
     shared = useJobRead(id),
     job = { ...shared, data: shared.job },
-    preparingSource = job.data?.jobType === 'document_extraction',
+    preparingSource = job.data?.jobType === "document_extraction",
     view = shared,
     action = useAction();
   const data = view.data;
@@ -219,7 +220,9 @@ export function GenerationScreen({ id }: { id: string }) {
   const stalled =
     !!data && stalledInQueue({ status: data.state, since: data.updatedAt });
   const canRetry =
-    !!job.data?.retryable && ["failed", "expired"].includes(job.data.status) && retryDeniedId !== id;
+    !!job.data?.retryable &&
+    ["failed", "expired"].includes(job.data.status) &&
+    retryDeniedId !== id;
   const message = !job.data
     ? "Connecting to your generation…"
     : stalled
@@ -261,111 +264,171 @@ export function GenerationScreen({ id }: { id: string }) {
       <Heading title="" crumb="Generation" back="/generate" />
       <State resource={job} />
       {job.data && (
-        <div className="generation">
-          <p className="meta">{job.data.source.displayName}</p>
-          <GenerationStatus message={message} />
-          <KnowledgeCore
-            state={
-              preparingSource
-                ? jobCoreState(job.data.status)
-                : generationCoreState(data?.state ?? null, true)
-            }
-          />
-          <p className="muted generation-note" role="status">
-            {stalled
-              ? "The generation service hasn’t picked this up. It may be busy or at its usage limit. Cancel and try again later."
-              : running
-                ? "You can leave this screen. We’ll keep working."
-                : job.data.status === "succeeded"
-                  ? preparingSource
-                    ? "Return to Generate to create a study tool."
-                    : "Opening it in your Library."
-                  : canRetry ? `${processingJobStoppedMessage(job.data.stage)}. Your material is safe.` : processingJobStoppedMessage(job.data.stage)}
-          </p>
-          {data?.progress && (
-            <p className="meta">
-              <CountUp value={data.progress.completed} /> of{" "}
-              {data.progress.total} {data.progress.unit}
-            </p>
-          )}
-          {data?.error && (
-            <Notice error>
-              {canRetry
-                ? "Try again with the same material and settings."
-                : data.error.code === "quiz_generation_failed"
-                  ? "The quiz could not be completed. Try another material."
-                  : data.error.message}
-            </Notice>
-          )}
-          <div className="generation-actions">
-            {data?.artifactId && (
-              <Link
-                className="button primary"
-                href={`/library/${encodeURIComponent(data.artifactId)}`}
-              >
-                {isDraft ? "Open Draft" : "Open saved output"}
-              </Link>
-            )}
-            {job.data.status === "succeeded" && preparingSource && (
-              <Link
-                className="button primary"
-                href={`/generate/new?extraction=${encodeURIComponent(id)}`}
-              >
-                Continue
-              </Link>
-            )}
-            {running && job.data.status !== "cancellation_requested" && (
-              <button
-                className={stalled ? "primary" : "subtle danger"}
-                disabled={action.busy}
-                onClick={() =>
-                  void action.run(async () => {
-                    await api(`/api/jobs/${id}/cancel`, { method: "POST" });
-                    job.refresh();
-                  })
-                }
-              >
-                {preparingSource ? "Cancel preparation" : "Cancel generation"}
-              </button>
-            )}
-            {canRetry && (
-              <button
-                className="button primary retry-button"
-                disabled={!generationEnabled || action.busy}
-                onClick={() =>
-                  void action.run(async () => {
-                    if (!generationEnabled)
-                      throw new Error(
-                        "Generation is unavailable in this environment.",
-                      );
-                    const key = generationKey(
-                      session!.user.id,
-                      `retry:${id}`,
-                      {},
-                    );
-                    const result = await api<ProcessingJobStatusView>(
-                      `/api/jobs/${id}/retry`,
-                      {
-                        method: "POST",
-                        key: key.key,
-                      },
-                    ).catch((cause: unknown) => {
-                      if (isProcessingJobRetryDenied(cause)) setRetryDeniedId(id);
-                      throw cause;
-                    });
-                    key.accepted();
-                    router.replace(`/generation/${result.id}`);
-                  })
-                }
-              >
-                Try again
-              </button>
-            )}
-            <Link className="button" href="/queue">
-              View Queue
-            </Link>
+        <div className="generation generation-layout">
+          <div className="generation-orb-pane">
+            <KnowledgeCore
+              state={
+                preparingSource
+                  ? jobCoreState(job.data.status)
+                  : generationCoreState(data?.state ?? null, true)
+              }
+            />
+            <GenerationStatus message={message} />
           </div>
-          {action.message && <Notice error>{action.message}</Notice>}
+          <div className="generation-detail-pane">
+            <section className="generation-material" aria-label="Material">
+              <p className="meta">{typeLabel(job.data)}</p>
+              <h2>{job.data.source.displayName}</h2>
+              {job.data.source.pageCount != null && (
+                <p className="muted">
+                  {job.data.source.pageCount}{" "}
+                  {job.data.source.pageCount === 1 ? "page" : "pages"}
+                </p>
+              )}
+            </section>
+            <ol className="generation-steps" aria-label="Generation steps">
+              {generationSteps(
+                job.data.stage,
+                job.data.status,
+                job.data.jobType,
+              ).map((step) => (
+                <li
+                  key={step.stage}
+                  data-state={step.state}
+                  aria-current={
+                    step.state === "current" || step.state === "failed"
+                      ? "step"
+                      : undefined
+                  }
+                >
+                  <span>{step.label}</span>
+                  <span className="meta">
+                    {step.state === "done"
+                      ? "Done"
+                      : step.state === "current"
+                        ? "In progress"
+                        : step.state === "failed"
+                          ? "Stopped here"
+                          : "Pending"}
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <p className="muted generation-note" role="status">
+              {stalled
+                ? "The generation service hasn’t picked this up. It may be busy or at its usage limit. Cancel and try again later."
+                : running
+                  ? "You can leave this screen. We’ll keep working."
+                  : job.data.status === "succeeded"
+                    ? preparingSource
+                      ? "Return to Generate to create a study tool."
+                      : "Opening it in your Library."
+                    : canRetry
+                      ? `${processingJobStoppedMessage(job.data.stage)}. Your material is safe.`
+                      : processingJobStoppedMessage(job.data.stage)}
+            </p>
+            {data?.progress && (
+              <p className="meta">
+                <CountUp value={data.progress.completed} /> of{" "}
+                {data.progress.total} {data.progress.unit}
+              </p>
+            )}
+            {data?.error && (
+              <Notice error>
+                {canRetry
+                  ? "Try again with the same material and settings."
+                  : data.error.code === "quiz_generation_failed"
+                    ? "The quiz could not be completed. Try another material."
+                    : data.error.message}
+              </Notice>
+            )}
+            <div className="generation-actions">
+              {data?.artifactId && (
+                <Link
+                  className="button primary"
+                  href={`/library/${encodeURIComponent(data.artifactId)}`}
+                >
+                  {isDraft
+                    ? "Open Draft"
+                    : job.data.jobType === "quiz_generation"
+                      ? "Open quiz"
+                      : "Open reviewer"}
+                </Link>
+              )}
+              {job.data.status === "succeeded" && preparingSource && (
+                <Link
+                  className="button primary"
+                  href={`/generate/new?extraction=${encodeURIComponent(id)}`}
+                >
+                  Continue
+                </Link>
+              )}
+              {running && (
+                <>
+                  <Link className="button primary" href="/queue">
+                    Open Queue
+                  </Link>
+                  <Link className="button subtle" href="/queue">
+                    Leave, it keeps going
+                  </Link>
+                </>
+              )}
+              {running && job.data.status !== "cancellation_requested" && (
+                <button
+                  className={stalled ? "primary" : "subtle danger"}
+                  disabled={action.busy}
+                  onClick={() =>
+                    void action.run(async () => {
+                      await api(`/api/jobs/${id}/cancel`, { method: "POST" });
+                      job.refresh();
+                    })
+                  }
+                >
+                  {preparingSource ? "Cancel preparation" : "Cancel generation"}
+                </button>
+              )}
+              {canRetry && (
+                <button
+                  className="button primary retry-button"
+                  disabled={!generationEnabled || action.busy}
+                  onClick={() =>
+                    void action.run(async () => {
+                      if (!generationEnabled)
+                        throw new Error(
+                          "Generation is unavailable in this environment.",
+                        );
+                      const key = generationKey(
+                        session!.user.id,
+                        `retry:${id}`,
+                        {},
+                      );
+                      const result = await api<ProcessingJobStatusView>(
+                        `/api/jobs/${id}/retry`,
+                        {
+                          method: "POST",
+                          key: key.key,
+                        },
+                      ).catch((cause: unknown) => {
+                        if (isProcessingJobRetryDenied(cause))
+                          setRetryDeniedId(id);
+                        throw cause;
+                      });
+                      key.accepted();
+                      router.replace(`/generation/${result.id}`);
+                    })
+                  }
+                >
+                  Try again
+                </button>
+              )}
+              {!running && (
+                <Link className="button" href="/queue">
+                  Open Queue
+                </Link>
+              )}
+            </div>
+            {action.message && <Notice error>{action.message}</Notice>}
+          </div>
         </div>
       )}
     </>
