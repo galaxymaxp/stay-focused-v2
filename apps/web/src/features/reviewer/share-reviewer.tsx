@@ -1,14 +1,19 @@
 "use client";
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { reviewerSharePath, type ReviewerReaderModel, type ReviewerShareLink } from '@stay-focused/shared';
 import { useAuth } from '../../components/providers';
 import { collectSharedAssists } from './assist-store';
 
-export function ShareReviewer({ artifactId, reviewer }: { artifactId: string; reviewer: ReviewerReaderModel }) {
-  const { api, session } = useAuth();
-  return <OwnerShare key={`${session?.user.id}:${artifactId}`} owner={session?.user.id} api={api} artifactId={artifactId} reviewer={reviewer} />;
+export interface ShareReviewerTrigger {
+  disabled: boolean;
+  onClick: () => void;
 }
-function OwnerShare({ owner, api, artifactId, reviewer }: { owner: string | undefined; api: ReturnType<typeof useAuth>['api']; artifactId: string; reviewer: ReviewerReaderModel }) {
+type ShareReviewerProps = { artifactId: string; reviewer: ReviewerReaderModel; renderTrigger?: (trigger: ShareReviewerTrigger) => ReactNode };
+export function ShareReviewer({ artifactId, reviewer, renderTrigger }: ShareReviewerProps) {
+  const { api, session } = useAuth();
+  return <OwnerShare key={`${session?.user.id}:${artifactId}`} owner={session?.user.id} api={api} artifactId={artifactId} reviewer={reviewer} renderTrigger={renderTrigger} />;
+}
+function OwnerShare({ owner, api, artifactId, reviewer, renderTrigger }: ShareReviewerProps & { owner: string | undefined; api: ReturnType<typeof useAuth>['api'] }) {
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [share, setShare] = useState<ReviewerShareLink | null>(null), [message, setMessage] = useState<string | null>(null);
   const path = `/api/experience/shares/${encodeURIComponent(artifactId)}`;
   async function mutate(method: 'POST' | 'PATCH' | 'DELETE') {
@@ -23,7 +28,8 @@ function OwnerShare({ owner, api, artifactId, reviewer }: { owner: string | unde
   }
   const url = share && typeof location !== 'undefined' ? `${location.origin}${reviewerSharePath(share.token)}` : '';
   return <div className="stack">
-    <button disabled={busy || !owner} onClick={() => { if (open) setOpen(false); else void mutate('POST'); }}>Share</button>
+    {renderTrigger ? renderTrigger({ disabled: busy || !owner, onClick: () => { if (open) setOpen(false); else void mutate('POST'); } }) :
+      <button disabled={busy || !owner} onClick={() => { if (open) setOpen(false); else void mutate('POST'); }}>Share</button>}
     {open && <div className="surface stack" role="region" aria-label="Share Reviewer">
       <p>Share a read-only version of this reviewer, included quizzes and Study Assist saved in this browser. Course images and account details are excluded.</p>
       {share && <><label>Share link<input readOnly value={url} onFocus={event => event.target.select()} /></label>

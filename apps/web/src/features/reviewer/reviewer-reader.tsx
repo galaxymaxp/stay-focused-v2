@@ -23,10 +23,8 @@ import {
   segmentIds,
   type ReviewerMatch,
 } from "../../app-model/reviewerNavigation";
-import { courseIdentity } from "../../app-model/courseIdentity";
 import { useAuth } from "../../components/providers";
-import { Heading, Icon, Notice } from "../../components/ui";
-import { dateLabel } from "../../lib/api";
+import { Icon, Notice } from "../../components/ui";
 import { generationEnabled } from "../../lib/generation";
 import {
   assistMark,
@@ -43,7 +41,7 @@ import { QuizFromReviewerDialog, reviewerArtifactIdFromLibraryId } from "./quiz-
 import { StudyAssistPanel } from "./study-assist-panel";
 import { SectionVisual } from "./section-visual";
 import { useReviewerImages } from './use-reviewer-images';
-import { ShareReviewer } from './share-reviewer';
+import { ReviewerHeader } from './reviewer-header';
 
 // Web counterpart of apps/mobile/src/features/reviewer/ReviewerReader.tsx:
 // topics and search on the left, the Reviewer in a reading column, and Study
@@ -324,25 +322,8 @@ export function ReviewerReader({
 
   return (
     <StudyAnswerScrollContext.Provider value={topicScroll}>
-      <Heading
-        title={artifact.title}
-        crumb={artifact.title}
-        parent={{
-          label: artifact.course ? courseIdentity(artifact.course).title : "Personal & other",
-          href: `/library/course/${encodeURIComponent(artifact.course?.id ?? "personal")}`,
-        }}
-        subtitle={[reviewer.course?.name, dateLabel(reviewer.generatedAt), `${reviewer.sections.length} topics`, reviewer.reviewMinutes ? `~${reviewer.reviewMinutes} min review` : null].filter(Boolean).join(" · ")}
-        back={`/library/course/${encodeURIComponent(artifact.course?.id ?? "personal")}`}
-        action={
-          <div className="row">
-            {artifact.id.startsWith('artifact:') && <ShareReviewer artifactId={artifact.id.slice('artifact:'.length)} reviewer={reviewer} />}
-            <button onClick={saveText}>Save to file</button>
-            <button className="primary" disabled={!generationEnabled} onClick={() => setQuizOpen(true)}>
-              Generate Quiz
-            </button>
-          </div>
-        }
-      />
+      <ReviewerHeader artifact={artifact} reviewer={reviewer} onSave={saveText}
+        onQuiz={() => setQuizOpen(true)} quizDisabled={!generationEnabled} />
       {snapshotStatus}
       {reviewer.generationNotice ? <Notice>{reviewer.generationNotice}</Notice> : null}
       <div className={`reviewer-layout${passage ? " with-panel" : ""}${picking ? " picking" : ""}`}>

@@ -4683,6 +4683,22 @@ mark.find-active {
 .account-popover .sign-out {
   color: var(--danger);
 }
+.reviewer-heading .page-heading { margin-bottom: 8px; align-items: flex-start; }
+.reviewer-heading { margin-bottom: 24px; }
+.reviewer-meta { display: flex; flex-direction: column; gap: 4px; line-height: 1.2; }
+.reviewer-heading-actions { justify-content: flex-end; }
+.reviewer-actions { position: relative; }
+.reviewer-actions > button { min-width: 44px; min-height: 44px; }
+.reviewer-actions-menu {
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: auto;
+  right: 0;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  animation: none;
+}
+.reviewer-actions-menu > button { min-height: 44px; }
 .account-button { font-size: 13px; }
 .due-chip {
   display: flex;

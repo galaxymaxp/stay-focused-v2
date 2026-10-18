@@ -454,7 +454,7 @@ export function ArtifactScreen({ id }: { id: string }) {
   );
   const data = artifact.data;
   if (data?.reviewer)
-    return <ReviewerReader artifact={data.artifact} reviewer={data.reviewer} snapshotStatus={<SnapshotStatus {...artifact} />} />;
+    return <ReviewerReader artifact={data.artifact} reviewer={data.reviewer} snapshotStatus={<SnapshotStatus {...artifact} hideFreshLabel />} />;
   return (
     <>
       <Heading
