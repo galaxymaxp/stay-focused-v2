@@ -1,5 +1,26 @@
 # Roadmap
 
+## GN1 mobile grace navigation preflight - STOPPED (2026-10-18)
+
+GN1 remains pending. STEP 0 found that CourseBatchControls already opens
+Queue immediately after a successful batch response (`:38`, required by its
+existing test), a visible transition omitted from the prompt's baseline.
+The mandatory surprise stop applies before implementation. The current
+`/generation-queue` route opens QU1's popout over the prior screen/Today.
+The non-start intent route avoids admission but reads the intent only on
+effect dependency changes; slow-admission progress observation also needs
+explicit treatment. Full inventory and exact owner question:
+[GN1 preflight](ai/acceptance/gn1-grace-navigation.md).
+
+No GN1 code step is complete; 1/7 gate commands run for documentation
+hygiene, the other 6/7 implementation gates **NOT RUN**.
+Next: owner resolves recorded baseline/observation questions, then corrected
+GN1 implementation, fake-timer/screen tests and every fresh serial gate.
+**Owner steps remaining:** mobile OTA/APK and Realme checks **NOT RUN**,
+skipped entirely. Production/database/Scheduler and physical-device state
+**UNVERIFIED (owner to confirm)**. No remote action, environment-file edit
+or push. Other roadmap slices were not started.
+
 ## OS1 source option rows complete via OS1b - PASS (2026-10-18)
 
 OS1 is done via OS1b. The owner correction resolves and supersedes the

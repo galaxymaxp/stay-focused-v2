@@ -5479,3 +5479,70 @@ No remote service call, deployment, SQL/migration, Scheduler action, email,
 environment-file edit or push. Unrelated untracked `UI/`,
 `apps/mobile/.gitignore`, `supabase/.temp/` remain preserved. Logs,
 helpers/progress/status and generated output are uncommitted and ignored.
+
+## GN1 mobile grace navigation - unattended preflight STOP (2026-10-18)
+
+**Status: STOPPED.** STEP 0's "STOP on any surprise" and unattended rule 4
+apply before implementation. Baseline `da57f05`, branch
+`overnight/2026-10-15_feedback`; local refs ahead 45 / behind 0, no fetch.
+The reviewer path exists and matches the prompt, but
+`apps/mobile/src/features/courses/CourseBatchControls.tsx:38` already opens
+Queue immediately on a successful batch response. Its existing test
+(`CourseBatchControls.test.ts:25`) requires `show()` once. This is a visible
+popout transition, not router navigation, and is omitted from the prompt's
+baseline. No implementation step was crossed. Full inventory, acceptance
+matrix and inspection limitations: [GN1 preflight](acceptance/gn1-grace-navigation.md).
+
+**STEP 0.3 route finding:** `GenerationScreen.tsx:32,74-94` with start=1
+calls `acceptGeneration`; it is not observe-only. With intent and no start,
+`:45-71` reads the saved intent and any generation ID without admission.
+An unresolved intent shows Ready to start / Start generation, and that
+effect does not subscribe to subsequent storage writes. A late admission
+therefore needs explicit observation treatment. `/generation-queue` is
+QU1's redirect: back, or replace `/today`, then open the Queue native Modal;
+it renders no persistent page. Queue opening itself need not blur a screen.
+
+**Exact owner question (recorded, not asked in this unattended session):**
+May GN1 replace CourseBatchControls' existing immediate `queue.show()`
+(and its test expectation) with the cancellable two-second opening through
+the current `/generation-queue` redirect/popout route, preserving QU1's
+popout rather than creating a new full-page queue? Also, may it add
+observe-only intent reconciliation in GenerationScreen so an admission
+that finishes after the initial intent read displays progress without
+another `acceptGeneration` call?
+
+**Commits:** no implementation commit. The scoped local checkpoint commit
+`docs: record GN1 preflight stop` contains this footer, the acceptance report
+and the three reconciled planning files. Its final hash is recorded in Git
+and `tmp/overnight/GN1.status` / `GN1.progress` after commit, without amending
+to embed its own hash. Author galaxymaxp <omgraythekid@gmail.com>.
+
+**Gate counts:** FRESH documentation `git diff --check` and
+`git diff --cached --check` PASS, 2/2 checks, zero whitespace errors.
+Of seven prompt gate commands (shared/mobile counted separately), only
+`git diff --check` ran: 1/7; other 6/7 NOT RUN due to the mandatory preflight
+stop. Forced root typecheck/lint, shared/mobile/API tests, API build,
+Android export and AUTOPILOT root build NOT RUN. No cached tests or previous
+slice's counts claimed. No suite first failure or flake. Read-only search
+helper errors (PowerShell brace expansion, two guessed absent source paths,
+an oversized truncated historical-doc read) were corrected and recorded in
+acceptance; they did not change repository content.
+
+### Owner steps remaining
+
+1. Resolve the exact recorded baseline/observation questions, issue corrected
+   resume instructions, then implement GN1 and pass all fresh serial gates.
+2. **Rollout - NOT RUN, skipped entirely:** Fely's mobile OTA/APK.
+3. **Device checks - NOT RUN, skipped entirely:** Realme Generate Reviewer,
+   stay two seconds, generation page opens; navigate to another tab within
+   two seconds, remain there; home/background then return, no navigation;
+   Generate all opens Queue after two seconds.
+4. Production revisions, database rows, Scheduler state, real-account and
+   physical-device behavior are **UNVERIFIED (owner to confirm)**; no live
+   check attempted. This uncertainty did not cause the preflight stop.
+
+No hook/screen/test/API/schema/dependency/ADR change. No remote call,
+deployment, SQL/migration, Scheduler action, email, environment-file edit
+or push. Unrelated untracked `UI/`, `apps/mobile/.gitignore` and
+`supabase/.temp/` preserved. No tmp or .local artifact staged. All three
+planning files mark GN1 STOPPED/pending; no later task started.

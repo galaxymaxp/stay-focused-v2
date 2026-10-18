@@ -1,5 +1,30 @@
 # Current State
 
+## GN1 mobile grace navigation preflight - STOPPED (2026-10-18)
+
+GN1 is pending, with no implementation change. At baseline `da57f05`,
+`CourseBatchControls.tsx:38` already opens the Queue popout immediately after
+a successful batch response, and its test requires `show()` once. This
+existing visible transition is absent from the prompt's baseline; STEP 0's
+"STOP on any surprise" and unattended rule 4 require checkpointing here.
+`/generation-queue` returns to the prior screen (or Today) and opens QU1's
+popout. It is not a persistent full-page batch screen.
+
+Route finding: `/generation?intent=...&start=1` calls `acceptGeneration`;
+omit start to avoid another admission call. Without start it reads the
+saved intent and any saved generation ID, but an unresolved intent shows
+Ready to start and does not subscribe to subsequent storage writes.
+The exact owner question and full source inventory are in
+[GN1 preflight](ai/acceptance/gn1-grace-navigation.md).
+
+Implementation tests/builds **NOT RUN**; 1/7 prompt gate commands run for
+documentation hygiene, 6/7 NOT RUN. Diff checks are recorded in handoff.
+No completion claim, remote calls, deployment, SQL/migration, Scheduler action, email,
+environment-file edit or push. Unrelated dirty paths remain preserved.
+**Owner steps remaining:** resolve recorded questions and resume GN1;
+mobile OTA/APK and Realme checks **NOT RUN**, skipped entirely. Production
+and physical-device state **UNVERIFIED (owner to confirm)**.
+
 ## OS1 source option rows complete via OS1b - PASS (2026-10-18)
 
 OS1 is done via OS1b. The owner correction resolves and supersedes the

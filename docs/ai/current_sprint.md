@@ -1,3 +1,31 @@
+<!-- GN1 begin -->
+## GN1 mobile grace navigation preflight - STOPPED (2026-10-18)
+
+Finite unattended scope: GN1 STEP 0 through tests, fresh serial gates, docs
+and local commits; exclude Rollout and Device checks. Baseline `da57f05`,
+branch `overnight/2026-10-15_feedback`. No implementation step crossed.
+
+Mandatory STEP 0 surprise stop: CourseBatchControls already immediately
+opens Queue after a successful batch response (`:38`), and its test expects
+`show()` once. The prompt omitted this visible transition. The queue route
+returns to the prior screen/Today and opens the existing QU1 popout.
+Without start, the generation route reads an intent without admission but
+does not subscribe to later saved generation IDs; start=1 calls admission.
+
+Acceptance matrix, full inventory and exact owner question are in
+[GN1 preflight](acceptance/gn1-grace-navigation.md). Await corrected resume
+instructions resolving immediate Queue opening and slow-intent observation.
+Implementation tests/builds **NOT RUN**; 1/7 prompt gate commands run for
+documentation hygiene, the other 6/7 **NOT RUN**. GN1 is pending,
+not done. No remote calls, deploy, SQL/migration, Scheduler action, email,
+environment-file edit or push. Unrelated untracked work is preserved.
+
+**Owner steps remaining:** baseline decision/resume, mobile OTA/APK and
+Realme checks (Rollout and Device checks **NOT RUN**, skipped entirely).
+Production/database/Scheduler and physical-device state are
+**UNVERIFIED (owner to confirm)**. No later roadmap task started.
+<!-- GN1 end -->
+
 <!-- OS1 begin -->
 ## OS1 source option rows complete via OS1b - PASS (2026-10-18)
 
