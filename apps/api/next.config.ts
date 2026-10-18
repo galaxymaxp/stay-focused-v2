@@ -5,6 +5,10 @@ import { withWorkflow } from "workflow/next";
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../.."),
   outputFileTracingIncludes: {
+    '/api/profile/avatar': [
+      '../../node_modules/@napi-rs/canvas/**/*',
+      '../../node_modules/@napi-rs/canvas-linux-x64-gnu/**/*',
+    ],
     // Today is a DTO-only read route. All other routes retain the existing
     // native/PDF asset packaging, including dynamically loaded write handlers.
     "/{.well-known,api/{auto-reviewer-preferences,canvas,cron,experience,health,internal,jobs,job-uploads,notification-devices,notification-preferences,notifications,ocr,reviewer,reviewers,sources,study-plan,study-sessions,tasks}}": [
