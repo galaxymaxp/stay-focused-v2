@@ -65,6 +65,7 @@ it('uses compact labels below 380 measured points with centered single-line text
     }
     expect(pill.props.style.minHeight).toBeGreaterThanOrEqual(44);
     expect(pill.findByProps({ accessibilityRole: 'radiogroup' }).props.style.minHeight).toBeGreaterThanOrEqual(44);
+    expect(button('Expound').parent!.props.style).toEqual({ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' });
   }
   await press('Simplify');
   expect(mocks.run).toHaveBeenCalledWith(props.owner, props.client, selection, 'topic_simplify', true);

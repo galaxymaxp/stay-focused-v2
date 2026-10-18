@@ -80,11 +80,13 @@ function TopicAssistContent({ reviewer, sectionId, owner, client, online, childr
         </Pressable>; })}
       </View>
       <View importantForAccessibility="no" style={{ width: 1, height: spacing[5], backgroundColor: colors.separator }} />
-      <Pressable accessibilityRole="button" accessibilityLabel={EXPOUND_LABEL} accessibilityState={{ expanded, disabled: !expanded && !canUse('topic_expound') }}
-        disabled={!expanded && !canUse('topic_expound')} onPress={toggleExpound} hitSlop={{ top: spacing[1] + 2, bottom: spacing[1] + 2 }}
-        style={{ flex: 1, minWidth: 0, minHeight: spacing[8], paddingHorizontal: spacing[1], justifyContent: 'center', borderRadius: radius.control, backgroundColor: expanded ? colors.blueSoft : undefined, opacity: canUse('topic_expound') ? 1 : 0.45 }}>
-        <Copy size="caption" numberOfLines={1} style={{ textAlign: 'center' }} color={expanded ? colors.accent : colors.textSecondary}>{EXPOUND_LABEL}</Copy>
-      </Pressable>
+      <View style={{ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={EXPOUND_LABEL} accessibilityState={{ expanded, disabled: !expanded && !canUse('topic_expound') }}
+          disabled={!expanded && !canUse('topic_expound')} onPress={toggleExpound} hitSlop={{ top: spacing[1] + 2, bottom: spacing[1] + 2 }}
+          style={{ minHeight: spacing[8], paddingHorizontal: spacing[1], justifyContent: 'center', borderRadius: radius.control, backgroundColor: expanded ? colors.blueSoft : undefined, opacity: canUse('topic_expound') ? 1 : 0.45 }}>
+          <Copy size="caption" numberOfLines={1} style={{ textAlign: 'center' }} color={expanded ? colors.accent : colors.textSecondary}>{EXPOUND_LABEL}</Copy>
+        </Pressable>
+      </View>
     </View>
     {!online && <Copy size="caption" muted>{STUDY_OFFLINE}</Copy>}
     <StudyAnswerArea id={bodyId}>{level === 'original' ? children : renderEntry(current, () => action && run(action, bodyId))}</StudyAnswerArea>
