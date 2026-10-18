@@ -5032,17 +5032,26 @@ mark.find-active {
   .topic-label-short { display: inline; }
 }
 
-/* Compact, single-line Library preference using the existing form palette. */
+/* Compact Library preference using the existing account popover palette. */
 .library-sort {
-  flex-direction: row;
-  align-self: flex-start;
-  white-space: nowrap;
+  position: relative;
+  align-self: flex-end;
 }
-.library-sort select {
-  width: auto;
-  min-height: 36px;
+.library-sort-trigger {
+  min-height: 44px;
   padding: 6px 10px;
-  font-size: inherit;
+}
+.library-sort-menu {
+  top: calc(100% + 8px);
+  bottom: auto;
+  left: auto;
+  right: 0;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  animation: none;
+}
+.library-sort-menu > button {
+  min-height: 44px;
 }
 
 /* WG1: flexible Generate controls use the shared button sizes and surfaces. */

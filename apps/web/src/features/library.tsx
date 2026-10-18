@@ -17,7 +17,7 @@ import type {
 } from "@stay-focused/shared";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { courseIdentity } from "../app-model/courseIdentity";
 import {
   PERSONAL_LIBRARY_KEY,
@@ -227,11 +227,61 @@ export function LibraryScreen() {
 function LibrarySortControl({ value, onChange, course = false, grid = false }: {
   value: LibrarySort; onChange: (value: LibrarySort) => void; course?: boolean; grid?: boolean;
 }) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const menuId = useId();
   const options = LIBRARY_SORT_OPTIONS.filter(option => (option.value !== "course" || course) && (option.value !== "custom" || !grid));
-  return <label className="library-sort">Sort <select aria-label="Sort Library" value={value} onChange={event => {
-    const option = options.find(item => item.value === event.target.value);
-    if (option) onChange(option.value);
-  }}>{options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>;
+  const selected = LIBRARY_SORT_OPTIONS.find(option => option.value === value);
+  useEffect(() => {
+    if (!open) return;
+    menu.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+    const close = () => { setOpen(false); trigger.current?.focus(); };
+    const outside = (event: Event) => {
+      if (!root.current?.contains(event.target as Node)) {
+        // Keep the dismissing press from moving focus away from the trigger.
+        event.preventDefault();
+        close();
+      }
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); close(); }
+    };
+    document.addEventListener("mousedown", outside);
+    document.addEventListener("touchstart", outside, { passive: false });
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("mousedown", outside);
+      document.removeEventListener("touchstart", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [open]);
+  return <div className="library-sort" ref={root} onBlur={event => {
+    if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+  }}>
+    <button ref={trigger} className="library-sort-trigger subtle" aria-label={`Sort Library: ${selected?.label ?? value}`}
+      aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined}
+      onClick={() => setOpen(current => !current)}
+      onKeyDown={event => { if (event.key === "ArrowDown") { event.preventDefault(); setOpen(true); } }}>
+      <Icon name="arrow-up-down" />Sort
+    </button>
+    {open && <div id={menuId} ref={menu} className="account-popover library-sort-menu" role="menu" aria-label="Sort Library"
+      onKeyDown={event => {
+        if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        const items = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+        const index = items.indexOf(document.activeElement as HTMLButtonElement);
+        const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 :
+          (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+        items[next]?.focus();
+      }}>
+      {options.map(option => <button key={option.value} role="menuitemradio" aria-checked={value === option.value}
+        onClick={() => { onChange(option.value); setOpen(false); trigger.current?.focus(); }}>
+        <span className="grow">{option.label}</span>{value === option.value && <Icon name="check" />}
+      </button>)}
+    </div>}
+  </div>;
 }
 
 type Pending = { kind: "rename" | "delete" | "remove" | "remake"; item: LibraryArtifactSummary } | null;
