@@ -6204,3 +6204,104 @@ freshness. Local tests establish error/loading behavior, not physical acceptance
 
 [IF2 diagnosis, full diff notes and local evidence](acceptance/if2-external-image.md).
 Endpoint: IF2 code scope complete; no further roadmap task started.
+
+## OR1b / BACKLOG P14 unattended handoff - PASS (2026-10-18)
+
+**Status: PASS for the finite code scope.** STEP 0-4, tests, all seven prompt
+gates, additional forced root build, docs and local commits complete from
+`9f53e47` on `overnight/2026-10-15_feedback`. OR1b's explicit owner answers
+supersede OR1's historical preflight STOP at `7a70262`; its source comparison
+was reused. The quoted owner roadmap section supplies the required scope.
+No OR2 or later roadmap slice started.
+
+`8eca072` adds an absolute static `react-native-svg` radial halo inside DayOrb,
+behind both GL and PNG. Existing day aura tint is memoized by minute and reused
+by the existing scene runtime. Peak alpha is 0.35 dark / 0.16 light, just outside
+the unchanged glass radius, fading to zero before the ring/handles and canvas
+edge. The center remains transparent, with the readout/ring above the orb.
+Both halo and host pass touches through. No animation, timer, frame callback,
+extra GL pass, native module or dependency was added; existing reduced render
+resolution, touch pause, foreground/live/Reduce Motion controls are retained.
+The static glow remains for Reduce Motion, live=false and failed-GL PNG fallback.
+
+**Cause found / limits:** the PNG path lacked any independent outer glow. The
+live GL path uses only additive light into a transparent Expo surface. A bounded
+inspection of installed Three found non-premultiplied additive blending uses
+`SRC_ALPHA, ONE`, giving an isolated low-alpha fragment squared alpha coverage;
+Expo Android TextureView is non-opaque. This is a concrete attenuation mechanism,
+but the actual phone path/compositing cause is **UNVERIFIED (owner to confirm)**.
+No renderer setting can be claimed as a proven device fix from this evidence.
+The explicitly approved SVG layer supplies visible-alpha spill independently.
+Existing web/mobile shader parity and adequate host room were already documented
+by OR1; no shared/web shader, render pipeline, Generation/Queue orb, schema,
+dependency or ADR change was made.
+
+### Gates and commits
+
+**FRESH PASS: 7/7 prompt gate commands, 0 final failures.**
+
+| Command | Result |
+| --- | --- |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached, corrected second attempt |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors, 6 existing warnings |
+| `npm run test --workspace @stay-focused/mobile` | 1446/1446 tests, 144 files |
+| `npm run test --workspace @stay-focused/shared` | 476/476 tests, 46 files, including existing compiled copies |
+| `npm run build --workspace @stay-focused/api` | PASS; 35/35 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | PASS; 1 Android bundle, 4266 modules |
+| `git diff --check` | PASS; staged-diff hygiene also PASS, 0 whitespace errors |
+
+Additional AUTOPILOT `npm run build -- --force`: **FRESH PASS, 8/8 tasks,
+0 cached**, including API/web builds and Android/iOS/web exports. Focused mounted
+DayOrb suite **7/7 FRESH PASS** covers geometry, touch pass-through, two day
+tones, light tuning, Reduce Motion/live=false single existing GL still frame,
+and static PNG fallback. No added Animated value, timer or frame loop.
+
+First forced typecheck: **7/8 tasks, 0 cached**, 8 test-only TS2345 diagnostics
+from mocked host strings; corrected queries use typed component imports, then
+all gates passed. No runtime test failure, nondeterministic flake, skipped test,
+weakened validation or hidden failed attempt. Source filename discovery misses
+were resolved with rg. A temporary PowerShell sprint encoding change was
+corrected from Git's UTF-8 source before commit. Existing Vite configuration and
+Metro color warnings remain.
+
+Gates ran serially against code now committed as `8eca072`, with process-local
+Node external-socket blocking, Expo offline/no-telemetry and Next/Turbo telemetry
+disabled. Turbo loose environment mode preserved the guard in build children.
+Next-generated declarations were inspected/restored. Validation logs, status,
+progress, scripts and outputs remain uncommitted under `tmp/overnight/OR1b*`.
+Separate API/web/workflow/provider tests are NOT APPLICABLE to unchanged
+boundaries. Initial SVG rasterization/composition is not a zero-hardware-cost
+claim; there is no added ongoing scheduled work.
+
+Commits, author `galaxymaxp <omgraythekid@gmail.com>`:
+
+```text
+8eca072 fix(mobile): add static outer glow to the Today orb
+docs: close OR1b (this footer; final hash in Git and tmp/overnight/OR1b.status)
+```
+
+No push, branch switch, deployment, migration/remote SQL, Supabase/Vercel/Google
+Cloud/Canvas/Resend call, Scheduler operation, email or environment-file edit.
+Unrelated untracked `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` preserved;
+no tmp path or generated build output is committed. Planning files reconciled.
+
+**UNVERIFIED (owner to confirm):** actual phone GL versus PNG path, Android
+compositing, installed/shipped/deployed revisions, physical appearance and power
+behavior, production database rows/applied migrations, Scheduler state and
+remote-ref freshness. Local tests establish structure/lifecycle behavior, not
+physical visual parity. No code blocker remains within OR1b's finite scope.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** reviewed Preview OTA through the
+  existing release process. No new native dependency/APK requirement.
+- **Device checks - NOT RUN, skipped entirely:** Realme Today dark/light soft
+  glow against website, handles grabbing immediately, unaffected scrolling,
+  clear readout, Reduce Motion without motion, fallback/inactive appearance and
+  low-power behavior. Check subtle combined GL/SVG glow where GL aura already
+  displays; final device tuning remains owner acceptance.
+- For future Vercel deployment tooling, the CLI is absent; installing
+  `npm i -g vercel` is strongly recommended. No installation or CLI call ran.
+
+[OR1b implementation and local acceptance](acceptance/or1b-today-orb-glow.md).
+Endpoint: OR1b code scope complete; no OR2 or further task started.
