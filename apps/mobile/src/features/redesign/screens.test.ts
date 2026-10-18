@@ -18,7 +18,8 @@ import { ArtifactScreen, LibraryCourseScreen, LibraryScreen } from "./LibraryScr
 import { ActivityScreen, TasksCourseScreen, TasksScreen } from "./TasksScreen";
 import { TodayScreen } from "./TodayScreen";
 import { DayRingClock } from "./DayRingClock";
-import { localDate } from "./presentation";
+import { ClockOptions } from "./ClockOptions";
+import { localDate, planningRequest } from "./presentation";
 import { TASK_COURSE_GRADES_PATHNAME, courseRouteParams } from "../../navigation/appRoutes";
 import { AnnouncementDetailScreen, AnnouncementsScreen } from "../announcements/AnnouncementsScreen";
 
@@ -26,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   artifact: null as LibraryArtifactDetail | null,
   offlineMissing: false,
   storeConfirmed: vi.fn(),
+  storageWrite: vi.fn(async (_key: string, _value: string) => {}),
   data: {} as Record<string, unknown>,
   errors: {} as Record<string, { message: string; code: string }>,
   paths: [] as string[],
@@ -144,7 +146,7 @@ vi.mock("../../design/SwipeRow", () => ({
 vi.mock("../sync/SyncStatus", () => ({ SyncStatus: "SyncStatus" }));
 vi.mock("../reviewer/ReviewerReader", () => ({ ReviewerReaderScreen: "ReviewerReaderScreen" }));
 vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView", useSafeAreaInsets: () => ({ top: 24, bottom: 16, left: 0, right: 0 }) }));
-vi.mock("../../auth/sessionStore", () => ({ sessionStore: { getItem: async () => null, setItem: async () => {} } }));
+vi.mock("../../auth/sessionStore", () => ({ sessionStore: { getItem: async () => null, setItem: mocks.storageWrite } }));
 vi.mock("./DayOrb", () => ({ DayOrb: "DayOrb", DAY_ORB_FILL: 0.642, dayOrbTouch: { active: false } }));
 vi.mock("react-native", () => ({
   AppState: {
@@ -159,6 +161,7 @@ vi.mock("react-native", () => ({
   StyleSheet: { absoluteFill: { position: "absolute" } },
   ScrollView: "ScrollView",
   Pressable: "Pressable",
+  Modal: "Modal", Switch: "Switch",
   TextInput: "TextInput",
   KeyboardAvoidingView: "KeyboardAvoidingView",
   Platform: { OS: "android" },
@@ -207,6 +210,7 @@ vi.mock("react-native-svg", () => ({
 }));
 vi.mock("lucide-react-native", () => ({
   ArrowDownWideNarrow: "ArrowDownWideNarrow",
+  Ellipsis: "Ellipsis",
   FileText: "FileText",
   ChevronDown: "ChevronDown",
   ChevronUp: "ChevronUp",
@@ -1089,9 +1093,9 @@ describe("B25 screen interactions", () => {
     const root = await render(createElement(DayRingClock, { date: "2026-09-13", timeline: [], start: 600, end: 720, onChange: vi.fn(), onCommit, locked: true, onToggleLock }));
     const end = ringAt(720);
     expect(ringTouch(root).props.onStartShouldSetPanResponder(touchAt(end.x, end.y))).toBe(false);
-    const lock = root.findAll((node) => node.props.testID === "clock-lock")[0]!;
-    expect(lock.props.accessibilityState).toEqual({ checked: true });
-    await act(async () => lock.props.onPress());
+    const options = root.findByType(ClockOptions);
+    expect(options.props.locked).toBe(true);
+    await act(async () => options.props.onToggleLock());
     expect(onToggleLock).toHaveBeenCalledTimes(1);
   });
 
@@ -1687,4 +1691,19 @@ describe('organizing saved items inside a course', () => {
     expect(mocks.alert).toHaveBeenCalledWith('Remove saved work?', expect.stringContaining('2 selected items'), expect.any(Array));
     expect(mocks.request).not.toHaveBeenCalled();
   });
+});
+
+it('keeps the lock storage key and sends typed free time through the drag planning path', async () => {
+  const path = `/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`;
+  mocks.data[path] = todayFixture();
+  mocks.request.mockResolvedValue({ algorithmVersion: 'deterministic-v1', planningRange: { startsAt: '', endsAt: '' }, availability: [], sessions: [], unscheduledWork: [] });
+  const root = await render(createElement(TodayScreen));
+  const options = () => root.findByType(ClockOptions);
+  await act(async () => options().props.onToggleLock());
+  expect(mocks.storageWrite).toHaveBeenCalledWith('sf.today.clock-locked', '1');
+  expect(options().props.locked).toBe(true);
+  await act(async () => options().props.onCommit(1320, 240));
+  expect(mocks.storageWrite).toHaveBeenCalledWith(`sf.today.free-time.${localDate()}`, JSON.stringify({ start: 1320, end: 240 }));
+  const request = mocks.request.mock.calls.find(call => call[1] === '/api/experience/planner/preview');
+  expect(request?.[2].body).toEqual(planningRequest(localDate(), 1320, 240));
 });

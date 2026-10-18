@@ -1,3 +1,4 @@
+import { freeTimeEnd, minuteInWindow, clockTimeLabel } from "@stay-focused/shared";
 import type { DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
 import { View } from "react-native";
 
@@ -23,11 +24,7 @@ function minuteOfDay(iso: string) {
   return date.getHours() * 60 + date.getMinutes();
 }
 
-function hourLabel(minutes: number) {
-  const date = new Date(2000, 0, 1, 0, 0);
-  date.setMinutes(Math.round(minutes));
-  return date.toLocaleTimeString([], { hour: "numeric", hour12: true, minute: minutes % 60 ? "2-digit" : undefined });
-}
+const hourLabel = clockTimeLabel;
 
 /**
  * The planner's proposal drawn to scale across the free window, so the
@@ -52,11 +49,12 @@ export function PlanPreview({
   onDiscard: () => void;
 }) {
   const { colors } = useTheme();
-  const span = Math.max(15, to - from);
+  const until = freeTimeEnd(from, to);
+  const span = Math.max(15, until - from);
   const taskIds = planTaskIds(plan);
   const planned = plan.sessions.reduce((total, session) => total + session.durationMinutes, 0);
   const unscheduled = plan.unscheduledWork.reduce((total, item) => total + item.unscheduledMinutes, 0);
-  const hours = Array.from({ length: Math.floor(to / 60) - Math.ceil(from / 60) + 1 }, (_, index) => (Math.ceil(from / 60) + index) * 60).filter((m) => m > from && m < to);
+  const hours = Array.from({ length: Math.floor(until / 60) - Math.ceil(from / 60) + 1 }, (_, index) => (Math.ceil(from / 60) + index) * 60).filter((m) => m > from && m < until);
   return (
     <Surface style={{ gap: spacing[3] }}>
       <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" }}>
@@ -76,7 +74,7 @@ export function PlanPreview({
           <View key={minutes} style={{ position: "absolute", top: 0, bottom: 0, width: 1, left: `${((minutes - from) / span) * 100}%`, backgroundColor: colors.separator }} />
         ))}
         {plan.sessions.map((session) => {
-          const start = minuteOfDay(session.startsAt);
+          const start = minuteInWindow(minuteOfDay(session.startsAt), from);
           const tone = planToneFor(taskIds, session.taskId);
           const late = session.scheduledAfterDeadline;
           return (
@@ -87,7 +85,7 @@ export function PlanPreview({
                 top: 4,
                 bottom: 4,
                 left: `${(Math.max(0, start - from) / span) * 100}%`,
-                width: `${(Math.min(session.durationMinutes, to - start) / span) * 100}%`,
+                width: `${(Math.min(session.durationMinutes, until - start) / span) * 100}%`,
                 paddingHorizontal: 6,
                 justifyContent: "center",
                 borderRadius: radius.control - 4,

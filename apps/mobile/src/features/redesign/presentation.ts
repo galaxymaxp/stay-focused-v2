@@ -1,3 +1,4 @@
+import { freeTimePlanningRange, freeTimeEnd, wrapMinute } from "@stay-focused/shared";
 import type {
   FeatureCapability,
   GenerateCoursePeriod,
@@ -103,7 +104,7 @@ export function clockMinutes(x: number, y: number) {
   return (((Math.atan2(y, x) * 180) / Math.PI + 90 + 360) % 360) * 4;
 }
 export function snapMinutes(minutes: number) {
-  return Math.min(1440, Math.max(0, Math.round(minutes / 15) * 15));
+  return wrapMinute(Math.round(minutes / 15) * 15);
 }
 export function ringDragMinutes(previous: number, angleMinutes: number) {
   const candidates = [angleMinutes - 1440, angleMinutes, angleMinutes + 1440];
@@ -195,14 +196,7 @@ export function planningRequest(
   start: number,
   end: number,
 ): StudyPlanningRequest {
-  if (end <= start) throw new Error("Choose an end time after the start time.");
-  const midnight = new Date(`${date}T00:00:00`);
-  const at = (minutes: number) =>
-    new Date(midnight.getTime() + minutes * 60000).toISOString();
-  return {
-    planningRange: { startsAt: at(0), endsAt: at(1440) },
-    availability: [{ startsAt: at(start), endsAt: at(end) }],
-  };
+  return freeTimePlanningRange(date, start, end);
 }
 
 /**
@@ -215,7 +209,7 @@ export function freeTimeAround(
   segments: readonly { readonly from: number; readonly to: number }[],
   nowMinutes: number,
 ): { start: number; end: number } | null {
-  const upcoming = segments.filter((s) => s.to > nowMinutes).sort((a, b) => a.from - b.from);
+  const upcoming = segments.map(s => ({ from: s.from, to: freeTimeEnd(s.from, s.to) })).filter((s) => s.to > nowMinutes).sort((a, b) => a.from - b.from);
   if (upcoming.length === 0) return null;
   let last = upcoming[0]!.to;
   for (const segment of upcoming.slice(1)) {
@@ -223,8 +217,8 @@ export function freeTimeAround(
     last = Math.max(last, segment.to);
   }
   const start = Math.max(0, Math.floor(upcoming[0]!.from / 15) * 15);
-  const end = Math.min(1440, Math.ceil(last / 15) * 15);
-  return end > start ? { start, end } : null;
+  const end = Math.min(start + 1425, Math.ceil(last / 15) * 15);
+  return end > start ? { start: wrapMinute(start), end: end <= 1440 ? end : wrapMinute(end) } : null;
 }
 export function timelineSegments(items: readonly TodayItem[], date: string) {
   const start = new Date(`${date}T00:00:00`).getTime();
@@ -234,7 +228,7 @@ export function timelineSegments(items: readonly TodayItem[], date: string) {
       0,
       (new Date(item.startAt).getTime() - start) / 60000,
     );
-    const to = Math.min(1440, (new Date(item.endAt).getTime() - start) / 60000);
+    const to = (new Date(item.endAt).getTime() - start) / 60000;
     return to > from
       ? [{ id: item.id, from, to, kind: item.kind, title: item.title }]
       : [];

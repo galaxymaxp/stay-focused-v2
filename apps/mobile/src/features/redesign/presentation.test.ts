@@ -69,13 +69,13 @@ describe("day-ring input and planner boundary", () => {
     expect(clockMinutes(x, y)).toBe(minutes),
   );
   it("keeps a midnight drag on the nearest boundary", () => {
-    expect(ringDragMinutes(1425, 0)).toBe(1440);
-    expect(ringDragMinutes(15, 1430)).toBe(0);
+    expect(ringDragMinutes(1425, 0)).toBe(0);
+    expect(ringDragMinutes(15, 1430)).toBe(1425);
   });
   it("snaps and bounds fifteen-minute adjustments", () => {
     expect(snapMinutes(368)).toBe(375);
-    expect(snapMinutes(-10)).toBe(0);
-    expect(snapMinutes(1500)).toBe(1440);
+    expect(snapMinutes(-10)).toBe(1425);
+    expect(snapMinutes(1500)).toBe(60);
   });
   it("offers only the free time, but replans the whole day so every block fits inside it", () => {
     const request = planningRequest("2026-09-13", 600, 720);
@@ -84,7 +84,7 @@ describe("day-ring input and planner boundary", () => {
     expect(Date.parse(window!.endsAt) - Date.parse(window!.startsAt)).toBe(120 * 60000);
     expect(request.planningRange.startsAt).toBe(new Date("2026-09-13T00:00:00").toISOString());
     expect(Date.parse(request.planningRange.endsAt) - Date.parse(request.planningRange.startsAt)).toBe(1440 * 60000);
-    expect(() => planningRequest("2026-09-13", 720, 600)).toThrow();
+    expect(() => planningRequest("2026-09-13", 720, 720)).toThrow();
   });
   it("draws only real timed blocks and excludes skipped sessions", () => {
     const items = [

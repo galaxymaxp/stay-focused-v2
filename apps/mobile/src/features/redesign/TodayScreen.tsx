@@ -1,3 +1,4 @@
+import { useTodayClockWindow } from "./useTodayClockWindow";
 import { SnapshotStatus } from "./SnapshotStatus";
 import type {
   TodayItem,
@@ -65,9 +66,12 @@ export function TodayScreen() {
   const { session } = useAuth();
   const displayName = [session?.user.userMetadata?.full_name, session?.user.userMetadata?.name].find(value => typeof value === "string" && value.trim()) as string | undefined;
   const firstName = displayName?.trim().split(/\s+/)[0];
-  const date = localDate();
+  const clockWindow = useTodayClockWindow();
+  const date = clockWindow.date;
+  const activeDate = useRef(date);
+  activeDate.current = date;
   const today = useExperience<TodayScreenData>(
-    `/api/today?date=${date}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`,
+    clockWindow.path,
     60000,
   );
   const capabilities = { ...today, data: today.data?.capabilities ?? null };
@@ -109,7 +113,7 @@ export function TodayScreen() {
     const activity = activityFor(item, activities.data?.items ?? []);
     if (activity) router.push({ pathname: "/activity", params: { id: activity.id } });
     else if (item.deepLinkTarget.surface === "activity") router.push({ pathname: "/activity", params: { id: item.deepLinkTarget.id } });
-    else router.push({ pathname: "/study-session", params: { id: item.deepLinkTarget.id, date: localDate() } });
+    else router.push({ pathname: "/study-session", params: { id: item.deepLinkTarget.id, date } });
   };
   const { colors, mode, reducedMotion } = useTheme();
   const { prefs, pin, hide } = useListPreferences();
@@ -193,35 +197,22 @@ export function TodayScreen() {
   > | null>(null);
   // The free time is remembered per day, so the planned blocks it holds and
   // the window you set stay together across launches.
-  const windowKey = `sf.today.free-time.${date}`;
   const [windowKnown, setWindowKnown] = useState(false);
+  const savedWindow = clockWindow.window;
   useEffect(() => {
-    let live = true;
-    void Promise.resolve(sessionStore.getItem(windowKey)).then((raw) => {
-      if (!live) return;
-      try {
-        const saved = raw ? (JSON.parse(raw) as { start?: unknown; end?: unknown }) : null;
-        if (saved && typeof saved.start === "number" && typeof saved.end === "number" && saved.end > saved.start) {
-          setStart(saved.start);
-          setEnd(saved.end);
-          setWindowKnown(true);
-          return;
-        }
-      } catch {
-        // Unreadable: fall back to the day's planned blocks below.
-      }
-      setWindowKnown(false);
-    }).catch(() => {});
-    return () => {
-      live = false;
-    };
-  }, [windowKey]);
+    setWindowKnown(!!savedWindow);
+    setPreview(null);
+    setPreviewRequest(null);
+    const fallback = Math.min(1410, Math.ceil((new Date().getHours() * 60 + new Date().getMinutes()) / 15) * 15);
+    setStart(savedWindow?.start ?? fallback);
+    setEnd(savedWindow?.end ?? Math.min(1440, fallback + 120));
+  }, [date, savedWindow]);
   // Nothing saved yet: wrap the free time around today's planned blocks.
   const planned = today.data?.timeline;
   useEffect(() => {
     if (windowKnown || !planned) return;
     const now = new Date();
-    const around = freeTimeAround(timelineSegments(planned.filter((item) => item.status === "planned"), date), now.getHours() * 60 + now.getMinutes());
+    const around = freeTimeAround(timelineSegments(planned.filter((item) => item.status === "planned"), date), (now.getTime() - new Date(`${date}T00:00:00`).getTime()) / 60000);
     if (around) {
       setStart(around.start);
       setEnd(around.end);
@@ -234,7 +225,7 @@ export function TodayScreen() {
     setPreview(null);
     setPreviewRequest(null);
     setWindowKnown(true);
-    void Promise.resolve(sessionStore.setItem(windowKey, JSON.stringify({ start: from, end: to }))).catch(() => {});
+    clockWindow.save({ start: from, end: to });
   };
   async function plan(from: number, to: number) {
     if (requestBusy.current || !available(capabilities.data?.planner)) return;
@@ -244,12 +235,14 @@ export function TodayScreen() {
     setPreview(null);
     setPreviewRequest(null);
     try {
-      const request = planningRequest(date, from, to);
+      const requestDate = date;
+      const request = planningRequest(requestDate, from, to);
       const result = await experienceRequest<DeterministicStudyPlan>(
         client,
         "/api/experience/planner/preview",
         { method: "POST", body: request },
       );
+      if (activeDate.current !== requestDate) return;
       setPreview(result);
       setPreviewRequest(request);
     } catch (error) {
@@ -324,7 +317,7 @@ export function TodayScreen() {
           preview
             ? preview.sessions.map((session) => {
                 const at = new Date(session.startsAt);
-                const from = at.getHours() * 60 + at.getMinutes();
+                const from = (at.getTime() - new Date(`${date}T00:00:00`).getTime()) / 60000;
                 return { id: session.proposalId, from, to: from + session.durationMinutes, color: colors[planToneFor(planTaskIds(preview), session.taskId)] };
               })
             : []

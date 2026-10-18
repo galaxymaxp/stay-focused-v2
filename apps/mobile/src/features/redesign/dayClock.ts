@@ -1,3 +1,4 @@
+import { containsMinute, freeTimeDuration, wrapMinute } from "@stay-focused/shared";
 /**
  * Pure model for the Today glass clock: ring geometry, touch hit-testing,
  * continuous drag math with snap-on-release, and the day state painted inside
@@ -44,14 +45,13 @@ export function angleMinutes(dx: number, dy: number) {
 
 /**
  * Follows the finger continuously: picks the angular reading nearest the
- * previous value (so midnight never wraps a range inside out) and clamps to
- * the day. No snapping happens here.
+ * previous value across midnight. No snapping happens here.
  */
 export function followMinutes(previous: number, angle: number) {
   const nearest = [angle - DAY_MINUTES, angle, angle + DAY_MINUTES].reduce((best, value) =>
     Math.abs(value - previous) < Math.abs(best - previous) ? value : best,
   );
-  return clamp(nearest, 0, DAY_MINUTES);
+  return nearest;
 }
 
 /** Shortest signed angular change between two readings, in minutes. */
@@ -63,44 +63,37 @@ export function angularDelta(from: number, to: number) {
 }
 
 export function snapTo(minutes: number, step: number = SNAP_MINUTES) {
-  return clamp(Math.round(minutes / step) * step, 0, DAY_MINUTES);
+  return Math.round(minutes / step) * step;
 }
 
-/** Moves a whole block, preserving its duration inside the day. */
+/** Moves a block around the clock, preserving its duration. */
 export function moveRange(start: number, end: number, delta: number) {
-  const duration = end - start;
-  const nextStart = clamp(start + delta, 0, DAY_MINUTES - duration);
-  return { start: nextStart, end: nextStart + duration };
+  const duration = freeTimeDuration(start, end);
+  const nextStart = wrapMinute(start + delta);
+  return { start: nextStart, end: wrapMinute(nextStart + duration) };
 }
-
-/** Keeps one edge from crossing the other while it is dragged. */
+/** Lift the dragged edge relative to its current range, then keep 15..1425 minutes. */
 export function dragEdge(edge: "start" | "end", value: number, start: number, end: number) {
-  return edge === "start"
-    ? { start: clamp(value, 0, end - MIN_RANGE_MINUTES), end }
-    : { start, end: clamp(value, start + MIN_RANGE_MINUTES, DAY_MINUTES) };
+  const until = start + freeTimeDuration(start, end);
+  if (edge === "start") {
+    const next = clamp(start + angularDelta(start, value), until - 1425, until - MIN_RANGE_MINUTES);
+    return { start: wrapMinute(next), end };
+  }
+  const next = clamp(until + angularDelta(end, value), start + MIN_RANGE_MINUTES, start + 1425);
+  return { start, end: wrapMinute(next) };
 }
-
-/**
- * Snap applied once, on release. A moved block keeps its duration (both edges
- * shift together); a resized edge snaps on its own.
- */
+/** Snap once on release; moving preserves even a typed window's duration. */
 export function snapRange(start: number, end: number, mode: "start" | "end" | "move") {
-  if (mode === "move") {
-    const duration = snapTo(end - start) || MIN_RANGE_MINUTES;
-    const snappedStart = clamp(snapTo(start), 0, DAY_MINUTES - duration);
-    return { start: snappedStart, end: snappedStart + duration };
-  }
-  const snapped = { start: snapTo(start), end: snapTo(end) };
-  if (snapped.end - snapped.start < MIN_RANGE_MINUTES) {
-    return mode === "start"
-      ? { start: snapped.end - MIN_RANGE_MINUTES, end: snapped.end }
-      : { start: snapped.start, end: snapped.start + MIN_RANGE_MINUTES };
-  }
-  return snapped;
+  if (mode === "move") return moveRange(start, end, snapTo(start) - start);
+  const snappedStart = wrapMinute(snapTo(start));
+  const snappedEnd = wrapMinute(snapTo(end));
+  if (snappedStart === snappedEnd) return mode === "start"
+    ? { start: wrapMinute(snappedEnd - MIN_RANGE_MINUTES), end: snappedEnd }
+    : { start: snappedStart, end: wrapMinute(snappedStart + MIN_RANGE_MINUTES) };
+  return { start: snappedStart, end: snappedEnd };
 }
-
 function withinRange(minutes: number, start: number, end: number) {
-  return minutes >= start && minutes <= end;
+  return containsMinute(start, end, minutes);
 }
 
 /**
@@ -122,7 +115,7 @@ export function hitTest(x: number, y: number, start: number, end: number): "star
   if (withinRange(minutes, start, end)) {
     // Inside the block the ends share it with the middle: a short block keeps
     // its central third for moving the whole thing.
-    const inside = Math.min(reach, (end - start) / 3);
+    const inside = Math.min(reach, freeTimeDuration(start, end) / 3);
     return Math.min(startGap, endGap) <= inside ? nearest : "move";
   }
   return Math.min(startGap, endGap) <= reach ? nearest : null;
@@ -148,7 +141,7 @@ export function segmentAt<T extends { readonly id: string; readonly from: number
   }
   const minutes = angleMinutes(dx, dy);
   const slack = 10;
-  return segments.find((segment) => minutes >= segment.from - slack && minutes <= segment.to + slack) ?? null;
+  return segments.find((segment) => [minutes, minutes + DAY_MINUTES].some(m => m >= segment.from - slack && m <= segment.to + slack)) ?? null;
 }
 
 /* ------------------------------------------------------------------------ */
@@ -325,4 +318,11 @@ export function dayOrbTones(minutes: number): DayOrbTones {
     position: { x: body.x * 0.6, y: -body.y * 0.55, z: 0.28 },
     strength: body.kind === "sun" ? 0.45 + 0.4 * body.altitude : 0.32 + 0.1 * body.altitude,
   };
+}
+
+/** Clockwise SVG arc; wrapped endpoints keep their actual duration. */
+export function ringArc(from: number, to: number, radius: number) {
+  if (to < from) to += DAY_MINUTES;
+  const a = ringPoint(from, radius), b = ringPoint(Math.min(to, from + 1439.9), radius);
+  return `M ${a.x} ${a.y} A ${radius} ${radius} 0 ${to - from > 720 ? 1 : 0} 1 ${b.x} ${b.y}`;
 }

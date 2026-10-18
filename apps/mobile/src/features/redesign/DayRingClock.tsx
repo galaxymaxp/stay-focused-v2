@@ -1,8 +1,8 @@
-import type { TodayItem } from "@stay-focused/shared";
+import { clockTimeLabel, freeTimeDuration, containsMinute, type TodayItem } from "@stay-focused/shared";
 import { useIsFocused } from "expo-router/react-navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Lock, LockOpen } from "lucide-react-native";
-import { Animated, PanResponder, Pressable, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
+import { ClockOptions } from "./ClockOptions";
+import { Animated, PanResponder, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
 
 import { haptic } from "../../design/haptics";
 import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
@@ -20,6 +20,7 @@ import {
   hitTest,
   moveRange,
   ringPoint,
+  ringArc as arc,
   segmentAt,
   snapRange,
   snapTo,
@@ -35,16 +36,8 @@ export function formatFreeTime(minutes: number) {
   if (hours === 0) return `${rest} min`;
   return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
 }
-function clockLabel(minutes: number) {
-  const date = new Date(2000, 0, 1, 0, 0);
-  date.setMinutes(Math.round(minutes));
-  return date.toLocaleTimeString([], { hour: "numeric", hour12: true, minute: "2-digit" });
-}
-function arc(from: number, to: number, radius: number) {
-  const a = ringPoint(from, radius),
-    b = ringPoint(Math.min(to, from + 1439.9), radius);
-  return `M ${a.x} ${a.y} A ${radius} ${radius} 0 ${to - from > 720 ? 1 : 0} 1 ${b.x} ${b.y}`;
-}
+const clockLabel = clockTimeLabel;
+
 
 type Mode = "start" | "end" | "move";
 type Range = { start: number; end: number };
@@ -263,7 +256,7 @@ export function DayRingClock({
         return;
       }
       state.stopSnap?.();
-      state.stopSnap = tween([released.start, released.end], [target.start, target.end], SNAP_MS, ([a, b]) => setDraft({ start: a!, end: b! }), done);
+      state.stopSnap = tween([released.start, released.end], [released.start + angularDelta(released.start, target.start), released.end + angularDelta(released.end, target.end)], SNAP_MS, ([a, b]) => setDraft({ start: a!, end: b! }), done);
     };
     return PanResponder.create({
       onStartShouldSetPanResponder: (event) => {
@@ -338,7 +331,7 @@ export function DayRingClock({
   }, [lift, publish]);
 
   const step = (edge: Mode, direction: 1 | -1) => {
-    if (disabled) return;
+    if (disabled || locked) return;
     const delta = SNAP_MINUTES * direction;
     const next =
       edge === "move"
@@ -353,7 +346,7 @@ export function DayRingClock({
   const segmentColor = (kind: TodayItem["kind"]) =>
     kind === "study_session" ? colors.blue : kind === "calendar_block" ? colors.orange : colors.violet;
   const marker = ringPoint(nowMinutes);
-  const middle = (range.start + range.end) / 2;
+  const middle = range.start + freeTimeDuration(range.start, range.end) / 2;
   const orbCanvas = (CLOCK.glass * 2) / DAY_ORB_FILL;
   const handles: { key: Mode; at: number }[] = [
     { key: "start", at: range.start },
@@ -408,7 +401,7 @@ export function DayRingClock({
           })}
           <Path d={arc(range.start, range.end, CLOCK.ring)} stroke={colors.accent} strokeOpacity={adjusting ? 1 : locked ? 0.55 : 0.9} strokeWidth={CLOCK.track} fill="none" strokeLinecap="butt" testID="free-time-arc" />
           {segments.map((segment) => (
-            <Path key={segment.id} d={arc(segment.from, Math.max(segment.to, segment.from + 0.5), CLOCK.lane)} stroke={segmentColor(segment.kind)} strokeWidth={6} fill="none" strokeLinecap="round" opacity={proposed.length || segment.to <= range.start || segment.from >= range.end ? 0.28 : 0.92} />
+            <Path key={segment.id} d={arc(segment.from, Math.max(segment.to, segment.from + 0.5), CLOCK.lane)} stroke={segmentColor(segment.kind)} strokeWidth={6} fill="none" strokeLinecap="round" opacity={proposed.length || !containsMinute(range.start, range.end, (segment.from + segment.to) / 2) ? 0.28 : 0.92} />
           ))}
           {proposed.map((session) => (
             <Path key={session.id} d={arc(session.from, Math.max(session.to, session.from + 0.5), CLOCK.lane)} stroke={session.color} strokeWidth={6} strokeDasharray="5 4" fill="none" strokeLinecap="round" testID="proposed-arc" />
@@ -441,7 +434,7 @@ export function DayRingClock({
               accessibilityLabel={control.label}
               accessibilityHint={control.key === "move" ? "Swipe up or down to move the whole block by fifteen minutes." : "Swipe up or down to adjust by fifteen minutes."}
               accessibilityValue={{ min: 0, max: DAY_MINUTES, now: Math.round(control.value), text }}
-              accessibilityState={{ disabled }}
+              accessibilityState={{ disabled: disabled || locked }}
               accessibilityActions={[
                 { name: "increment", label: "Fifteen minutes later" },
                 { name: "decrement", label: "Fifteen minutes earlier" },
@@ -457,23 +450,7 @@ export function DayRingClock({
           importantForAccessibility="no"
           style={{ position: "absolute", top: 0, left: 0, width: size, height: size }}
         />
-        {onToggleLock ? (
-          <Pressable
-            accessibilityRole="switch"
-            accessibilityLabel="Lock clock"
-            accessibilityHint="When locked, your free time can't be changed by accident."
-            accessibilityState={{ checked: locked }}
-            testID="clock-lock"
-            onPress={() => {
-              haptic.select();
-              onToggleLock();
-            }}
-            hitSlop={6}
-            style={({ pressed }) => ({ position: "absolute", top: 0, right: 0, width: 44, height: 44, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.55 : 1 })}
-          >
-            {locked ? <Lock size={17} color={colors.accent} strokeWidth={2} /> : <LockOpen size={17} color={colors.textMuted} strokeWidth={1.8} />}
-          </Pressable>
-        ) : null}
+        {onToggleLock ? <ClockOptions start={start} end={end} locked={locked} onToggleLock={onToggleLock} onCommit={onCommit} disabled={disabled} /> : null}
       </View>
     </View>
   );
@@ -510,7 +487,7 @@ function CenterReadout({ mode, range, now }: { mode: Mode | null; range: Range; 
           {mode === "move" ? `${clockLabel(range.start)}` : clockLabel(time)}
         </Copy>
         <Copy color="rgba(255,255,255,0.86)" size="caption" style={{ ...shadow, fontVariant: ["tabular-nums"] }}>
-          {mode === "move" ? `until ${clockLabel(range.end)} · ` : ""}{formatFreeTime(range.end - range.start)}
+          {mode === "move" ? `until ${clockLabel(range.end)} · ` : ""}{formatFreeTime(freeTimeDuration(range.start, range.end))}
         </Copy>
       </>
     );
