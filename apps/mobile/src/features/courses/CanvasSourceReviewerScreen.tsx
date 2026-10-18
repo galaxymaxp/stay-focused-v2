@@ -13,6 +13,8 @@ import { useLegacyTheme, type LegacyColors } from "../../design/theme";
 import type { ReviewerOutput } from "@stay-focused/engine";
 import {
   isActiveProcessingJobStatus,
+  isProcessingJobRetryDenied,
+  processingJobStoppedMessage,
   type ProcessingJobStatusView,
 } from "@stay-focused/shared";
 import {
@@ -183,6 +185,10 @@ export function CanvasSourceReviewerScreen({
   const [isRestoringReviewerJob, setIsRestoringReviewerJob] = useState(true);
   const [activeReviewerJob, setActiveReviewerJob] =
     useState<ProcessingJobStatusView | null>(null);
+  const [reviewerRetryDenial, setReviewerRetryDenial] = useState<{ id: string; message: string } | null>(null);
+  const visibleReviewerJob = activeReviewerJob && reviewerRetryDenial?.id === activeReviewerJob.id
+    ? { ...activeReviewerJob, retryable: false, safeErrorMessage: reviewerRetryDenial.message }
+    : activeReviewerJob;
   const [appIsActive, setAppIsActive] = useState(
     AppState.currentState === "active",
   );
@@ -204,6 +210,8 @@ export function CanvasSourceReviewerScreen({
   const loadMoreLockRef = useRef(false);
   const previewLockRef = useRef(false);
   const generationLockRef = useRef(false);
+  const reviewerRetryLockRef = useRef(false);
+  const [retryingReviewer, setRetryingReviewer] = useState(false);
   const saveLockRef = useRef(false);
   const generationIdempotencyKeyRef = useRef<string | null>(null);
   const recoveryRecordRef = useRef<CanvasReviewerRecoveryRecord | null>(null);
@@ -1426,36 +1434,48 @@ export function CanvasSourceReviewerScreen({
     const context = createRequestContext(session?.accessToken);
     const ownerUserId = session?.user.id;
     const recovery = recoveryRecordRef.current;
-    if (!context.ok || !ownerUserId || !activeReviewerJob || !recovery) return;
-    const retryIdempotencyKey = createProcessingJobIdempotencyKey(
-      "reviewer_generation",
-    );
-    const result = await retryProcessingJob({
-      ...context.value,
-      jobId: activeReviewerJob.id,
-      idempotencyKey: retryIdempotencyKey,
-    });
-    if (!result.ok) {
-      setError(formatProcessingJobError(result.error));
-      return;
-    }
-    const rebound = await acceptCanvasReviewerRecovery(
-      prepareCanvasReviewerRetryRecovery(recovery, retryIdempotencyKey),
-      result.data,
-    );
-    if (!rebound) {
-      setError({
-        message: "The retry did not match the original study material.",
-        title: "Reviewer retry was stopped safely",
+    if (!context.ok || !ownerUserId || !activeReviewerJob || !recovery ||
+      activeReviewerJob.status !== "failed" || !activeReviewerJob.retryable || reviewerRetryDenial?.id === activeReviewerJob.id || reviewerRetryLockRef.current) return;
+    reviewerRetryLockRef.current = true;
+    setRetryingReviewer(true);
+    try {
+      const retryIdempotencyKey = createProcessingJobIdempotencyKey(
+        "reviewer_generation",
+      );
+      const result = await retryProcessingJob({
+        ...context.value,
+        jobId: activeReviewerJob.id,
+        idempotencyKey: retryIdempotencyKey,
       });
-      return;
+      if (!result.ok) {
+        if (isProcessingJobRetryDenied(result.error)) {
+          setReviewerRetryDenial({ id: activeReviewerJob.id, message: result.error.message });
+          setActiveReviewerJob({ ...activeReviewerJob, retryable: false, safeErrorMessage: result.error.message });
+        }
+        setError(formatProcessingJobError(result.error));
+        return;
+      }
+      const rebound = await acceptCanvasReviewerRecovery(
+        prepareCanvasReviewerRetryRecovery(recovery, retryIdempotencyKey),
+        result.data,
+      );
+      if (!rebound) {
+        setError({
+          message: "The retry did not match the original study material.",
+          title: "Reviewer retry was stopped safely",
+        });
+        return;
+      }
+      await removeActiveProcessingJob(activeReviewerJob.id);
+      await upsertActiveProcessingJob(ownerUserId, result.data);
+      recoveryRecordRef.current = rebound;
+      setActiveReviewerJob(result.data);
+      setIsGenerating(true);
+      setError(null);
+    } finally {
+      reviewerRetryLockRef.current = false;
+      setRetryingReviewer(false);
     }
-    await removeActiveProcessingJob(activeReviewerJob.id);
-    await upsertActiveProcessingJob(ownerUserId, result.data);
-    recoveryRecordRef.current = rebound;
-    setActiveReviewerJob(result.data);
-    setIsGenerating(true);
-    setError(null);
   };
 
   const handleDismissReviewerJob = async () => {
@@ -1627,10 +1647,11 @@ export function CanvasSourceReviewerScreen({
         </View>
       ) : activeReviewerJob ? (
         <CanvasReviewerJobCard
-          job={activeReviewerJob}
+          job={visibleReviewerJob!}
           onCancel={() => void handleCancelReviewerJob()}
           onDismiss={() => void handleDismissReviewerJob()}
           onRetry={() => void handleRetryReviewerJob()}
+          retrying={retryingReviewer}
         />
       ) : selectedSourceAction === "preview" &&
         selectedSource &&
@@ -1648,12 +1669,13 @@ export function CanvasSourceReviewerScreen({
         />
       ) : preview ? (
         <PreviewStage
-          activeJob={activeReviewerJob}
+          activeJob={visibleReviewerJob}
           isGenerating={isGenerating}
           onBack={handleReturnToBlockSelection}
           onCancel={() => void handleCancelReviewerJob()}
           onChangeText={handleSourceTextChange}
           onRetry={() => void handleRetryReviewerJob()}
+          retrying={retryingReviewer}
           preview={preview}
           source={selectedSource}
           sourceText={resolution.sourceText}
@@ -2342,11 +2364,13 @@ function PreviewStage({
   onCancel,
   onChangeText,
   onRetry,
+  retrying,
   preview,
   source,
   sourceText,
 }: {
   readonly activeJob: ProcessingJobStatusView | null;
+  readonly retrying: boolean;
   readonly isGenerating: boolean;
   readonly onBack: () => void;
   readonly onCancel: () => void;
@@ -2413,19 +2437,22 @@ function PreviewStage({
           onCancel={onCancel}
           onDismiss={onBack}
           onRetry={onRetry}
+          retrying={retrying}
         />
       ) : null}
     </View>
   );
 }
 
-function CanvasReviewerJobCard({
+export function CanvasReviewerJobCard({
   job,
   onCancel,
   onDismiss,
   onRetry,
+  retrying = false,
 }: {
   readonly job: ProcessingJobStatusView;
+  readonly retrying?: boolean;
   readonly onCancel: () => void;
   readonly onDismiss: () => void;
   readonly onRetry: () => void;
@@ -2449,8 +2476,9 @@ function CanvasReviewerJobCard({
     >
       <Text style={styles.cardTitle}>{canvasReviewerProgressLabel(job)}</Text>
       <Text style={styles.statusText}>
-        Stay Focused is turning your selected material into study notes.
+        {job.status === "failed" ? processingJobStoppedMessage(job.stage) : "Stay Focused is turning your selected material into study notes."}
       </Text>
+      {job.status === "failed" && job.retryable ? <Text style={styles.bodyText}>Your material is safe.</Text> : null}
       {hasUnits ? (
         <Text style={styles.statusText}>
           {job.progress.completedUnits} of {job.progress.totalUnits}{" "}
@@ -2475,11 +2503,11 @@ function CanvasReviewerJobCard({
         </Button>
       ) : null}
       {job.status === "failed" && job.retryable ? (
-        <Button fullWidth onPress={onRetry} variant="primary">
-          Retry
+        <Button disabled={retrying} fullWidth onPress={onRetry} variant="primary">
+          {retrying ? "Retrying…" : "Try again"}
         </Button>
       ) : null}
-      {!active ? (
+      {!active && !job.retryable ? (
         <Button fullWidth onPress={onDismiss} variant="secondary">
           Choose another material
         </Button>

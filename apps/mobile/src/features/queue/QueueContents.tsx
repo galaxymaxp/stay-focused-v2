@@ -3,6 +3,7 @@ import type {
   ProcessingJobStatusView,
 } from "@stay-focused/shared";
 import { router } from "expo-router";
+import { isProcessingJobRetryDenied, processingJobStoppedMessage } from "@stay-focused/shared";
 import { useRef, useState } from "react";
 import { View } from "react-native";
 import {
@@ -69,9 +70,10 @@ function QueueCard({
   const activity = useAppActivity();
   const { close } = useQueueItems();
   const locked = useRef(false);
+  const [retryDenied, setRetryDenied] = useState(false);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
-    [retryKey] = useState(newRequestKey);
+    [retryKey, setRetryKey] = useState(newRequestKey);
   const type =
     job.jobType === "quiz_generation"
       ? "Quiz"
@@ -145,7 +147,7 @@ function QueueCard({
     }
   }
   async function retry() {
-    if (locked.current) return;
+    if (locked.current || retryDenied) return;
     locked.current = true;
     setBusy(true);
     setError(null);
@@ -155,11 +157,13 @@ function QueueCard({
         `/api/jobs/${encodeURIComponent(job.id)}/retry`,
         { method: "POST", key: retryKey },
       );
+      setRetryKey(newRequestKey());
       onRefresh();
       activity.refresh();
       close();
       router.push({ pathname: "/generation", params: { id: result.id } });
     } catch (cause) {
+      if (isProcessingJobRetryDenied(cause)) setRetryDenied(true);
       setError(
         cause instanceof Error
           ? cause.message
@@ -249,9 +253,10 @@ function QueueCard({
           Cancel
         </Action>
       )}
-      {job.retryable && ["failed", "expired"].includes(job.status) && (
+      {job.status === "failed" ? <Copy muted size="caption">{processingJobStoppedMessage(job.stage)}{job.retryable && !retryDenied ? ". Your material is safe." : ""}</Copy> : null}
+      {job.retryable && !retryDenied && ["failed", "expired"].includes(job.status) && (
         <Action secondary disabled={busy} onPress={() => void retry()}>
-          Retry
+          Try again
         </Action>
       )}
       {error && <Notice>{error}</Notice>}

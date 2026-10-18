@@ -32,7 +32,8 @@ const messages: Record<string, string> = {
   quiz_source_unavailable: "This source is not available for a quiz yet.",
   quiz_source_capacity_exceeded: "Choose fewer questions for this material.",
   quiz_generation_failed:
-    "Your quiz could not be completed. Choose another material.",
+    "Your quiz could not be completed. Your material is safe. Try again.",
+  processing_job_not_retryable: "This job cannot be retried.",
   activity_generation_failed:
     "Your draft could not be completed. Review the assignment and its materials.",
   rate_limited: "Please wait a moment before trying again.",

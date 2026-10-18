@@ -5,7 +5,7 @@ import type { GenerationView } from "@stay-focused/shared";
 import type { GenerationIntent } from "../../services/generationRecovery";
 import { GenerationScreen } from "./GenerationScreen";
 
-vi.mock("../queue/useQueueItems", () => ({ useQueueItems: () => ({ show: vi.fn() }), useJobRead: (id: string | null) => { mocks.detailRead(id); return { data: id ? mocks.generation : null, error: null, refresh: vi.fn() }; } }));
+vi.mock("../queue/useQueueItems", () => ({ useQueueItems: () => ({ show: vi.fn() }), useJobRead: (id: string | null) => { mocks.detailRead(id); return { data: id ? mocks.generation : null, job: { stage: 'generating_sections' }, error: null, refresh: vi.fn() }; } }));
 
 const mocks = vi.hoisted(() => ({
   accept: vi.fn(),
@@ -18,7 +18,10 @@ const mocks = vi.hoisted(() => ({
   storeCompleted: vi.fn(),
   focused: true,
   detailRead: vi.fn(),
+  request: vi.fn(),
+  key: vi.fn(),
 }));
+vi.mock('../../services/experienceApi', async original => ({ ...await original<typeof import('../../services/experienceApi')>(), experienceRequest: mocks.request, newRequestKey: mocks.key }));
 
 vi.mock("expo-router", () => ({
   router: { push: mocks.push, replace: mocks.replace },
@@ -60,6 +63,7 @@ const pending: GenerationIntent = { key: "pending-key", title: "Reviewer request
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.key.mockImplementation(() => `retry-key-${mocks.key.mock.calls.length}`);
   mocks.params = { intent: "pending-key" };
   mocks.generation = null;
   mocks.focused = true;
@@ -139,6 +143,40 @@ describe("Queue generation confirmation safety", () => {
 });
 
 describe("Draft generation result", () => {
+  const failed = (retryable = true): GenerationView => ({ id: 'job-id', state: 'failed', artifactId: null, updatedAt: '2026-10-18', progress: null,
+    error: { code: 'generation_failed', title: 'Could not finish', message: 'Could not finish.', retryable, action: retryable ? 'retry' : 'choose_material' } });
+  it('offers Try again with the real stage and safe-material copy; suppresses duplicate taps and makes fresh accepted attempts', async () => {
+    mocks.params = { id: 'job-id' }; mocks.generation = failed();
+    let accept!: (value: unknown) => void;
+    mocks.request.mockReturnValueOnce(new Promise(resolve => { accept = resolve; }));
+    const root = await render(createElement(GenerationScreen));
+    const retry = () => root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Try again')[0]!;
+    expect(JSON.stringify(rendered!.toJSON())).toContain('Stopped while building topics');
+    expect(JSON.stringify(rendered!.toJSON())).toContain('Your material is safe.');
+    await act(async () => { retry().props.onPress(); retry().props.onPress(); });
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+    await act(async () => accept({ id: 'retry-1' }));
+    mocks.generation = { ...failed(), id: 'retry-1' };
+    await act(async () => rendered!.update(createElement(GenerationScreen)));
+    mocks.request.mockResolvedValueOnce({ id: 'retry-2' });
+    await act(async () => retry().props.onPress());
+    expect(mocks.request.mock.calls[0]![2].key).not.toBe(mocks.request.mock.calls[1]![2].key);
+    expect(mocks.request.mock.calls[1]![1]).toBe('/api/jobs/retry-1/retry');
+    expect(mocks.replace).toHaveBeenLastCalledWith({ pathname: '/generation', params: { id: 'retry-2' } });
+  });
+  it.each(['processing_job_not_retryable', 'quiz_source_capacity_exceeded'])('removes Try again after %s, retaining safe server copy', async code => {
+    mocks.params = { id: 'job-id' }; mocks.generation = failed();
+    mocks.request.mockRejectedValueOnce(Object.assign(new Error('This job cannot be retried.'), { code }));
+    const root = await render(createElement(GenerationScreen));
+    await act(async () => root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Try again')[0]!.props.onPress());
+    expect(root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Try again')).toHaveLength(0);
+    expect(JSON.stringify(rendered!.toJSON())).toContain('This job cannot be retried.');
+  });
+  it('never offers Try again for a non-retryable job', async () => {
+    mocks.params = { id: 'job-id' }; mocks.generation = failed(false);
+    const root = await render(createElement(GenerationScreen));
+    expect(root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Try again')).toHaveLength(0);
+  });
   it("reopens a completed assignment generation directly as the saved Draft", async () => {
     mocks.params = { id: "job-id" };
     mocks.generation = { id: "job-id", state: "completed", artifactId: "activity:saved", updatedAt: "2026-09-29", progress: null, error: null };

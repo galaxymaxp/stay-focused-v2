@@ -64,6 +64,8 @@ const { QueueContents } = await import("./QueueContents");
 let rendered: ReactTestRenderer | undefined;
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.request.mockReset();
+  mocks.key.mockReset().mockReturnValue('stable-retry-key');
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
 afterEach(async () => {
@@ -77,6 +79,25 @@ async function render() {
   return rendered!.root;
 }
 describe("mobile Queue dropdown actions", () => {
+  it('uses a fresh key after an accepted retry even when the original card remains mounted', async () => {
+    mocks.jobs = [job({ status: 'failed', retryable: true })];
+    mocks.key.mockReturnValueOnce('attempt-one').mockReturnValueOnce('attempt-two');
+    mocks.request.mockResolvedValueOnce({ id: 'child-one' }).mockResolvedValueOnce({ id: 'child-two' });
+    const root = await render();
+    const retry = () => root.findAllByType('Action' as never).find(node => node.props.children === 'Try again')!;
+    await act(async () => retry().props.onPress());
+    await act(async () => retry().props.onPress());
+    expect(mocks.request.mock.calls.map(call => call[2].key)).toEqual(['attempt-one', 'attempt-two']);
+  });
+  it.each(['processing_job_not_retryable', 'quiz_source_capacity_exceeded'])('removes Try again after %s', async code => {
+    mocks.jobs = [job({ status: 'failed', retryable: true, stage: 'generating_sections' })];
+    mocks.request.mockRejectedValueOnce(Object.assign(new Error('Safe rejection.'), { code }));
+    const root = await render();
+    expect(root.findAllByType('Copy' as never).flatMap(node => node.props.children).join(' ')).toContain('Stopped while building topics');
+    await act(async () => root.findAllByType('Action' as never).find(node => node.props.children === 'Try again')!.props.onPress());
+    expect(root.findAllByType('Action' as never).some(node => node.props.children === 'Try again')).toBe(false);
+    expect(root.findAllByType('Notice' as never).map(node => node.props.children).join(' ')).toContain('Safe rejection.');
+  });
   it("posts a retry once during a double tap, reuses the key after failure, and opens the accepted job", async () => {
     mocks.jobs = [job({ status: "failed", retryable: true })];
     let reject!: (e: Error) => void;
@@ -88,7 +109,7 @@ describe("mobile Queue dropdown actions", () => {
     const root = await render();
     const retry = root
       .findAllByType("Action" as never)
-      .find((n) => n.props.children === "Retry")!;
+      .find((n) => n.props.children === "Try again")!;
     await act(async () => {
       retry.props.onPress();
       retry.props.onPress();
@@ -103,7 +124,7 @@ describe("mobile Queue dropdown actions", () => {
     await act(async () =>
       root
         .findAllByType("Action" as never)
-        .find((n) => n.props.children === "Retry")!
+        .find((n) => n.props.children === "Try again")!
         .props.onPress(),
     );
     expect(mocks.request.mock.calls[1]![2].key).toBe("stable-retry-key");

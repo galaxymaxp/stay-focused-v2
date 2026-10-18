@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useIsFocused } from "expo-router/react-navigation";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, View } from "react-native";
+import { isProcessingJobRetryDenied, processingJobStoppedMessage } from "@stay-focused/shared";
 
 
 import { useAuth } from "../../auth";
@@ -119,21 +120,29 @@ export function GenerationScreen() {
     ["queued", "preparing", "generating", "finalizing"].includes(data.state);
   const stalled = !!data && stalledInQueue({ status: data.state, since: data.updatedAt });
   const [cancelling, setCancelling] = useState(false);
-  // One key per failed screen: a double tap returns the same retry instead of a second job.
-  const [retryKey] = useState(newRequestKey);
+  // Reuse ambiguous submissions; every accepted attempt gets a fresh identity.
+  const retryRequest = useRef<{ id: string; key: string } | null>(null);
+  const retryLock = useRef(false);
+  const [retryDeniedId, setRetryDeniedId] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
-  const canRetry = data?.state === "failed" && data.error?.retryable === true;
+  const canRetry = data?.state === "failed" && data.error?.retryable === true && retryDeniedId !== id;
   async function retryFailed() {
-    if (!id || retrying) return;
+    if (!id || !canRetry || retryLock.current) return;
+    retryLock.current = true;
+    if (retryRequest.current?.id !== id) retryRequest.current = { id, key: newRequestKey() };
     setRetrying(true);
     setError(null);
     try {
-      const result = await experienceRequest<{ id: string }>(client, `/api/jobs/${encodeURIComponent(id)}/retry`, { method: "POST", key: retryKey });
+      const result = await experienceRequest<{ id: string }>(client, `/api/jobs/${encodeURIComponent(id)}/retry`, { method: "POST", key: retryRequest.current.key });
+      retryRequest.current = null;
+      setId(result.id);
       activity.refresh();
       router.replace({ pathname: "/generation", params: { id: result.id, ...(params.quiz === "1" ? { quiz: "1" } : {}) } });
     } catch (cause) {
+      if (isProcessingJobRetryDenied(cause)) setRetryDeniedId(id);
       setError(cause instanceof Error ? cause.message : "Could not retry this generation.");
     } finally {
+      retryLock.current = false;
       setRetrying(false);
     }
   }
@@ -191,8 +200,11 @@ export function GenerationScreen() {
           {stalled ? (
             <View style={{ width: 240 }}><Action disabled={cancelling} pill onPress={() => void cancelStalled()}>{cancelling ? "Cancelling…" : "Cancel generation"}</Action></View>
           ) : null}
+          {data?.state === "failed" ? (
+            <Copy muted size="bodySmall">{processingJobStoppedMessage(generation.job?.stage)}</Copy>
+          ) : null}
           {canRetry ? (
-            <View style={{ width: 240 }}><Action disabled={retrying} pill onPress={() => void retryFailed()}>{retrying ? "Retrying…" : "Retry"}</Action></View>
+            <View style={{ width: 240 }}><Action disabled={retrying} pill onPress={() => void retryFailed()}>{retrying ? "Retrying…" : "Try again"}</Action></View>
           ) : null}
           <View style={{ width: 240 }}><Action secondary pill onPress={() => queue.show()}>View Queue</Action></View>
         </View>
@@ -212,7 +224,7 @@ export function GenerationScreen() {
         {data?.error && (
           <Notice>
             {canRetry
-              ? "This didn’t pass its checks. Retry uses the same settings and topics."
+              ? "Your material is safe."
               : data.error.code === "activity_source_unavailable"
                 ? data.error.message
                 : data.error.code === "quiz_generation_failed"

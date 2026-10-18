@@ -2,6 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { experienceRequest } from "./experienceApi";
 import { ApiConfigurationError } from "../config/apiBaseUrlResolution";
 describe("experience client", () => {
+  it('uses the safe server rejection copy for a non-retryable job', async () => {
+    await expect(experienceRequest({ baseUrl: 'https://api.example', accessToken: 'token',
+      fetchImpl: async () => Response.json({ ok: false, error: { code: 'processing_job_not_retryable', message: 'private diagnostics', retryable: false } }, { status: 409 }),
+    }, '/api/jobs/job/retry', { method: 'POST' })).rejects.toMatchObject({ code: 'processing_job_not_retryable', message: 'This job cannot be retried.', retryable: false });
+  });
   it("keeps missing configuration separate from authentication and prevents a request", async () => {
     const fetchImpl = vi.fn();
     const client = { baseUrl: "", accessToken: "valid-session-token", fetchImpl };
