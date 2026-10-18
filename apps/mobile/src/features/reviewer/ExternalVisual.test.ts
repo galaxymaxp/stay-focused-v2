@@ -116,3 +116,24 @@ describe('automatic separate external card',()=>{
     await act(async()=>tree!.update(createElement(ExternalVisual,props)));expect(tree!.root.findByType(Image).props.source.uri).toBe(found.image);
   });
 });
+
+it('renders a saved external reference offline with its attribution and label', async () => {
+  const local = { ...found, image: 'file:///documents/offline-images/external.img' };
+  await mount({ online: false, visual: local });
+  expect(tree!.root.findByType(Image).props.source.uri).toBe(local.image);
+  expect(tree!.root.findByType(Image).props.accessibilityLabel).toBe(local.title);
+  expect(text()).toContain(EXTERNAL_VISUAL_LABEL);
+  expect(button('Show a different one')).toBeUndefined();
+  await act(async () => button('View external reference').props.onPress());
+  expect(text().some(value => value.includes(local.credit) && value.includes(local.license))).toBe(true);
+  expect(mocks.find).not.toHaveBeenCalled();
+});
+
+it('prefers the downloaded replacement after switching offline in the same reader', async () => {
+  const replacement = { ...found, id: 'b'.repeat(64), image: 'https://upload.wikimedia.org/replacement.png' };
+  mocks.find.mockResolvedValue(replacement);
+  await mount();
+  await act(async () => button('Show a different one').props.onPress());
+  await act(async () => tree!.update(createElement(ExternalVisual, { ...props, online: false, visual: { ...replacement, image: 'file:///documents/offline-images/replacement.png' } })));
+  expect(tree!.root.findByType(Image).props.source.uri).toBe('file:///documents/offline-images/replacement.png');
+});

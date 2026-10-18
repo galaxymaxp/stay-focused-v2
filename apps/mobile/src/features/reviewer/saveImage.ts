@@ -1,3 +1,4 @@
+import { downloadStudyImage, ImageFileError } from '../../services/studyImageFile';
 import { Linking, Platform } from 'react-native';
 import { studyImageFilename, type StudyImageDownload } from '@stay-focused/shared';
 
@@ -42,24 +43,14 @@ export async function saveImage(image: StudyImageDownload, refreshUri?: () => Pr
     stage = 'download';
     if (!files.cacheDirectory) throw new Error('no_cache');
     // Owner reads mint fresh signed URLs; do not fall back to expired or changed source evidence.
-    const sourceUri = refreshUri ? await refreshUri() : image.uri;
     // A private per-operation directory prevents collisions and keeps the original untouched.
     const directory = `${files.cacheDirectory}study-image-${Date.now()}-${Math.random().toString(36).slice(2)}/`;
     cleanup = () => files.deleteAsync(directory, { idempotent: true });
     await files.makeDirectoryAsync(directory, { intermediates: true });
     let uri = directory + studyImageFilename(image);
-    if (/^https:\/\//i.test(sourceUri)) {
-      const downloaded = await files.downloadAsync(sourceUri, uri, { headers: image.headers ? { ...image.headers } : undefined });
-      if (downloaded.status < 200 || downloaded.status >= 300) return failure(`download_http_${downloaded.status}`);
-      const mime = Object.entries(downloaded.headers).find(([key]) => key.toLowerCase() === 'content-type')?.[1];
-      if (mime && !mime.toLowerCase().startsWith('image/')) return failure('not_image');
-      const named = directory + studyImageFilename(image, mime);
-      if (named !== uri) { await files.moveAsync({ from: uri, to: named }); uri = named; }
-    } else if (sourceUri.startsWith('file://')) {
-      await files.copyAsync({ from: sourceUri, to: uri });
-    } else throw new Error('invalid_image');
-    const info = await files.getInfoAsync(uri);
-    if (!info.exists || info.isDirectory || !Number.isFinite(info.size) || info.size <= 0) return failure('empty');
+    const { mime } = await downloadStudyImage(files, image, uri, refreshUri);
+    const named = directory + studyImageFilename(image, mime);
+    if (named !== uri) { await files.moveAsync({ from: uri, to: named }); uri = named; }
     stage = 'media_write';
     if (Platform.OS === 'ios') {
       // Album queries require full read access on iOS; add-only never touches them.
@@ -72,7 +63,7 @@ export async function saveImage(image: StudyImageDownload, refreshUri?: () => Pr
     const destination = Platform.OS === 'android' ? 'Saved to Stay Focused.' : 'Saved to your photos.';
     return { status: 'saved', message: image.attribution ? `${destination}\n${image.attribution}` : destination };
   } catch (error: unknown) {
-    return failure(missingModule(error) ? 'module_missing' : stage);
+    return failure(missingModule(error) ? 'module_missing' : error instanceof ImageFileError ? error.stage : stage);
   } finally {
     await cleanup?.().catch(() => {});
   }

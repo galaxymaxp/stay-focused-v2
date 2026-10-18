@@ -1,3 +1,5 @@
+import { runOfflineImageQueue, stopOfflineImageQueue } from './offlineImageQueue';
+import { subscribeOfflineImages } from './imageManifest';
 import type { ExperienceClient } from '../experienceApi';
 import { libraryRemote } from './deviceLibrary';
 import { getLocalArtifactStore } from './localArtifactDatabase';
@@ -21,7 +23,9 @@ export function subscribeOfflineLibrary(owner: string, listener: () => void): ()
   const subscriptions = listeners.get(owner) ?? new Set();
   subscriptions.add(listener);
   listeners.set(owner, subscriptions);
+  const unsubscribeImages = subscribeOfflineImages(owner, listener);
   return () => {
+    unsubscribeImages();
     subscriptions.delete(listener);
     if (!subscriptions.size) listeners.delete(owner);
   };
@@ -43,6 +47,7 @@ export function runOfflineCatchUp(
   if (flight) return flight.promise;
   const last = successfulAt.get(ownerUserId);
   if (!ownerUserId || (!options.force && last !== undefined && Date.now() - last < THROTTLE_MS)) {
+    if (ownerUserId) void runOfflineImageQueue(ownerUserId, client);
     return Promise.resolve({ result: null, errorCode: null });
   }
   const controller = new AbortController();
@@ -54,11 +59,12 @@ export function runOfflineCatchUp(
         store, ownerUserId, remote: libraryRemote(client, controller.signal),
         isCancelled: () => controller.signal.aborted,
         onListReconciled: () => notify(ownerUserId),
-        onProgress: () => notify(ownerUserId),
+        onProgress: () => { notify(ownerUserId); void runOfflineImageQueue(ownerUserId, client); },
       });
+      void runOfflineImageQueue(ownerUserId, client);
       // Incomplete catch-ups resume on the next trigger without a ten-minute delay.
-      const stats = await store.offlineStats(ownerUserId);
-      if (result.listComplete && result.bodyStoppedBy === 'done' && stats.current === stats.total) {
+      const missingBodies = await store.idsNeedingBody(ownerUserId, 1, true);
+      if (result.listComplete && result.bodyStoppedBy === 'done' && missingBodies.length === 0) {
         successfulAt.set(ownerUserId, Date.now());
       }
       return { result, errorCode: result.bodyStoppedBy === 'offline' ? 'connection' : null };
@@ -81,6 +87,7 @@ export async function stopOfflineCatchUp(ownerUserId: string): Promise<void> {
   const flight = flights.get(ownerUserId);
   flight?.controller.abort();
   await flight?.promise;
+  await stopOfflineImageQueue(ownerUserId);
   successfulAt.delete(ownerUserId);
 }
 

@@ -150,3 +150,13 @@ describe('batched availability lifecycle',()=>{
     expect(tree!.root.findByType('Discovery' as never).props.sections).toEqual([]);
   });
 });
+
+it('renders and opens private figures offline while preserving labels', async () => {
+  const local = { ...figure, url: 'file:///documents/offline-images/figure.img' };
+  await act(async () => { tree = create(createElement(SourceFigures, { ...props, offline: true, loadedFigures: [local] })); });
+  expect(tree!.root.findAllByType(Image)[0]!.props.source.uri).toBe(local.url);
+  expect(tree!.root.findAllByType(Image)[0]!.props.accessibilityLabel).toBe('Diagram from page 2');
+  await act(async () => button('Enlarge Diagram from page 2').props.onPress());
+  expect(tree!.root.findByType(ImageViewer).props.visible).toBe(true);
+  expect(mocks.read).not.toHaveBeenCalled();
+});

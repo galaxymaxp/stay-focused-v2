@@ -10,8 +10,11 @@ import type { LocalUpsertOutcome } from "./artifactStore";
 import { getLocalArtifactStore } from "./localArtifactDatabase";
 import { persistCompletedGeneration, type LibraryRemote } from "./librarySync";
 
+import { runOfflineImageQueue } from './offlineImageQueue';
+
 export function libraryRemote(client: ExperienceClient, signal?: AbortSignal): LibraryRemote {
   return {
+    onDetailStored: (owner, detail) => { if ('reviewer' in detail) void runOfflineImageQueue(owner, client); },
     fetchQuizAnswerKey: quizId => experienceRequest<QuizAnswerKey>(client,
       `/api/experience/quizzes/${encodeURIComponent(quizId)}/answer-key`, signal ? { signal } : {}),
     fetchPage: (offset, limit) =>

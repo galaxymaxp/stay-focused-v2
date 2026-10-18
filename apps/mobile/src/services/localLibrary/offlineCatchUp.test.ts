@@ -25,7 +25,7 @@ describe('offline catch-up', () => {
     const generation = { id: 'job', state: 'completed' as const, updatedAt: '2026-10-12T00:00:00Z', progress: null, artifactId: reviewerDetail().artifact.id, error: null };
     await storeCompletedGeneration(OWNER_A, client, generation);
     await service.runOfflineCatchUp(OWNER_A, client);
-    expect((await store.offlineStats(OWNER_A)).current).toBe(1);
+    expect((await store.offlineStats(OWNER_A)).current).toBe(0);
     expect(mocks.request.mock.calls.some(call => String(call[1]).includes('?'))).toBe(true);
   });
   it('shares one flight for concurrent callers, including forced calls', async () => {
@@ -34,7 +34,7 @@ describe('offline catch-up', () => {
     expect(service.runOfflineCatchUp(OWNER_A, client, { force: true })).toBe(first);
     await first;
     expect(mocks.request).toHaveBeenCalledTimes(2);
-    expect((await store.offlineStats(OWNER_A)).current).toBe(1);
+    expect((await store.offlineStats(OWNER_A)).current).toBe(0);
   });
   it('throttles successful runs for ten minutes; force and another owner bypass it', async () => {
     const { service } = await setup();

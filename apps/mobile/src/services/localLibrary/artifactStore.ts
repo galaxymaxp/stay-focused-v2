@@ -1,3 +1,5 @@
+import { createImageManifestStore, initializeImageManifest, invalidateImages, type ImageManifestStore } from './imageManifestStore';
+import { imagesReady, notifyOfflineImages, removeImageDirectory, withOfflineImageLock } from './imageManifest';
 import type {
   LibraryArtifactDetail,
   LibraryArtifactSummary,
@@ -42,7 +44,7 @@ export interface OfflineStats {
 }
 export type LocalLibrarySummary = LibraryArtifactSummary & { readonly offlineReady: boolean };
 
-export interface LocalArtifactStore extends AssistCache, TopicCache, PendingDraftStore, ScreenSnapshotStore {
+export interface LocalArtifactStore extends ImageManifestStore, AssistCache, TopicCache, PendingDraftStore, ScreenSnapshotStore {
   readQuizAnswerKey(ownerUserId: string, quizId: string, bodyUpdatedAt: string): Promise<QuizAnswerKey | null>;
   saveQuizAnswerKey(ownerUserId: string, key: QuizAnswerKey, bodyUpdatedAt: string): Promise<void>;
   offlineStats(ownerUserId: string): Promise<OfflineStats>;
@@ -96,6 +98,7 @@ export function createLocalArtifactStore(
   now: () => string = () => new Date().toISOString(),
 ): LocalArtifactStore {
   return {
+    ...createImageManifestStore(db),
     ...createScreenSnapshotStore(db),
     ...createAssistCache(db),
     ...createTopicCache(db),
@@ -204,6 +207,12 @@ export function createLocalArtifactStore(
           ORDER BY cloud_updated_at DESC, artifact_id ASC`,
         [ownerUserId],
       );
+      const manifests = await db.getAllAsync<{artifact_id: string; version: string; manifest_json: string}>(
+        'SELECT artifact_id, version, manifest_json FROM offline_image_manifests WHERE owner_user_id=?', [ownerUserId]);
+      const imageReady = new Set(manifests.flatMap(row => {
+        try { return imagesReady(JSON.parse(row.manifest_json) as import('./imageManifest').OfflineImageManifest) ? [row.artifact_id + ':' + row.version] : []; }
+        catch { return []; }
+      }));
       const responseRows = await db.getAllAsync<{ artifact_id: string; responses_json: string; completed: number }>(
         'SELECT artifact_id, responses_json, completed FROM activity_responses WHERE owner_user_id = ?', [ownerUserId]);
       const responses = new Map(responseRows.map(row => [row.artifact_id, row]));
@@ -218,7 +227,7 @@ export function createLocalArtifactStore(
       return rows.flatMap((row) => {
         const parsed = parseSummary(row.summary_json);
         if (!parsed) return [];
-        const summary: LocalLibrarySummary = { ...parsed, offlineReady: row.offline_ready === 1 };
+        const summary: LocalLibrarySummary = { ...parsed, offlineReady: row.offline_ready === 1 && (parsed.type !== "reviewer" || imageReady.has(parsed.id + ":" + parsed.updatedAt)) };
         const pendingContent = pendingDrafts.get(summary.id.replace(/^activity:/, ''));
         if (pendingContent && summary.type === 'activity_output') {
           try { return [{ ...summary, title: (JSON.parse(pendingContent) as import('@stay-focused/shared').ActivityDraftContent).title, offlineReady: true }]; }
@@ -286,12 +295,13 @@ export function createLocalArtifactStore(
     async upsertSummaries(ownerUserId, summaries) {
       requireOwner(ownerUserId);
       const outcomes: LocalUpsertOutcome[] = [];
-      await db.withExclusiveTransactionAsync(async (transaction) => {
+      await withOfflineImageLock(() => db.withExclusiveTransactionAsync(async (transaction) => {
         for (const summary of summaries) {
           if (!isCompletedSummary(summary)) continue;
           outcomes.push(await writeSummary(transaction, ownerUserId, summary, now()));
         }
-      });
+      }));
+      notifyOfflineImages(ownerUserId);
       return outcomes;
     },
 
@@ -301,9 +311,11 @@ export function createLocalArtifactStore(
         throw new Error("invalid_artifact_detail");
       }
       let outcome: LocalUpsertOutcome = "unchanged";
-      await db.withExclusiveTransactionAsync(async (transaction) => {
+      await withOfflineImageLock(() => db.withExclusiveTransactionAsync(async (transaction) => {
         const canonical = detail.artifact.id;
         if (requestedId !== canonical) {
+          await invalidateImages(transaction, ownerUserId, requestedId);
+          await removeImageDirectory(ownerUserId, requestedId);
           // The server resolved this id to a different canonical artifact
           // (for example a finished generation that became a saved Reviewer).
           // That is an explicit identity mapping, not an absence-based delete.
@@ -319,7 +331,8 @@ export function createLocalArtifactStore(
           );
         }
         outcome = await writeDetail(transaction, ownerUserId, detail, now());
-      });
+      }));
+      notifyOfflineImages(ownerUserId);
       return outcome;
     },
 
@@ -345,8 +358,10 @@ export function createLocalArtifactStore(
 
     async removeArtifact(ownerUserId, artifactId) {
       requireOwner(ownerUserId);
-      await db.withExclusiveTransactionAsync(async (transaction) => {
+      await withOfflineImageLock(() => db.withExclusiveTransactionAsync(async (transaction) => {
         const canonical = await resolveAlias(transaction, ownerUserId, artifactId);
+        await invalidateImages(transaction, ownerUserId, canonical);
+        await removeImageDirectory(ownerUserId, canonical);
         await transaction.runAsync('DELETE FROM pending_draft_edits WHERE owner_user_id=? AND draft_id IN (?,?)', [ownerUserId, artifactId.replace(/^activity:/, ''), canonical.replace(/^activity:/, '')]);
         await transaction.runAsync('DELETE FROM draft_sync_receipts WHERE owner_user_id=? AND draft_id IN (?,?)', [ownerUserId, artifactId.replace(/^activity:/, ''), canonical.replace(/^activity:/, '')]);
         await transaction.runAsync("DELETE FROM activity_responses WHERE owner_user_id = ? AND artifact_id IN (?, ?)", [ownerUserId, artifactId, canonical]);
@@ -361,7 +376,8 @@ export function createLocalArtifactStore(
           "DELETE FROM library_artifact_aliases WHERE owner_user_id = ? AND (alias_id = ? OR artifact_id IN (?, ?))",
           [ownerUserId, artifactId, artifactId, canonical],
         );
-      });
+      }));
+      notifyOfflineImages(ownerUserId);
     },
 
     async offlineStats(ownerUserId) {
@@ -376,24 +392,31 @@ export function createLocalArtifactStore(
               WHERE owner_user_id = ?), 0) AS approximate_bytes
           FROM library_artifacts WHERE owner_user_id = ?`,
         [LOCAL_PAYLOAD_SCHEMA, ownerUserId, ownerUserId]);
-      return { total: row?.total ?? 0, current: row?.current ?? 0, approximateBytes: row?.approximate_bytes ?? 0 };
+      const images = await db.getFirstAsync<{ bytes: number }>('SELECT COALESCE(SUM(bytes), 0) AS bytes FROM offline_image_manifests WHERE owner_user_id=?', [ownerUserId]);
+      const summaries = await this.listSummaries(ownerUserId);
+      return { total: row?.total ?? 0, current: summaries.filter(item => item.offlineReady).length, approximateBytes: (row?.approximate_bytes ?? 0) + (images?.bytes ?? 0) };
     },
 
     async clearBodies(ownerUserId) {
       requireOwner(ownerUserId);
-      await db.withExclusiveTransactionAsync(async (transaction) => {
+      await withOfflineImageLock(() => db.withExclusiveTransactionAsync(async (transaction) => {
+        await invalidateImages(transaction, ownerUserId);
+        await removeImageDirectory(ownerUserId);
         await transaction.runAsync(`UPDATE library_artifacts
           SET payload_json = NULL, payload_schema = NULL, payload_cloud_updated_at = NULL
           WHERE owner_user_id = ? AND NOT EXISTS (SELECT 1 FROM pending_draft_edits p
             WHERE p.owner_user_id=library_artifacts.owner_user_id AND 'activity:' || p.draft_id=library_artifacts.artifact_id)`, [ownerUserId]);
         await transaction.runAsync('DELETE FROM study_assists WHERE owner_user_id = ?', [ownerUserId]);
         await transaction.runAsync('DELETE FROM quiz_answer_keys WHERE owner_user_id = ?', [ownerUserId]);
-      });
+      }));
+      notifyOfflineImages(ownerUserId);
     },
 
     async purgeOwner(ownerUserId) {
       requireOwner(ownerUserId);
-      await db.withExclusiveTransactionAsync(async (transaction) => {
+      await withOfflineImageLock(() => db.withExclusiveTransactionAsync(async (transaction) => {
+        await invalidateImages(transaction, ownerUserId);
+        await removeImageDirectory(ownerUserId);
         await transaction.runAsync('DELETE FROM screen_snapshots WHERE owner_user_id=?', [ownerUserId]);
         await transaction.runAsync('DELETE FROM pending_draft_edits WHERE owner_user_id=?', [ownerUserId]);
         await transaction.runAsync('DELETE FROM draft_sync_receipts WHERE owner_user_id=?', [ownerUserId]);
@@ -404,7 +427,8 @@ export function createLocalArtifactStore(
         await transaction.runAsync("DELETE FROM study_assists WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM library_artifacts WHERE owner_user_id = ?", [ownerUserId]);
         await transaction.runAsync("DELETE FROM library_artifact_aliases WHERE owner_user_id = ?", [ownerUserId]);
-      });
+      }));
+      notifyOfflineImages(ownerUserId);
     },
   };
 }
@@ -460,6 +484,10 @@ async function writeSummary(
     if (order < 0) return "ignored_older";
     if (order === 0 && existing.summary_json === summaryJson) return "unchanged";
   }
+  if (existing && compareInstants(summary.updatedAt, existing.cloud_updated_at) > 0) {
+    await invalidateImages(db, ownerUserId, summary.id);
+    await removeImageDirectory(ownerUserId, summary.id);
+  }
   await db.runAsync(
     `INSERT INTO library_artifacts (
        owner_user_id, artifact_id, artifact_type, title, course_id, source_id, activity_id,
@@ -499,8 +527,13 @@ async function writeDetail(
       existing.payload_json === payloadJson &&
       existing.payload_schema === LOCAL_PAYLOAD_SCHEMA
     ) {
+      if ('reviewer' in detail) await initializeImageManifest(db, ownerUserId, summary.id, summary.updatedAt);
       return "unchanged";
     }
+  }
+  if (existing && existing.payload_cloud_updated_at !== summary.updatedAt) {
+    await invalidateImages(db, ownerUserId, summary.id);
+    await removeImageDirectory(ownerUserId, summary.id);
   }
   await db.runAsync(
     `INSERT INTO library_artifacts (
@@ -530,6 +563,7 @@ async function writeDetail(
       localNow,
     ],
   );
+  if ('reviewer' in detail) await initializeImageManifest(db, ownerUserId, summary.id, summary.updatedAt);
   return existing ? "updated" : "inserted";
 }
 

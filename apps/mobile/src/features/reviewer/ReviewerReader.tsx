@@ -1,3 +1,6 @@
+import { runOfflineImageQueue } from '../../services/localLibrary/offlineImageQueue';
+import { useOfflineReviewerImages } from '../../services/localLibrary/useOfflineReviewerImages';
+import { localReviewerImages, preferLocalReviewerImages } from '../../services/localLibrary/offlineImagePresentation';
 import { TopicAssist } from './TopicAssist';
 import { StudyAnswerScrollContext, useStudyAnswerScroll } from './studyAnswerScroll';
 import type { StudyImageTarget, AssistType, LibraryArtifactSummary, QuizDifficulty, QuizQuestionType, ReviewerReaderModel } from "@stay-focused/shared";
@@ -118,8 +121,15 @@ export function ReviewerReaderScreen({
   const { session } = useAuth();
   const snapshotClient = useMemo(() => ({ baseUrl: getApiBaseUrl() ?? '', accessToken: session?.accessToken ?? '' }), [session?.accessToken]);
   const figureArtifactId = session?.accessToken && /^artifact:/.test(artifact.id) ? artifact.id.slice('artifact:'.length) : null;
-  const reviewerImages = useReviewerImages(snapshotClient, figureArtifactId, deviceCopy);
-  const imageSections = new Map(reviewerImages.data?.sections.map(s => [s.sectionId, s]));
+  const reviewerImages = useReviewerImages(snapshotClient, figureArtifactId, deviceCopy, artifact.updatedAt);
+  const queueImages = useCallback(() => {
+    if (session?.user.id && !deviceCopy) void runOfflineImageQueue(session.user.id, snapshotClient);
+  }, [session?.user.id, deviceCopy, snapshotClient]);
+  useEffect(() => { if (reviewerImages.data) queueImages(); }, [reviewerImages.data, queueImages]);
+  const offlineImages = useOfflineReviewerImages(session?.user.id ?? null, artifact.id, artifact.updatedAt);
+  const cachedImages = useMemo(() => localReviewerImages(offlineImages.manifest, reviewer.sections.map(s => s.id)), [offlineImages.manifest, reviewer.sections]);
+  const displayedImages = useMemo(() => preferLocalReviewerImages(reviewerImages.data, cachedImages), [reviewerImages.data, cachedImages]);
+  const imageSections = new Map(displayedImages?.sections.map(s => [s.sectionId, s]));
   const figureSections = {has:(id:string)=>imageSections.get(id)?.hasFigures===true, online:!!reviewerImages.data};
   const [snapshotAvailability, setSnapshotAvailability] = useState<Record<string, boolean | null>>({});
   const [figureAvailability, setFigureAvailability] = useState<Record<string, boolean>>({});
@@ -359,6 +369,7 @@ export function ReviewerReaderScreen({
     >
       {deviceCopy ? <Notice>Showing the copy saved on this device. Saving changes and practice need a connection.</Notice> : null}
       {reviewer.generationNotice ? <Notice>{reviewer.generationNotice}</Notice> : null}
+      {offlineImages.needsConnection ? <Copy muted size="caption">Some images need a connection</Copy> : null}
       <ReviewerHeader artifact={artifact} reviewer={reviewer} secondaryLine={secondaryLine}
         topicCount={anchors.length} client={snapshotClient} offline={deviceCopy}
         onExport={() => setExportOpen(true)} onQuiz={() => setQuizOpen(true)} />
@@ -385,18 +396,18 @@ export function ReviewerReaderScreen({
               <Text ref={register(segmentIds.sectionTitle(section.id))} style={{ color: colors.textPrimary, fontSize: 22, lineHeight: 29, fontWeight: "600" }}>
                 {render(segmentIds.sectionTitle(section.id), section.title)}
               </Text>
-              {figureArtifactId ? <SourceFigures key={`${session?.user.id}:${figureArtifactId}`} client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id}
+              {figureArtifactId ? <SourceFigures key={`${session?.user.id}:${figureArtifactId}:${artifact.updatedAt}`} client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id}
                 reviewerTitle={reviewer.title} sectionTitle={section.title}
                 onAvailability={available => setFigureAvailability(current => current[section.id] === available ? current : { ...current, [section.id]: available })}
                 onAsk={image => askImage(section.id, image)} hasFigures={figureSections.has(section.id)} offline={deviceCopy} loadedFigures={imageSections.get(section.id)?.figures ?? EMPTY_FIGURES} refreshOnce={reviewerImages.refreshOnce} /> : null}
               {!figureSections.has(section.id) && (artifact.sourceType === 'canvas_file' || artifact.sourceType === 'local_file' || artifact.sourceType == null) && session?.accessToken && /^artifact:/.test(artifact.id) ?
-                <SourcePageSnapshot key={`${session?.user.id}:${figureArtifactId}`} client={snapshotClient} artifactId={artifact.id.slice('artifact:'.length)} sectionId={section.id} offline={deviceCopy} loadedSnapshot={imageSections.get(section.id)?.snapshot ?? null} refreshOnce={reviewerImages.refreshOnce}
+                <SourcePageSnapshot key={`${session?.user.id}:${figureArtifactId}:${artifact.updatedAt}`} client={snapshotClient} artifactId={artifact.id.slice('artifact:'.length)} sectionId={section.id} offline={deviceCopy} loadedSnapshot={imageSections.get(section.id)?.snapshot ?? null} refreshOnce={reviewerImages.refreshOnce}
                   reviewerTitle={reviewer.title} sectionTitle={section.title}
                   onAsk={image => askImage(section.id, image)} onAvailability={available => setSnapshotAvailability(current => current[section.id] === available ? current : { ...current, [section.id]: available })} /> : null}
             </View>
             <TopicAssist key={`${session?.user.id}|${reviewer.id}|${reviewer.generatedAt}|${section.id}|${deferredQuery}`} reviewer={reviewer} sectionId={section.id}
               owner={session?.user.id ?? ""} client={snapshotClient} online={!deviceCopy && figureSections.online === true}>
-            {figureArtifactId ? <ExternalVisual client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id} visual={imageSections.get(section.id)?.external} onAsk={image => askImage(section.id, image)}
+            {figureArtifactId ? <ExternalVisual key={`${session?.user.id}:${figureArtifactId}:${artifact.updatedAt}`} onVisualChanged={queueImages} client={snapshotClient} artifactId={figureArtifactId} sectionId={section.id} visual={imageSections.get(section.id)?.external} onAsk={image => askImage(section.id, image)}
               reviewerTitle={reviewer.title} sectionTitle={section.title}
               online={!deviceCopy && figureSections.online === true}
               hasSourceVisual={figureSections.has(section.id) ? figureAvailability[section.id] === true : hasSnapshotControl && snapshotAvailability[section.id] === true} /> : null}

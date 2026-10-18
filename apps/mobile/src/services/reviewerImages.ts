@@ -5,8 +5,8 @@ import { experienceRequest, type ExperienceClient } from './experienceApi';
 import { requireApiBaseUrl } from '../config/apiBaseUrlResolution';
 
 /** Owner/token changes, backgrounding and offline copies discard ephemeral URLs. */
-export function useReviewerImages(client: ExperienceClient, artifactId: string | null, offline: boolean) {
-  const [state,setState]=useState<{client:ExperienceClient;artifactId:string;data:ReviewerImages}|null>(null);
+export function useReviewerImages(client: ExperienceClient, artifactId: string | null, offline: boolean, version?: string) {
+  const [state,setState]=useState<{client:ExperienceClient;artifactId:string;version?:string;data:ReviewerImages}|null>(null);
   const loader=useRef<ReturnType<typeof createReviewerImageLoader>|null>(null);
   useEffect(()=>{
     let controller:AbortController|undefined;
@@ -17,7 +17,7 @@ export function useReviewerImages(client: ExperienceClient, artifactId: string |
       if (offline || !artifactId || !client.accessToken || AppState.currentState!=='active') return;
       controller=new AbortController();
       connected=true;
-      const active=createReviewerImageLoader(artifactId,(path,options)=>experienceRequest(client,path,options),data=>{connected=!!data;setState(data?{client,artifactId,data}:null);},controller.signal);
+      const active=createReviewerImageLoader(artifactId,(path,options)=>experienceRequest(client,path,options),data=>{connected=!!data;setState(data?{client,artifactId,version,data}:null);},controller.signal);
       loader.current=active;void active.load();
     };
     load();const subscription=AppState.addEventListener('change',load);
@@ -37,7 +37,7 @@ export function useReviewerImages(client: ExperienceClient, artifactId: string |
       })();
     },10000);
     return ()=>{alive=false;controller?.abort();probeController?.abort();loader.current=null;clearInterval(heartbeat);subscription.remove();};
-  },[client,artifactId,offline]);
+  },[client,artifactId,offline,version]);
   const refreshOnce=useCallback(()=>loader.current?.refreshOnce()??Promise.resolve(false),[]);
-  return {data:!offline && state?.client===client && state.artifactId===artifactId?state.data:null,refreshOnce};
+  return {data:!offline && state?.client===client && state.artifactId===artifactId && state.version===version?state.data:null,refreshOnce};
 }

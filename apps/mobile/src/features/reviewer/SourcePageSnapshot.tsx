@@ -1,3 +1,4 @@
+import { refreshSnapshotUri } from '../../services/studyImageFile';
 import type { StudyImageTarget } from '@stay-focused/shared';
 import { AskImageButton } from './AskImageButton';
 import { SaveImageButton } from './SaveImageButton';
@@ -28,7 +29,8 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
   // Match the website: eligibility/rendering is not an inline source image.
-  const hasImage = !offline && snapshot?.available === true && 'url' in snapshot;
+  const localImage = snapshot?.available === true && 'url' in snapshot && snapshot.url.startsWith('file://');
+  const hasImage = (!offline || localImage) && snapshot?.available === true && 'url' in snapshot;
   useEffect(() => { availabilityRef.current?.(hasImage); }, [hasImage]);
   const inFlight = useRef<AbortController | null>(null);
   const alive = useRef(true);
@@ -86,7 +88,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
     return () => clearInterval(timer);
   }, [offline, visible, snapshotStatus, request, loadedSnapshot]);
   const show = async () => {
-    if (waiting || offline) return;
+    if (waiting || (offline && !localImage)) return;
     if (loadedSnapshot !== undefined) {setOpen(true);return;}
     setWaiting(true); setExhausted(false);
     const result = await request(true);
@@ -94,7 +96,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
     if (alive.current) setWaiting(false);
   };
   const failed = () => {setSnapshot(null);setOpen(false);void refreshOnce?.();};
-  if (offline) return <AskImageButton offline />;
+  if (offline && !localImage) return <AskImageButton offline />;
   if (!snapshot) return null;
   const unit = snapshot.labelKind === 'slide' ? 'slide' : 'page';
   const captionUnit = snapshot.labelKind === 'slide' ? 'Slide' : 'Page';
@@ -129,11 +131,7 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
           </View>}
         </View>
         {ready ? <AskImageButton image={image} offline={offline} onAsk={target => {setOpen(false);onAsk?.(target);}} /> : null}
-        {ready ? <SaveImageButton offline={offline} image={{ uri: ready.url, reviewerTitle, sectionTitle, kind: 'page_snapshot' }} refreshUri={async()=>{
-          const fresh=await readPageSnapshot(client,artifactId,sectionId,false);
-          if(!ready.id || !fresh.available || !('url' in fresh) || fresh.id!==ready.id || fresh.page!==ready.page || fresh.labelKind!==ready.labelKind)throw new Error('snapshot_unavailable');
-          return fresh.url;
-        }} /> : null}
+        {ready ? <SaveImageButton offline={offline} image={{ uri: ready.url, reviewerTitle, sectionTitle, kind: 'page_snapshot' }} refreshUri={() => refreshSnapshotUri(client,artifactId,sectionId,ready)} /> : null}
         <Text style={{ color: colors.textPrimary, textAlign: 'center', padding: spacing[4] }}>
           {ready ? `${ready.sourceLabel} · ${captionUnit} ${ready.page}` : `${captionUnit} ${snapshot.page}`}
         </Text>

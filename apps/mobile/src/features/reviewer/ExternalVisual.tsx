@@ -11,10 +11,10 @@ import { EXTERNAL_IMAGE_HEADERS, EXTERNAL_VISUAL_LABEL, findExternalVisual, type
 import { ZoomablePage } from './SourcePageSnapshot';
 
 /** Batch images arrive from the reader; only an explicit replacement searches here. */
-export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisual,visual,onAsk,reviewerTitle='Reviewer',sectionTitle='Section'}:{client:ExperienceClient;artifactId:string;sectionId:string;online:boolean;hasSourceVisual:boolean;visual?:ExternalReferenceVisual|null;onAsk?:(image:StudyImageTarget)=>void;reviewerTitle?:string;sectionTitle?:string}) {
+export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisual,visual,onAsk,reviewerTitle='Reviewer',sectionTitle='Section',onVisualChanged}:{client:ExperienceClient;artifactId:string;sectionId:string;online:boolean;hasSourceVisual:boolean;visual?:ExternalReferenceVisual|null;onAsk?:(image:StudyImageTarget)=>void;reviewerTitle?:string;sectionTitle?:string;onVisualChanged?:()=>void}) {
   const {colors}=useTheme();const {height}=useWindowDimensions();
   const [replacement,setReplacement]=useState<ExternalReferenceVisual|null>(null);const [busy,setBusy]=useState(false);const [open,setOpen]=useState(false);
-  const result=replacement??visual;
+  const result=replacement && visual && visual.id === replacement.id && visual.image.startsWith('file://') ? visual : replacement??visual;
   const [failedImage,setFailedImage]=useState<string|null>(null);const [retry,setRetry]=useState(0);
   const imageKey=`${result?.image}:${retry}`;
   const imageFailed=failedImage===imageKey;
@@ -26,12 +26,12 @@ export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisu
   const find=async()=>{
     if(!online || hasSourceVisual || !result || result.attemptCount>=2 || pending.current)return;
     const controller=new AbortController();pending.current=controller;setBusy(true);
-    try{const found=await findExternalVisual(client,artifactId,sectionId,true,controller.signal);if(pending.current===controller && !controller.signal.aborted && found.status==='found')setReplacement(found);}
+    try{const found=await findExternalVisual(client,artifactId,sectionId,true,controller.signal);if(pending.current===controller && !controller.signal.aborted && found.status==='found'){setReplacement(found);onVisualChanged?.();}}
     catch{ /* Keep the current image when no replacement is available. */ }
     finally{if(pending.current===controller){pending.current=null;setBusy(false);}}
   };
   if(hasSourceVisual || !result)return null;
-  if(!online)return <AskImageButton offline />;
+  if(!online && !result.image.startsWith('file://'))return <AskImageButton offline />;
   const image: StudyImageTarget | undefined = result.id ? {reference:{kind:'external_visual',id:result.id},thumbnail:result.image,label:result.title} : undefined;
   return <View style={{gap:spacing[2]}}>
     {result?.status==='found'?<View style={{gap:spacing[2],padding:spacing[3],borderWidth:1,borderColor:colors.separator,borderRadius:radius.card,backgroundColor:colors.surfaceSecondary}}>
@@ -42,7 +42,7 @@ export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisu
       </Pressable>}
       <AskImageButton image={image} offline={!online} onAsk={onAsk} />
     </View>:null}
-    {result.attemptCount<2?<Pressable accessibilityRole="button" accessibilityLabel="Show a different one" disabled={busy} accessibilityState={{busy,disabled:busy}}
+    {online && result.attemptCount<2?<Pressable accessibilityRole="button" accessibilityLabel="Show a different one" disabled={busy} accessibilityState={{busy,disabled:busy}}
       onPress={()=>void find()} style={{alignSelf:'flex-start',minHeight:hitTarget.min,padding:spacing[2],borderRadius:radius.control}}><Text style={{color:colors.accent}}>Show a different one</Text></Pressable>:null}
     {open && result?.status==='found'?<ImageViewer visible title="External reference" onClose={()=>setOpen(false)}>
       {onZoomChange => <>

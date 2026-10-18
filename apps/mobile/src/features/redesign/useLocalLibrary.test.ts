@@ -125,8 +125,8 @@ describe("useLocalLibrary", () => {
     expect(library.items.map((item) => item.id)).toEqual([reviewerDetail().artifact.id, quizDetail().artifact.id]);
     expect(library.refreshing).toBe(false);
     expect(library.error).toBeNull();
-    expect(library.offlineStats).toMatchObject({ total: 2, current: 2 });
-    expect(library.items.every(item => item.offlineReady)).toBe(true);
+    expect(library.offlineStats).toMatchObject({ total: 2, current: 1 });
+    expect(library.items.filter(item => item.offlineReady).map(item => item.type)).toEqual(["quiz"]);
   });
 
   it("keeps device-saved work when the cloud refresh fails", async () => {
@@ -139,8 +139,8 @@ describe("useLocalLibrary", () => {
     expect(library.items).toHaveLength(1);
     expect(library.error).toBe("connection");
     expect(library.errorCode).toBe("connection");
-    expect(library.offlineStats).toMatchObject({ total: 1, current: 1 });
-    expect(library.items[0]?.offlineReady).toBe(true);
+    expect(library.offlineStats).toMatchObject({ total: 1, current: 0 });
+    expect(library.items[0]?.offlineReady).toBe(false);
     expect(library.refreshing).toBe(false);
   });
 

@@ -8,6 +8,7 @@ import type {
 import type { LocalArtifactStore, LocalUpsertOutcome } from "./artifactStore";
 
 export interface LibraryRemote {
+  onDetailStored?(owner: string, detail: LibraryArtifactDetail): void;
   fetchPage(offset: number, limit: number): Promise<LibraryOverview>;
   fetchDetail(artifactId: string): Promise<LibraryArtifactDetail>;
   fetchQuizAnswerKey?(quizId: string): Promise<QuizAnswerKey>;
@@ -55,6 +56,7 @@ export async function reconcileLibrary(input: {
     const overview = await remote.fetchPage(offset, PAGE_SIZE);
     categories ??= overview.categories;
     supersededReviewerIds = overview.supersededReviewerIds ?? supersededReviewerIds;
+    if (!cancelled()) for (const id of supersededReviewerIds) await store.removeArtifact(ownerUserId, id);
     if (cancelled()) break;
     await store.upsertSummaries(ownerUserId, overview.items);
     if (overview.nextOffset === null || overview.nextOffset <= offset) {
@@ -112,7 +114,7 @@ export async function hydrateLibraryBodies(input: {
 export async function refreshArtifactDetail(input: {
   readonly store: LocalArtifactStore;
   readonly ownerUserId: string;
-  readonly remote: Pick<LibraryRemote, "fetchDetail" | "fetchQuizAnswerKey">;
+  readonly remote: Pick<LibraryRemote, "fetchDetail" | "fetchQuizAnswerKey" | "onDetailStored">;
   readonly artifactId: string;
   readonly isCancelled?: () => boolean;
 }): Promise<{ detail: LibraryArtifactDetail; outcome: LocalUpsertOutcome }> {
@@ -128,6 +130,7 @@ export async function refreshArtifactDetail(input: {
   }
   if (input.isCancelled?.()) return { detail, outcome: "unchanged" };
   const outcome = await store.upsertDetail(ownerUserId, artifactId, detail);
+  if (outcome !== 'ignored_older') remote.onDetailStored?.(ownerUserId, detail);
   if ('quiz' in detail && remote.fetchQuizAnswerKey && outcome !== 'ignored_older') {
     try {
       const key = await remote.fetchQuizAnswerKey(detail.quiz.id);

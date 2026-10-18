@@ -55,6 +55,16 @@ function generation(state: GenerationView["state"], artifactId: string | null): 
 }
 
 describe("cloud reconciliation", () => {
+  it('removes explicitly superseded reviewers while retaining mere list absences', async () => {
+    const store = await setup();
+    const detail = reviewerDetail();
+    await store.upsertDetail(OWNER_A, detail.artifact.id, detail);
+    const remote = remoteWith([]);
+    remote.fetchPage.mockResolvedValue({ items: [], categories, nextOffset: null, supersededReviewerIds: [detail.artifact.id] });
+    await reconcileLibrary({ store, ownerUserId: OWNER_A, remote });
+    expect(await store.readDetail(OWNER_A, detail.artifact.id)).toBeNull();
+    expect(await store.readImageManifest(OWNER_A, detail.artifact.id)).toBeNull();
+  });
   it("inserts remote artifacts, hydrates their bodies, and makes them readable offline", async () => {
     const store = await setup();
     const remote = remoteWith([reviewerDetail(), quizDetail(), draftDetail()]);
@@ -230,7 +240,8 @@ describe('batched body hydration', () => {
     const progress = vi.fn();
     expect(await hydrateLibraryBodies({ ...input, onProgress: progress })).toEqual({ hydrated: 45, stoppedBy: 'done' });
     expect(progress).toHaveBeenCalledTimes(3);
-    expect((await input.store.offlineStats(OWNER_A)).current).toBe(45);
+    expect((await input.store.offlineStats(OWNER_A)).current).toBe(0);
+    expect(await input.store.idsNeedingBody(OWNER_A, 100)).toEqual([]);
   });
   it('stops offline without removing rows', async () => {
     const input = await missing(3);

@@ -179,3 +179,13 @@ describe('source-page thumbnail and viewer', () => {
     vi.mocked(Date.now).mockRestore();
   });
 });
+
+it('renders and opens a saved page offline with the original accessible caption', async () => {
+  const local = { ...ready, available: true as const, url: 'file:///documents/offline-images/page.img' };
+  await act(async () => { tree = create(createElement(SourcePageSnapshot, { ...props, offline: true, loadedSnapshot: local })); });
+  expect(tree!.root.findAllByType(Image)[0]!.props.source.uri).toBe(local.url);
+  expect(tree!.root.findAllByType(Image)[0]!.props.accessibilityLabel).toContain(ready.sourceLabel);
+  await act(async () => buttons()[0]!.props.onPress());
+  expect(tree!.root.findByType(Modal).props.visible).toBe(true);
+  expect(mocks.read).not.toHaveBeenCalled();
+});

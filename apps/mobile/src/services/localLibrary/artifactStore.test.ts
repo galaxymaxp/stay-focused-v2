@@ -133,7 +133,7 @@ describe("local artifact store", () => {
     first.close();
 
     const second = await freshStore(path);
-    await expect(second.store.listSummaries(OWNER_A)).resolves.toEqual([{ ...reviewerDetail().artifact, offlineReady: true }]);
+    await expect(second.store.listSummaries(OWNER_A)).resolves.toEqual([{ ...reviewerDetail().artifact, offlineReady: false }]);
     await expect(second.store.readDetail(OWNER_A, reviewerDetail().artifact.id)).resolves.toMatchObject({
       detail: reviewerDetail(),
     });
@@ -249,7 +249,7 @@ describe("local artifact store", () => {
     await store.upsertSummaries(OWNER_A, [{ ...reviewerDetail().artifact, id: generationId }]);
     // The server resolves the finished generation to its saved Reviewer.
     await store.upsertDetail(OWNER_A, generationId, reviewerDetail());
-    await expect(store.listSummaries(OWNER_A)).resolves.toEqual([{ ...reviewerDetail().artifact, offlineReady: true }]);
+    await expect(store.listSummaries(OWNER_A)).resolves.toEqual([{ ...reviewerDetail().artifact, offlineReady: false }]);
     expect((await store.readDetail(OWNER_A, generationId))?.detail.artifact.id).toBe(`artifact:${REVIEWER_ROW_ID}`);
   });
 
@@ -299,11 +299,11 @@ describe('offline storage controls', () => {
     await store.upsertSummaries(OWNER_A, [draftDetail().artifact,
       { ...quizDetail().artifact, updatedAt: '2026-10-01T00:00:00.000Z' }]);
     await store.upsertDetail(OWNER_B, 'r', reviewerDetail());
-    expect(await store.offlineStats(OWNER_A)).toMatchObject({ total: 3, current: 1 });
-    expect((await store.listSummaries(OWNER_A)).filter(item => item.offlineReady).map(item => item.id)).toEqual([reviewerDetail().artifact.id]);
+    expect(await store.offlineStats(OWNER_A)).toMatchObject({ total: 3, current: 0 });
+    expect((await store.listSummaries(OWNER_A)).filter(item => item.offlineReady).map(item => item.id)).toEqual([]);
     raw.prepare('UPDATE library_artifacts SET payload_schema = 99 WHERE owner_user_id = ?').run(OWNER_A);
     expect((await store.offlineStats(OWNER_A)).current).toBe(0);
-    expect(await store.offlineStats(OWNER_B)).toMatchObject({ total: 1, current: 1 });
+    expect(await store.offlineStats(OWNER_B)).toMatchObject({ total: 1, current: 0 });
   });
   it('clears bodies and assists, keeping aliases, snapshots and unsynced work', async () => {
     const { store, raw } = await freshStore();

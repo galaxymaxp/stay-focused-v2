@@ -1,3 +1,4 @@
+import { refreshFigureUri } from '../../services/studyImageFile';
 import type { StudyImageTarget } from '@stay-focused/shared';
 import { AskImageButton } from './AskImageButton';
 import { SaveImageButton } from './SaveImageButton';
@@ -49,7 +50,8 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
   const [open,setOpen]=useState(false);const [figures,setFigures]=useState<readonly SourceFigure[]>([]);
   const [index,setIndex]=useState(0);const [hidden,setHidden]=useState(false);
   const availabilityRef=useRef(onAvailability);availabilityRef.current=onAvailability;
-  const hasImages=!offline && hasFigures && !hidden && figures.length>0;
+  const localImages=figures.some(figure=>figure.url.startsWith('file://'));
+  const hasImages=(!offline || localImages) && hasFigures && !hidden && figures.length>0;
   useEffect(()=>{availabilityRef.current?.(hasImages);},[hasImages]);
   const request=useRef<AbortController|null>(null);
   useEffect(()=>{
@@ -70,7 +72,7 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
     return ()=>{controller.abort();clearTimeout(timeout);if(request.current===controller)request.current=null;};
   },[client,artifactId,sectionId,hasFigures,offline,visible,figures.length,hidden,loadedFigures]);
   const failed=()=>{setHidden(true);close();void refreshOnce?.();};
-  if(offline)return hasFigures ? <AskImageButton offline /> : null;
+  if(offline && !localImages)return hasFigures ? <AskImageButton offline /> : null;
   if(!hasFigures || hidden)return null;
   const figure=figures[index];const label=figure?.page?`From page ${figure.page}`:figure?.slide?`From slide ${figure.slide}`:'From source';
   return <>
@@ -93,11 +95,7 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
             onError={failed}/>
         </View>
         <AskImageButton offline={offline} onAsk={target=>{close();onAsk?.(target);}} image={{reference:{kind:'figure',id:figure.id},thumbnail:figure.url,label}} />
-        <SaveImageButton offline={offline} image={{uri:figure.url,reviewerTitle,sectionTitle,kind:'figure'}} refreshUri={async()=>{
-          const fresh=(await readSectionFigures(client,artifactId,sectionId)).find(item=>item.id===figure.id);
-          if(!fresh)throw new Error('figure_unavailable');
-          return fresh.url;
-        }} />
+        <SaveImageButton offline={offline} image={{uri:figure.url,reviewerTitle,sectionTitle,kind:'figure'}} refreshUri={() => refreshFigureUri(client,artifactId,sectionId,figure.id)} />
         {figures.length>1?<View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:spacing[2]}}>
           <Pressable accessibilityRole="button" accessibilityLabel="Previous figure" accessibilityState={{disabled:index===0}} disabled={index===0}
             onPress={()=>setIndex(n=>Math.max(0,n-1))} style={{minHeight:hitTarget.min,padding:spacing[2]}}><Text style={{color:index===0?colors.textMuted:colors.accent}}>Previous</Text></Pressable>
