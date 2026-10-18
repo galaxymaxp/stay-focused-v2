@@ -1,5 +1,21 @@
 # Roadmap
 
+## MD1 material descriptions - STOPPED at preflight (2026-10-18)
+
+Baseline `665c156`; branch `overnight/2026-10-15_feedback`. STEP 0 cannot
+confirm the prompt's three Canvas post-commit figure hooks: there are two.
+Manual uploads follow MR2's immediate reviewer generation rather than a
+selectable material detail pane before Generate. The exact scope question
+is recorded, not sent, under the unattended rules. No implementation,
+migration file or ADR was added. MD1 remains unfinished; no next slice starts.
+
+Gate counts: **FRESH PASS 1/10** (diff hygiene), **9/10 NOT RUN** at the
+preflight STOP. Rollout and Device checks are **NOT RUN**, owner steps after
+scope resolution and implementation. Production state is **UNVERIFIED (owner
+to confirm)**. Cross-student reuse remains Future only. See
+[MD1 acceptance](ai/acceptance/md1-material-description.md) for the exact
+question, baseline, findings and remaining owner steps.
+
 ## WD1 draft activity instructions complete locally - PASS (2026-10-18)
 
 WD1's finite unattended code scope is complete: STEP 0-5, tests, fresh serial

@@ -1,5 +1,27 @@
 # Current State
 
+## MD1 material descriptions - STOPPED at preflight (2026-10-18)
+
+MD1 was read in full and checked against baseline `665c156` on
+`overnight/2026-10-15_feedback`. The mandatory STEP 0 confirmation found two
+Canvas post-commit figure hooks, whereas the prompt requires three. Manual
+uploads also generate immediately after extraction inside an accepted
+reviewer job (ADR-037), with no selectable pre-generation material detail
+pane. The exact scope question is recorded in the acceptance report; no
+unattended question was sent. UNATTENDED rule 4 requires stopping here.
+
+Only preflight/checkpoint documentation changed. No description feature,
+migration file or ADR was implemented; MD1 remains unfinished. Gate counts:
+**FRESH PASS 1/10** (diff hygiene); **9/10 NOT RUN**, including all tests and
+builds, because of the preflight STOP. Rollout and Device checks were skipped
+entirely. Production/database/Scheduler/device state is **UNVERIFIED (owner
+to confirm)**. No remote action, environment-file edit or push was performed.
+Unrelated untracked work is preserved. Resume only with the recorded
+preflight assumptions resolved; no later roadmap slice was started.
+
+[MD1 acceptance](ai/acceptance/md1-material-description.md) records the
+baseline, exact owner question, findings and Owner steps remaining.
+
 ## WD1 draft activity instructions complete locally - PASS (2026-10-18)
 
 WD1's finite unattended code scope is complete: STEP 0-5, tests, fresh serial

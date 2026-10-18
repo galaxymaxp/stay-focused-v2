@@ -5746,3 +5746,70 @@ are ahead 55 / behind 0 after closure relative to locally recorded
 [WD1 acceptance](acceptance/wd1-draft-activity-instructions.md) contains the
 baseline, matrix, commands, failures and limits. Endpoint reached; no later
 roadmap slice was started or authorized.
+
+## MD1 material descriptions - STOPPED at preflight (2026-10-18)
+
+Baseline `665c156`, branch `overnight/2026-10-15_feedback`. Read the full MD1
+prompt and both referenced roadmaps. STEP 0 is partial; implementation steps
+1-6 are NOT RUN. No later slice started. UNATTENDED rule 4 requires this
+checkpoint and STOPPED after a preflight surprise, without asking questions.
+
+The Canvas worker has two post-commit `extractPreparedFigures` hook sites
+(lines 92 and 119), not the three STEP 0.2 requires confirming. Manual uploads
+also start reviewer generation immediately (ADR-037), extracting inside the
+accepted job. They do not have the selectable material detail pane before
+Generate described in MD1's goal. A description attachment hook alone cannot
+supply that pre-generation manual UI.
+
+**Exact owner question (recorded, not sent):** May MD1 target the two actual
+Canvas post-commit hook sites plus the separate manual source attachment
+path, preserve MR2's immediate manual reviewer generation, and limit
+pre-generation detail-pane display to Canvas materials; or should manual
+uploads gain a separate preparation/detail/Generate flow first?
+
+**Commits:** one local documentation checkpoint, `docs: checkpoint MD1
+preflight stop`, author `galaxymaxp <omgraythekid@gmail.com>`. Its resulting
+hash is recorded in Git and `tmp/overnight/MD1.status`; no self-referential
+commit amendment. Only the acceptance report, three planning files and this
+handoff were changed. No code, migration or ADR was added. **Migration file
+name: none.** The preparation/manual schemas are in `packages/db/migrations/`;
+`supabase/migrations/` contains only the course-batch migration. Latest across
+both tracked directories is `20261018000100_failed_generation_retry.sql`, so
+any future MD1 migration must sort after it.
+
+**Gates:** FRESH PASS **1/10** prompt gate commands (`git diff --check`, zero
+whitespace errors); **9/10 NOT RUN** at the preflight STOP: root forced
+typecheck/lint, API/shared/web/mobile tests, API/web builds and Android export.
+Tests: **0 run**, no suite result claimed. Staged diff hygiene also FRESH PASS.
+First diff check found one new blank line at EOF in the sprint checkpoint;
+removed and rechecked before commit. No test failure or flake occurred.
+Read-only Windows wildcard searches had path errors; exact-path reads and
+repository-wide searches established the findings. Python was unavailable for
+an attempted documentation edit; the edit was completed with Node instead.
+This is a documentation checkpoint, not MD1 completion or production acceptance.
+
+**UNVERIFIED (owner to confirm):** production revisions, database rows/applied
+migrations, Scheduler state, remote-ref freshness and browser/phone behavior.
+No remote service call, deployment, SQL, Scheduler operation, email,
+environment-file edit or push. Unrelated untracked `UI/`,
+`apps/mobile/.gitignore` and `supabase/.temp/` are preserved.
+
+**Owner steps remaining**
+
+- Resolve the recorded preflight question; implement MD1 steps 1-6 and run
+  every fresh gate before marking the feature done.
+- **Rollout - NOT RUN, skipped entirely:** after implementation, apply the
+  new migration, optionally set `MATERIAL_DESCRIPTION_MODEL`, deploy API /
+  Google worker / web and publish mobile OTA/APK. Existing prepared materials
+  need re-preparation or a separately approved backfill; none was written or
+  run. For the owner's later Vercel tooling, installing the missing CLI with
+  `npm i -g vercel` is strongly recommended; no installation or CLI use here.
+- **Device checks - NOT RUN, skipped entirely:** phone/browser descriptions
+  for prepared PDF/PPTX/Canvas pages, absent-description behavior and Generate
+  staying usable; clarify manual-upload acceptance first.
+- Future only: cross-student cache reuse for identical files. Owner isolation
+  remains required.
+
+[MD1 acceptance](acceptance/md1-material-description.md) records the complete
+baseline and retained preflight findings. MD1 remains unfinished; resume only
+with the recorded scope assumptions resolved.

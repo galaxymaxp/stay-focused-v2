@@ -1,3 +1,25 @@
+<!-- MD1 begin -->
+## MD1 material descriptions - STOPPED at preflight (2026-10-18)
+
+Finite scope: MD1 STEP 0-6, tests/gates/docs/local commits only; Rollout and
+Device checks excluded by the overriding unattended rules. Baseline `665c156`
+on `overnight/2026-10-15_feedback`. STEP 0 is partial: two Canvas figure hook
+sites exist, not the required three. Manual uploads generate immediately
+after extraction and have no pre-generation selectable-material detail flow.
+The exact owner question is recorded in
+[MD1 acceptance](acceptance/md1-material-description.md), without asking the
+unattended owner. Rule 4 requires STOPPED and no subsequent implementation.
+
+No code, migration file or ADR changed. MD1 is unfinished. **FRESH PASS 1/10**
+prompt gates (diff hygiene); **9/10 NOT RUN**, including all tests/builds.
+Owner steps remaining: resolve the recorded scope question; implement and
+verify MD1; then owner rollout and phone/browser checks, skipped entirely
+here. Production revisions, database, Scheduler, remote-ref freshness and
+device behavior remain **UNVERIFIED (owner to confirm)**. No remote operation,
+environment-file edit or push. Unrelated untracked work preserved; no later
+slice started. Git and `tmp/overnight/MD1.status` identify the checkpoint commit.
+<!-- MD1 end -->
+
 <!-- WD1 begin -->
 ## WD1 draft activity instructions complete locally - PASS (2026-10-18)
 
