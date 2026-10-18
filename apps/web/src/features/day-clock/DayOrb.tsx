@@ -1,4 +1,6 @@
 "use client";
+import { useOrbInteraction, type OrbInteractionHandle } from '../knowledge-core/orbInteraction';
+import { createOrbInteractionSampler } from '../knowledge-core/orbInteractionFrame';
 import { memo, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { createOrbAura } from "../knowledge-core/orbAura";
@@ -34,11 +36,14 @@ interface Runtime {
 export const DayOrb = memo(function DayOrb({
   minutes,
   size,
+  interaction: suppliedInteraction,
 }: {
   minutes: number;
   /** Canvas size in CSS pixels; the ball fills DAY_ORB_FILL of it. */
   size: number;
+  interaction?: OrbInteractionHandle;
 }) {
+  const interaction = useOrbInteraction(suppliedInteraction);
   const frameRef = useRef<HTMLDivElement>(null);
   const runtime = useRef<Runtime>({
     tones: dayOrbTones(minutes),
@@ -69,7 +74,7 @@ export const DayOrb = memo(function DayOrb({
     };
     sync();
     try {
-      controller.current = buildScene(canvas, runtime);
+      controller.current = buildScene(canvas, runtime, interaction);
     } catch {
       canvas.remove();
       setUnsupported(true);
@@ -90,7 +95,7 @@ export const DayOrb = memo(function DayOrb({
       controller.current = null;
       canvas.remove();
     };
-  }, []);
+  }, [interaction]);
 
   return (
     <div
@@ -107,7 +112,9 @@ export const DayOrb = memo(function DayOrb({
 function buildScene(
   canvas: HTMLCanvasElement,
   runtime: React.MutableRefObject<Runtime>,
+  interaction: OrbInteractionHandle,
 ) {
+  const sampleInteraction = createOrbInteractionSampler(interaction);
   const renderer = new THREE.WebGLRenderer({
     canvas,
     alpha: true,
@@ -144,26 +151,27 @@ function buildScene(
 
   let disposed = false;
   let requestId: number | null = null;
-  let lastFrame = performance.now();
+  let lastFrame = Date.now();
   let lastRender = 0;
   let time = 8.4;
   let spinAngle = 0;
   let settleUntil = 0;
+  let interacting = false;
   const spinMatrix = new THREE.Matrix3();
   const spinRotation = new THREE.Matrix4();
 
   const draw = () => {
     requestId = null;
     if (disposed) return;
-    const now = performance.now();
+    const now = Date.now();
     const current = runtime.current;
     const moving = current.running && !current.reducedMotion;
-    if (now - lastRender >= FRAME_MS || !moving) {
+    if (now - lastRender >= (interacting || interaction.state.current.gesture?.rotating ? 16 : FRAME_MS) || !moving) {
       const delta = Math.min((now - lastFrame) / 1000, 0.08);
       lastFrame = now;
       lastRender = now;
       const rate = current.reducedMotion ? 0.08 : 0.35;
-      if (current.running) {
+      if (moving) {
         time += delta * rate;
         spinAngle =
           (spinAngle + delta * (current.reducedMotion ? 0.03 : 0.12)) %
@@ -172,6 +180,8 @@ function buildScene(
       spinMatrix.setFromMatrix4(
         spinRotation.makeRotationAxis(SPIN_AXIS, spinAngle),
       );
+      const interactionFrame = sampleInteraction(now, delta * 1000, current.reducedMotion, spinMatrix);
+      interacting = interactionFrame.animating;
       camera.lookAt(0, 0, 0);
       camera.updateMatrixWorld();
       const tones = current.tones;
@@ -193,6 +203,8 @@ function buildScene(
             },
       });
       body.update({
+        idleColor: interactionFrame.idleColor,
+        bulgeDir: interactionFrame.bulgeDir, bulgeAmount: interactionFrame.bulgeAmount,
         time,
         life: 0.22,
         stir: 0,
@@ -206,22 +218,24 @@ function buildScene(
       });
       renderer.render(scene, camera);
     }
-    if (!disposed && (moving || now < settleUntil))
+    if (!disposed && current.running && !current.reducedMotion && (moving || interacting || now < settleUntil))
       requestId = requestAnimationFrame(draw);
   };
 
   const wake = () => {
-    settleUntil = performance.now() + 400;
+    settleUntil = Date.now() + 400;
     if (requestId === null) {
-      lastFrame = performance.now();
+      lastFrame = Date.now();
       requestId = requestAnimationFrame(draw);
     }
   };
+  interaction.wake.current = wake;
   wake();
   return {
     wake,
     dispose: () => {
       disposed = true;
+      if (interaction.wake.current === wake) interaction.wake.current = null;
       if (requestId !== null) cancelAnimationFrame(requestId);
       observer.disconnect();
       body.dispose();

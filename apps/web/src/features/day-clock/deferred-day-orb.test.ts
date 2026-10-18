@@ -1,3 +1,5 @@
+import { beginOrbGesture, createOrbInteraction, moveOrbGesture } from '@stay-focused/shared';
+import type { OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
@@ -11,7 +13,7 @@ beforeEach(() => {
   frames = new Map(); serial = 0; reduced = false;
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal('window', { matchMedia: () => ({ matches: reduced, addEventListener: vi.fn(), removeEventListener: vi.fn() }) });
+  vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn(), matchMedia: () => ({ matches: reduced, addEventListener: vi.fn(), removeEventListener: vi.fn() }) });
   vi.stubGlobal('requestAnimationFrame', (fn: FrameRequestCallback) => { frames.set(++serial, fn); return serial; });
   vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
 });
@@ -31,7 +33,7 @@ it('renders a same-size still before useful content and before requesting the or
   await frame();
   await act(async () => { await vi.dynamicImportSettled(); });
   expect(mocks.load).toHaveBeenCalledOnce();
-  expect(mocks.render).toHaveBeenCalledWith({ minutes: 720, size: 240 });
+  expect(mocks.render).toHaveBeenCalledWith(expect.objectContaining({ minutes: 720, size: 240, interaction: expect.any(Object) }));
 });
 it('keeps the static frame without requesting animation for reduced motion', async () => {
   reduced = true;
@@ -39,4 +41,16 @@ it('keeps the static frame without requesting animation for reduced motion', asy
   await frame(); await frame();
   expect(mocks.render).not.toHaveBeenCalled();
   expect(root!.root.findByProps({ 'data-testid': 'day-orb-still' })).toBeTruthy();
+});
+
+it('loads a single renderable reduced-motion pose on held rotation, without ambient frames', async () => {
+  reduced = true;
+  const interaction: OrbInteractionHandle = { state: { current: createOrbInteraction() }, wake: { current: null } };
+  await act(async () => { root = create(createElement(DeferredDayOrb, { minutes: 0, size: 240, ready: true, interaction })); });
+  interaction.state.current = moveOrbGesture(beginOrbGesture(interaction.state.current, 50, 50, 0), 70, 50, 100, 250, true);
+  await act(async () => interaction.wake.current?.());
+  await frame(); await frame(); await act(async () => { await vi.dynamicImportSettled(); });
+  expect(mocks.render).toHaveBeenCalled();
+  expect(interaction.state.current.spin.velocityY).toBe(0);
+  expect(frames.size).toBe(0);
 });

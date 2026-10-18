@@ -1,3 +1,4 @@
+import { readLocalPreference, writeLocalPreference } from '../../lib/local-preference';
 import { validFreeTime as valid } from "@stay-focused/shared";
 // Minutes from local midnight, shared by Today's clock and Schedule's planner.
 export interface FreeTime {
@@ -9,7 +10,7 @@ const key = (date: string) => `sf.today.free-time.${date}`;
 
 export function readFreeTime(date: string): FreeTime | null {
   try {
-    const saved = JSON.parse(localStorage.getItem(key(date)) ?? "null") as Partial<FreeTime> | null;
+    const saved = JSON.parse(readLocalPreference(key(date)) ?? "null") as Partial<FreeTime> | null;
     return valid(saved) ? { start: saved.start, end: saved.end } : null;
   } catch {
     return null;
@@ -19,7 +20,7 @@ export function readFreeTime(date: string): FreeTime | null {
 export function writeFreeTime(date: string, value: FreeTime): void {
   if (!valid(value)) return;
   try {
-    localStorage.setItem(key(date), JSON.stringify(value));
+    writeLocalPreference(key(date), JSON.stringify(value));
   } catch {
     /* Keep the chosen window for this visit if storage is blocked. */
   }

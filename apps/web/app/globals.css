@@ -761,7 +761,7 @@ input[type="range"] {
 .knowledge-core {
   width: min(100%, 300px);
   aspect-ratio: 1;
-  touch-action: manipulation;
+  touch-action: pan-y;
   -webkit-tap-highlight-color: transparent;
 }
 .knowledge-core canvas {

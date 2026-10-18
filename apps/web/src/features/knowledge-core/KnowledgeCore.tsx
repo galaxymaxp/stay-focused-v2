@@ -1,9 +1,10 @@
 "use client";
+import { OrbPointerLayer, useOrbInteraction, type OrbInteractionHandle } from './orbInteraction';
+import { createOrbInteractionSampler } from './orbInteractionFrame';
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import {
   CORE_MOTION_PROFILES,
-  coreAccessibilityLabel,
   coreMotionRate,
   coreShimmerTarget,
   coreSpinTarget,
@@ -23,6 +24,7 @@ const ORB_MAX_SPIN = 0.9;
 const SPIN_AXIS = new THREE.Vector3(0.18, 1, -0.12).normalize();
 const CAMERA_DISTANCE = 4.55;
 const CAMERA_FOV = 36;
+const ORB_FILL = (0.95 * 2) / (2 * CAMERA_DISTANCE * Math.tan(CAMERA_FOV * Math.PI / 360));
 
 type Mode = "light" | "dark";
 interface SceneController {
@@ -35,20 +37,13 @@ interface RuntimeProps {
   reducedMotion: boolean;
   active: boolean;
 }
-interface TouchState {
-  strength: number;
-  x: number;
-  y: number;
-  age: number;
-}
-
 const readMode = (): Mode =>
   document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 
 export function KnowledgeCore({ state }: { state: CoreState }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const controller = useRef<SceneController | null>(null);
-  const touch = useRef<TouchState>({ strength: 0, x: 0, y: 0, age: 10 });
+  const interaction = useOrbInteraction();
   const runtime = useRef<RuntimeProps>({
     state,
     mode: "light",
@@ -76,7 +71,7 @@ export function KnowledgeCore({ state }: { state: CoreState }) {
     };
     sync();
     try {
-      controller.current = buildScene(canvas, runtime, touch);
+      controller.current = buildScene(canvas, runtime, interaction);
     } catch {
       canvas.remove();
       setUnsupported(true);
@@ -98,29 +93,20 @@ export function KnowledgeCore({ state }: { state: CoreState }) {
       controller.current = null;
       canvas.remove();
     };
-  }, []);
+  }, [interaction]);
 
   return (
     <div
       ref={frameRef}
       className="knowledge-core"
-      role="img"
-      aria-label={coreAccessibilityLabel(state)}
-      aria-busy={["reading", "generating", "finalizing"].includes(state)}
+      aria-hidden="true"
+      style={{ position: "relative", touchAction: "pan-y" }}
       data-testid="knowledge-core"
       data-state={state}
-      onPointerDown={(event) => {
-        const box = event.currentTarget.getBoundingClientRect();
-        touch.current = {
-          strength: runtime.current.reducedMotion ? 0.25 : 1,
-          age: 0,
-          x: (event.clientX - box.left) / box.width - 0.5,
-          y: (event.clientY - box.top) / box.height - 0.5,
-        };
-        controller.current?.renderForChange();
-      }}
+
     >
       {unsupported && <div className="knowledge-core-fallback" />}
+      <OrbPointerLayer interaction={interaction} fill={ORB_FILL} />
     </div>
   );
 }
@@ -128,8 +114,9 @@ export function KnowledgeCore({ state }: { state: CoreState }) {
 function buildScene(
   canvas: HTMLCanvasElement,
   runtime: React.MutableRefObject<RuntimeProps>,
-  touch: React.MutableRefObject<TouchState>,
+  interaction: OrbInteractionHandle,
 ): SceneController {
+  const sampleInteraction = createOrbInteractionSampler(interaction);
   const renderer = new THREE.WebGLRenderer({
     canvas,
     alpha: true,
@@ -164,7 +151,7 @@ function buildScene(
 
   let requestId: number | null = null;
   let disposed = false;
-  let lastFrame = performance.now();
+  let lastFrame = Date.now();
   let animatedTime = 8.4;
   let spinAngle = 0;
   let activity = 0,
@@ -183,17 +170,17 @@ function buildScene(
       requestId = null;
       return;
     }
-    const now = performance.now();
+    const now = Date.now();
     const delta = Math.min((now - lastFrame) / 1000, 0.04);
     lastFrame = now;
     const current = runtime.current;
     const profile = CORE_MOTION_PROFILES[current.state];
-    const ease = 1 - Math.pow(0.002, delta);
+    const ease = current.reducedMotion ? 1 : 1 - Math.pow(0.002, delta);
     activity += (profile.activity - activity) * ease;
     completion += (profile.completion - completion) * ease;
     error += (profile.error - error) * ease;
     // Spin, shimmer and liveliness carry momentum between states; failure winds them down rather than cutting them.
-    const momentum = 1 - Math.pow(0.12, delta);
+    const momentum = current.reducedMotion ? 1 : 1 - Math.pow(0.12, delta);
     const spinTarget = coreSpinTarget(current.state, current.reducedMotion);
     const shimmerTarget = coreShimmerTarget(
       current.state,
@@ -214,24 +201,14 @@ function buildScene(
     spinMatrix.setFromMatrix4(
       spinRotation.makeRotationAxis(SPIN_AXIS, spinAngle),
     );
-    touch.current.strength *= Math.pow(0.2, delta);
-    touch.current.age += delta;
-
+    const interactionFrame = sampleInteraction(now, delta * 1000, current.reducedMotion, spinMatrix);
     root.position.y = Math.sin(animatedTime * 0.5) * 0.02;
-    const parallax =
-      touch.current.strength * Math.min(1, touch.current.age * 3);
-    camera.position.x +=
-      (touch.current.x * 0.12 * parallax - camera.position.x) *
-      Math.min(1, delta * 5);
-    camera.position.y +=
-      (-touch.current.y * 0.09 * parallax + 0.02 - camera.position.y) *
-      Math.min(1, delta * 5);
     camera.lookAt(0, 0, 0);
     camera.updateMatrixWorld();
 
     const glow = 0.55 + activity * 0.5 + completion * 0.15;
     aura.update({
-      delta,
+      delta: current.reducedMotion ? 0 : delta,
       shimmer,
       glow,
       error,
@@ -249,8 +226,9 @@ function buildScene(
       spin: spinMatrix,
       mode: current.mode,
       level: aura.shimmer.level,
-      // A touch stirs the liquid briefly.
-      stir: touch.current.strength,
+      stir: 0,
+      idleColor: current.state === 'idle' ? interactionFrame.idleColor : undefined,
+      bulgeDir: interactionFrame.bulgeDir, bulgeAmount: interactionFrame.bulgeAmount,
     });
     renderer.render(scene, camera);
     const settling =
@@ -259,24 +237,26 @@ function buildScene(
       Math.abs(spin - spinTarget) > 0.004 ||
       Math.abs(shimmer - shimmerTarget) > 0.004 ||
       Math.abs(life - lifeTarget) > 0.004 ||
-      touch.current.strength > 0.01;
-    requestId = motionRate > 0 || settling ? requestAnimationFrame(draw) : null;
+      interactionFrame.animating;
+    requestId = !current.reducedMotion && (motionRate > 0 || settling) ? requestAnimationFrame(draw) : null;
   };
 
   function renderForChange() {
     if (disposed) return;
     settleUntil =
-      performance.now() + (runtime.current.reducedMotion ? 360 : 1100);
+      Date.now() + (runtime.current.reducedMotion ? 360 : 1100);
     if (requestId === null) {
-      lastFrame = performance.now();
+      lastFrame = Date.now();
       requestId = requestAnimationFrame(draw);
     }
   }
 
+  interaction.wake.current = renderForChange;
   return {
     renderForChange,
     dispose: () => {
       disposed = true;
+      if (interaction.wake.current === renderForChange) interaction.wake.current = null;
       if (requestId !== null) cancelAnimationFrame(requestId);
       observer.disconnect();
       body.dispose();

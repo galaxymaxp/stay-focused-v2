@@ -1,4 +1,5 @@
 "use client";
+import { OrbPointerLayer, useOrbInteraction } from '../knowledge-core/orbInteraction';
 import { ClockOptions } from "./clock-options";
 import { freeTimeDuration, freeTimeEnd, containsMinute } from "@stay-focused/shared";
 import type { TodayItem } from "@stay-focused/shared";
@@ -393,6 +394,7 @@ export function DayRingClock({
     end: fromMidnight(freeTimeEnd(range.start, range.end)),
   };
   const marker = ringPoint(fromMidnight(nowMinutes));
+  const orbInteraction = useOrbInteraction();
   const orbCanvas = (CLOCK.glass * 2) / DAY_ORB_FILL;
   const cursor = adjusting
     ? "grabbing"
@@ -419,7 +421,7 @@ export function DayRingClock({
           top: (CLOCK.center - orbCanvas / 2) * scale,
         }}
       >
-        <DeferredDayOrb minutes={nowMinutes} size={orbCanvas * scale} ready={orbReady} />
+        <DeferredDayOrb interaction={orbInteraction} minutes={nowMinutes} size={orbCanvas * scale} ready={orbReady} />
       </div>
       <div
         className="day-readout"
@@ -548,9 +550,10 @@ export function DayRingClock({
           );
         })}
       </svg>
+      <OrbPointerLayer interaction={orbInteraction} fill={CLOCK.glass * 2 / CLOCK.size} />
       <div
         className="day-clock-touch"
-        style={{ cursor }}
+        style={{ cursor, zIndex: 1, clipPath: ringTouchClipPath }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -586,3 +589,10 @@ export function DayRingClock({
     </div>
   );
 }
+
+// A hole only inside the existing ring band; handle hit testing is unchanged.
+const innerRingPoints = Array.from({ length: 65 }, (_, i) => {
+  const angle = i * Math.PI / 32, radius = CLOCK.touchInner / CLOCK.size * 100;
+  return `${50 + Math.cos(angle) * radius}% ${50 + Math.sin(angle) * radius}%`;
+});
+const ringTouchClipPath = `polygon(evenodd, 0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, ${innerRingPoints.join(", ")}, ${innerRingPoints[0]})`;
