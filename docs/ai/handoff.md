@@ -5063,3 +5063,69 @@ migration, Scheduler operation, email, environment-file edit or push occurred.
    owner-controlled environment, deployment and log work; not run here.
 
 Current state, roadmap and sprint are reconciled. QU1 stops here.
+
+
+## RV2 unattended handoff - PASS locally (2026-10-18)
+
+Status: **PASS** for finite STEP 0-4, tests, all required fresh serial gates,
+docs and scoped local commits. Branch `overnight/2026-10-15_feedback`, baseline
+`1064513`, tested implementation `ec580e9`. Both clients and signed-out web
+now show one four-part pill. Expound retains independent expansion, full
+button semantics and disabled rules; three levels keep their selection and
+full accessibility labels. Original content and generation behavior remain.
+
+Commits:
+
+- `0b553dd feat(shared): compact topic level labels`
+- `bf5febd feat(mobile): topic levels and expound in one pill`
+- `fc1cb84 fix(mobile): preserve equal topic pill shares and hit bounds`
+- `ec580e9 feat(web): topic levels and expound in one pill`
+- Documentation closure: `docs: close RV2`; final hash and all commits are
+  recorded in ignored `tmp/overnight/RV2.status` after the closure commit.
+
+Narrow threshold: mobile **<380 measured row points**, leaving about 85pt
+for text per segment at the boundary; web **<=400px viewport**. Short labels
+are Original / Simpler / Simplest. Mobile visible segments are 32pt, with
+vertical-only 6pt hit slop and 44pt parent bounds; no horizontal ScrollView.
+Web uses equal shares, 44px targets, existing palette/radius/border tokens
+and no overflow. Signed-out links retain the exact sign-in return path.
+
+**FRESH PASS, serial:** forced root typecheck **8/8**, lint **8/8**, both
+**0 cached**; shared **447/447** (44 files including existing compiled
+copies), web **280/280** (42 files), mobile **1334/1334** (139 files); API
+build **1/1**, **35/35** static pages; local Android export **1/1**;
+diff/staged-diff **0 whitespace errors**. Six existing lint warnings. No
+unit/gate failure or test skip. Isolated browser **24/24** at
+1440/768/390/360px in light/dark, actual components/CSS, all network blocked,
+zero unexpected requests/page errors. Screenshots at 360 light and 1440 dark
+were inspected. This verifies component layout, not a deployed app flow.
+
+Browser first attempts are retained: **0/24** before an equal-width assertion
+caught padding affecting flex shares (layout corrected); **2/24** before a
+wrong `returnTo` fixture expectation (existing helper uses `next`); **3/24**
+before an encoded Windows screenshot path failed (harness now uses
+fileURLToPath). Final **24/24** passed. No nondeterministic flake observed. Closure tooling initially exited 9009
+because Python is unavailable; an equivalent Node helper completed docs
+without an installation. No gate failure or partial doc edit resulted.
+Exact commands/results and scope limits:
+[RV2 acceptance](acceptance/rv2-topic-pill.md). Progress/logs/status and
+screenshots remain ignored under `tmp/overnight/RV2*`.
+
+### Owner steps remaining
+
+1. **Rollout - NOT RUN, skipped entirely:** owner website deploy and mobile
+   OTA/APK through the existing release process. No RV2 migration is needed.
+2. **Device checks - NOT RUN, skipped entirely:** Realme Android at 360pt,
+   compact/readable four-part pill, no scrolling, Expound opens/closes and
+   TalkBack reads three level radios plus an expandable button. Real web at
+   1440 and 390px.
+3. Production revision, database rows, Scheduler state and real-account/device
+   behavior are **UNVERIFIED (owner to confirm)**; no live check attempted.
+4. Vercel CLI is absent. Strongly recommend `npm i -g vercel` for later owner
+   environment/deployment/log work; no installation or CLI call was run.
+
+No remote service call, deployment, remote SQL, migration application,
+Scheduler action, email, environment-file edit or push occurred. API-generated
+Next declarations were inspected and restored. Unrelated untracked paths were
+preserved; no generated artifact, `tmp/` or `.local/` file was staged. Current
+state, roadmap and sprint are reconciled. RV2 stops here.

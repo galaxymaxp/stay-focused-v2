@@ -1,3 +1,44 @@
+<!-- RV2 begin -->
+## RV2 topic level pill complete locally - PASS (2026-10-18)
+
+Finite unattended STEP 0-4, tests, all eight required fresh serial gate
+commands, documentation and scoped local commits are complete on
+`overnight/2026-10-15_feedback`, baseline `1064513`. Mobile and website now
+show one four-part topic pill. Original / Simplify / Explain simply retain
+their level selection; Expound remains an independent expandable button,
+separated by an existing border token. Open Expound and the selected level
+can both highlight. Signed-out website controls keep their sign-in links.
+No source, API, migration, dependency or native module change.
+
+Mobile has 32-point visible segments with vertical-only 6-point hit slop
+inside 44-point parent bounds, no ScrollView and full accessibility names.
+Short labels Original / Simpler / Simplest appear below **380 measured row
+points** (about 85 text points per segment at the boundary). Website uses
+them at **<=400px viewport**, equal shares, 44px targets and no scrolling.
+Implementation: **0b553dd**, **bf5febd**, **fc1cb84**, **ec580e9**.
+
+**FRESH PASS:** root forced typecheck/lint **8/8 tasks each, 0 cached**;
+shared **447/447** (44 files, existing compiled copies included), web
+**280/280** (42 files), mobile **1334/1334** (139 files); API build **1/1**,
+**35/35** static pages; local Android export **1/1**; diff/staged-diff checks.
+Isolated browser **24/24** at 1440/768/390/360px in light/dark themes, using
+actual components and CSS with all network blocked, zero requests/errors.
+Six existing lint warnings remain. Three deterministic initial browser
+failures and fixes are retained in acceptance; no nondeterministic flake.
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Owner website deployment and mobile OTA/APK, then Realme 360-point
+readability, no-scroll, Expound and TalkBack checks, plus real web at 1440/390.
+Production revision, database/Scheduler state and real-account/device behavior
+are **UNVERIFIED (owner to confirm)**. No remote service call, deployment,
+remote SQL, migration application, Scheduler operation, environment-file edit
+or push. Build-generated Next declarations were restored; unrelated untracked
+work is preserved. RV2 is the finite endpoint; no later task started.
+
+[Acceptance and exact evidence](acceptance/rv2-topic-pill.md).
+
+<!-- RV2 end -->
+
 <!-- QU1 begin -->
 ## QU1 Queue popout complete locally - PASS (2026-10-18)
 
