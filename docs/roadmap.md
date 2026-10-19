@@ -1,5 +1,32 @@
 # Roadmap
 
+<!-- RV3 begin -->
+RV3 / reference topic level pill (2026-10-19): **PASS for the finite unattended
+local code scope**. Frozen endpoint complete: STEP 0-3, mobile/web/shared-reader
+presentation, regressions, 10/10 prompt gates, forced root build, docs and local
+commits. Baseline `829b8fb`, branch `overnight/2026-10-15_feedback` retained.
+Mobile `61cbb03`: measured native translation / layout width, 200ms ease,
+instant Reduce Motion, neutral content-width rounded track and inset thumbs.
+Web `d1df22b`: measured CSS translation/width, ResizeObserver, reduced-motion
+override, focus-visible radios/keyboard navigation, independent Expound, no
+divider. Both retain regular primary labels and RV2 short labels. Shared-reader
+links preserve sign-in-only behavior and display the same Original thumb.
+40pt/px visual tracks retain >=44pt/px targets. No platform implementation skipped.
+FRESH PASS: shared 590, API 2433 / 3 intentional live skips, mobile 1525, web 374;
+typecheck/lint/root build 8/8 tasks each, 0 cached; six existing lint warnings.
+API/web builds, Android export and diff hygiene pass. Focused mobile 12/12,
+web 36/36; isolated web Playwright 54/54, mobile RN Web layout/theme 8/8, zero
+requests/page errors. Screenshots inspected. Tooling retries are recorded;
+no unit/gate failure or nondeterministic flake. No API/schema/dependency/ADR
+change. Generated declarations restored; original owner paths preserved.
+Rollout/Device checks NOT RUN, skipped entirely; live/physical state UNVERIFIED
+(owner to confirm). No remote call, environment-file edit, deployment or push.
+Next: owner rollout/reference comparison on Realme and actual web, light/dark.
+RV3 supersedes RV2 presentation; its generation and independent-toggle behavior
+remain. Endpoint RV3 only; no later task started or AN1 resumed.
+[Acceptance](ai/acceptance/rv3-topic-pill.md).
+<!-- RV3 end -->
+
 <!-- GS1 begin -->
 GS1 / Generate course search on scroll (2026-10-19): **PASS for the finite
 local code scope** from `149a516` on `overnight/2026-10-15_feedback`.

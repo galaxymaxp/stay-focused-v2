@@ -7628,3 +7628,121 @@ branch switch or push ran. Live-state limitations did not stop local code work.
 
 Final progress/status: ignored `tmp/overnight/GS1.*`. Endpoint GS1 only;
 no rollout, device work, AN1 resumption or later overnight slice is started.
+
+## RV3 / reference topic level pill (2026-10-19)
+
+**Status: PASS for the finite unattended local code scope.** Read the full RV3
+prompt and overriding UNATTENDED rules. STEP 0-3, regressions, all 10 requested
+gates, additional forced root build, docs and local commits complete. Baseline
+`829b8fb`, branch `overnight/2026-10-15_feedback` retained; cached upstream
+ahead 26 / behind 2 at entry, no fetch. Tracked baseline clean. Owner `UI/`,
+`apps/mobile/.gitignore`, `supabase/.temp/` and ignored `tmp/` preserved.
+
+Opened the exact reference image; read current planning, AUTOPILOT,
+ADR-001/011/039, latest and RV2 handoffs. Source matches RV2 description;
+line numbers drifted. Only reviewer/shared-reader use segmented, and CSS
+remains scoped to topic-level-row. Mobile uses textPrimary/surfaceElevated;
+dark elevated #2c2c2e versus field #3a3a3c retains the required existing tokens.
+
+Mobile now hugs content left with a fully rounded 40pt visual track inside
+48pt interaction bounds, 44pt buttons plus vertical hit slop, 32pt elevated
+thumbs, regular primary text and no divider. Measured onLayout positions/widths
+drive 200ms easing; separate nodes use native translation and JS width.
+First measurement/Reduce Motion snap and interrupted motion cleans up. RV2's
+<380pt available-width labels remain. Expound is still an independent toggle.
+
+Web/shared-reader match using scoped max-content CSS, 40px track/32px thumbs
+and 48px targets. Owner thumb translates/resizes over 200ms, ResizeObserver
+handles responsive labels, and live Reduce Motion removes transitions.
+Web's pre-existing group/pressed buttons differed from the explicit prompt:
+implemented radiogroup/radios, full names, roving arrows/Home/End, disabled
+skipping, visible focus and offline-safe Original tab stop. Expound retains
+aria-expanded. Shared links retain exact sign-in paths, no generation, and
+one Original thumb. Interactive thumb movement does not apply to those links.
+No other platform code skipped; no source/cache/generation/API/schema,
+migration, dependency or ADR change.
+
+Commits, author `galaxymaxp <omgraythekid@gmail.com>`:
+
+- `61cbb03 style(mobile): topic level pill with sliding thumb`
+- `d1df22b style(web): topic level pill with sliding thumb`
+- `docs: complete RV3 topic pill handoff` is the documentation checkpoint;
+  its final hash is in Git and ignored RV3.status after committing.
+
+**FRESH PASS: 10/10 prompt gates**, plus AUTOPILOT forced root build:
+
+| Exact command | Result | Evidence |
+| --- | --- | --- |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached | FRESH PASS, final rerun |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors / 6 existing warnings | FRESH PASS, final rerun |
+| `npm run test --workspace @stay-focused/shared` | 590/590 tests, 56 files | FRESH PASS |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | 2433 passed / 3 intentional live skips, 212 files | FRESH PASS |
+| `npm run test --workspace @stay-focused/mobile` | 1525/1525 tests, 158 files | FRESH PASS |
+| `npm run test --workspace @stay-focused/web` | 374/374 tests, 56 files | FRESH PASS |
+| `npm run build --workspace @stay-focused/api` | 36/36 static pages | FRESH PASS |
+| `npm run build --workspace @stay-focused/web` | 20/20 static pages | FRESH PASS |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | 1 Android bundle / 35 assets, local export | FRESH PASS |
+| `git diff --check` | 0 whitespace errors; staged/final checks also pass | FRESH PASS |
+| `npm run build -- --force --env-mode=loose` (additional AUTOPILOT gate) | 8/8 tasks, 0 cached; local Android/iOS/web exports | FRESH PASS |
+
+Every requested workspace has a test script. API full suite uses two workers
+for local database-test memory, without filtering. Focused mobile **12/12**
+(1 file); web topic/shared **36/36** (2 files). Web Playwright **54/54** checks
+at 1440/768/400/390/360/320px in light/dark: geometry/tokens, content width,
+no scroll, 48px targets, measured selected alignment, independent two thumbs,
+keyboard/focus, exact sign-in links, 200ms animation, live Reduce Motion and
+live breakpoint remeasurement. Mobile RN Web **8/8** layout/theme combinations
+at 500/390/360/320px using actual TopicAssist/unchanged extracted Copy.
+Final harnesses: **0 requests, 0 page errors**. Isolated fictional component
+fixtures, not authenticated/deployed/device acceptance. Native semantics are
+covered by render tests; RN Web 0.21 does not map accessibilityState to ARIA.
+390 light expanded / 1440 dark web and 360 light/dark mobile images inspected.
+
+Required screenshot paths (ignored, not committed):
+
+- [1440 light](../../tmp/overnight/RV3-browser/1440-light.png),
+  [1440 dark](../../tmp/overnight/RV3-browser/1440-dark.png).
+- [390 light](../../tmp/overnight/RV3-browser/390-light.png),
+  [390 dark](../../tmp/overnight/RV3-browser/390-dark.png),
+  [390 light with two thumbs](../../tmp/overnight/RV3-browser/390-light-expanded.png).
+- [Mobile 360 light](../../tmp/overnight/RV3-mobile-browser/360-light.png),
+  [mobile 360 dark](../../tmp/overnight/RV3-mobile-browser/360-dark.png).
+
+Failed attempts retained: optional mobile-browser first attempt **0/8** because
+it expected RN Web to expose the native accessibilityState prop as ARIA;
+corrected layout probe passes **8/8**, with native a11y render assertions kept.
+PowerShell documentation encoding conversion was detected and historical
+bytes restored from Git while retaining the new prefix. Inline Node repair
+first failed shell quoting with no write; the file-based helper succeeded.
+Exploratory wildcard/renamed-path reads were corrected. No unit-test/gate
+failure or nondeterministic flake. Initial green typecheck/lint and 35-test
+web focused run were followed by final green reruns after the offline focus
+safeguard. Existing Vite/React renderer/Expo warnings remain non-failing.
+Full evidence: [RV3 acceptance](acceptance/rv3-topic-pill.md).
+
+Generated Next declarations inspected/restored; local export/log/progress/
+status/screenshots and all tmp paths excluded from staging. Outbound guards,
+disabled live flags and offline/no-telemetry settings used; environment files
+untouched. Current-state, roadmap and sprint reconciled. Workflow/provider
+contract suites NOT APPLICABLE to UI-only paths; full API tests still passed.
+
+**UNVERIFIED (owner to confirm):** deployed API/mobile/website revisions,
+database/applied-migration/Scheduler state, remote-ref freshness, reported
+production symptom, real Realme/authenticated-browser appearance and native
+animation/TalkBack behavior. No Supabase, Vercel, Google Cloud, Canvas or
+Resend call, remote SQL/migration application, Scheduler action, email,
+deployment, environment-file edit, branch switch or push ran.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** owner reviews these local commits
+  and chooses website deployment and mobile OTA/APK publication separately.
+- **Device checks - NOT RUN, skipped entirely:** compare the exact reference
+  on Realme and website in light/dark; inspect narrow labels, sliding thumb,
+  independent Expound/two thumbs, Reduce Motion, TalkBack and web focus.
+- Confirm UNVERIFIED state above. Installing the missing Vercel CLI with
+  `npm i -g vercel` is strongly recommended for later owner deployment/env/log
+  work; no installation or invocation ran here.
+
+Final progress/status: ignored `tmp/overnight/RV3.*`. RV3 endpoint only;
+no rollout, device work, AN1 resumption or later overnight slice started.
