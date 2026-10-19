@@ -6,6 +6,7 @@ import { ASSIST_RESULT_LABELS, TOPIC_LEVELS, TOPIC_LABELS, TOPIC_SHORT_LABELS, E
 import { StudyText } from './reviewer/study-text';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { ImageHelpIcon } from './reviewer/image-help-icon';
 
 export const SHARED_AI_ACTIONS = ['Ask', 'Ask about this image', 'Define', 'Explain', 'Summarize', 'Analogy', 'Example', 'Test', 'Generate Quiz', 'Find a visual', 'Regenerate', 'Show a different one'] as const;
 
@@ -85,7 +86,7 @@ export function SharedReviewerReader({ snapshot, token }: { snapshot: ReviewerSh
           {snapshot.visuals.filter(v => v.section === i).map((v, j) => <figure className="surface stack" key={j}>
             <p className="meta">External reference — not from your course material.</p>
             <img src={v.image} alt={v.title} loading="lazy" referrerPolicy="no-referrer" />
-            <Link href={signIn} className="button"><span aria-hidden="true">? </span>Ask about this image</Link>
+            <Link href={signIn} className="button reviewer-image-action"><ImageHelpIcon />Ask about this image</Link>
             <figcaption>{v.title} · <a href={v.sourceUrl} target="_blank" rel="noreferrer">{v.credit}</a> · <a href={v.licenseUrl} target="_blank" rel="noreferrer">{v.license}</a></figcaption>
           </figure>)}
           {s.blocks.map((b, j) => <div className="reviewer-block" key={j}>

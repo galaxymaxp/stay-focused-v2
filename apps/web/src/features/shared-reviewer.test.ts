@@ -25,6 +25,7 @@ it('renders the read-only reviewer, terms, existing assists, text citations and 
   expect(rendered!.root.findByType('img').props.referrerPolicy).toBe('no-referrer');
   const imageAction=rendered!.root.findByType('figure').findAllByType('a').find(node=>[node.props.children].flat().includes('Ask about this image'))!;
   expect(imageAction.props.href).toBe(reviewerShareSignIn(token));
+  expect(imageAction.findByType('svg').findByType('use').props.href).toBe('/icons/circle-help.svg#icon');
 });
 it('every AI control routes to sign-in with an exact local return link and makes zero calls', async () => {
   await act(async () => { rendered = create(createElement(SharedReviewerReader, { token, snapshot })); });

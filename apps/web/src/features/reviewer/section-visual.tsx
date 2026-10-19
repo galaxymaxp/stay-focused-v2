@@ -6,6 +6,8 @@ import { downloadStudyImage } from './download-image';
 import { Icon } from "../../components/ui";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../components/providers";
+import { ZoomableImage } from './zoomable-image';
+import { ImageHelpIcon } from './image-help-icon';
 
 type Snapshot = { available: false; reason: string } | { available: true; id?: string; page: number; labelKind?: "slide"; status?: "rendering" | "unrendered"; url?: string };
 type Figure = { id: string; url: string; page?: number; slide?: number };
@@ -17,7 +19,7 @@ export function SectionVisual({ artifactId, sectionId, visual, eagerCount = 0, r
   const snapshot: Snapshot | null = visual?.snapshot ?? null, figures: readonly Figure[] = visual?.figures ?? [];
   const [failedSources, setFailedSources] = useState<ReadonlySet<string>>(new Set());
   const [replacement, setReplacement] = useState<ExternalVisual | null>(null), [busy, setBusy] = useState(false);
-  const [zoomed, setZoomed] = useState<{ src: string; alt: string; grounding: string; details?: ExternalVisual; image?: StudyImageTarget; download: StudyImageDownload } | null>(null), [zoom, setZoom] = useState(1);
+  const [zoomed, setZoomed] = useState<{ src: string; alt: string; grounding: string; details?: ExternalVisual; image?: StudyImageTarget; download: StudyImageDownload } | null>(null);
   const [saving, setSaving] = useState(false), [saveNote, setSaveNote] = useState('');
   const savePending = useRef(false);
   const path = `/api/reviewers/${encodeURIComponent(artifactId)}/sections/${encodeURIComponent(sectionId)}`;
@@ -51,7 +53,7 @@ export function SectionVisual({ artifactId, sectionId, visual, eagerCount = 0, r
     setZoomed({ src, alt, image, grounding: kind === 'external_visual' && external ? external.label : `${alt} · your course material`,
       ...(kind === 'external_visual' && external ? { details: external } : {}), download: { uri: src, reviewerTitle, sectionTitle, kind,
       ...(kind === 'external_visual' && external ? { sourceTitle: external.title, attribution: `${external.credit} · ${external.license}` } : {}) } });
-    setSaveNote(''); setZoom(1); dialog.current?.showModal();
+    setSaveNote(''); dialog.current?.showModal();
   }
   async function save() {
     if (!zoomed || !session?.user.id || !online || savePending.current) return;
@@ -120,13 +122,15 @@ export function SectionVisual({ artifactId, sectionId, visual, eagerCount = 0, r
         <a href={zoomed.details.sourceUrl} target="_blank" rel="noreferrer">{zoomed.details.credit} · {zoomed.details.license}</a>
         <a href={zoomed.details.licenseUrl} target="_blank" rel="noreferrer">License</a>
       </div>}
-      <AskImageButton image={zoomed?.image} online={online} onAsk={image=>{dialog.current?.close();onAsk?.(image);}} />
-      {session?.user.id && zoomed && <button className="subtle row" disabled={!online || saving} onClick={() => void save()}><Icon name="download" />{saving ? 'Saving…' : 'Save image'}</button>}
+      <div className="reviewer-image-actions">
+        <AskImageButton image={zoomed?.image} online={online} hideOfflineNote onAsk={image=>{dialog.current?.close();onAsk?.(image);}} />
+        {session?.user.id && zoomed && <button className="subtle row reviewer-image-action" disabled={!online || saving} onClick={() => void save()}><Icon name="download" />{saving ? 'Saving…' : 'Save image'}</button>}
+      </div>
+      {!online && <p className="meta">{STUDY_OFFLINE}</p>}
       {saveNote && <p role="status">{saveNote}</p>}
-      <label>Zoom<input type="range" min="1" max="4" step="0.25" value={zoom} onChange={event => setZoom(Number(event.target.value))} /></label>
-      <div style={{ overflow: "auto", maxHeight: "70vh", flexShrink: 0 }}>
+      <div>
         {zoomed && (zoomed.details && failedImage === imageKey(zoomed.src) ? <ExternalImageError sourceUrl={zoomed.details.sourceUrl} onRetry={retryImage} />
-          : failedSources.has(zoomed.src) ? <SourceImageError /> : <img decoding="async" key={imageKey(zoomed.src)} src={zoomed.src} alt={zoomed.alt} onError={zoomed.details ? () => imageFailed(zoomed.src) : () => void sourceFailed(zoomed.src)} style={{ width: `${zoom * 100}%`, maxWidth: "none" }} />)}
+          : failedSources.has(zoomed.src) ? <SourceImageError /> : <ZoomableImage key={imageKey(zoomed.src)} src={zoomed.src} alt={zoomed.alt} onError={zoomed.details ? () => imageFailed(zoomed.src) : () => void sourceFailed(zoomed.src)} />)}
       </div>
     </dialog>
   </div>;
@@ -142,11 +146,11 @@ function ExternalImageError({sourceUrl,onRetry}:{sourceUrl:string;onRetry:()=>vo
 
 function SourceImageError() { return <p role="status">Image unavailable. Try reopening the reviewer when connected.</p>; }
 
-function AskImageButton({ image, online, onAsk }: { image?: StudyImageTarget; online: boolean; onAsk?: (image: StudyImageTarget) => void }) {
+function AskImageButton({ image, online, onAsk, hideOfflineNote = false }: { image?: StudyImageTarget; online: boolean; onAsk?: (image: StudyImageTarget) => void; hideOfflineNote?: boolean }) {
   return <div className="stack">
-    <button className="subtle row" disabled={!online || !image || !onAsk} onClick={() => image && onAsk?.(image)}>
-      <Icon name="message-circle" />Ask about this image
+    <button className="subtle row reviewer-image-action" disabled={!online || !image || !onAsk} onClick={() => image && onAsk?.(image)}>
+      <ImageHelpIcon />Ask about this image
     </button>
-    {!online && <p className="meta">{STUDY_OFFLINE}</p>}
+    {!online && !hideOfflineNote && <p className="meta">{STUDY_OFFLINE}</p>}
   </div>;
 }
