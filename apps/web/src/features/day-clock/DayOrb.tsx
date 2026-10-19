@@ -106,6 +106,7 @@ export const DayOrb = memo(function DayOrb({
     const lost = (event: Event) => {
       event.preventDefault();
       controller.current?.dispose(); controller.current = null;
+      canvas.remove();
       currentRuntime.onGlassReady?.(false);
       setUnsupported(true);
     };

@@ -145,6 +145,11 @@ it('keeps glass under Reduce Motion, draws only on changes and restores text aft
     const before = await count(); await page.waitForTimeout(350); expect(await count()).toBe(before);
     await page.evaluate(() => document.querySelector('canvas')!.dispatchEvent(new Event('webglcontextlost', { cancelable: true })));
     expect(await page.locator('.glass-ready').count()).toBe(0);
+    expect(await page.locator('.day-orb canvas').count()).toBe(0);
+    const orb = await page.locator('.day-orb').boundingBox(), fallback = await page.locator('.day-orb-fallback').boundingBox();
+    expect(orb).not.toBeNull(); expect(fallback).not.toBeNull();
+    expect(fallback!.y).toBeGreaterThanOrEqual(orb!.y);
+    expect(fallback!.y + fallback!.height).toBeLessThanOrEqual(orb!.y + orb!.height + 1);
     expect(await page.locator('.readout-time').evaluate(el => getComputedStyle(el).opacity)).toBe('1');
     expect(errors).toEqual([]);
   } finally { await page.close(); }
