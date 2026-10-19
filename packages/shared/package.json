@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./grade-estimator": "./src/grade-estimator.ts",
+    "./clock-glass-renderer": "./src/clock-glass-renderer.ts",
     "./task-planning": "./src/task-planning.ts",
     "./notification-preferences": "./src/notification-preferences.ts"
   },
@@ -16,7 +17,11 @@
     "typecheck": "tsc --noEmit",
     "clean": "rimraf dist"
   },
+  "dependencies": {
+    "three": "0.166.1"
+  },
   "devDependencies": {
+    "@types/three": "^0.166.0",
     "rimraf": "^6.0.1",
     "typescript": "^5.8.3",
     "vitest": "^4.1.9"

@@ -263,3 +263,4 @@ export * from './app-release';
 export * from './legal';
 export * from './profile-preferences';
 export * from './orb-preference-sync';
+export * from './clock-glyphs';
