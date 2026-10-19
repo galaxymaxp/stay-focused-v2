@@ -3,7 +3,7 @@ import {
   REVIEWER_JOB_STAGES,
 } from "@stay-focused/shared";
 import { describe, expect, it } from "vitest";
-import { generationSteps } from "./generation-steps";
+import { generationSteps, stepRevealQueue } from "./generation-steps";
 
 describe("generation steps from the reported job stage", () => {
   it("uses the shared reviewer order and marks only the reported stage current", () => {
@@ -96,5 +96,36 @@ describe("generation steps from the reported job stage", () => {
         "reviewer_generation",
       )[4]?.state,
     ).toBe("pending");
+  });
+});
+
+describe("fast-tail step reveal", () => {
+  const states = (stage: (typeof REVIEWER_JOB_STAGES)[number], status: "running" | "succeeded" | "failed" = "running") =>
+    generationSteps(stage, status, "reviewer_generation").map((step) => step.state);
+  it("ticks off a multi-stage jump in order, ending exactly on the server state", () => {
+    const prev = states("generating_sections");
+    const next = states("storing_reviewer", "succeeded");
+    const frames = stepRevealQueue(prev, next);
+    expect(frames).toHaveLength(5);
+    expect(frames.map((frame) => frame.indexOf("current"))).toEqual([5, 6, 7, 8, -1]);
+    expect(frames.map((frame) => frame.filter((state) => state === "done").length)).toEqual([5, 6, 7, 8, 9]);
+    expect(frames.at(-1)).toEqual(next);
+  });
+  it("never reveals a stage the server has not reported done", () => {
+    const prev = states("detecting_outline");
+    const next = states("verifying_coverage");
+    for (const frame of stepRevealQueue(prev, next))
+      frame.forEach((state, index) => {
+        if (state === "done") expect(next[index]).toBe("done");
+      });
+    const failed = stepRevealQueue(prev, states("assembling_reviewer", "failed"));
+    expect(failed.at(-1)![7]).toBe("failed");
+    expect(failed.slice(0, -1).every((frame) => !frame.includes("failed"))).toBe(true);
+  });
+  it("shows one-stage moves, unchanged states and changed lists immediately", () => {
+    const prev = states("generating_sections");
+    expect(stepRevealQueue(prev, states("verifying_coverage"))).toEqual([states("verifying_coverage")]);
+    expect(stepRevealQueue(prev, prev)).toEqual([prev]);
+    expect(stepRevealQueue(prev.slice(0, 3), prev)).toEqual([prev]);
   });
 });

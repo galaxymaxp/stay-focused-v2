@@ -8,7 +8,7 @@ import type {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   generationCoreState,
   generationMessages,
@@ -21,7 +21,12 @@ import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction } from "../lib/hooks";
 import { queueProgress } from "./queue-presentation";
 import { jobCoreState } from "./knowledge-core/coreModel";
-import { generationSteps } from "./generation-steps";
+import {
+  generationSteps,
+  STEP_REVEAL_MS,
+  stepRevealQueue,
+  type GenerationStepState,
+} from "./generation-steps";
 
 // Web counterparts of QueueScreen and GenerationScreen in
 // apps/mobile/src/features/redesign/GenerationScreen.tsx.
@@ -201,6 +206,42 @@ function GenerationStatus({ message }: { message: string }) {
   );
 }
 
+/**
+ * Server-reported step states, ticked off one at a time when a poll reveals
+ * several finished stages at once. Instant under Reduce Motion.
+ */
+function useRevealedStates(next: readonly GenerationStepState[]) {
+  const key = next.join(",");
+  const [shown, setShown] = useState<readonly GenerationStepState[]>(next);
+  const latest = useRef(shown);
+  useEffect(() => {
+    const target = key ? (key.split(",") as GenerationStepState[]) : [];
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const frames = reduced ? [target] : stepRevealQueue(latest.current, target);
+    let index = 0;
+    const show = () => {
+      latest.current = frames[index]!;
+      setShown(frames[index]!);
+    };
+    show();
+    if (frames.length === 1) return;
+    const timer = setInterval(() => {
+      index += 1;
+      show();
+      if (index === frames.length - 1) clearInterval(timer);
+    }, STEP_REVEAL_MS);
+    return () => clearInterval(timer);
+  }, [key]);
+  return shown.length === next.length ? shown : next;
+}
+
+const stepStateWord = {
+  done: "done",
+  current: "in progress",
+  failed: "stopped here",
+  pending: "pending",
+} satisfies Record<GenerationStepState, string>;
+
 export function GenerationScreen({ id }: { id: string }) {
   const [retryDeniedId, setRetryDeniedId] = useState<string | null>(null);
   const { api, session } = useAuth(),
@@ -242,23 +283,26 @@ export function GenerationScreen({ id }: { id: string }) {
           : running
             ? generationMessages.queued
             : "This generation couldn’t finish.";
-  // Completed and saved: open it, as the app does, after a moment to read the state.
-  const opened = useRef<string | null>(null);
+  const steps = job.data
+    ? generationSteps(job.data.stage, job.data.status, job.data.jobType)
+    : [];
+  const shownStates = useRevealedStates(steps.map((step) => step.state));
+  const progress = data?.progress ?? null;
+  // Completed and saved: open it, as the app does, after a moment to read the
+  // state. Keyed by the saved id, so re-renders (polls, step reveal) never
+  // restart or cancel the wait.
+  const savedId = data?.state === "completed" ? data.artifactId : null;
+  const routerRef = useRef(router);
+  routerRef.current = router;
   useEffect(() => {
-    const artifactId = data?.artifactId;
-    if (
-      !artifactId ||
-      data.state !== "completed" ||
-      opened.current === artifactId
-    )
-      return;
-    opened.current = artifactId;
+    if (!savedId) return;
     const timer = setTimeout(
-      () => router.replace(`/library/${encodeURIComponent(artifactId)}`),
+      () =>
+        routerRef.current.replace(`/library/${encodeURIComponent(savedId)}`),
       1400,
     );
     return () => clearTimeout(timer);
-  }, [data, router]);
+  }, [savedId]);
   return (
     <>
       <Heading title="" crumb="Generation" back="/generate" />
@@ -287,32 +331,53 @@ export function GenerationScreen({ id }: { id: string }) {
               )}
             </section>
             <ol className="generation-steps" aria-label="Generation steps">
-              {generationSteps(
-                job.data.stage,
-                job.data.status,
-                job.data.jobType,
-              ).map((step) => (
-                <li
-                  key={step.stage}
-                  data-state={step.state}
-                  aria-current={
-                    step.state === "current" || step.state === "failed"
-                      ? "step"
-                      : undefined
-                  }
-                >
-                  <span>{step.label}</span>
-                  <span className="meta">
-                    {step.state === "done"
-                      ? "Done"
-                      : step.state === "current"
-                        ? "In progress"
-                        : step.state === "failed"
-                          ? "Stopped here"
-                          : "Pending"}
-                  </span>
-                </li>
-              ))}
+              {steps.map((step, index) => {
+                const state = shownStates[index] ?? step.state;
+                // Real section (or page) counts belong to the stage doing that work.
+                const counted =
+                  state === "current" &&
+                  !!progress &&
+                  (progress.unit === "pages" ||
+                    step.stage === "generating_sections");
+                return (
+                  <li
+                    key={step.stage}
+                    data-state={state}
+                    aria-current={
+                      state === "current" || state === "failed"
+                        ? "step"
+                        : undefined
+                    }
+                  >
+                    <span
+                      className={`generation-step-segment${state === "current" ? " animated" : ""}`}
+                      style={
+                        counted
+                          ? ({
+                              "--fill": progress.completed / progress.total,
+                            } as CSSProperties)
+                          : undefined
+                      }
+                      aria-hidden="true"
+                    />
+                    <span>
+                      {step.label}
+                      <span className="sr-only">, {stepStateWord[state]}</span>
+                    </span>
+                    {state === "failed" && (
+                      <span className="meta" aria-hidden="true">
+                        Stopped here
+                      </span>
+                    )}
+                    {counted && (
+                      <span className="meta generation-step-count">
+                        <CountUp value={progress.completed} /> of{" "}
+                        {progress.total} {progress.unit}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ol>
             <p className="muted generation-note" role="status">
               {stalled
@@ -327,12 +392,6 @@ export function GenerationScreen({ id }: { id: string }) {
                       ? `${processingJobStoppedMessage(job.data.stage)}. Your material is safe.`
                       : processingJobStoppedMessage(job.data.stage)}
             </p>
-            {data?.progress && (
-              <p className="meta">
-                <CountUp value={data.progress.completed} /> of{" "}
-                {data.progress.total} {data.progress.unit}
-              </p>
-            )}
             {data?.error && (
               <Notice error>
                 {canRetry

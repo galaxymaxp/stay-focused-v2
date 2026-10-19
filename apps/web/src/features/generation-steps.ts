@@ -63,3 +63,32 @@ export function generationSteps(
     return { stage: item, label: stageLabels[item], state };
   });
 }
+
+/** Time each newly finished stage holds before the next one ticks off. */
+export const STEP_REVEAL_MS = 180;
+
+/**
+ * When one poll reports several finished stages at once, the frames that tick
+ * them off in order instead of in the same frame. A frame marks a stage done
+ * only when `next` (the server) reports it done; the last frame is `next`.
+ */
+export function stepRevealQueue(
+  prev: readonly GenerationStepState[],
+  next: readonly GenerationStepState[],
+): GenerationStepState[][] {
+  if (prev.length !== next.length) return [[...next]];
+  const newly = next.flatMap((state, index) =>
+    state === "done" && prev[index] !== "done" ? [index] : [],
+  );
+  const frames = newly.slice(1).map((upcoming, shown) =>
+    next.map((state, index): GenerationStepState =>
+      state === "done" &&
+      (prev[index] === "done" || newly.indexOf(index) <= shown)
+        ? "done"
+        : index === upcoming
+          ? "current"
+          : "pending",
+    ),
+  );
+  return [...frames, [...next]];
+}

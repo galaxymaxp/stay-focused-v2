@@ -765,19 +765,67 @@ input[type="range"] {
 .generation-material p {
   margin: 0;
 }
+/* One thin vertical track; each stage owns a segment. No numbers or state words. */
 .generation-steps {
   margin: 0;
-  padding-left: 24px;
+  padding: 0;
+  list-style: none;
   color: var(--secondary);
 }
 .generation-steps li {
-  padding: 6px 0 6px 8px;
+  position: relative;
+  padding: 8px 0 8px 20px;
 }
-.generation-steps li > span {
+.generation-steps li > span:not(.generation-step-segment) {
   display: block;
 }
-.generation-steps [data-state="done"]::marker {
-  color: var(--success);
+.generation-step-segment {
+  --fill: 0;
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  left: 0;
+  width: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line);
+  transition: background-color var(--motion-small) var(--ease-standard);
+}
+/* Real progress fills from the top; the moving highlight covers the rest. */
+.generation-step-segment::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: calc(var(--fill) * 100%);
+  background: var(--success);
+  transition: height var(--motion-normal) var(--ease-out);
+}
+.generation-step-segment.animated::after {
+  content: "";
+  position: absolute;
+  inset: calc(var(--fill) * 100%) 0 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--muted) 55%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 100% 200%;
+  animation: step-sweep 1.6s var(--ease-standard) infinite;
+}
+@keyframes step-sweep {
+  from {
+    background-position: 0 200%;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+.generation-steps [data-state="done"] .generation-step-segment {
+  background: var(--success);
+}
+.generation-steps [data-state="failed"] .generation-step-segment {
+  background: var(--danger);
 }
 .generation-steps [data-state="current"] {
   color: var(--text);
@@ -785,6 +833,21 @@ input[type="range"] {
 }
 .generation-steps [data-state="failed"] {
   color: var(--danger);
+}
+.generation-step-count {
+  margin-top: 2px;
+  font-weight: 400;
+}
+@media (prefers-reduced-motion: reduce) {
+  .generation-step-segment,
+  .generation-step-segment::before {
+    transition: none;
+  }
+  /* No movement: a steady half-strength fill. */
+  .generation-step-segment.animated::after {
+    animation: none;
+    background: color-mix(in srgb, var(--success) 50%, transparent);
+  }
 }
 @media (min-width: 1024px) {
   .generation-layout {

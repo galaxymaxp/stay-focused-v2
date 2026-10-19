@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   key: vi.fn(),
   accepted: vi.fn(),
   refresh: vi.fn(),
+  reduced: false,
 }));
 vi.mock("./queue-items", () => ({ useJobRead: mocks.read }));
 vi.mock("next/dynamic", () => ({ default: () => "figure" }));
@@ -46,6 +47,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.api.mockReset();
   vi.useFakeTimers();
+  mocks.reduced = false;
+  vi.stubGlobal("window", { matchMedia: () => ({ matches: mocks.reduced }) });
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   mocks.key.mockReturnValue({ key: "same-key", accepted: mocks.accepted });
   mocks.read.mockReturnValue({
@@ -60,6 +63,7 @@ afterEach(async () => {
   if (rendered) await act(async () => rendered!.unmount());
   rendered = undefined;
   vi.useRealTimers();
+  vi.unstubAllGlobals();
 });
 async function render() {
   await act(async () => {
@@ -251,4 +255,68 @@ describe("web generation layout and actions", () => {
       ).toHaveLength(0);
     },
   );
+  describe("vertical step bar", () => {
+    const states = () =>
+      rendered!.root
+        .findByType("ol")
+        .findAllByType("li")
+        .map((node) => node.props["data-state"]);
+    const running = (stage: string, progress: GenerationView["progress"] = null) => ({
+      job: job({ stage: stage as never }),
+      data: { ...generation, progress },
+      loading: false,
+      error: null,
+      refresh: mocks.refresh,
+    });
+    it("shows labels only, with the current segment animated and its state for screen readers", async () => {
+      mocks.read.mockReturnValue(running("generating_sections"));
+      const root = await render();
+      const list = root.findByType("ol");
+      expect(list.props.className).toBe("generation-steps");
+      const text = JSON.stringify(list.findAllByType("li").map((node) => node.findAll((child) => child.props.className === "meta").length));
+      expect(text).toBe("[0,0,0,0,0,0,0,0,0]");
+      expect(output()).not.toMatch(/"(Done|Pending|In progress)"/);
+      const current = list.findByProps({ "aria-current": "step" });
+      expect(current.findByProps({ className: "generation-step-segment animated" }).props["aria-hidden"]).toBe("true");
+      expect(current.findByProps({ className: "sr-only" }).props.children).toEqual([", ", "in progress"]);
+      expect(list.findAllByProps({ className: "generation-step-segment animated" })).toHaveLength(1);
+    });
+    it("fills Building study material by real section progress and moves the count under it", async () => {
+      mocks.read.mockReturnValue(running("generating_sections", { completed: 3, total: 18, unit: "sections" }));
+      const root = await render();
+      const current = root.findByType("ol").findByProps({ "aria-current": "step" });
+      expect(current.findByProps({ className: "generation-step-segment animated" }).props.style).toEqual({ "--fill": 3 / 18 });
+      const count = current.findByProps({ className: "meta generation-step-count" });
+      expect(count.findByType("CountUp" as never).props.value).toBe(3);
+      expect(count.children.filter((child) => typeof child === "string").join("")).toBe(" of 18 sections");
+      expect(root.findByProps({ className: "generation-detail-pane" }).findAllByType("CountUp" as never)).toHaveLength(1);
+    });
+    it("ticks a multi-stage jump through in order without delaying the Library open", async () => {
+      mocks.read.mockReturnValue(running("generating_sections"));
+      await render();
+      mocks.read.mockReturnValue({
+        job: job({ status: "succeeded", stage: "storing_reviewer" }),
+        data: { ...generation, state: "completed", artifactId: "saved" },
+        loading: false,
+        error: null,
+        refresh: mocks.refresh,
+      });
+      await act(async () => rendered!.update(createElement(GenerationScreen, { id: "job-1" })));
+      expect(states().filter((state) => state === "done")).toHaveLength(5);
+      await act(async () => { vi.advanceTimersByTime(180); });
+      expect(states().filter((state) => state === "done")).toHaveLength(6);
+      await act(async () => { vi.advanceTimersByTime(540); });
+      expect(states().every((state) => state === "done")).toBe(true);
+      await act(async () => { vi.advanceTimersByTime(680); });
+      expect(mocks.replace).toHaveBeenCalledWith("/library/saved");
+    });
+    it("shows the server state at once under Reduce Motion", async () => {
+      mocks.reduced = true;
+      mocks.read.mockReturnValue(running("generating_sections"));
+      await render();
+      mocks.read.mockReturnValue(running("storing_reviewer"));
+      await act(async () => rendered!.update(createElement(GenerationScreen, { id: "job-1" })));
+      expect(states()).toEqual(["done", "done", "done", "done", "done", "done", "done", "done", "current"]);
+    });
+  });
 });
