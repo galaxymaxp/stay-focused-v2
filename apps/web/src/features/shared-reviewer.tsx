@@ -74,10 +74,10 @@ export function SharedReviewerReader({ snapshot, token }: { snapshot: ReviewerSh
             <div className="segmented">
               <div className="topic-level-options" role="group" aria-label="Topic level">
                 {TOPIC_LEVELS.map(level => <Link key={level} className="button" href={signIn} aria-label={TOPIC_LABELS[level]}>
+                  {level === 'original' && <span className="topic-level-thumb topic-level-thumb-static" aria-hidden="true" />}
                   <span className="topic-label-full" aria-hidden="true">{TOPIC_LABELS[level]}</span><span className="topic-label-short" aria-hidden="true">{TOPIC_SHORT_LABELS[level]}</span>
                 </Link>)}
               </div>
-              <span className="topic-level-divider" aria-hidden="true" />
               <Link className="button" href={signIn} aria-label={EXPOUND_LABEL}>{EXPOUND_LABEL}</Link>
             </div>
           </div>

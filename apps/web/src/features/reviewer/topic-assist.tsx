@@ -1,7 +1,7 @@
 "use client";
 import { TOPIC_ACTIONS, TOPIC_LEVELS, TOPIC_LABELS, TOPIC_SHORT_LABELS, EXPOUND_LABEL, STUDY_OFFLINE, STUDY_GROUNDING_LABELS, selectTopic, topicLevelAction,
   type ReviewerReaderModel, type TopicAction, type TopicLevel, type TopicResult } from '@stay-focused/shared';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type { Api } from '../../lib/api';
 import { topicAssist } from './assist-store';
 import { StudyText } from './study-text';
@@ -19,6 +19,23 @@ function TopicAssistContent({ reviewer, sectionId, owner, client, online, childr
   const selection = useMemo(() => selectTopic(reviewer, sectionId), [reviewer, sectionId]);
   const [level, setLevel] = useState<TopicLevel>('original');
   const [expanded, setExpanded] = useState(false);
+  const options = useRef<HTMLDivElement>(null);
+  const [thumb, setThumb] = useState<{ x: number; width: number } | null>(null);
+  useLayoutEffect(() => {
+    const group = options.current;
+    if (!group) return;
+    const measure = () => {
+      const selected = group.querySelector<HTMLButtonElement>('[aria-checked="true"]');
+      if (!selected) return;
+      const x = selected.offsetLeft, width = selected.offsetWidth;
+      setThumb(old => old?.x === x && old.width === width ? old : { x, width });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(group);
+    for (const button of group.querySelectorAll('button')) observer.observe(button);
+    return () => observer.disconnect();
+  }, [level]);
   const [entries, setEntries] = useState<Partial<Record<TopicAction, Entry>>>({});
   const alive = useRef(true);
   const reveal = useAnswerReveal();
@@ -33,6 +50,7 @@ function TopicAssistContent({ reviewer, sectionId, owner, client, online, childr
   const action = topicLevelAction(level), current = action ? entries[action] : undefined;
   const expound = entries.topic_expound;
   const canUse = (action: TopicAction) => !!selection && !!owner && (online || entries[action]?.status === 'ready');
+  const focusLevel = action && !canUse(action) ? 'original' : level;
   function run(action: TopicAction, target: string) {
     if (!selection) return;
     const token = reveal.begin(target);
@@ -64,14 +82,26 @@ function TopicAssistContent({ reviewer, sectionId, owner, client, online, childr
   return <div className="stack topic-assist">
     <div className="topic-level-row no-select">
       <div className="segmented">
-        <div className="topic-level-options" role="group" aria-label="Topic level">
-          {TOPIC_LEVELS.map(item => { const a = topicLevelAction(item); return <button key={item} type="button" aria-label={TOPIC_LABELS[item]} aria-pressed={level === item}
+        <div ref={options} className="topic-level-options" role="radiogroup" aria-label="Topic level" onKeyDown={event => {
+          if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+          const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
+          const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+          if (index < 0 || !buttons.length) return;
+          event.preventDefault();
+          const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
+            : (index + (event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1) + buttons.length) % buttons.length;
+          buttons[next]?.focus(); buttons[next]?.click();
+        }}>
+          {thumb && <span className="topic-level-thumb" aria-hidden="true" style={{ width: thumb.width, transform: `translateX(${thumb.x}px)` }} />}
+          {TOPIC_LEVELS.map(item => { const a = topicLevelAction(item); return <button key={item} type="button" role="radio" aria-label={TOPIC_LABELS[item]} aria-checked={level === item} tabIndex={focusLevel === item ? 0 : -1}
             disabled={!!a && !canUse(a)} onClick={() => choose(item)}>
             <span className="topic-label-full" aria-hidden="true">{TOPIC_LABELS[item]}</span><span className="topic-label-short" aria-hidden="true">{TOPIC_SHORT_LABELS[item]}</span>
           </button>; })}
         </div>
-        <span className="topic-level-divider" aria-hidden="true" />
-        <button type="button" aria-label={EXPOUND_LABEL} aria-expanded={expanded} disabled={!expanded && !canUse('topic_expound')} onClick={toggleExpound}>{EXPOUND_LABEL}</button>
+        <button type="button" aria-label={EXPOUND_LABEL} aria-expanded={expanded} disabled={!expanded && !canUse('topic_expound')} onClick={toggleExpound}>
+          {expanded && <span className="topic-level-thumb topic-level-thumb-static" aria-hidden="true" />}
+          <span>{EXPOUND_LABEL}</span>
+        </button>
       </div>
     </div>
     {!online && <p className="meta">{STUDY_OFFLINE}</p>}

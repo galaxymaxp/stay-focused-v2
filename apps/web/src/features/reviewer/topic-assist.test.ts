@@ -22,24 +22,32 @@ const body = () => JSON.stringify(tree!.toJSON());
 it('keeps the three level buttons and independent expandable button in one pill', async () => {
   await mount();
   const pill = tree!.root.findByProps({ className: 'segmented' });
-  const levels = pill.findByProps({ role: 'group', 'aria-label': 'Topic level' });
+  const levels = pill.findByProps({ role: 'radiogroup', 'aria-label': 'Topic level' });
   expect(pill.findAllByType('button')).toHaveLength(4);
   expect(levels.findAllByType('button')).toHaveLength(3);
   expect(pill.findAllByType('button').includes(button('Expound'))).toBe(true);
   expect(button('Expound').props.className).toBeUndefined();
-  for (const label of ['Original', 'Simplify', 'Explain simply']) expect(button(label).props['aria-pressed']).toBe(label === 'Original');
+  expect(pill.findAllByProps({ className: 'topic-level-divider' })).toHaveLength(0);
+  expect(pill.findAllByProps({ className: 'topic-level-thumb topic-level-thumb-static' })).toHaveLength(0);
+  for (const label of ['Original', 'Simplify', 'Explain simply']) {
+    expect(button(label).props.role).toBe('radio');
+    expect(button(label).props.tabIndex).toBe(label === 'Original' ? 0 : -1);
+  }
+  for (const label of ['Original', 'Simplify', 'Explain simply']) expect(button(label).props['aria-checked']).toBe(label === 'Original');
   expect(button('Expound').props['aria-expanded']).toBe(false);
   await press('Simplify'); await press('Expound');
-  expect(button('Simplify').props['aria-pressed']).toBe(true);
-  expect(button('Original').props['aria-pressed']).toBe(false);
+  expect(button('Simplify').props['aria-checked']).toBe(true);
+  expect(button('Original').props['aria-checked']).toBe(false);
   expect(button('Expound').props['aria-expanded']).toBe(true);
-  expect(button('Expound').props['aria-pressed']).toBeUndefined();
+  expect(pill.findAllByProps({ className: 'topic-level-thumb topic-level-thumb-static' })).toHaveLength(1);
+  expect(button('Expound').props['aria-checked']).toBeUndefined();
   expect(body()).toContain('topic_expound');
   await press('Explain simply');
   expect(button('Expound').props['aria-expanded']).toBe(true);
   await press('Expound');
-  expect(button('Explain simply').props['aria-pressed']).toBe(true);
+  expect(button('Explain simply').props['aria-checked']).toBe(true);
   expect(button('Expound').props['aria-expanded']).toBe(false);
+  expect(pill.findAllByProps({ className: 'topic-level-thumb topic-level-thumb-static' })).toHaveLength(0);
   expect(body()).not.toContain('topic_expound');
   expect(button('Explain simply').findByProps({ className: 'topic-label-full' }).props.children).toBe('Explain simply');
   expect(button('Explain simply').findByProps({ className: 'topic-label-short' }).props.children).toBe('Simplest');
@@ -62,6 +70,15 @@ it('offline disables uncached actions but hydrates saved levels and Expound with
   await mount(false);
   for (const label of ['Simplify', 'Explain simply', 'Expound']) { expect(button(label).props.disabled).toBe(false); await press(label); }
   expect(mocks.run).not.toHaveBeenCalled();
+});
+it('keeps Original keyboard-reachable when the selected pending level becomes disabled offline', async () => {
+  mocks.run.mockReturnValue(new Promise<TopicResult>(() => {}));
+  await mount(); await press('Simplify');
+  await act(async () => tree!.update(createElement(TopicAssist, { ...props, online: false })));
+  expect(button('Simplify').props.disabled).toBe(true);
+  expect(button('Simplify').props['aria-checked']).toBe(true);
+  expect(button('Original').props.tabIndex).toBe(0);
+  expect(button('Simplify').props.tabIndex).toBe(-1);
 });
 it('late responses do not override Original or the currently selected level; pending levels can be revisited', async () => {
   let done!: (r: TopicResult) => void; mocks.run.mockReturnValue(new Promise<TopicResult>(resolve => { done = resolve; }));

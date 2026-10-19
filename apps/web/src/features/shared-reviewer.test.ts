@@ -47,7 +47,9 @@ it('uses the same four-part pill and responsive labels for signed-out sign-in li
     expect(link.props['aria-pressed']).toBeUndefined(); expect(link.props['aria-expanded']).toBeUndefined();
   }
   expect(levels.findAllByProps({ className: 'topic-label-short' }).map(node => node.props.children)).toEqual(['Original', 'Simpler', 'Simplest']);
-  expect(pill.findByProps({ className: 'topic-level-divider' }).props['aria-hidden']).toBe('true');
+  expect(pill.findAllByProps({ className: 'topic-level-divider' })).toHaveLength(0);
+  expect(pill.findAllByProps({ className: 'topic-level-thumb topic-level-thumb-static' })).toHaveLength(1);
+  expect(links[0]!.findByProps({ className: 'topic-level-thumb topic-level-thumb-static' }).props['aria-hidden']).toBe('true');
   expect(fetcher).not.toHaveBeenCalled();
 });
 it('scores in memory without a network write or storage and offers sign-in to save', async () => {

@@ -5154,13 +5154,19 @@ mark.find-active {
 .study-text li { padding-inline-start: 0.2rem; white-space: pre-wrap; }
 .study-text li + li { margin-top: 0.25rem; }
 
-/* Topic controls stay on one compact row on narrow screens. */
-.topic-level-row { width: 100%; min-width: 0; max-width: 32rem; overflow: visible; white-space: nowrap; }
-.topic-level-row .segmented { display: flex; align-items: center; width: 100%; min-width: 0; background: var(--field); border-radius: var(--radius-control); padding: .15rem; }
-.topic-level-options { display: flex; flex: 3; min-width: 0; }
-.topic-level-row .segmented button, .topic-level-row .segmented a { display: inline-flex; align-items: center; justify-content: center; flex: 1; min-width: 0; min-height: 44px; font-size: .75rem; padding: .15rem 0; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--secondary); box-shadow: none; white-space: nowrap; }
-.topic-level-row .segmented button[aria-pressed="true"], .topic-level-row .segmented button[aria-expanded="true"] { background: var(--elevated); color: var(--accent); }
-.topic-level-divider { flex: 0 0 1px; height: 1.25rem; background: var(--line); }
+/* 40px visual track inside 48px interaction bounds; all topic styles are local. */
+.topic-level-row { width: max-content; max-width: 100%; min-width: 0; align-self: flex-start; overflow: visible; white-space: nowrap; }
+.topic-level-row .segmented { position: relative; isolation: isolate; display: flex; align-items: center; width: max-content; max-width: 100%; min-width: 0; padding: 0 4px; gap: 4px; border-radius: 999px; }
+.topic-level-row .segmented::before { content: ""; position: absolute; z-index: -1; inset: 4px 0; background: var(--field); border-radius: inherit; }
+.topic-level-row .topic-level-options { position: relative; display: flex; min-width: 0; }
+.topic-level-row .segmented button, .topic-level-row .segmented a { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 0; min-height: 48px; font-size: .75rem; font-weight: 400; line-height: 1.5; padding: 6px 8px; border: 0; border-radius: 999px; background: transparent; color: var(--text); box-shadow: none; white-space: nowrap; }
+.topic-level-row .segmented button > span:not(.topic-level-thumb), .topic-level-row .segmented a > span:not(.topic-level-thumb) { position: relative; }
+.topic-level-row .topic-level-thumb { position: absolute; pointer-events: none; left: 0; top: 8px; bottom: 8px; border-radius: 999px; background: var(--elevated); box-shadow: var(--shadow); transition: transform 200ms ease-in-out, width 200ms ease-in-out; }
+.topic-level-row .topic-level-thumb-static { right: 0; }
+.topic-level-row .segmented :focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .topic-level-row .topic-level-thumb { transition: none; }
+}
 .topic-label-short { display: none; }
 @media (max-width: 400px) {
   .topic-label-full { display: none; }
