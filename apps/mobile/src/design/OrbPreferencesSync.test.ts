@@ -2,6 +2,8 @@ import { createElement, Fragment } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ORB_COLOR_KEY, orbIdleColor } from '@stay-focused/shared';
+import { OrbPreferencesSync } from './OrbPreferencesSync';
+import { rememberOrbColor, useOrbInteraction, type OrbInteractionHandle } from '../features/generation-core/orbInteraction';
 const store = new Map<string,string>();
 const mocks = vi.hoisted(() => ({ owner: 'owner-a', offline: false, request: vi.fn(), foreground: undefined as undefined | ((state: string) => void) }));
 vi.mock('../auth', () => ({ useAuth: () => ({ session: mocks.owner ? { user: { id: mocks.owner }, accessToken: 'jwt', offline: mocks.offline } : null, isSigningOut: false }) }));
@@ -9,8 +11,6 @@ vi.mock('../auth/sessionStore', () => ({ sessionStore: { getItem: async (key: st
 vi.mock('react-native', () => ({ View: 'View', AppState: { currentState: 'active', addEventListener: (_: string, callback: (state:string) => void) => { mocks.foreground=callback; return { remove: () => { mocks.foreground=undefined; } }; } } }));
 vi.mock('../config/apiBaseUrl', () => ({ getApiBaseUrl: () => 'https://api.test' }));
 vi.mock('../services/profilePreferencesApi', () => ({ profilePreferencesRequest: mocks.request }));
-import { OrbPreferencesSync } from './OrbPreferencesSync';
-import { rememberOrbColor, useOrbInteraction, type OrbInteractionHandle } from '../features/generation-core/orbInteraction';
 let tree: ReactTestRenderer | undefined, handle: OrbInteractionHandle;
 function Probe() { handle = useOrbInteraction(); return null; }
 const element = () => createElement(Fragment, null, createElement(OrbPreferencesSync), createElement(Probe));

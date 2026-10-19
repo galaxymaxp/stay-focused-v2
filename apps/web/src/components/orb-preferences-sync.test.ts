@@ -2,11 +2,11 @@ import { createElement, Fragment } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ORB_COLOR_KEY, orbIdleColor } from '@stay-focused/shared';
+import { OrbPreferencesSync } from './orb-preferences-sync';
+import { rememberOrbColor, useOrbInteraction, type OrbInteractionHandle } from '../features/knowledge-core/orbInteraction';
 const store = new Map<string,string>();
 const mocks = vi.hoisted(() => ({ owner: 'owner-a', offline: false, request: vi.fn() }));
 vi.mock('./providers', () => ({ useAuth: () => ({ session: mocks.owner ? { user: { id: mocks.owner } } : null, api: mocks.request }) }));
-import { OrbPreferencesSync } from './orb-preferences-sync';
-import { rememberOrbColor, useOrbInteraction, type OrbInteractionHandle } from '../features/knowledge-core/orbInteraction';
 let tree: ReactTestRenderer | undefined, handle: OrbInteractionHandle;
 function Probe() { handle = useOrbInteraction(); return null; }
 const element = () => createElement(Fragment, null, createElement(OrbPreferencesSync), createElement(Probe));
