@@ -7420,3 +7420,109 @@ deployment, environment-file edit or push ran.
 
 Final AN1 progress/status are in ignored `tmp/overnight/AN1.*`. Stop at AN1;
 no later overnight prompt or rollout is started.
+
+## GB1 / generation action spacing (2026-10-19)
+
+**Status: PASS for the finite unattended local code scope.** Baseline `795fbba`,
+branch `overnight/2026-10-15_feedback` retained. Read the full GB1 prompt,
+including its overriding UNATTENDED rules. Endpoint: STEP 0-2, regression
+tests, local gates, docs and local commits. No later slice; AN1 remains
+separately STOPPED. Tracked baseline was clean; expected owner `UI/`,
+`apps/mobile/.gitignore`, `supabase/.temp/` remain untouched and unstaged.
+Baseline local tracking ahead 21 / behind 2; no fetch or push.
+
+STEP 0: read newest handoffs and WGP1/GN1b, current planning, AUTOPILOT and
+ADR-001/011. Mobile status column had gap 0, adjacent 240pt action wrappers,
+and separate artifact/reconnect actions. Action pills had only 16pt primary /
+8pt secondary horizontal padding, 8pt vertical padding, minimum height 48pt.
+Web already shared a full-width column with gap 10px and 24px space above;
+base padding 12px / 16px and 48px minimum height became 0 / 14px and 36px
+under desktop density rules. Stalled web Queue and Cancel were both primary.
+Approximate prompt line numbers drifted without changing the repair.
+
+Mobile now groups every action in one centered 240pt column, with
+`spacing[3]` (12pt) gaps and `spacing[4]` (16pt) top margin. Artifact opens
+first, reconnect actions join the column, and at most one action is primary.
+The shared pill style uses `spacing[5]` (20pt) horizontal padding and retains
+the `hitTarget.min` 48pt minimum. Non-pill styles are preserved. Web gets 12px
+gaps, 20px horizontal padding and a local 48px minimum height; stalled Queue
+becomes secondary. Both platforms retain visibility conditions and handlers,
+admission/retry/cancellation behavior and completion navigation. No API,
+database/migration, dependency, orb renderer, motion or ADR change.
+
+No platform implementation was skipped. Web's already-shared full pane width
+and existing 24px top separation are retained to respect WGP1's desktop
+layout, adapting mobile's fixed width/top-space rule. Shared pill padding
+also affects other mobile pill callers as explicitly permitted; physical
+appearance remains an owner check.
+
+Commits, author `galaxymaxp <omgraythekid@gmail.com>`:
+
+- `e1b4979 fix: space and pad generation actions on mobile and web`
+- `docs: complete GB1 generation spacing handoff` is the documentation
+  checkpoint; its final hash is recorded in Git and ignored `GB1.status`
+  after committing, without a self-referential amendment.
+
+**FRESH PASS: all 10/10 requested gates**, plus the AUTOPILOT root build:
+
+| Exact command | FRESH result / counts |
+| --- | --- |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached; final rerun |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors, 6 existing warnings |
+| `npm run test --workspace @stay-focused/shared` | 590/590 tests, 56 files, existing emitted copies included |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | 2433 passed / 3 intentional live skips, 212 files |
+| `npm run test --workspace @stay-focused/mobile` | 1521/1521 tests, 158 files; final rerun |
+| `npm run test --workspace @stay-focused/web` | 364/364 tests, 55 files |
+| `npm run build --workspace @stay-focused/api` | 36/36 static pages |
+| `npm run build --workspace @stay-focused/web` | 20/20 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | 1 local Android bundle / 35 assets; no publication |
+| `git diff --check` | 0 whitespace errors; staged and baseline-to-HEAD checks also pass |
+| `npm run build -- --force --env-mode=loose` (additional) | 8/8 tasks, 0 cached; API/web and local Android/iOS/web exports |
+
+Every requested workspace has a test script. API runs the complete suite with
+two workers, as in LG1, to bound local database-test memory. Focused final
+checks: mobile 36/36 in 2 files, web 10/10 in 1 file. Synthetic Playwright CSS
+geometry passes 4/4 widths (360/800/1024/1440): equal button widths, 12px gap,
+20px horizontal padding, at least 48px height, 24px space above, no overflow,
+correct stacking/desktop columns and zero network requests. No authenticated
+app or physical-device acceptance is inferred. Workflow/provider-contract
+suites NOT APPLICABLE to these UI-only paths. Exact acceptance, logs and
+failed-attempt evidence: [GB1 acceptance](acceptance/gb1-generation-action-spacing.md).
+
+Failed first attempts retained: focused mobile 35 passed / 1 timed out due to
+new session/client identities in the existing mock; stable hoisted fixture
+objects fixed the missing-intent loop. Initial forced lint failed at 7/8
+tasks with one new `react/no-children-prop` error; test construction was fixed.
+Initial CSS probe passed 360px then found the real 36px desktop height at
+800px; the local minimum-height rule fixes it. No nondeterministic flake,
+assertion weakening or validation suppression. One final multi-file docs
+patch failed atomic context validation and was reapplied with the correct
+anchor; no partial file edits or gate failure. Exploratory wildcard-path
+reads were corrected. Existing Vite/React renderer/Expo color warnings remain.
+
+Generated Next declarations were inspected and restored. Local test TEMP/TMP,
+disabled live flags, outbound HTTP/fetch/socket guards and offline/no-telemetry
+build settings were used. Logs, exports, fixtures, progress/status and tmp
+paths are excluded from commits. Current-state, roadmap and sprint reconciled.
+
+**UNVERIFIED (owner to confirm):** deployed mobile/API/website revisions,
+production/database/applied-migration/Scheduler state, remote-ref freshness,
+reported deployed symptom and real Realme/authenticated-browser appearance.
+No Supabase, Vercel, Google Cloud, Canvas or Resend call, remote SQL/migration
+application, Scheduler action, email, deployment, environment-file edit,
+branch switch or push ran. Live-state limitations did not stop this code work.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** owner chooses website deployment
+  and mobile OTA/APK publication after reviewing these local commits.
+- **Device checks - NOT RUN, skipped entirely:** on Realme start generation
+  and inspect running, stalled, failed/Try again and done states; verify even
+  gaps, comfortable padding, artifact-first actions and reconnect actions.
+  Confirm website parity at narrow/desktop widths and other mobile pill callers.
+- Confirm the UNVERIFIED states above. For later Vercel deployment/env/log
+  workflows, installing the missing CLI with `npm i -g vercel` is strongly
+  recommended; no installation or invocation ran here.
+
+Final GB1 progress/status are in ignored `tmp/overnight/GB1.*`. Endpoint GB1;
+no rollout, device work, AN1 resumption or later overnight slice is started.

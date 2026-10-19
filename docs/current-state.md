@@ -1,5 +1,25 @@
 # Current State
 
+<!-- GB1 begin -->
+GB1 / generation action spacing (2026-10-19): **PASS for the finite unattended
+local code scope**, baseline `795fbba`, branch `overnight/2026-10-15_feedback`.
+Implementation `e1b4979` puts all mobile actions in one centered 240pt column,
+12pt gaps and 16pt top space; artifact first, reconnect included, at most one
+primary. Pills now have 20pt horizontal padding and retain 48pt minimum height.
+Web uses 12px gaps, 20px horizontal padding and 48px minimum height, retaining
+WGP1 full pane width and its existing 24px top separation; stalled Queue is
+secondary. Visibility, handlers, generation lifecycle and navigation preserved.
+FRESH PASS: all 10 requested gates; typecheck/lint 8/8 tasks each, 0 cached,
+0 lint errors / 6 existing warnings; shared 590, API 2433 / 3 intentional live
+skips, mobile 1521, web 364 tests. API/web builds, Android export, diff hygiene
+and additional forced root build (8/8, 0 cached) pass. Synthetic CSS geometry
+4/4 widths passes; failed first attempts retained in acceptance. No API,
+database, dependency, motion or ADR change. Rollout and Device checks NOT RUN,
+skipped entirely; live/device state UNVERIFIED (owner to confirm). No remote
+operation, environment-file edit or push. Endpoint GB1 only; AN1 remains
+separately STOPPED. [GB1 acceptance](ai/acceptance/gb1-generation-action-spacing.md).
+<!-- GB1 end -->
+
 <!-- AN1 begin -->
 AN1 / opening announcements marks them read (2026-10-19): **STOPPED at STEP 0**
 from baseline `b38c46a` on `overnight/2026-10-15_feedback`. Both detail screens

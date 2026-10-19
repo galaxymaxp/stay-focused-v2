@@ -1,5 +1,23 @@
 # Roadmap
 
+<!-- GB1 begin -->
+GB1 / generation action spacing (2026-10-19): **PASS for the finite local code
+scope** from `795fbba` on `overnight/2026-10-15_feedback`. STEP 0-2,
+regressions, all 10 requested gates, additional forced root build, docs and
+local commits complete. Implementation `e1b4979`: shared mobile 240pt action
+column with 12pt gap / 16pt top margin, artifact first and reconnect included;
+20pt pill padding / 48pt minimum height; one primary. Web spacing/padding,
+48px target and stalled single-primary parity retain WGP1 pane layout.
+FRESH tests: shared 590, API 2433 / 3 intentional live skips, mobile 1521,
+web 364; forced typecheck/lint/build each 8/8 tasks, 0 cached; existing six
+lint warnings only. CSS geometry 4/4 widths; failed first attempts recorded.
+Next: owner rollout and Realme running/stalled/failed/done checks, both NOT RUN
+and skipped entirely here. Live/device state UNVERIFIED (owner to confirm).
+No remote service operation, environment-file edit or push. Endpoint GB1;
+no later slice started and AN1 is not resumed by this work.
+[Acceptance](ai/acceptance/gb1-generation-action-spacing.md).
+<!-- GB1 end -->
+
 <!-- AN1 begin -->
 AN1 / opening announcements marks them read (2026-10-19): **STOPPED at STEP 0**
 from baseline `b38c46a` on `overnight/2026-10-15_feedback`. Finite endpoint:

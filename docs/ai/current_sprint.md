@@ -1,3 +1,24 @@
+<!-- GB1 begin -->
+GB1 / generation action spacing (2026-10-19): **PASS for the finite unattended
+local code scope**, baseline `795fbba` on `overnight/2026-10-15_feedback`.
+Frozen endpoint completed: STEP 0-2, mobile/web layout and pill padding,
+regressions, all 10 prompt gates, extra forced root build, docs/local commits.
+Implementation `e1b4979`: one mobile 240pt action column, 12pt gap, 16pt top
+separation, artifact first, reconnect included, one primary; 20pt pill padding
+and 48pt minimum height. Web gets gap/padding/height and stalled emphasis
+parity, retaining WGP1 full pane width and existing 24px top separation.
+FRESH PASS: shared 590, API 2433 / 3 intentional live skips, mobile 1521,
+web 364; typecheck/lint/root build each 8/8 tasks, 0 cached; six existing lint
+warnings. API/web/Android builds and diff hygiene pass; synthetic geometry
+4/4 widths passes. Failed first focused mobile, lint and CSS attempts are
+recorded; no nondeterministic flake. No API/schema/dependency/motion change.
+Rollout/Device checks NOT RUN, skipped entirely; live state UNVERIFIED (owner
+to confirm). No remote action, environment-file edit or push. Owner paths
+preserved; generated declarations restored. Next: owner rollout/Realme checks.
+Endpoint GB1; AN1 remains separately STOPPED, no later task started.
+[Acceptance and exact gates](acceptance/gb1-generation-action-spacing.md).
+<!-- GB1 end -->
+
 <!-- AN1 begin -->
 AN1 / opening announcements marks them read (2026-10-19): **STOPPED at STEP 0**
 from baseline `b38c46a` on `overnight/2026-10-15_feedback`. Frozen finite scope:
