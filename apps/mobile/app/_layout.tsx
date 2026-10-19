@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AppLifecycle } from "../src/app-shell/AppLifecycle";
 import { AuthProvider } from "../src/auth";
 import { ThemeProvider, useTheme } from "../src/design/theme";
+import { OrbPreferencesSync } from '../src/design/OrbPreferencesSync';
 import { ProfileAvatarProvider } from '../src/design/ProfileAvatarProvider';
 
 /**
@@ -42,7 +43,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider><NavigationTheme><AuthProvider>
-        <ProfileAvatarProvider><AppLifecycle /><RootStack /></ProfileAvatarProvider>
+        <ProfileAvatarProvider><OrbPreferencesSync /><AppLifecycle /><RootStack /></ProfileAvatarProvider>
       </AuthProvider></NavigationTheme></ThemeProvider>
     </SafeAreaProvider>
   );

@@ -1,4 +1,4 @@
-import { beginOrbGesture, createOrbInteraction, endOrbGesture, moveOrbGesture, orbIdleColor, ORB_COLOR_KEY, parseOrbColorKey, legacyOrbIndexToKey, orbColorIndex, ORB_LEGACY_COLOR_KEY, ORB_IDLE_PALETTE, projectTapToSphere, type OrbInteraction } from '@stay-focused/shared';
+import { beginOrbGesture, createOrbInteraction, endOrbGesture, moveOrbGesture, orbIdleColor, ORB_COLOR_KEY, parseOrbColorKey, legacyOrbIndexToKey, orbColorIndex, ORB_LEGACY_COLOR_KEY, ORB_IDLE_PALETTE, projectTapToSphere, type OrbColorKey, type OrbInteraction } from '@stay-focused/shared';
 import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import { View, type GestureResponderEvent, type PanResponderInstance } from 'react-native';
 import { sessionStore } from '../../auth/sessionStore';
@@ -29,7 +29,18 @@ export async function readOrbColor(): Promise<number> {
   } catch { /* Keep this visit's color if storage is unavailable. */ }
   return colorIndex;
 }
+export function applySyncedOrbColor(key: OrbColorKey) {
+  saveOrbColor(orbColorIndex(key));
+}
+const choices = new Set<(key: OrbColorKey) => void>();
+export function subscribeOrbColorChoices(listener: (key: OrbColorKey) => void) {
+  choices.add(listener); return () => { choices.delete(listener); };
+}
 export function rememberOrbColor(index: number) {
+  saveOrbColor(index);
+  choices.forEach(listener => listener(ORB_IDLE_PALETTE[colorIndex]!.key));
+}
+function saveOrbColor(index: number) {
   colorIndex = orbColorIndex(parseOrbColorKey(ORB_IDLE_PALETTE[index]?.key ?? null)); revision++;
   listeners.forEach(listener => listener(colorIndex));
   writeColor(colorIndex);
