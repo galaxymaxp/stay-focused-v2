@@ -20,7 +20,7 @@ beforeEach(() => {
   rpc.mockImplementation(async (name: string, args: { p_path?: string | null; p_paths?: string[] }) => {
     if (rpcError) return { error: { message: 'private' } };
     if (conflict) return { data: false, error: null };
-    if (name === 'commit_profile_avatar_v1') row = { user_id: owner, avatar_path: args.p_path ?? null, avatar_updated_at: 'now', avatar_cleanup_paths: row?.avatar_path ? [row.avatar_path] : [] };
+    if (name === 'commit_profile_avatar_v1') row = { orb_color: null, orb_color_updated_at: null, user_id: owner, avatar_path: args.p_path ?? null, avatar_updated_at: 'now', avatar_cleanup_paths: row?.avatar_path ? [row.avatar_path] : [] };
     else if (row) row.avatar_cleanup_paths = row.avatar_cleanup_paths.filter(path => !args.p_paths?.includes(path));
     return { data: true, error: null };
   });
@@ -30,7 +30,7 @@ it('GET returns null when no avatar exists and never exposes a private path', as
   expect(createSignedUrl).not.toHaveBeenCalled();
 });
 it('replacement stores and signs new bytes before swapping, then retires old object', async () => {
-  row = { user_id: owner, avatar_path: old, avatar_updated_at: null, avatar_cleanup_paths: [] };
+  row = { orb_color: null, orb_color_updated_at: null, user_id: owner, avatar_path: old, avatar_updated_at: null, avatar_cleanup_paths: [] };
   const value = await replaceProfileAvatar(client, owner, Buffer.from('normalized'));
   const path = upload.mock.calls[0]![0]; expect(path).toMatch(new RegExp(`^${owner}/avatar-.*\\.png$`));
   expect(createSignedUrl).toHaveBeenCalledWith(path, 600);
@@ -39,13 +39,13 @@ it('replacement stores and signs new bytes before swapping, then retires old obj
   expect(upload.mock.invocationCallOrder[0]).toBeLessThan(rpc.mock.invocationCallOrder[0]!);
 });
 it('delete clears pointer and object, and is idempotent', async () => {
-  row = { user_id: owner, avatar_path: old, avatar_updated_at: null, avatar_cleanup_paths: [] };
+  row = { orb_color: null, orb_color_updated_at: null, user_id: owner, avatar_path: old, avatar_updated_at: null, avatar_cleanup_paths: [] };
   expect(await deleteProfileAvatar(client, owner)).toEqual({ url: null, expiresAt: null });
   expect(row!.avatar_path).toBeNull(); expect(remove).toHaveBeenCalledWith([old]);
   await deleteProfileAvatar(client, owner); expect(remove).toHaveBeenCalledTimes(1);
 });
 it('denies another owner path before signing or deleting', async () => {
-  row = { user_id: owner, avatar_path: old.replace(owner, 'other'), avatar_updated_at: null, avatar_cleanup_paths: [] };
+  row = { orb_color: null, orb_color_updated_at: null, user_id: owner, avatar_path: old.replace(owner, 'other'), avatar_updated_at: null, avatar_cleanup_paths: [] };
   await expect(getProfileAvatar(client, owner)).rejects.toMatchObject({ status: 503 }); expect(createSignedUrl).not.toHaveBeenCalled(); expect(remove).not.toHaveBeenCalled();
 });
 it('compensates explicit conflicts but preserves objects after uncertain RPC failure', async () => {
@@ -54,7 +54,7 @@ it('compensates explicit conflicts but preserves objects after uncertain RPC fai
   await expect(replaceProfileAvatar(client, owner, Buffer.from('png'))).rejects.toMatchObject({ status: 503 }); expect(remove).not.toHaveBeenCalled();
 });
 it('retains durable cleanup after a failed storage delete and retries on GET', async () => {
-  row = { user_id: owner, avatar_path: old, avatar_updated_at: null, avatar_cleanup_paths: [] };
+  row = { orb_color: null, orb_color_updated_at: null, user_id: owner, avatar_path: old, avatar_updated_at: null, avatar_cleanup_paths: [] };
   remove.mockResolvedValueOnce({ error: { message: 'private' } });
   await expect(deleteProfileAvatar(client, owner)).rejects.toMatchObject({ status: 503 });
   expect(row!.avatar_cleanup_paths).toEqual([old]);

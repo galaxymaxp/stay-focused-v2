@@ -61,4 +61,6 @@ export class OrbPreferenceSync {
     }
   }
   dispose(): void { this.disposed = true; clearTimeout(this.timer); }
+  /** A replacement instance waits for this owner's queued disk writes. */
+  settled(): Promise<void> { return this.writes; }
 }
