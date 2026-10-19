@@ -19,7 +19,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.current = job({ status: 'failed', retryable: true, stage: 'generating_sections' });
   const values = new Map<string, string>();
-  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, window: new EventTarget(), sessionStorage: {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, window: Object.assign(new EventTarget(), { matchMedia: () => ({ matches: false }) }), sessionStorage: {
     getItem: (key: string) => values.get(key) ?? null,
     setItem: (key: string, value: string) => values.set(key, value),
     removeItem: (key: string) => values.delete(key),
