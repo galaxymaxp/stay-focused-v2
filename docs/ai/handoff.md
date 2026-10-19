@@ -1,5 +1,34 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff — FULLSEND (2026-10-19)
+
+What changed:
+Shipped the finite FS2 release from pinned source 7506d51cde323caf036c6bc930512739a94613cb; tested application main is e11779a46f46513035f4cdacae55286bd337e5cf. The only release repair is e11779a, which makes the offline-image database restart test create its own repository-local temporary parent. The original b25-3-3-work checkout was preserved; all release work used this fresh clone.
+
+Verification (exact counts):
+FRESH PASS: npm ci (1,488 packages), Expo Doctor 21/21; forced root typecheck, lint and build each 8/8 tasks, 0 cached. Shared 282/282 across 27 source files; Canvas 75/75 (1 file), OCR 27/27 (3), engine 606/606, API 2,397 passed and 3 intentional live skips (209 files, two workers), mobile 1,481/1,481 (154), web 353/353 (54), provider contract 20/20 (fake clients only). API/web builds produced 35/35 and 19/19 pages; Android/iOS/web exports passed. Six existing lint warnings remain. Diff hygiene passed; Next-generated declarations were restored. GitHub release quality run 39150200346 SUCCESS repeats these counts, including forced gates with 0 cached tasks. First failures and tool retries are retained in the acceptance report.
+
+Deployments (IDs, SHAs):
+Supabase xfdbwfqtorelmurncyql: applied only 20261018000100_failed_generation_retry.sql, 20261018000200_material_descriptions.sql and 20261018000300_profile_avatars.sql before main. Exact-set dry run passed; post-list has 98 matching versions, zero unmatched. RLS, owner policies, eight service-only RPCs and private avatar bucket metadata verified.
+Worker build 29123816-84a5-4fbf-99eb-3b0957cd481d SUCCESS; image asia-northeast1-docker.pkg.dev/stay-focus-492811/generation/worker:e11779a, digest sha256:7d64c5be35043c5c00a99952fe8aa3f7eb4986a49a6e861c162090d917d0ddb4; generation-worker-00029-br6 Ready, 100% traffic, dispatch configuration successful, initial ERROR query zero entries.
+API Git status reference 43oQUjybjvenibMU5v2D4Ljsxpo2 / GitHub deployment 7158236365 SUCCESS at e11779a; https://stay-focused-v2-prototype-6x4psutxk-galaxymaxps-projects.vercel.app. Direct health and website API proxy return 200/status ok/commit e11779a; valid overnight Today override returns expected unauthenticated 401.
+Website production dpl_6dq21qJz4UPLx4pxCMXdyCKgYGEk READY at e11779a; stay-focused-ten.vercel.app alias assignment verified and HTTP 200. Existing connector rebuilt the source for production after CLI authentication failed; preview dpl_G9UfZLk46o4iNNnJQtB9piBvXcUD was not promoted. Previous READY dpl_EgAH83B3iJFhkHT5fWiN6PBHe5MN retained; no rollback.
+Android preview OTA group 946136b5-2716-4e87-b1ba-b254f101fa4f, update 01a15020-2f92-74b9-8c2b-63c146cc77ed, runtime 2.2.0-sdk57, Git e11779a. Two Realme relaunches completed; new clock/quiz UI and image checks prove the OTA is running. Phone versionName 2.2.0/code 6; owner session retained. APK path NOT APPLICABLE because there was no native diff.
+
+Live checks:
+FRESH PASS: TC1b typed 10 PM–4 AM fields and midnight ring; OR1b visible halo; IF1 Image saved / Saved to Stay Focused; IF2 external image visibly loads and viewer remains open; QZ1 question-number jump to question 2 and back to 1; PF1 provider photo. Original free time restored to 2 AM–4 AM (00 minutes), clock lock left false, no plan applied and no quiz answers submitted. Zero paid generations.
+NOT RUN: after-midnight session blocks (preview had no fitting sessions), previous-date current-plan ownership (required prior overnight plan baseline not established), MD1b description display (new cache has 0 ready/0 total entries), desktop Today/WGP1 UI (browser inventory empty; IAB creation explicitly unavailable).
+
+Next steps:
+Finish the listed live checks with an eligible overnight plan, an existing ready material description and an available browser. Any broad description backfill remains a separate owner decision. FS2 ends here; no later queued product slice was started. Final documentation commit and any subsequent automatic API deployment are recorded in the external overnight result/status, avoiding a self-referential commit hash.
+
+Blockers:
+API runtime log scan remains BLOCKED: installed Vercel CLI 64.5.0 rejects its saved token, and the existing connector returns 404 for this API project/deployment. Website publication was recovered through the connector and its bounded error/fatal scan returned zero groups. No new authentication completed, credentials created/rotated, project settings changed or email delivery enabled.
+
+Risks:
+The named NOT RUN checks and inaccessible API runtime logs remain unverified; passing local/CI tests do not replace those observations. A source-figure viewer changed state between early captures; a stale-coordinate attempt opened Study Assist, was dismissed without submission, then exact live UI bounds produced a successful save. No cause for that transient state change is claimed. Device captures and validation logs remain ignored in .local/fullsend-20261019; no private academic content, credentials or generated outputs enter the commit.
+
+
 ## Handoff — FULLSEND (2026-10-18)
 
 What changed:
