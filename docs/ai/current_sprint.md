@@ -1,3 +1,15 @@
+<!-- FULLSEND recovery begin -->
+FULLSEND recovery (2026-10-19): **BLOCKED before step 1**. WA1 final-code gates
+are FRESH PASS and commits 3fe40518 / 1a808907 close its local code scope.
+First release prerequisite: Vercel CLI 64.5.0 `whoami --json --non-interactive`
+exited 1 with `loggedIn: false`. No release attempt, main integration/push,
+deployment, EAS APK or adb install occurred. GitHub main was freshly verified as
+384173c0; the reviewed release checkout and fresh candidate gates remain NOT RUN.
+Config unchanged/unconfigured, owner Pause retained and WX1 unstarted. Owner
+must complete local Vercel login before a new exact FULLSEND attempt from step 1.
+[Local blocker/evidence](acceptance/fullsend-recovery-20261019.md).
+<!-- FULLSEND recovery end -->
+
 <!-- WA1 begin -->
 WA1 / Website password recovery (2026-10-19): **PASS for the finite unattended
 local code scope**, recovered on Windows from interrupted bb1ed7fe on
