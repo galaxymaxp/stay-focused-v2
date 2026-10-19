@@ -1,5 +1,28 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff — FULLSEND (20261020-0604)
+
+What changed:
+Published UC1/UC2/UC3, LG1, GB1, GS1, RV3, IV1, AN1b, OF1b, OR3b, OR4, WGP2, LP1, GL1, WA1, WX1 and OA1 from pinned 202f8c3f7e7b012136acf3708a7e044a561be827; previous main 384173c0e936bd3709f021842f3be2a2e79743e1; application main b6645ed4cc8d27c86af2ccc5e1a830e1e4d8074e. Release-only merge 436dc36 and docs cleanup b6645ed retain both histories. All work used a fresh clone; source untracked files and separate showcase-only commit remain left local, not shipped.
+
+Verification (exact counts):
+FRESH PASS: npm ci 1593, Doctor 21/21, forced typecheck/lint/build 8/8 each and 0 cached; shared 330/34 source files, Canvas 75/1, OCR 27/3, engine 606, API 2452 passed/3 intentional skips/213 files, mobile 1581/166, web 524/72, provider 20, publisher 27. Builds API 37/37 pages, web 23/23 and Android/iOS/web exports. Six existing warnings. First mobile five-second timeout and four web test plus one teardown timeout retained; focused mobile 10/10 and full two-worker reruns pass. No weakened/skipped tests. GitHub CI 39339336556 SUCCESS repeats counts and fresh forced gates. Diff hygiene pass; generated declarations restored.
+
+Deployments (IDs, SHAs):
+Only additive migration 20261018000301_profile_preferences.sql applied to xfdbwfqtorelmurncyql before main; exact-set dry run, post-list 99 matching/0 pending and RLS/grants/trigger catalog checks pass. Worker build 6c1d040c-5573-4bb0-9f7a-2b7c79f0dbaa SUCCESS; image worker:b6645ed, digest sha256:343d6551c1cc50f4169bc24af1188d60f4b235ce910b3ce8fd2ae276b1691bcc, revision generation-worker-00030-c2q Ready/100%, dispatch configured. API dpl_FTJbc451LXaRmGadBioS7bQ6qqno and website dpl_9R9BSaNwPUP3hmT856fFjpEpVTQS READY at b6645ed4cc8d27c86af2ccc5e1a830e1e4d8074e; stable production aliases healthy. OTA group 8274c431-7189-42cb-bb36-7fe546e06ea7 / Android 01a1567c-cc55-7bbf-bdf1-7c3ccc2380f0 runs on Realme, native 2.2.0/code6/runtime2.2.0-sdk57. No APK path or public native release applies. Final documentation commit and automatic follow-up deployment IDs are recorded externally after this commit.
+
+Live checks:
+Six FRESH bounded PASS: Today orb/clock render; exact About OTA/native metadata and manual up-to-date result; correct native download share URL (dismissed, not sent); Privacy and Terms screens; Generate search hides/reappears on down/up scroll; reviewer Original selected with Simplify/Explain simply/Expound controls. Direct/proxied health 200 matching application SHA, public root/download/privacy/terms 200, unauthenticated preferences401, release metadata200/version2.2.0. Worker initial ERROR query zero; API/web bounded error/fatal and 5xx scans zero, no excluded intervals. Desktop browser UI NOT RUN (no surfaces/IAB unavailable). Zero paid generations; no quiz answers or settings changes. Swipe-only keyguard dismissed using standard command; failed timeout write unchanged at1800000, device returned asleep. Transient list navigation was resolved from fresh button bounds.
+
+Next steps:
+No required FS3 publication remains. Desktop UI and broader feature/visual/performance acceptance remain separate. UC2 showcase-only push/PR is left local outside this repository; OA2/later roadmap scopes are not resumed. Final source fetch/ancestry and final commit are in the external result. [Full evidence](acceptance/fullsend-20261020-0604.md).
+
+Blockers:
+Desktop browser unavailable. Required migrations, worker, API, website and mobile publication have no pending owner/Claude action.
+
+Risks:
+Six quick checks do not close full feature acceptance, offline/reconnect flows, recovery email, cross-device sync, image gestures, physical reference parity or GPU/power measurements. Initial load flakes and exploratory failures are retained. CLI link's automatically created local environment file was removed without reading values; no persistent credential, project-setting change or email activation was performed. Original owner work, source content and later scopes remain preserved.
+
 ## Handoff — FULLSEND (2026-10-19)
 
 What changed:
