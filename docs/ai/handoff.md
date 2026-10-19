@@ -8922,3 +8922,106 @@ Scheduler operation, email, environment-file edit, branch switch or push.
 
 Ignored progress/status: tmp/overnight/WGP2.progress and WGP2.status.
 Endpoint WGP2 only; rollout/device work and later tasks remain owner work.
+
+## GL1 / Today glass clock - PASS locally (2026-10-19)
+
+**Status: PASS for the finite unattended local code scope.** Re-read the full
+GL1 prompt with UNATTENDED rules first, then progress/Git/diff. No prior GL1
+progress or committed work existed. Baseline ec9ddbf9; retained branch
+overnight/2026-10-15_feedback. Tracked entry tree was clean. STEP 0, both apps,
+atlas/shared compositor, tests/screenshots, all gates, docs and commits complete.
+
+Both apps now draw only the large time as refractive glass in the existing
+orb GL view. Inter Bold 700/tabular/-2% tracking, 45% baseline AM/PM; plain
+Inter 600/500 small labels; no weekday and centered idle time. One committed
+512x256 build-time atlas, one pure layout and one shared shader/compositor;
+no per-time texture uploads. Existing scrim is retained below glass, with
+stronger bright-tone treatment. Plain Inter time remains accessible and is
+shown until glass succeeds or if GL/atlas/float/shader/render support fails.
+Reduce Motion keeps glass with no ambient loop or shimmer. Both apps retain
+80ms idle/16ms interaction; mobile retains 0.6 render scale. Native uses
+existing expo-font/asset/GL modules; web keeps deferred loading without drag
+updates restarting it. Generation passes no clock prop and keeps its orb path.
+Parity is complete; differences are only native asset/font loading versus web
+deferred loading/context events. No product skip. ADR-049 and design readme/
+typography comments record the approved readout-only font/glass exceptions.
+
+### Commits and gate counts
+
+- c4329a3f build: clock glyph atlas from Inter
+- 2afd2e41 feat(shared): add clock glyph layout and glass compositor
+- 18e2967c fix(shared): preserve glass clock contrast over translucent orbs
+- dec26802 feat(mobile): render Today time as glass in Inter
+- cba28643 feat(web): render Today time as glass in Inter
+- e00dd0ea fix(web): keep the orb fallback in place after context loss
+- docs commit: hash in tmp/overnight/GL1.status and Git.
+
+All use the requested owner author and no attribution trailers. All prompt
+gates FRESH PASS, plus the forced root build:
+
+| Exact command | FRESH result |
+| --- | --- |
+| `npm run typecheck -- --force --env-mode=loose` | PASS 8/8 tasks, 0 cached; closure repeat |
+| `npm run lint -- --force --env-mode=loose` | PASS 8/8 tasks, 0 cached; 0 errors / 6 existing warnings; closure repeat |
+| `npm run test --workspace @stay-focused/shared` | PASS 632/632 tests, 64 files; post-build repeat |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | PASS 2452 passed / 3 intentional live skips, 213 files |
+| `npm run test --workspace @stay-focused/mobile` | PASS 1587/1587 tests, 166 files |
+| `npm run test --workspace @stay-focused/web` | PASS 451/451 tests, 67 files, including 10/10 clock browser checks |
+| `npm run build --workspace @stay-focused/api` | PASS 37/37 static pages |
+| `npm run build --workspace @stay-focused/web` | PASS 22/22 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | PASS local Android export |
+| `git diff --check` / `git diff --cached --check` | PASS, 0 whitespace errors (closure checked again before commit) |
+| Additional `npm run build -- --force --env-mode=loose` | PASS 8/8 tasks, 0 cached; local exports only |
+
+Clock browser suite is 10/10, real local Chromium/SwiftShader, all non-local
+requests aborted. Eight screenshots:
+tmp/overnight/GL1-screens/{1440,390}-{light,dark}-{idle,drag}.png.
+Brightest-pearl solid-stroke contrast minimum: light 7.08:1,
+dark 11.42:1 (75th-percentile solid pixels per glyph, excluding AA
+fringe; a regression check, not a full WCAG audit). Local renderer.info:
+1 -> 3 draw calls/frame, median interval 83.4 -> 83.5ms,
+median CPU submission 0.20 -> 0.30ms,
+p95 0.30 -> 0.40ms. These do not establish GPU/device performance.
+
+**Failed first attempts:** native focused 88 pass/15 fail (missing Text mock,
+fixed, then 103/103); browser 0/8 (pre-DOM theme/date setup, fixed), later 6/8
+(intro spring settling, harness waits), contrast 9/10 (bright M/P/1, stronger
+scrim/tint, unchanged thresholds), deferred fixture 5/6 (mock module cache
+ordering, fixed). Draft typecheck 6/8 (test host-name comparison, fixed);
+draft lint had 5 introduced warnings, all removed. A docs EOF blank line was
+also fixed. The final gate sequence passed; no nondeterministic flake remained.
+All details, limitations and logs: [acceptance](acceptance/gl1-glass-clock.md).
+Generated Next declarations were inspected/restored; exports, screenshots,
+test copies, logs and tmp helpers remain uncommitted.
+
+**Risks/debt:** local software WebGL and mocked native lifecycle cannot prove
+Realme GPU/image upload performance or physical screen-reader behavior. A
+half-float-unsupported GPU uses plain Inter time rather than disappearing.
+The stronger scrim is deliberate for brightest-tone readability; owner visual
+review remains. No engine/auth/RLS/source, DB/migration or release change.
+
+**UNVERIFIED (owner to confirm):** deployed website/mobile/API revisions,
+the exact installed APK's native module inventory, real GPU/Realme timing and
+physical appearance/accessibility, applied remote migrations and Scheduler
+state, and remote-ref freshness. Local Expo dependency/autolinking evidence
+requires no new native module or APK change. No Supabase, Vercel, Google Cloud,
+Canvas or Resend call, deployment, remote SQL/migration application, Scheduler
+operation, email, environment-file edit, branch switch or push occurred.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** publish the website and mobile OTA
+  through the existing owner release process. No API/database change is needed
+  by GL1; prior slices retain their own pending release work.
+- **Device checks - NOT RUN, skipped entirely:** website and Realme current
+  time and dragged time look like glass, respond to orb rotation/ripple/color,
+  stay readable in both themes, retain plain small Inter labels, and show no
+  weekday. Check dragging without flicker, Realme frame cost/stutter/power,
+  screen-reader time and the static/plain fallbacks. Reduce Motion must retain
+  glass with no ambient motion or shimmer.
+- Confirm the recorded UNVERIFIED items. For later authorized deployment/env/log
+  work, strongly recommend installing the missing Vercel CLI with
+  `npm i -g vercel`. No installation or invocation was made during GL1.
+
+Ignored progress/status: tmp/overnight/GL1.progress and GL1.status. Unrelated
+untracked paths remain untouched. Endpoint GL1 only; no later task started.

@@ -172,3 +172,12 @@ focus ring is a soft double gold halo (`--focus-ring`).
   Google Fonts `@import`, not bundled binaries.)*
 - V2's repo is engine-first scaffolding; the actual product visuals here are
   derived from the V1 prototype plus the V2 spec (mobile-native + iOS 26 glass).
+
+### GL1 approved Today readout exception (2026-10-19)
+
+Fely approved Inter (SIL OFL) only inside the Today clock readout: Bold 700
+time with tabular figures and -2% tracking, SemiBold 600 labels and Medium
+500 captions. Only time uses glass, including dragged time; small text stays
+plain and the weekday line is removed. This narrowly approved decorative
+clock exception does not expand glass to other content or change the locked
+Aptos / Segoe UI stack elsewhere. See docs/architecture/ADR-049-today-glass-clock.md.

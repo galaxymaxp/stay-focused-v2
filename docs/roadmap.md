@@ -1,5 +1,27 @@
 # Roadmap
 
+<!-- GL1 begin -->
+GL1 / Today glass clock (2026-10-19): **PASS for the finite unattended local
+code scope**. Both apps use one shared MSDF refraction composite in the existing
+orb view, with bundled Inter 700 time and plain 600/500 captions. Weekday is
+removed; idle time is centered and dragged time updates next frame. Accessible
+real time, static/plain fallbacks and Reduce Motion remain. Inter and clock-glass
+exceptions are documented in ADR-049 and design typography documentation.
+Commits: c4329a3f, 2afd2e41, 18e2967c, dec26802, cba28643, e00dd0ea; docs hash in Git/status.
+FRESH PASS: forced typecheck/lint/root build 8/8 tasks each, 0 cached; 6 existing
+lint warnings. Shared 632, API 2452 / 3 intentional live skips, mobile 1587,
+web 451 tests pass. Browser clock checks 10/10, 8 screenshots at 1440/390 in
+both themes; bright-pearl stroke-contrast regression passes. API/web builds
+37/37 and 22/22 pages, local Android export and diff checks pass. Mobile keeps
+0.6 render scale and 80ms idle/16ms interaction cadence. Local renderer.info
+shows 1 -> 3 draw calls with ~83ms idle interval; CPU submission timing is not
+GPU or Realme proof. Draft failures are retained in acceptance. Rollout and
+Device checks NOT RUN, skipped entirely; deployed/physical state UNVERIFIED
+(owner to confirm). No prohibited service call, deployment, remote SQL/migration,
+Scheduler operation, environment-file edit or push. Prior untracked paths
+preserved; no later task started. [Acceptance](ai/acceptance/gl1-glass-clock.md).
+<!-- GL1 end -->
+
 <!-- OF1b begin -->
 OF1b / automatic offline saving (2026-10-19): **PASS for the finite unattended
 local code scope**. STEP 0-3, tests, all 10 prompt gates, additional forced root
