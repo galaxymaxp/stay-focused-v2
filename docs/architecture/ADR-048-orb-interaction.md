@@ -116,3 +116,26 @@ required for the removed Today glow.
 These are local code and GPU checks, not physical acceptance. Owner rollout,
 Realme/desktop appearance, actual gesture feel, power and installed/deployed
 revisions remain separate, unverified owner work.
+
+## OA1 ambient spill (2026-10-20)
+
+The owner's finite OA1 instruction supersedes OR3b's Today-glow removal only.
+Both platforms now draw one shared procedural ambient plane in the existing GL
+scene, using the body's resolved base/deep/light colors, liquid time/life/stir,
+inverse spin, world-space light and error/glow uniforms. Four wide directional
+samples approximate the body field; this is not pixel sampling or a claim about
+YouTube's private algorithm. No extra target, GL view, readback or scheduler is
+introduced. The sphere and glass compositor are unchanged. Light fades inside
+the existing canvas margins, with a pale treatment on paper backgrounds.
+
+The renderer is a dedicated shared package subpath, following the glass helper's
+bundle boundary. Colors ease with a 0.24-second exponential response; reduced
+motion and the first frame copy the current source exactly and own no settling
+loop. Today keeps 80ms idle/16ms interaction and mobile render scale 0.6. Scene
+visibility, AppState/focus, context-loss fallback and resource disposal remain
+platform-owned. Static stills and Queue raster miniatures diffuse their exact
+image/gradient; the miniature's existing rotation drives both layers. No native
+SVG stop updates or per-frame React state are needed. PNG failures retain the
+bundled pearl artwork and its matching static spill, rather than claiming a
+live procedural palette. Physical Android compositing, performance and final
+visual acceptance remain separate owner/OA2 work.

@@ -9132,3 +9132,78 @@ path failure (0 tests) and trailing blank line correction are also retained.
 Ignored evidence: tmp/overnight/WX1-* plus WX1.progress and WX1.status. No
 service call, deployment, remote SQL/migration, Scheduler, email, environment
 edit or push. Original untracked paths preserved; no later task started.
+
+## OA1 - ambient orb light, local implementation complete (2026-10-20)
+
+**Status: PASS for the finite unattended local code scope only.** STEP 0-4,
+local implementation, required applicable gates, documentation and scoped local
+commits are complete. This is the first implementation milestone of the owner's
+finite implementation -> supervisor handoff -> separate verification benchmark.
+No OA2 or other backlog task was started.
+
+Requirement coverage: all four actual GL scene owners use one shared procedural
+ambient renderer driven by the body's resolved palette, liquid clock/life/stir,
+spin, world-space light, glow and error. Today and Generation/Queue-opened jobs
+reuse the same component on both apps. Retained KnowledgeCore/lab paths, deferred
+and failed stills and both Queue raster miniatures are covered. The old aura is
+replaced, not stacked. Static spills use the displayed gradient/image; the native
+failure PNG remains a pearl still. Body/clock shader and interaction sources,
+layout, synced preferences, native 0.6 scale and existing frame cadence remain.
+Reduced Motion snaps to stable source light without an ambient loop; visibility,
+focus, AppState and disposal stop work. This is a documented procedural
+approximation, not pixel sampling or a claim about YouTube's private algorithm.
+
+Commits (all author galaxymaxp <omgraythekid@gmail.com>):
+
+- 3b1abbbb feat(shared): add source-coupled orb ambient renderer
+- 50cf0103 feat(orb): integrate ambient spill across web and mobile
+- docs(orb): close OA1 local implementation and gates (this documentation
+  commit; exact hash is recorded in Git and tmp/overnight/OA1.status).
+
+Final gates: **FRESH PASS** forced root typecheck, lint and build **8/8 tasks
+apiece, 0 cached**, with **6 baseline lint warnings / 0 errors**. Shared default
+suite **660/660 / 68 files** includes compiled duplicates; explicit source-only
+suite is **330/330 / 34 files**. Mobile **1581/1581 / 166 files**, web **524/524 /
+72 files** pass. The web suite includes **8 ambient + 10 glass + 3 Generation
+page browser cases**. API tests **NOT APPLICABLE** (client-only subpath and no
+API/default shared runtime/schema change). The prompt's equivalent-build
+allowance reuses final root API **37/37 generated pages**, web **23/23** and
+Android export (one HBC bundle, also iOS/web emitted); separate standalone
+build invocations were **NOT RUN**, not cached. Working/staged diff checks
+**FRESH PASS, exit 0 / 0 whitespace errors**, including each scoped commit.
+
+First attempts are retained in [acceptance](acceptance/oa1-orb-ambient-glow.md),
+including root typecheck 7/8 (two unsupported native Image props, repaired),
+focused equality/fallback issues, added BOM lint warnings (removed), and first
+full web 521 passed / 3 failed. Direct GPU snapshots removed a 2D conversion
+measurement artifact without changing tolerances; the existing Generation
+caption test now waits for its same exact animated target. Affected browser
+retry passed 11/11 and final full web passed 524/524. No gate was weakened.
+
+Evidence: ignored tmp/overnight/OA1-*.log, OA1-before/, OA1-after/ (screenshots,
+WebM videos, palette/state/context-loss and GPU/resource JSON), OA1.progress
+and OA1.status. Browser harness traffic is loopback only, with no academic body
+content or production calls. Direct GPU interior RGBA diff and edge alpha are
+0 on both tested GL paths; spatial spill is nonzero. Local DayOrb draw calls
+are 1 -> 2 (3 -> 4 with clock), idle intervals remain about 83ms, and CPU
+submission/resource observations are recorded without claiming GPU/device FPS
+or power. Before video was not captured. Next-generated declaration-only diffs
+were inspected/restored. No validation output or generated artifact is staged.
+
+**Owner steps remaining**
+
+- Review OA1 commits, source inventory, gates and artifacts, then publish a
+  separate bounded OA2 visual/performance/coverage verification prompt. Final
+  visual/reference parity is UNVERIFIED; unit PASS is not visual approval.
+- **Rollout: NOT RUN, skipped entirely.** Follow the owner's separate release
+  process after review. No deployment, remote migration, Scheduler, email,
+  environment-file edit, service call or push occurred here.
+- **Device checks: NOT RUN, skipped entirely.** Confirm real Android Today,
+  preparation, Generation/Queue-opened jobs, miniature and fallback lighting,
+  themes/palettes/states, Reduce Motion, glass/plain clock, gestures/scrolling,
+  clipping, focus/background, actual GPU/frame timing, allocations and power.
+- Deployed revisions and live preference/database/migration/Scheduler state,
+  Android compositing/blur and all physical results are **UNVERIFIED (owner to
+  confirm)**. Original UI/, apps/mobile/.gitignore and supabase/.temp/ are
+  preserved. Owner Pause and unrelated scopes remain unchanged. No Supabase,
+  Vercel, Google Cloud, Canvas or Resend call was made.

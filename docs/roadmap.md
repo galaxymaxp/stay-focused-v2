@@ -1,5 +1,28 @@
 # Roadmap
 
+<!-- OA1 begin -->
+OA1 / Orb ambient light (2026-10-20): **PASS for the finite unattended local
+code scope**. Shared procedural spill follows final body palette, liquid motion,
+spin, day light and state in all four GL scenes. Today/Generation, retained
+KnowledgeCore, static fallbacks and Queue miniature sources are covered. Body,
+glass clock, gestures, synced choices, layout and render rates are preserved;
+Reduce Motion is stable and hidden/unfocused/disposed work stops.
+Implementation: 3b1abbbb, 50cf0103; documentation hash in Git/OA1.status.
+FRESH PASS: forced typecheck/lint/build 8/8 tasks each, 0 cached; 6 existing lint
+warnings. Shared 330/34 source files (default suite 660/68 including compiled
+duplicates), mobile 1581/166, web 524/72. Final root build supplies equivalent
+API 37/37 pages, web 23/23 pages and Android export gates. Diff checks pass.
+Local screenshots/videos, real GPU pixel checks, clock/gesture checks and CPU
+submission/resource observations are recorded; failed first attempts retained.
+Rollout and Device checks NOT RUN; physical/reference visual parity, performance
+and deployed/live state UNVERIFIED (owner to confirm). No service call, remote
+SQL/migration, Scheduler, environment-file edit, deployment or push. Original
+untracked paths and Owner Pause preserved. OA1 ends here; supervisor review and
+separately published OA2 remain owner work.
+[Acceptance and exact gates](ai/acceptance/oa1-orb-ambient-glow.md).
+<!-- OA1 end -->
+
+
 <!-- WX1 begin -->
 WX1 / Website saved study exports (2026-10-19): **PASS for the finite
 unattended local code scope**. Pure layout/PDF/DOCX/PPTX builders now live in
