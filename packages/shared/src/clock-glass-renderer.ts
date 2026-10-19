@@ -17,11 +17,13 @@ uniform float uScrim;
 varying vec2 vUv;
 void main() {
   vec4 orb = texture2D(uOrb, vUv);
-  float shade = (1.0 - smoothstep(0.02, 0.26, distance(vUv, vec2(0.5)))) * uScrim;
-  gl_FragColor = vec4(orb.rgb / max(orb.a, 0.001) * (1.0 - shade), orb.a);
+  float shade = (1.0 - smoothstep(0.12, 0.31, length((vUv - 0.5) * vec2(0.85, 1.0)))) * uScrim;
+  gl_FragColor = vec4(orb.rgb / max(orb.a, 0.001), orb.a);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
-  gl_FragColor.rgb *= gl_FragColor.a;
+  gl_FragColor.rgb *= gl_FragColor.a * (1.0 - shade);
+  // The orb is translucent. The scrim must also cover the page seen through it.
+  gl_FragColor.a += shade * (1.0 - gl_FragColor.a);
 }`;
 export const CLOCK_GLASS_FRAGMENT = `
 uniform sampler2D uOrb;
@@ -37,13 +39,13 @@ float field(vec2 uv) {
 }
 void main() {
   float d = field(vUv);
-  float aa = max(fwidth(d), 0.001);
+  float aa = max(fwidth(d) * 0.5, 0.001);
   float coverage = smoothstep(-aa, aa, d);
   if (coverage < 0.001) discard;
   vec2 grad = vec2(field(vUv + vec2(uAtlasTexel.x, 0.0)) - field(vUv - vec2(uAtlasTexel.x, 0.0)),
     field(vUv - vec2(0.0, uAtlasTexel.y)) - field(vUv + vec2(0.0, uAtlasTexel.y)));
   vec2 normal = grad / max(length(grad), 0.00001);
-  float edge = 1.0 - smoothstep(0.02, 0.32, d);
+  float edge = 1.0 - smoothstep(0.01, 0.14, d);
   vec2 refracted = clamp(vScreen + normal * mix(0.015, 0.028, edge), 0.0, 1.0);
   vec3 glass = texture2D(uOrb, refracted).rgb * 0.4;
   glass += texture2D(uOrb, refracted + uPixel * vec2(1.5, 0.0)).rgb * 0.15;
@@ -51,13 +53,13 @@ void main() {
   glass += texture2D(uOrb, refracted + uPixel * vec2(0.0, 1.5)).rgb * 0.15;
   glass += texture2D(uOrb, refracted - uPixel * vec2(0.0, 1.5)).rgb * 0.15;
   // White tint, dark inner rim and directional fresnel preserve bright-sky legibility.
-  glass = mix(glass, vec3(1.0), 0.48);
-  glass *= 1.0 - edge * 0.72;
+  glass = mix(glass, vec3(1.0), 0.65);
   float facing = max(dot(-normal, normalize(uLight + vec2(0.0001))), 0.0);
-  glass += vec3(1.0) * pow(edge, 3.0) * (0.12 + 0.8 * facing);
   gl_FragColor = vec4(glass, coverage);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
+  gl_FragColor.rgb *= 1.0 - edge * 0.82;
+  gl_FragColor.rgb += vec3(1.0) * pow(edge, 3.0) * (0.06 + 0.6 * facing);
 }`;
 
 /** Orb target then base + glyph quads in one composite render pass.
@@ -87,6 +89,8 @@ export function createClockGlass(renderer: THREE.WebGLRenderer, atlas: THREE.Tex
   glyphs.frustumCulled = false; glyphs.renderOrder = 1;
   scene.add(glyphs);
   const bufferSize = new THREE.Vector2();
+  const previousShaderError = renderer.debug?.onShaderError;
+  if (renderer.debug) renderer.debug.onShaderError = () => { throw new Error('clock_shader_compile_failed'); };
   let previous = '';
   return {
     render(orb: THREE.Scene, orbCamera: THREE.Camera, readout: ClockGlassReadout, size: number, light: readonly number[], dark: boolean) {
@@ -94,7 +98,7 @@ export function createClockGlass(renderer: THREE.WebGLRenderer, atlas: THREE.Tex
       if (target.width !== bufferSize.x || target.height !== bufferSize.y) target.setSize(bufferSize.x, bufferSize.y);
       uniforms.uPixel.value.set(1 / bufferSize.x, 1 / bufferSize.y);
       uniforms.uLight.value.set(light[0] ?? 0, light[1] ?? 1);
-      base.uniforms.uScrim!.value = dark ? 0.25 : 0.5;
+      base.uniforms.uScrim!.value = dark ? 0.35 : 0.78;
       const key = `${readout.text}/${readout.fontSize}/${size}`;
       if (key !== previous) {
         previous = key;
@@ -115,6 +119,9 @@ export function createClockGlass(renderer: THREE.WebGLRenderer, atlas: THREE.Tex
       renderer.setRenderTarget(target); renderer.render(orb, orbCamera);
       renderer.setRenderTarget(null); renderer.render(scene, camera);
     },
-    dispose() { target.dispose(); plane.dispose(); geometry.dispose(); base.dispose(); material.dispose(); },
+    dispose() {
+      if (renderer.debug) renderer.debug.onShaderError = previousShaderError ?? null;
+      target.dispose(); plane.dispose(); geometry.dispose(); base.dispose(); material.dispose();
+    },
   };
 }
