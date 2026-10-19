@@ -748,7 +748,7 @@ input[type="range"] {
   gap: 24px;
   text-align: center;
 }
-.generation-orb-pane .knowledge-core {
+.generation-orb-pane .generation-orb {
   width: min(80%, 70vh);
 }
 .generation-detail-pane {
@@ -794,12 +794,19 @@ input[type="range"] {
   .generation-orb-pane {
     min-height: 70vh;
   }
-  .generation-orb-pane .knowledge-core {
+  .generation-orb-pane .generation-orb {
     width: min(60%, 70vh);
   }
 }
 .generation h1 {
   font-size: 24px;
+}
+.generation-orb {
+  position: relative;
+  width: min(100%, 300px);
+  aspect-ratio: 1;
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
 }
 .knowledge-core {
   width: min(100%, 300px);

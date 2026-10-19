@@ -5,6 +5,14 @@ import { createOrbInteractionSampler } from '../knowledge-core/orbInteractionFra
 import { memo, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { createOrbBody } from "../knowledge-core/orbBody";
+import { orbShimmerLevel, SHIMMER_SPEED } from "../knowledge-core/orbAura";
+import {
+  coreLevelsExtra,
+  createCoreLevels,
+  stepCoreLevels,
+  type CoreLevels,
+  type CoreState,
+} from "../knowledge-core/coreModel";
 import { dayOrbTones, type DayOrbTones } from "./dayClock";
 export { DAY_ORB_FILL } from './orb-footprint';
 
@@ -25,22 +33,27 @@ interface Runtime {
   mode: Mode;
   reducedMotion: boolean;
   running: boolean;
+  state?: CoreState;
 }
 
 /**
  * The Today clock's body: the generation orb's glass ball and liquid, carrying
  * the day instead of the work. The liquid takes the sky of the moment and the
  * inner light is the sun or moon on its path. It turns slowly, never pulses,
- * and stops rendering when the tab is hidden.
+ * and stops rendering when the tab is hidden. With a generation `state` it
+ * shows the work by behaviour: livelier while running, still and dimmed on
+ * failure, a brief brighten on completion.
  */
 export const DayOrb = memo(function DayOrb({
   minutes,
   size,
+  state,
   interaction: suppliedInteraction,
 }: {
   minutes: number;
-  /** Canvas size in CSS pixels; the ball fills DAY_ORB_FILL of it. */
-  size: number;
+  /** Canvas size in CSS pixels; the ball fills DAY_ORB_FILL of it. Omit to fill the parent. */
+  size?: number;
+  state?: CoreState;
   interaction?: OrbInteractionHandle;
 }) {
   const interaction = useOrbInteraction(suppliedInteraction);
@@ -50,13 +63,15 @@ export const DayOrb = memo(function DayOrb({
     mode: "light",
     reducedMotion: false,
     running: true,
+    state,
   });
   const controller = useRef<{ wake: () => void; dispose: () => void } | null>(
     null,
   );
   const [unsupported, setUnsupported] = useState(false);
   runtime.current.tones = dayOrbTones(minutes);
-  useEffect(() => controller.current?.wake(), [minutes]);
+  runtime.current.state = state;
+  useEffect(() => controller.current?.wake(), [minutes, state]);
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -102,8 +117,9 @@ export const DayOrb = memo(function DayOrb({
     <div
       ref={frameRef}
       className="day-orb"
-      style={{ width: size, height: size }}
+      style={{ width: size ?? "100%", height: size ?? "100%" }}
       aria-hidden="true"
+      data-state={state}
     >
       {unsupported && <div className="day-orb-fallback" />}
     </div>
@@ -154,6 +170,8 @@ function buildScene(
   let spinAngle = 0;
   let settleUntil = 0;
   let interacting = false;
+  let levels: CoreLevels | null = null;
+  let shimmerTime = 0;
   const spinMatrix = new THREE.Matrix3();
   const spinRotation = new THREE.Matrix4();
 
@@ -162,17 +180,25 @@ function buildScene(
     if (disposed) return;
     const now = Date.now();
     const current = runtime.current;
-    const moving = current.running && !current.reducedMotion;
-    if (now - lastRender >= (interacting || interaction.state.current.gesture?.rotating ? 16 : FRAME_MS) || !moving) {
+    const settled = levels ? coreLevelsExtra(levels, current.reducedMotion) : null;
+    // A failed orb winds down and then stays still, as the Knowledge Core does.
+    const moving = current.running && !current.reducedMotion && !(current.state === "error" && settled && !settled.lively);
+    if (now - lastRender >= (interacting || interaction.state.current.gesture?.rotating || settled?.lively ? 16 : FRAME_MS) || !moving) {
       const delta = Math.min((now - lastFrame) / 1000, 0.08);
       lastFrame = now;
       lastRender = now;
+      levels = current.state
+        ? stepCoreLevels(levels ?? createCoreLevels(current.state, current.reducedMotion), current.state, delta, current.reducedMotion)
+        : null;
+      const extra = levels ? coreLevelsExtra(levels, current.reducedMotion) : null;
       const rate = current.reducedMotion ? 0.08 : 0.35;
       if (moving) {
-        time += delta * rate;
+        time += extra ? delta * (rate + extra.rate) * (1 - extra.error) : delta * rate;
+        const turn = current.reducedMotion ? 0.03 : 0.12;
         spinAngle =
-          (spinAngle + delta * (current.reducedMotion ? 0.03 : 0.12)) %
+          (spinAngle + delta * (extra ? Math.max(0, turn + extra.spin) : turn)) %
           (Math.PI * 2);
+        if (levels) shimmerTime = (shimmerTime + levels.shimmer * SHIMMER_SPEED * delta) % 10000;
       }
       spinMatrix.setFromMatrix4(
         spinRotation.makeRotationAxis(SPIN_AXIS, spinAngle),
@@ -186,11 +212,11 @@ function buildScene(
         idleColor: interactionFrame.idleColor,
         rippleDir: interactionFrame.rippleDir, rippleTime: interactionFrame.rippleTime,
         time,
-        life: 0.22,
+        life: 0.22 + (extra?.life ?? 0),
         stir: 0,
-        glow: 0.35 + tones.strength * 0.75,
-        level: 0,
-        error: 0,
+        glow: 0.35 + tones.strength * 0.75 + (extra?.glow ?? 0),
+        level: extra ? orbShimmerLevel(shimmerTime) * extra.shimmerAmount : 0,
+        error: extra?.error ?? 0,
         spin: spinMatrix,
         mode: current.mode,
         tones: { base: tones.base, deep: tones.deep, glow: tones.light },

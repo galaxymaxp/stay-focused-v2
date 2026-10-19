@@ -27,9 +27,9 @@ import { generationSteps } from "./generation-steps";
 // apps/mobile/src/features/redesign/GenerationScreen.tsx.
 
 // three.js loads only with the Generation screen, not the Queue list.
-const KnowledgeCore = dynamic(
-  () => import("./knowledge-core/KnowledgeCore").then((m) => m.KnowledgeCore),
-  { ssr: false, loading: () => <div className="knowledge-core" /> },
+const GenerationOrb = dynamic(
+  () => import("./day-clock/GenerationOrb").then((m) => m.GenerationOrb),
+  { ssr: false, loading: () => <div className="generation-orb" /> },
 );
 
 const typeLabel = (job: ProcessingJobStatusView) =>
@@ -266,7 +266,7 @@ export function GenerationScreen({ id }: { id: string }) {
       {job.data && (
         <div className="generation generation-layout">
           <div className="generation-orb-pane">
-            <KnowledgeCore
+            <GenerationOrb
               state={
                 preparingSource
                   ? jobCoreState(job.data.status)

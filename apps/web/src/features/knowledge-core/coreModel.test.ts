@@ -98,3 +98,29 @@ describe("web job status mapping", () => {
       expect(jobCoreState(status)).toBe("error");
   });
 });
+
+describe("Today orb generation levels", () => {
+  it("adds nothing for idle or settled completion and winds failure down to still", async () => {
+    const { createCoreLevels, coreLevelsExtra, stepCoreLevels } = await import("./coreModel");
+    const idle = coreLevelsExtra(createCoreLevels("idle", false), false);
+    expect(idle).toMatchObject({ life: 0, glow: 0, rate: 0, shimmerAmount: 0, error: 0, lively: false });
+    expect(idle.spin).toBeCloseTo(0);
+    let levels = createCoreLevels("generating", false);
+    expect(coreLevelsExtra(levels, false).lively).toBe(true);
+    levels = stepCoreLevels(levels, "complete", 0.016, false);
+    expect(levels.flash).toBe(1);
+    for (let i = 0; i < 200; i++) levels = stepCoreLevels(levels, "complete", 0.016, false);
+    expect(levels.flash).toBe(0);
+    expect(coreLevelsExtra(levels, false).life).toBeCloseTo(0, 3);
+    for (let i = 0; i < 200; i++) levels = stepCoreLevels(levels, "error", 0.016, false);
+    const failed = coreLevelsExtra(levels, false);
+    expect(failed.error).toBeCloseTo(1, 3);
+    expect(0.12 + failed.spin).toBeLessThanOrEqual(0);
+  });
+  it("snaps under Reduced Motion without a completion brighten", async () => {
+    const { createCoreLevels, stepCoreLevels } = await import("./coreModel");
+    const levels = stepCoreLevels(createCoreLevels("generating", true), "complete", 0.016, true);
+    expect(levels.flash).toBe(0);
+    expect(levels.activity).toBe(CORE_MOTION_PROFILES.idle.activity);
+  });
+});
