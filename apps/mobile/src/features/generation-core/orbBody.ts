@@ -3,20 +3,31 @@ import * as THREE from "three";
 export const ORB_RADIUS = 0.95;
 
 const VERTEX = `
-uniform vec3 uBulgeDir;
-uniform float uBulgeAmount;
+uniform vec3 uRippleDir;
+uniform float uRippleTime;
 varying vec3 vNormal;
 varying vec3 vWorldPosition;
+// Great-circle wave packet: about two crests, travelling pole to antipode.
+float rippleHeight(float d, float t) {
+  float front = 3.4906585 * t;
+  float packet = 1.0 - smoothstep(0.15, 0.8, abs(d - front));
+  float envelope = pow(sin(3.14159265 * t / 0.9), 2.0) * exp(-2.0 * t);
+  return 0.12 * envelope * sin(16.0 * d - 55.850536 * t) * packet;
+}
 void main() {
   vec3 displaced = position;
   vec3 surfaceNormal = normal;
-  // Uniform zero fast path retains the original idle vertex/shading work.
-  if (uBulgeAmount > 0.0) {
-    float alignment = max(dot(normal, uBulgeDir), 0.0);
-    float height = 0.18 * uBulgeAmount * pow(alignment, 12.0);
+  // Off and exact endpoints preserve the original position and normal.
+  if (uRippleTime > 0.0 && uRippleTime < 0.9) {
+    float alignment = clamp(dot(normal, uRippleDir), -1.0, 1.0);
+    float d = acos(alignment);
+    float height = rippleHeight(d, uRippleTime);
     displaced = position + normal * height;
-    vec3 slope = (uBulgeDir - normal * alignment) * (2.16 * uBulgeAmount * pow(alignment, 11.0));
-    surfaceNormal = normal - slope / (length(position) + height);
+    // Differentiate the very same displacement; avoid singularities at the poles.
+    float slope = (rippleHeight(min(3.14159265, d + 0.002), uRippleTime)
+      - rippleHeight(max(0.0, d - 0.002), uRippleTime)) / 0.004;
+    vec3 tangent = (normal * alignment - uRippleDir) / max(sin(d), 0.002);
+    surfaceNormal = normal - tangent * slope / (length(position) + height);
   }
   vec4 world = modelMatrix * vec4(displaced, 1.0);
   vWorldPosition = world.xyz;
@@ -112,8 +123,8 @@ const TONES = {
 } as const;
 
 export interface OrbBodyFrame {
-  readonly bulgeDir?: { readonly x: number; readonly y: number; readonly z: number };
-  readonly bulgeAmount?: number;
+  readonly rippleDir?: { readonly x: number; readonly y: number; readonly z: number };
+  readonly rippleTime?: number;
   /** Pass only for idle: generation states retain their authoritative appearance. */
   readonly idleColor?: string;
   readonly time: number;
@@ -139,7 +150,7 @@ export function createOrbBody() {
     uBase: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uGlowColor: { value: new THREE.Color() },
     uEnvFloor: { value: new THREE.Color() }, uEnvSky: { value: new THREE.Color() },
     uLight: { value: new THREE.Vector3() },
-    uBulgeDir: { value: new THREE.Vector3(0, 0, 1) }, uBulgeAmount: { value: 0 },
+    uRippleDir: { value: new THREE.Vector3(0, 0, 1) }, uRippleTime: { value: -1 },
   };
   const geometry = new THREE.SphereGeometry(ORB_RADIUS, 96, 64);
   const material = new THREE.ShaderMaterial({
@@ -159,10 +170,10 @@ export function createOrbBody() {
       uniforms.uGlowColor.value.set(frame.idleColor ?? tones.glow);
       uniforms.uEnvFloor.value.set(TONES[frame.mode].envFloor);
       uniforms.uEnvSky.value.set(TONES[frame.mode].envSky);
-      const dir = frame.bulgeDir;
-      uniforms.uBulgeDir.value.set(dir?.x ?? 0, dir?.y ?? 0, dir?.z ?? 1);
-      uniforms.uBulgeAmount.value = frame.bulgeAmount ?? 0;
-      if (frame.light) uniforms.uLight.value.set(frame.light.x, frame.light.y, frame.light.z);
+      const dir = frame.rippleDir;
+      uniforms.uRippleDir.value.set(dir?.x ?? 0, dir?.y ?? 0, dir?.z ?? 1);
+      uniforms.uRippleTime.value = frame.rippleTime ?? -1;
+      uniforms.uLight.value.set(frame.light?.x ?? 0, frame.light?.y ?? 0, frame.light?.z ?? 0);
       uniforms.uTime.value = frame.time;
       uniforms.uLife.value = frame.life;
       uniforms.uStir.value = frame.stir;
