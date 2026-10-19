@@ -9,6 +9,7 @@ import { useAuth } from "./providers";
 import { QueueButton } from "./queue-button";
 import { Icon, Notice } from "./ui";
 import { Avatar } from './avatar';
+import { OrbPreferencesSync } from './orb-preferences-sync';
 import { ProfileAvatarProvider, useProfileAvatar } from './profile-avatar';
 const tabs = [
   { href: "/today", label: "Today", icon: "clock" },
@@ -21,7 +22,7 @@ const tools = [
   { href: "/canvas", label: "Canvas", icon: "globe" },
 ];
 export function Shell({ children }: { children: ReactNode }) {
-  return <ProfileAvatarProvider><QueueReadProvider><ShellContent>{children}</ShellContent></QueueReadProvider></ProfileAvatarProvider>;
+  return <ProfileAvatarProvider><OrbPreferencesSync /><QueueReadProvider><ShellContent>{children}</ShellContent></QueueReadProvider></ProfileAvatarProvider>;
 }
 function ShellContent({ children }: { children: ReactNode }) {
   const { session, loading, error } = useAuth(),

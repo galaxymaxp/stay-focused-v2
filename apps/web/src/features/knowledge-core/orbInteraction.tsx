@@ -1,5 +1,5 @@
 "use client";
-import { beginOrbGesture, createOrbInteraction, endOrbGesture, moveOrbGesture, orbIdleColor, ORB_COLOR_KEY, ORB_HOLD_MS, parseOrbColorKey, legacyOrbIndexToKey, orbColorIndex, ORB_LEGACY_COLOR_KEY, ORB_IDLE_PALETTE, projectTapToSphere, type OrbInteraction } from '@stay-focused/shared';
+import { beginOrbGesture, createOrbInteraction, endOrbGesture, moveOrbGesture, orbIdleColor, ORB_COLOR_KEY, ORB_HOLD_MS, parseOrbColorKey, legacyOrbIndexToKey, orbColorIndex, ORB_LEGACY_COLOR_KEY, ORB_IDLE_PALETTE, projectTapToSphere, type OrbColorKey, type OrbInteraction } from '@stay-focused/shared';
 import { useEffect, useMemo, useRef, type MutableRefObject, type PointerEvent } from 'react';
 import { readLocalPreference, writeLocalPreference } from '../../lib/local-preference';
 export interface OrbInteractionHandle {
@@ -13,10 +13,22 @@ export function readOrbColor(): number {
   if (saved === null) writeLocalPreference(ORB_COLOR_KEY, key);
   return orbColorIndex(key);
 }
-export const rememberOrbColor = (index: number) => writeLocalPreference(ORB_COLOR_KEY, ORB_IDLE_PALETTE[index]?.key ?? 'pearl');
+const choices = new Set<(key: OrbColorKey) => void>();
+export function subscribeOrbColorChoices(listener: (key: OrbColorKey) => void) {
+  choices.add(listener); return () => { choices.delete(listener); };
+}
+export function applySyncedOrbColor(key: OrbColorKey) {
+  writeLocalPreference(ORB_COLOR_KEY, key);
+  listeners.forEach(listener => listener(orbColorIndex(key)));
+}
+export function rememberOrbColor(index: number) {
+  const key = ORB_IDLE_PALETTE[index]?.key ?? 'pearl';
+  applySyncedOrbColor(key);
+  choices.forEach(listener => listener(key));
+}
 const listeners = new Set<(index: number) => void>();
 export function useOrbInteraction(supplied?: OrbInteractionHandle): OrbInteractionHandle {
-  const state = useRef(createOrbInteraction());
+  const state = useRef(createOrbInteraction(readOrbColor()));
   const wake = useRef<(() => void) | null>(null);
   const ringDragging = useRef(false);
   useEffect(() => {
@@ -50,7 +62,7 @@ export function OrbPointerLayer({ interaction, fill, reducedMotion }: { interact
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     if (previous !== interaction.state.current.colorIndex) {
       const index = interaction.state.current.colorIndex;
-      rememberOrbColor(index); listeners.forEach(listener => listener(index));
+      rememberOrbColor(index);
     }
     interaction.wake.current?.();
   };
