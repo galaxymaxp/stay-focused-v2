@@ -8,15 +8,16 @@ import { Notice } from "../components/ui";
 import { LegalLinks } from '../components/legal-links';
 import { sharedReturnPath } from '@stay-focused/shared';
 import { useAction } from "../lib/hooks";
+import { requestWebPasswordReset } from "./password-reset";
 export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
-  const { client, session, loading, error, theme, setTheme } = useAuth(),
+  const { client, session, loading, error, theme, setTheme, recoveryRequired } = useAuth(),
     router = useRouter();
   const [email, setEmail] = useState(""),
     [password, setPassword] = useState("");
   const action = useAction();
   useEffect(() => {
-    if (!loading && session) router.replace(sharedReturnPath(new URLSearchParams(location.search).get('next')));
-  }, [loading, session, router]);
+    if (!loading && session) router.replace(recoveryRequired ? '/auth/reset' : sharedReturnPath(new URLSearchParams(location.search).get('next')));
+  }, [loading, session, recoveryRequired, router]);
   // Set by the OAuth callback when Google or Microsoft did not finish.
   const [oauthFailed, setOauthFailed] = useState(false);
   const [returnPath, setReturnPath] = useState('/today');
@@ -70,6 +71,12 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
           "Check your email to confirm your account, then sign in.",
         );
       }
+    });
+  }
+  function forgotPassword() {
+    void action.run(async () => {
+      if (!client) throw new Error("Sign-in is not configured for this environment.");
+      action.setMessage(await requestWebPasswordReset(client, email, location.origin));
     });
   }
   return (
@@ -135,6 +142,7 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
               onChange={(event) => setPassword(event.target.value)}
             />
           </label>
+          {!signUp && <button type="button" className="link-button subtle" disabled={loading || !client || action.busy} onClick={forgotPassword}>Forgot password?</button>}
           {action.message && <Notice>{action.message}</Notice>}
           <button
             className="primary"

@@ -22,6 +22,9 @@ const tools = [
   { href: "/canvas", label: "Canvas", icon: "globe" },
 ];
 export function Shell({ children }: { children: ReactNode }) {
+  const { recoveryRequired } = useAuth();
+  // Do not mount private screen readers while the recovery password is pending.
+  if (recoveryRequired) return <main className="auth-page"><BookLoader label="Opening password reset" /></main>;
   return <ProfileAvatarProvider><OrbPreferencesSync /><QueueReadProvider><ShellContent>{children}</ShellContent></QueueReadProvider></ProfileAvatarProvider>;
 }
 function ShellContent({ children }: { children: ReactNode }) {

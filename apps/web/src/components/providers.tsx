@@ -1,5 +1,5 @@
 "use client";
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   createClient,
   type Session,
@@ -11,11 +11,13 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { purgeScreenSnapshots } from "../lib/screen-snapshots";
 import { createApi, type Api } from "../lib/api";
+import { RECOVERY_OWNER_KEY, recoveryParams } from "../features/password-reset";
 
 type Preference = "system" | "light" | "dark";
 interface AuthState {
@@ -27,6 +29,8 @@ interface AuthState {
   theme: Preference;
   setTheme: (value: Preference) => void;
   signOut: () => Promise<void>;
+  recoveryRequired: boolean;
+  completePasswordRecovery: () => void;
 }
 const Context = createContext<AuthState | null>(null);
 let singleton: SupabaseClient | null = null;
@@ -39,7 +43,9 @@ function browserClient() {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true,
+      // auth-js rejects implicit hashes in PKCE mode. Those recovery links
+      // are established explicitly below; PKCE keeps automatic code exchange.
+      detectSessionInUrl: recoveryParams(location.search, location.hash).kind !== "hash",
       flowType: "pkce",
       storageKey: "stay-focused-web-auth",
     },
@@ -65,11 +71,24 @@ function PublicTheme({ children }: { children: ReactNode }) {
   return children;
 }
 function AuthenticatedProviders({ children }: { children: ReactNode }) {
+  const router = useRouter(), pathname = usePathname();
   const [client, setClient] = useState<SupabaseClient | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true),
     [error, setError] = useState<string | null>(null);
   const [theme, updateTheme] = useState<Preference>("system");
+  const [recoveryOwner, setRecoveryOwner] = useState<string | null>(null);
+  const recoveryOwnerRef = useRef<string | null>(null);
+  const hashCompletion = useRef<Promise<Session | null> | null>(null);
+  const recoveryRequired = Boolean(session && recoveryOwner === session.user.id);
+  const completePasswordRecovery = useCallback(() => {
+    recoveryOwnerRef.current = null;
+    setRecoveryOwner(null);
+    try { sessionStorage.removeItem(RECOVERY_OWNER_KEY); } catch { /* In-memory guard remains available. */ }
+  }, []);
+  useEffect(() => {
+    if (recoveryRequired && pathname !== "/auth/reset") router.replace("/auth/reset");
+  }, [recoveryRequired, pathname, router]);
   useEffect(() => {
     try {
       const stored = localStorage.getItem("stay-focused-web-theme");
@@ -77,6 +96,14 @@ function AuthenticatedProviders({ children }: { children: ReactNode }) {
     } catch {
       /* OS preference still works if storage is unavailable. */
     }
+    // Capture before SDK initialization consumes the code or clears the hash.
+    const link = recoveryParams(location.search, location.hash);
+    recoveryOwnerRef.current = null;
+    try {
+      // A second, invalid link must not clear an already accepted recovery
+      // session and let it bypass the password step. Bind evidence to its owner.
+      recoveryOwnerRef.current = sessionStorage.getItem(RECOVERY_OWNER_KEY);
+    } catch { /* Storage may be unavailable; current-visit recovery still works. */ }
     let auth: SupabaseClient | null;
     try {
       auth = browserClient();
@@ -92,27 +119,53 @@ function AuthenticatedProviders({ children }: { children: ReactNode }) {
       return;
     }
     let observedOwner: string | null = null;
-    const acceptSession = (next: Session | null) => {
+    const acceptSession = (next: Session | null, recovery = false) => {
       if (observedOwner && observedOwner !== next?.user.id) void purgeScreenSnapshots(observedOwner);
       observedOwner = next?.user.id ?? null;
+      if (recovery && next) recoveryOwnerRef.current = next.user.id;
+      if (!next || recoveryOwnerRef.current !== next.user.id) recoveryOwnerRef.current = null;
+      setRecoveryOwner(recoveryOwnerRef.current);
+      try {
+        if (recoveryOwnerRef.current) sessionStorage.setItem(RECOVERY_OWNER_KEY, recoveryOwnerRef.current);
+        else sessionStorage.removeItem(RECOVERY_OWNER_KEY);
+      } catch { /* Keep the in-memory guard when storage is unavailable. */ }
       setSession(next);
     };
     let alive = true,
       revision = 0;
     const {
       data: { subscription },
-    } = auth.auth.onAuthStateChange((_event, next) => {
+    } = auth.auth.onAuthStateChange((event, next) => {
       revision++;
       if (alive) {
-        acceptSession(next);
-        setLoading(false);
+        acceptSession(next, event === "PASSWORD_RECOVERY");
+        // Explicit hash establishment must finish before publishing readiness.
+        if (link.kind !== "hash") setLoading(false);
         setError(null);
       }
     });
     const initialRevision = revision;
-    void auth.auth
-      .getSession()
-      .then(({ data, error: failure }) => {
+    const activeClient = auth;
+    if (link.kind === "hash") {
+      hashCompletion.current ??= activeClient.auth.setSession({ access_token: link.access_token, refresh_token: link.refresh_token })
+        .then(({ data, error: failure }) => failure ? null : data.session)
+        .catch(() => null);
+    }
+    void (async () => {
+      if (link.kind === "hash") {
+        const recovered = await hashCompletion.current;
+        if (!alive) return;
+        // Remove credentials from browser history even on failure.
+        window.history.replaceState(window.history.state, "", location.pathname + location.search);
+        acceptSession(recovered, Boolean(recovered));
+        setLoading(false);
+        return;
+      }
+      return activeClient.auth.getSession();
+    })()
+      .then((result) => {
+        if (!result) return;
+        const { data, error: failure } = result;
         if (alive && revision === initialRevision) {
           acceptSession(data.session);
           setError(
@@ -182,7 +235,7 @@ function AuthenticatedProviders({ children }: { children: ReactNode }) {
   );
   return (
     <Context.Provider
-      value={{ client, session, loading, error, api, theme, setTheme, signOut }}
+      value={{ client, session, loading, error, api, theme, setTheme, signOut, recoveryRequired, completePasswordRecovery }}
     >
       {children}
     </Context.Provider>
