@@ -47,9 +47,9 @@ vi.mock("./useExperience", () => ({
   useExperienceClient: () => mocks.client,
   useExperience: () => ({ data: mocks.generation, error: null, refresh: vi.fn() }),
 }));
-vi.mock("../../design/theme", () => ({ useTheme: () => ({ reducedMotion: true, colors: {} }) }));
+vi.mock("../../design/theme", () => ({ useTheme: () => ({ reducedMotion: true, colors: { success: "success", separator: "separator" } }) }));
 vi.mock("../../design/primitives", () => ({
-  Action: "Action", Copy: "Copy", Notice: "Notice", Page: "Page", Surface: "Surface", RowLink: "RowLink", ContentIcon: "ContentIcon",
+  Action: "Action", Copy: "Copy", Notice: "Notice", Page: "Page", Surface: "Surface", RowLink: "RowLink", ContentIcon: "ContentIcon", SkeletonBlock: "SkeletonBlock",
 }));
 vi.mock("lucide-react-native", () => ({ CheckCircle2: "CheckCircle2", CircleDashed: "CircleDashed", Clock3: "Clock3", AlertCircle: "AlertCircle" }));
 vi.mock("react-native", () => ({
@@ -127,6 +127,45 @@ describe("generation action spacing", () => {
     mocks.read.mockResolvedValue([pending]);
     await act(async () => reconnect.props.onPress());
     expect(root.findAll(node => String(node.type) === "Action").map(node => node.props.children)).toEqual(["Start generation", "View Queue"]);
+  });
+});
+
+describe("compact generation progress", () => {
+  const running = (state: GenerationView["state"], progress: GenerationView["progress"] = null): GenerationView => ({
+    id: "job-id", state, artifactId: null, updatedAt: new Date().toISOString(), progress, error: null,
+  });
+  it("renders the Today orb with the job state and a shimmering bar under the status line while running", async () => {
+    mocks.params = { id: "job-id" };
+    mocks.generation = running("generating");
+    const root = await render(createElement(GenerationScreen));
+    expect(root.findAll(node => String(node.type) === "GenerationCore")[0]!.props.state).toBe("generating");
+    const bar = root.findByProps({ testID: "generation-progress" });
+    const progress = bar.parent!, siblings = progress.parent!.children;
+    expect((progress.type as { name?: string }).name).toBe("GenerationProgress");
+    expect(siblings.indexOf(progress)).toBe(1);
+    expect((siblings[0] as { type: { name?: string } }).type.name).toBe("GenerationStatus");
+    expect(bar.findAll(node => String(node.type) === "SkeletonBlock")[0]!.props).toMatchObject({ width: "100%", height: 3 });
+    expect(bar.findAllByProps({ testID: "generation-progress-fill" })).toHaveLength(0);
+    expect(bar.findAll(node => String(node.type) === "Copy")).toHaveLength(0);
+  });
+  it("fills by real section progress during Building study material with its caption", async () => {
+    mocks.params = { id: "job-id" };
+    mocks.generation = running("generating", { completed: 3, total: 18, unit: "sections" });
+    const root = await render(createElement(GenerationScreen));
+    const bar = root.findByProps({ testID: "generation-progress" });
+    expect(bar.findByProps({ testID: "generation-progress-fill" }).props.style).toMatchObject({ width: `${(3 / 18) * 100}%`, backgroundColor: "success" });
+    expect(bar.findAll(node => String(node.type) === "SkeletonBlock")[0]!.props.width).toBe(`${(15 / 18) * 100}%`);
+    expect(bar.findAll(node => String(node.type) === "Copy")[0]!.props.children).toBe("3 of 18 sections");
+  });
+  it.each([
+    ["completed", running("completed")],
+    ["failed", { ...running("failed"), error: { code: "generation_failed", title: "Could not finish", message: "Could not finish.", retryable: true, action: "retry" } } as GenerationView],
+    ["stalled", { ...running("queued"), updatedAt: "2020-01-01T00:00:00Z" }],
+  ] as const)("hides the bar once %s", async (_name, view) => {
+    mocks.params = { id: "job-id" };
+    mocks.generation = view;
+    const root = await render(createElement(GenerationScreen));
+    expect(root.findAllByProps({ testID: "generation-progress" })).toHaveLength(0);
   });
 });
 

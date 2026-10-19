@@ -6,10 +6,10 @@ import { isProcessingJobRetryDenied, processingJobStoppedMessage } from "@stay-f
 
 
 import { useAuth } from "../../auth";
-import { Action, Copy, Notice, Page } from "../../design/primitives";
+import { Action, Copy, Notice, Page, SkeletonBlock } from "../../design/primitives";
 import { useAppActivity } from "../../design/appActivity";
 import { useTheme } from "../../design/theme";
-import { spacing } from "../../design/tokens";
+import { radius, spacing } from "../../design/tokens";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import {
   acceptGeneration,
@@ -185,6 +185,11 @@ export function GenerationScreen() {
           style={{ alignItems: "center", gap: 0, width: "100%" }}
         >
           <GenerationStatus message={stalled ? "Still waiting to start" : data ? isDraft && data.state === "completed" ? "Draft ready" : generationMessages[data.state] : id ? "Connecting to your generation…" : intent && !autoStart ? "Ready to start" : "Starting your request…"} />
+          {data && running && !stalled ? (
+            <GenerationProgress
+              progress={data.progress && (data.progress.unit === "pages" || generation.job?.stage === "generating_sections") ? data.progress : null}
+            />
+          ) : null}
           <GenerationCore state={generationCoreState(data?.state ?? null, !!id)} />
           <Copy muted size="bodySmall" style={{ textAlign: "center", textAlignVertical: "center", width: 270, minHeight: 56, lineHeight: 20 }}>
             {id
@@ -255,6 +260,31 @@ export function GenerationScreen() {
         )}
       </View>
     </Page>
+  );
+}
+
+/**
+ * Compact progress under the status line: one thin bar with the app's
+ * skeleton shimmer while running, filled by the server's real section (or
+ * page) count when it reports one. Holds still under Reduce Motion.
+ */
+function GenerationProgress({ progress }: { progress: { completed: number; total: number; unit: string } | null }) {
+  const { colors } = useTheme();
+  const filled = progress ? Math.min(1, progress.completed / progress.total) : 0;
+  return (
+    <View testID="generation-progress" style={{ width: 240, alignItems: "center", gap: spacing[2], marginBottom: spacing[2] }}>
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        style={{ width: "100%", height: 3, flexDirection: "row", overflow: "hidden", borderRadius: radius.pill, backgroundColor: colors.separator }}
+      >
+        {filled > 0 ? <View testID="generation-progress-fill" style={{ width: `${filled * 100}%`, backgroundColor: colors.success }} /> : null}
+        {filled < 1 ? <SkeletonBlock width={`${(1 - filled) * 100}%`} height={3} radius={0} /> : null}
+      </View>
+      {progress ? (
+        <Copy muted size="caption">{`${progress.completed} of ${progress.total} ${progress.unit}`}</Copy>
+      ) : null}
+    </View>
   );
 }
 
