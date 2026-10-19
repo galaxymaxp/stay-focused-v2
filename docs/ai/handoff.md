@@ -8007,3 +8007,106 @@ Scheduler action, email, deployment, environment-file edit or push ran.
 
 Ignored progress/status: `tmp/overnight/OF1.progress` and `OF1.status`.
 No later overnight task or AN1 resumption started.
+
+
+## OR3 unattended orb interaction - STOPPED (2026-10-19)
+
+**Status: STOPPED before STEP 1.** Full prompt and overriding UNATTENDED rules
+read. No question sent to the absent owner. Baseline a68072f, branch
+overnight/2026-10-15_feedback retained; tracked entry tree clean. Original
+untracked UI/, apps/mobile/.gitignore, supabase/.temp/ and ignored tmp/
+preserved and unstaged. Cached upstream: 2 behind / 33 ahead; no fetch.
+
+This is a material internal requirements conflict, not missing live state or
+an unreachable ring handle. AUTOPILOT requires owner judgment for unresolved
+material requirements conflicts; UNATTENDED rule 4 supplies this stop and
+checkpoint procedure. No product code was changed or requirement weakened.
+
+### Findings and exact owner question
+
+The specified exponential exp(-dt / 1.4), stopping below 0.01 rad/s, gives
+t = 1.4 * ln(v0 / 0.01). A 6 rad/s flick takes **8.955701517 s** to cross
+the cutoff; 1 rad/s takes **6.447238260 s**. OR3's mandatory tests require
+**2.5-5 s** and **under 2 s** respectively. Discrete frames only cross later;
+EMA cannot change tests with specified starting velocities. Keeping the pure
+exponential and cutoff, both timing tests need a time constant approximately
+0.390812489 <= tau < 0.434294482. Tau 0.4 gives 2.558771862 / 1.842068074 s,
+materially different from 1.4. Extra braking/truncation would also change the
+specified model. The code cannot satisfy all these numerical requirements.
+
+**Exact owner question for a later attended run:** Should OR3 preserve the
+specified exp(-dt / 1.4) friction and 0.01 rad/s cutoff and revise stopping-time
+tests to approximately 8.96 s / 6.45 s, or preserve the required 2.5-5 s /
+under-2 s tests and authorize a roughly 0.4 s time constant (or explicitly
+specify a different braking model)?
+
+STEP 0 is partial, with source findings preserved for resume. Both ring move
+handlers can reach existing orbInteraction handles without Today restructuring.
+Body uSpin transforms liquid only; uLight is world-space, Today-supplied from
+tones.position and centered by default in KnowledgeCore. Both aura adapters
+accept per-frame offset/color. Native SVG currently uses fixed center/day tint;
+installed Shape has setNativeProps, warranting investigation before deciding
+tracking versus the approved removal fallback. No tracking attempt/removal
+decision is claimed. Neutral #E6EAF1 already exists in both light body palettes.
+Mobile's page touch pause excludes only orb rotation today. Tests that need
+updating and the acceptance matrix are in the [OR3 preflight](acceptance/or3-orb-momentum-preflight.md).
+
+### Commit and verification
+
+Local checkpoint commit: **docs: record OR3 momentum requirements conflict**,
+author galaxymaxp <omgraythekid@gmail.com> via --author. Final commit hash is
+recorded in Git and ignored tmp/overnight/OR3.status; no implementation commit.
+
+| Exact command | Result / counts |
+| --- | --- |
+| node tmp/overnight/OR3-momentum-preflight.mjs | FRESH diagnostic; exit 1; 6/6 mathematical assertions PASS, 0/2 timing bounds compatible |
+| npm run typecheck -- --force | NOT RUN, 0 tasks; requirements STOP |
+| npm run lint -- --force | NOT RUN, 0 tasks; requirements STOP |
+| npm run test --workspace @stay-focused/shared | NOT RUN, 0 tests; requirements STOP |
+| npm run test --workspace @stay-focused/api | NOT RUN, 0 tests; requirements STOP |
+| npm run test --workspace @stay-focused/mobile | NOT RUN, 0 tests; requirements STOP |
+| npm run test --workspace @stay-focused/web | NOT RUN, 0 tests; requirements STOP |
+| npm run build --workspace @stay-focused/api | NOT RUN, 0 builds; requirements STOP |
+| npm run build --workspace @stay-focused/web | NOT RUN, 0 builds; requirements STOP |
+| npm run build --workspace @stay-focused/mobile -- --platform android | NOT RUN, 0 exports; requirements STOP |
+| npm run build -- --force (AUTOPILOT) | NOT RUN, 0 tasks; requirements STOP |
+| git diff --check and git diff --cached --check | FRESH PASS, 0 whitespace errors |
+
+Prompt gates: 1/10 checked (diff hygiene), 9/10 NOT RUN. No product test or
+completion claim. Documentation preservation check: FRESH PASS, 4/4 existing
+files retain all pre-existing bytes; 4/4 newly added OR3 report links resolve.
+The exit-1 mathematical diagnostic is retained as a requirements incompatibility,
+not relabelled as a passing suite. No test flake or implementation gate attempt.
+The first documentation helper exited 1 before writing because Git object LF
+bytes differed from the clean checkout's CRLF; normalized baseline comparison
+and byte-preserving insertion correct that tooling assertion on the retry.
+One exploratory rg glob was invalid under Windows (os error 123); reads and
+explicit source paths still establish the inspected baseline. No file changed
+as a result. No ADR decision was made; ADR-048 remains unchanged.
+
+Current-state, roadmap and sprint record this checkpoint without superseding
+prior completed scopes. Only five owned Markdown paths are staged; all tmp
+diagnostics, progress/status and original untracked paths stay uncommitted.
+
+**UNVERIFIED (owner to confirm):** deployed API/mobile/website revisions,
+database/applied-migration/Scheduler state, remote-ref freshness and actual
+physical/authenticated-browser behavior. No Supabase, Vercel, Google Cloud,
+Canvas or Resend call, remote SQL/migration application, Scheduler action,
+email, deployment, environment-file access/edit, branch switch or push ran.
+
+### Owner steps remaining
+
+- Resolve the exact physics question above, then resume STEP 1-5, shared and
+  renderer/ring/storage regressions, all gates and implementation commits.
+- **Rollout - NOT RUN, skipped entirely:** after a later reviewed implementation,
+  owner chooses website/mobile publication separately.
+- **Device checks - NOT RUN, skipped entirely:** after implementation, check
+  hard/gentle flicks, both ring edges/block and move-hold-move-release, traveling
+  ripple, tracked glow or approved absence, fresh pearl, preserved legacy gold
+  and Reduce Motion on Realme and desktop browser.
+- Confirm all UNVERIFIED state above. For later owner deployment/env/log work,
+  installing the missing Vercel CLI with npm i -g vercel is strongly recommended;
+  no installation or CLI invocation ran here.
+
+Ignored progress/status: tmp/overnight/OR3.progress and OR3.status.
+OR3 ends at this requirements checkpoint; no later overnight work started.

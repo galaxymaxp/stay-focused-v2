@@ -1,5 +1,25 @@
 # Current State
 
+<!-- OR3 begin -->
+OR3 / orb momentum, ring spin, ripple, glow and pearl (2026-10-19):
+**STOPPED before STEP 1** for a material requirements conflict. The requested
+exponential friction exp(-dt / 1.4) with a 0.01 rad/s cutoff stops 6 rad/s
+after 8.9557 s and 1 rad/s after 6.4472 s, incompatible with the mandatory
+2.5-5 s / under-2 s tests. No product code changed and no alternative physics
+or weakened tests were selected. STEP 0 is partial; both ring paths can reach
+their existing orb interaction handles, so no Today restructuring is needed.
+FRESH local math diagnostic: 6/6 assertions pass, 0/2 timing requirements
+compatible (exit 1). Nine implementation gates and extra root build NOT RUN;
+docs-only preservation/diff checks recorded in the handoff. Full evidence and
+exact owner question: [OR3 preflight](ai/acceptance/or3-orb-momentum-preflight.md).
+Endpoint: requirements checkpoint and scoped local docs commit only. Owner
+must choose the friction formula or authorize revised stopping behavior before
+STEP 1-5 resume. Rollout/Device checks NOT RUN, skipped entirely. Deployed and
+physical state UNVERIFIED (owner to confirm). Branch retained; no remote call,
+environment-file change, deployment, migration application or push.
+<!-- OR3 end -->
+
+
 <!-- OF1 begin -->
 OF1 / automatic offline saving (2026-10-19): **STOPPED at STEP 0**, under
 the prompt's overriding UNATTENDED rules 3-4. Baseline `09e53dd`, branch
