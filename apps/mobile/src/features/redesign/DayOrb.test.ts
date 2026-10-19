@@ -121,3 +121,40 @@ describe("Today orb without an external glow", () => {
     expect(mocks.frame).not.toHaveBeenCalled();
   });
 });
+
+describe("Today orb with a generation state", () => {
+  const uniforms = () => {
+    const scene = mocks.render.mock.lastCall![0] as { children: { children: { material: { uniforms: Record<string, { value: number }> } }[] }[] };
+    return scene.children[0]!.children[0]!.material.uniforms;
+  };
+  const step = () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); };
+  it("keeps Today exactly without a state", async () => {
+    await render(); await startGL(); vi.advanceTimersByTime(80); mocks.frame.mock.lastCall![0](Date.now());
+    expect(uniforms().uLife!.value).toBe(0.22); expect(uniforms().uError!.value).toBe(0); expect(uniforms().uLevel!.value).toBe(0);
+  });
+  it("runs livelier at full frame rate while generating", async () => {
+    await render({ state: "generating" }); await startGL();
+    for (let i = 0; i < 5; i++) step();
+    expect(mocks.render.mock.calls.length).toBeGreaterThanOrEqual(5);
+    expect(uniforms().uLife!.value).toBeGreaterThan(0.6); expect(uniforms().uError!.value).toBe(0);
+  });
+  it("dims a failure to still and stops requesting frames", async () => {
+    await render({ state: "error" }); await startGL();
+    for (let i = 0; i < 40; i++) step();
+    expect(uniforms().uError!.value).toBe(1);
+    const requested = mocks.frame.mock.calls.length;
+    step();
+    expect(mocks.frame.mock.calls.length).toBe(requested);
+  });
+  it("brightens briefly on completion, then returns to Today's idle body", async () => {
+    await render({ state: "generating" }); await startGL();
+    for (let i = 0; i < 3; i++) step();
+    await act(async () => rendered!.update(createElement(DayOrb, { ...props, state: "complete" })));
+    step();
+    const settledGlow = () => uniforms().uGlow!.value;
+    const bright = settledGlow();
+    for (let i = 0; i < 300; i++) step();
+    expect(bright).toBeGreaterThan(settledGlow() + 0.2);
+    expect(uniforms().uLife!.value).toBeCloseTo(0.22, 2);
+  });
+});

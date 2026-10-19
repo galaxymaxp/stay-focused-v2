@@ -83,3 +83,79 @@ export function coreAccessibilityLabel(state: CoreState): string {
     case "error": return "Knowledge Core generation needs attention";
   }
 }
+
+/** Radians per second at full spin (generating), as the Knowledge Core renderer. */
+export const CORE_MAX_SPIN = 0.9;
+
+/** Eased state levels a renderer carries between frames. */
+export interface CoreLevels {
+  readonly state: CoreState;
+  readonly activity: number;
+  readonly error: number;
+  readonly spin: number;
+  readonly shimmer: number;
+  /** Brief brighten after a live completion, decaying to zero. */
+  readonly flash: number;
+}
+
+/** Completion settles as idle after its brief brighten. */
+const levelProfile = (state: CoreState): CoreState =>
+  state === "complete" ? "idle" : state;
+
+export function createCoreLevels(state: CoreState, reducedMotion: boolean): CoreLevels {
+  const target = levelProfile(state);
+  return {
+    state,
+    activity: CORE_MOTION_PROFILES[target].activity,
+    error: CORE_MOTION_PROFILES[target].error,
+    spin: coreSpinTarget(target, reducedMotion),
+    shimmer: coreShimmerTarget(target, reducedMotion),
+    flash: 0,
+  };
+}
+
+/** The Knowledge Core's easing, applied to the state the server last reported. */
+export function stepCoreLevels(
+  levels: CoreLevels,
+  state: CoreState,
+  deltaSeconds: number,
+  reducedMotion: boolean,
+): CoreLevels {
+  const target = levelProfile(state);
+  const profile = CORE_MOTION_PROFILES[target];
+  const ease = reducedMotion ? 1 : 1 - Math.pow(0.002, deltaSeconds);
+  const momentum = reducedMotion ? 1 : 1 - Math.pow(0.12, deltaSeconds);
+  const flash = reducedMotion
+    ? 0
+    : state === "complete" && levels.state !== "complete"
+      ? 1
+      : levels.flash * Math.pow(0.02, deltaSeconds);
+  return {
+    state,
+    activity: levels.activity + (profile.activity - levels.activity) * ease,
+    error: levels.error + (profile.error - levels.error) * ease,
+    spin: levels.spin + (coreSpinTarget(target, reducedMotion) - levels.spin) * momentum,
+    shimmer: levels.shimmer + (coreShimmerTarget(target, reducedMotion) - levels.shimmer) * momentum,
+    flash: flash < 0.005 ? 0 : flash,
+  };
+}
+
+/**
+ * What a state adds to the Today orb's idle body: the Knowledge Core's excess
+ * over its own idle profile. Idle and settled completion add nothing.
+ */
+export function coreLevelsExtra(levels: CoreLevels, reducedMotion: boolean) {
+  const idle = CORE_MOTION_PROFILES.idle;
+  const extra = Math.max(0, levels.activity - idle.activity);
+  return {
+    life: extra * 0.65,
+    glow: extra * 0.5 + levels.flash * 0.35,
+    /** Added radians per second; a failed orb winds down to still. */
+    spin: (levels.spin - coreSpinTarget("idle", reducedMotion)) * CORE_MAX_SPIN,
+    rate: extra * 0.65,
+    shimmerAmount: extra * 0.8 * (1 - levels.error),
+    error: levels.error,
+    /** Still easing or brightening: render at full frame rate. */
+    lively: extra > 0.005 || levels.flash > 0 || (levels.error > 0.005 && levels.error < 0.995),
+  };
+}
