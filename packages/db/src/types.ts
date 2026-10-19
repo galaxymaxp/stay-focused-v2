@@ -611,9 +611,9 @@ export interface Database {
   public: {
     Tables: {
       user_profiles: {
-        Row: { user_id: string; avatar_path: string | null; avatar_updated_at: string | null; avatar_cleanup_paths: string[] };
-        Insert: { user_id: string; avatar_path?: string | null; avatar_updated_at?: string | null; avatar_cleanup_paths?: string[] };
-        Update: { avatar_path?: string | null; avatar_updated_at?: string | null; avatar_cleanup_paths?: string[] };
+        Row: { user_id: string; avatar_path: string | null; avatar_updated_at: string | null; avatar_cleanup_paths: string[]; orb_color: "pearl" | "gold" | "green" | "violet" | "orange" | null; orb_color_updated_at: string | null };
+        Insert: { user_id: string; avatar_path?: string | null; avatar_updated_at?: string | null; avatar_cleanup_paths?: string[]; orb_color?: "pearl" | "gold" | "green" | "violet" | "orange" | null; orb_color_updated_at?: string | null };
+        Update: { avatar_path?: string | null; avatar_updated_at?: string | null; avatar_cleanup_paths?: string[]; orb_color?: "pearl" | "gold" | "green" | "violet" | "orange" | null; orb_color_updated_at?: string | null };
         Relationships: [];
       };
       material_descriptions: {
