@@ -1,3 +1,30 @@
+
+<!-- OF1b begin -->
+OF1b / automatic offline saving (2026-10-19): **PASS for the finite unattended
+local code scope**. STEP 0-3, tests, all 10 prompt gates, additional forced root
+build, documentation and local commits complete. Baseline 9bf8335; branch
+overnight/2026-10-15_feedback retained. OF1b owner answers supersede OF1's STOP.
+AppLifecycle remains owner; the Library joins. Limited body runs automatically
+continue, transient errors back off, and local SQLite migration 10 records
+version-bound permanent failures on existing artifact rows. Per-item
+notifications drive current/total/failedPermanent captions on both Library
+surfaces. Sync/generation changes arriving mid-flight request a later list
+recheck. Inventory walks beyond ten pages. No NetInfo/shared reconnect listener
+exists; foreground/session restoration plus idle active retries are the approved
+fallback. OI1 image scheduling/caps/cleanup and image-aware readiness remain.
+Both caption twins have exact wording; web has no offline mode or caption caller.
+Commits: 5bc6652 (mobile), 9a38527 (web); docs hash in Git/OF1b.status.
+FRESH PASS: typecheck/lint/root build 8/8 tasks each, 0 cached; 6 existing lint
+warnings. Shared 596, API 2433 / 3 intentional live skips, mobile 1546, web 391
+tests pass. API/web builds 36/36 and 22/22 pages; Android export and diff checks
+pass. Failed first attempts and final verification repeats are recorded.
+Rollout and Device checks NOT RUN, skipped entirely; live state and physical
+reconnect behavior UNVERIFIED (owner to confirm). No deployment, external call,
+remote SQL/migration, Scheduler, email, environment-file edit or push. Original
+untracked paths preserved. No later task started; owner rollout/device review
+remains. [Acceptance and exact gates](acceptance/of1b-offline-continuation.md).
+<!-- OF1b end -->
+
 <!-- AN1b begin -->
 AN1b / announcement read on open (2026-10-19): **PASS for the finite unattended
 local code scope**. STEP 0-3, both apps, regression tests, all 10 prompt gates,

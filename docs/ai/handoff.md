@@ -8408,3 +8408,119 @@ requested or invoked by the implementation workflow.
 
 Ignored progress/status: `tmp/overnight/AN1b.progress` and `AN1b.status`.
 Endpoint AN1b only; no rollout, device work or later task started.
+
+
+## OF1b / automatic offline saving - PASS locally (2026-10-19)
+
+**Status: PASS for the finite unattended local code scope.** Read OF1b in full,
+including its overriding UNATTENDED rules. STEP 0-3, tests, all 10 prompt gates,
+additional forced root build, documentation and local commits are complete.
+Baseline `9bf8335`; branch `overnight/2026-10-15_feedback` retained. Tracked
+entry tree was clean. Reused `a68072f`/OF1 findings, then verified the same
+limits, app-level ownership and blur independence on HEAD. The OF1 owner
+question is resolved by OF1b's explicit answers. SP1/OI1 handoffs and ADR-027 /
+ADR-043 were reviewed. No later overnight task was started.
+
+### What changed
+
+- AppLifecycle remains the owner; the Library-focused trigger remains a joiner.
+  Active/offline-session admission cancels body work/timers when suspended.
+  Foreground and restored online sessions resume it. There is no NetInfo or
+  shared native reconnect listener in the installed app; release checks use
+  isolated reachability probes. The explicitly approved fallback is foreground
+  plus idle active retry admissions (30 seconds up to five minutes), rather
+  than an immediate hardware reconnect event. No native dependency was added.
+- Limited body runs automatically continue after 250ms, retaining the
+  60-second/300-attempt per-run bounds. Five-item groups yield between groups.
+  Each committed item publishes progress. A sync/generation change arriving
+  mid-flight schedules another list check without creating concurrent flights.
+  Inventory follows every advancing 100-item page; the former ten-page ceiling
+  no longer strands larger libraries. List absence/failure never deletes work.
+- Forward-only local SQLite migration 10 adds four failure/retry columns to
+  existing artifact rows, with no new table or remote migration. Per-item
+  transient backoff starts at 2 seconds and caps at five minutes. Permanent
+  denials are owner/item/version bound; a newer version, successful open or
+  explicit clear resets eligibility. Late old-version failures cannot mark a
+  new version. Exact detail not_found still removes only that owned artifact;
+  a missing quiz key keeps its readable body and stops an endless key retry.
+- Current/total/failedPermanent counts come from the existing store. The hook
+  subscribes to per-item and image notifications, including queue completion.
+  Offline waiting leaves the existing checking label quiet. Image-aware
+  readiness, OI1 downloads/concurrency/retries/caps and cleanup stay unchanged;
+  the image queue only exposes running state and a final notification.
+- Both mobile Library surfaces already use the same caption helper. Mobile
+  and web twins now have all four exact requested texts. Web has no offline
+  mode or caption caller: the helper is retained and tested, with no new web
+  offline behavior. No required platform feature was skipped. No new button,
+  toast, animation, design token, dependency, release-version, API/auth/RLS,
+  source content or ADR change. React best-practices skill review applied.
+
+### Commits and gate counts
+
+- `5bc6652 feat(mobile): continue offline saving with live progress`
+- `9a38527 fix(web): align offline library caption wording`
+- `docs: complete OF1b offline saving handoff` (final hash in Git and
+  ignored `tmp/overnight/OF1b.status`; no self-hash amendment).
+
+All commits use `--author='galaxymaxp <omgraythekid@gmail.com>'`. Evidence is
+**FRESH** for code tip `9a38527`, whose implementation is identical to the
+final verified tree. All workspaces have test scripts. **Prompt gates: 10/10
+PASS**, plus the additional forced root build. No cached result is called fresh.
+
+| Exact command | FRESH result / counts |
+| --- | --- |
+| `npm run typecheck -- --force --env-mode=loose` | PASS, 8/8 tasks, 0 cached; final repeat |
+| `npm run lint -- --force --env-mode=loose` | PASS, 8/8 tasks, 0 cached; 0 errors / 6 existing warnings; final repeat |
+| `npm run test --workspace @stay-focused/shared` | PASS, 596/596 tests, 58 files |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | PASS, 2433 passed / 3 intentional live skips, 212 files; full suite |
+| `npm run test --workspace @stay-focused/mobile` | PASS, 1546/1546 tests, 162 files; final repeat |
+| `npm run test --workspace @stay-focused/web` | PASS, 391/391 tests, 60 files |
+| `npm run build --workspace @stay-focused/api` | PASS, 36/36 static pages |
+| `npm run build --workspace @stay-focused/web` | PASS, 22/22 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | PASS, 1 local Android bundle; final repeat |
+| `git diff --check` and `git diff --cached --check` | PASS, 0 whitespace errors; repeated at closure |
+| Additional `npm run build -- --force --env-mode=loose` | PASS, 8/8 tasks, 0 cached; Android/iOS/web local exports; final repeat |
+
+Turbo loose env mode preserves the ignored outbound HTTP(S)/fetch/socket
+blocker and disabled telemetry/live flags; Expo runs offline. API uses the
+complete suite with two workers, not a test filter. Temporary directories stay
+inside the repo. Generated Next declarations were inspected/restored. No tmp,
+credential, generated export, private fixture or validation output is committed.
+
+Failed first attempts: focused **122 passed / 3 failed** (7 passed / 2 failed
+files), then **139 / 3** (11 / 2 files, plus a teardown timeout). New queued-state
+and retry-deadline expectations needed updating; cold native imports stalled
+the Node fake-timer harness. An isolated diagnostic had **1 failed / 10 skipped**.
+Explicit inert filesystem mocks repaired the harness without increasing a
+production timeout or weakening assertions. Corrected focused **142/142** and
+then **155/155** passed. Later missing-key/pagination regressions are included
+in final mobile **1546/1546**. Preliminary full mobile **1545/1545** and a first
+1546/1546 run also passed; final UI polish justified a final 1546/1546 rerun and
+fresh type/lint/build repeats. All repository gate attempts passed. No remaining
+failure or nondeterministic flake established. Existing Vite/renderer/Expo color
+warnings are non-failing. Exact evidence and implementation limits are in
+[OF1b acceptance](acceptance/of1b-offline-continuation.md).
+
+**UNVERIFIED (owner to confirm):** deployed API/web/mobile revisions, the actual
+production cause of 40/72, database/applied-migration/Scheduler state, remote-ref
+freshness, and physical Wi-Fi/airplane-mode/foreground behavior. Baseline cached
+upstream was behind 2 / ahead 41 without fetch. No live service call, deployment,
+remote SQL/migration application, Scheduler operation, email, environment-file
+edit, branch switch or push ran. Original untracked UI/, apps/mobile/.gitignore
+and supabase/.temp/ remain untouched/unstaged. No local code blocker remains.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** review the local commits and choose
+  web/mobile publication separately. No deployment, OTA or EAS command ran.
+- **Device checks - NOT RUN, skipped entirely:** on Realme, fresh sign-in on
+  Wi-Fi and open Today only; confirm the Library count rises and ends at
+  `72 saved for offline use`. Interrupt and restore connectivity; verify
+  automatic resumption, background/foreground, both Library captions and
+  offline opening. Account for the documented fallback retry delay.
+- Confirm all UNVERIFIED states above. For later authorized deployment/env/log
+  tooling, installing the missing Vercel CLI with `npm i -g vercel` is strongly
+  recommended; no installation or invocation ran here.
+
+Ignored progress/status: `tmp/overnight/OF1b.progress` and `OF1b.status`.
+Endpoint OF1b only; rollout/device work and later tasks remain owner work.
