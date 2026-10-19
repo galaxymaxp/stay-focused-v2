@@ -2,7 +2,7 @@
 import type { StudentAnnouncement, StudentAnnouncementList } from "@stay-focused/shared";
 import Link from "next/link";
 import { useSelectedLayoutSegment } from "next/navigation";
-import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
 import { announcementCourseLabel, formatAnnouncementDate } from "../app-model/announcementPresentation";
 import { arrangeList } from "../app-model/listPreferences";
 import { PageCrumb } from "../components/crumbs";
@@ -133,12 +133,18 @@ export function AnnouncementsOverview() {
 
 export function AnnouncementDetail({ id }: { id: string }) {
   const items = useContext(Context);
-  const { read } = useListPreferences();
+  const { ownerId, read } = useListPreferences();
   const item = items?.find((entry) => entry.id === id) ?? null;
-  // Opening an announcement, from anywhere, reads it.
+  const opened = useRef<{ id: string; ownerId: string; marked: boolean } | null>(null);
+  // Wait for displayed data and an owner; explicit unread stays until reopened.
   useEffect(() => {
+    if (opened.current?.id !== id || opened.current?.ownerId !== ownerId) {
+      opened.current = { id, ownerId, marked: false };
+    }
+    if (!item || !ownerId || opened.current.marked) return;
+    opened.current.marked = true;
     read(id, true);
-  }, [id, read]);
+  }, [id, item, ownerId, read]);
   if (!items) return null;
   if (!item)
     return (

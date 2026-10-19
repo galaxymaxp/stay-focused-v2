@@ -95,5 +95,5 @@ export function useListPreferences() {
   const reorderLibrary = useCallback((scope: string, ids: readonly string[]) => {
     if (owner) update(owner, current => setLibrarySort(setLibraryOrder(current, scope, ids), scope, "custom"));
   }, [owner]);
-  return { prefs, pin, hide, read, sortLibrary, reorderLibrary };
+  return { ownerId: owner, prefs, pin, hide, read, sortLibrary, reorderLibrary };
 }
