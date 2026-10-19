@@ -35,7 +35,7 @@ export function DeferredDayOrb({ minutes, size, ready, interaction: suppliedInte
   useEffect(() => {
     if (Orb && (!reduced || interactiveStill)) return;
     const update = () => {
-      if (interaction.state.current.gesture?.rotating) setInteractiveStill(true);
+      if (interaction.state.current.gesture?.rotating || interaction.ringDragging?.current) setInteractiveStill(true);
       const color = orbIdleColor(interaction.state.current, Date.now(), true);
       if (still.current) still.current.style.background = `radial-gradient(circle at 40% 32%, ${dayOrbTones(minutes).light} 0%, ${color} 45%, ${dayOrbTones(minutes).deep} 100%)`;
     };
@@ -47,6 +47,6 @@ export function DeferredDayOrb({ minutes, size, ready, interaction: suppliedInte
   const diameter = size * DAY_ORB_FILL;
   return <div className="day-orb" data-testid="day-orb-still" aria-hidden="true" style={{ width: size, height: size, display: 'grid', placeItems: 'center' }}>
     <div ref={still} style={{ width: diameter, height: diameter, borderRadius: '50%',
-      background: `radial-gradient(circle at 40% 32%, ${tones.light} 0%, ${tones.base} 45%, ${tones.deep} 100%)` }} />
+      background: `radial-gradient(circle at 40% 32%, ${tones.light} 0%, ${orbIdleColor(interaction.state.current, Date.now(), true)} 45%, ${tones.deep} 100%)` }} />
   </div>;
 }

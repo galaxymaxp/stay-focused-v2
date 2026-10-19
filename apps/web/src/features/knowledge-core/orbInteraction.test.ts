@@ -1,10 +1,10 @@
-import { Matrix3, Vector3 } from 'three';
+import { Euler, Matrix3, Matrix4, Vector3 } from 'three';
 import { createOrbInteractionSampler } from './orbInteractionFrame';
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createOrbInteraction, ORB_COLOR_KEY } from '@stay-focused/shared';
+import { createOrbInteraction, ORB_COLOR_KEY, ORB_LEGACY_COLOR_KEY } from '@stay-focused/shared';
 import { OrbPointerLayer, readOrbColor, rememberOrbColor, type OrbInteractionHandle } from './orbInteraction';
 const store = new Map<string, string>();
 let tree: ReactTestRenderer | undefined;
@@ -15,7 +15,7 @@ beforeEach(() => {
 });
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); });
 it('reads and writes the device preference with guarded storage', () => {
-  expect(readOrbColor()).toBe(0); rememberOrbColor(2); expect(store.get(ORB_COLOR_KEY)).toBe('2'); expect(readOrbColor()).toBe(2);
+  expect(readOrbColor()).toBe(0); rememberOrbColor(2); expect(store.get(ORB_COLOR_KEY)).toBe('green'); expect(readOrbColor()).toBe(2);
   store.set(ORB_COLOR_KEY, '99'); expect(readOrbColor()).toBe(0);
   vi.stubGlobal('localStorage', { getItem: () => { throw Error('blocked'); }, setItem: () => { throw Error('blocked'); } });
   expect(readOrbColor()).toBe(0); expect(() => rememberOrbColor(1)).not.toThrow();
@@ -51,4 +51,19 @@ it('uses inverse liquid coordinates so a rightward drag moves the visible liquid
   const handle: OrbInteractionHandle = { state: { current: { ...initial, spin: { ...initial.spin, y: 0.5 } } }, wake: { current: null } };
   const matrix = new Matrix3(); createOrbInteractionSampler(handle)(0, 0, false, matrix);
   expect(new Vector3(0, 0, 1).applyMatrix3(matrix).x).toBeLessThan(0);
+});
+
+it.each([['0', 'gold', 1], ['1', 'green', 2], ['2', 'violet', 3], ['3', 'orange', 4], [null, 'pearl', 0]] as const)('migrates legacy %s once to %s', (legacy, key, index) => {
+  if (legacy !== null) store.set(ORB_LEGACY_COLOR_KEY, legacy);
+  expect(readOrbColor()).toBe(index); expect(store.get(ORB_COLOR_KEY)).toBe(key);
+  store.set(ORB_LEGACY_COLOR_KEY, '3');
+  expect(readOrbColor()).toBe(index);
+});
+it('uses the inverse of the full two-axis pose', () => {
+  const initial = createOrbInteraction();
+  const handle: OrbInteractionHandle = { state: { current: { ...initial, spin: { ...initial.spin, x: 0.6, y: 0.5 } } }, wake: { current: null } };
+  const matrix = new Matrix3(); createOrbInteractionSampler(handle)(0, 0, false, matrix);
+  const origin = new Vector3(0.1, 0.2, 0.9);
+  const forward = new Matrix3().setFromMatrix4(new Matrix4().makeRotationFromEuler(new Euler(0.6, 0.5, 0)));
+  expect(origin.clone().applyMatrix3(forward).applyMatrix3(matrix).distanceTo(origin)).toBeLessThan(1e-10);
 });

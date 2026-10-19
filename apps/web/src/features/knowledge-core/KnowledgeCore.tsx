@@ -1,4 +1,5 @@
 "use client";
+import { cancelOrbSpin } from '@stay-focused/shared';
 import { OrbPointerLayer, useOrbInteraction, type OrbInteractionHandle } from './orbInteraction';
 import { createOrbInteractionSampler } from './orbInteractionFrame';
 import { useEffect, useRef, useState } from "react";
@@ -67,6 +68,7 @@ export function KnowledgeCore({ state }: { state: CoreState }) {
       runtime.current.mode = readMode();
       runtime.current.reducedMotion = motion.matches;
       runtime.current.active = document.visibilityState === "visible";
+      if (!runtime.current.active) interaction.state.current = cancelOrbSpin(interaction.state.current);
       controller.current?.renderForChange();
     };
     sync();
@@ -215,6 +217,8 @@ function buildScene(
       mode: current.mode,
       camera,
       center: root.position,
+      color: current.state === 'idle' ? interactionFrame.idleColor : undefined,
+      // The generation light is centered, so rotation keeps its aura centered.
       // Reduced Motion keeps a steady glow.
       shimmerAmount: current.reducedMotion ? 0 : 0.4 + activity * 0.6,
     });
@@ -228,7 +232,7 @@ function buildScene(
       level: aura.shimmer.level,
       stir: 0,
       idleColor: current.state === 'idle' ? interactionFrame.idleColor : undefined,
-      bulgeDir: interactionFrame.bulgeDir, bulgeAmount: interactionFrame.bulgeAmount,
+      rippleDir: interactionFrame.rippleDir, rippleTime: interactionFrame.rippleTime,
     });
     renderer.render(scene, camera);
     const settling =
@@ -256,6 +260,7 @@ function buildScene(
     renderForChange,
     dispose: () => {
       disposed = true;
+      interaction.state.current = cancelOrbSpin(interaction.state.current);
       if (interaction.wake.current === renderForChange) interaction.wake.current = null;
       if (requestId !== null) cancelAnimationFrame(requestId);
       observer.disconnect();

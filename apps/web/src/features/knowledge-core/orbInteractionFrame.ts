@@ -8,7 +8,7 @@ export function createOrbInteractionSampler(interaction: OrbInteractionHandle) {
     interaction.state.current = frame.state;
     const pose = frame.state.spin;
     // uSpin maps world positions into liquid coordinates, so use the inverse drag pose.
-    spin.multiply(matrix.setFromMatrix4(rotation.makeRotationFromEuler(euler.set(-pose.x, -pose.y, 0))));
-    return { ...frame, bulgeDir: frame.state.bulgeDir };
+    spin.multiply(matrix.setFromMatrix4(rotation.makeRotationFromEuler(euler.set(pose.x, pose.y, 0)).invert()));
+    return { ...frame, rippleDir: frame.state.rippleDir };
   };
 }

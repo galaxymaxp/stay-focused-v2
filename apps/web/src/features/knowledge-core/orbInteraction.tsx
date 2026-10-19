@@ -1,17 +1,24 @@
 "use client";
-import { beginOrbGesture, createOrbInteraction, endOrbGesture, moveOrbGesture, orbIdleColor, ORB_COLOR_KEY, ORB_HOLD_MS, parseOrbColor, projectTapToSphere, type OrbInteraction } from '@stay-focused/shared';
+import { beginOrbGesture, createOrbInteraction, endOrbGesture, moveOrbGesture, orbIdleColor, ORB_COLOR_KEY, ORB_HOLD_MS, parseOrbColorKey, legacyOrbIndexToKey, orbColorIndex, ORB_LEGACY_COLOR_KEY, ORB_IDLE_PALETTE, projectTapToSphere, type OrbInteraction } from '@stay-focused/shared';
 import { useEffect, useMemo, useRef, type MutableRefObject, type PointerEvent } from 'react';
 import { readLocalPreference, writeLocalPreference } from '../../lib/local-preference';
 export interface OrbInteractionHandle {
   readonly state: MutableRefObject<OrbInteraction>;
+  readonly ringDragging?: MutableRefObject<boolean>;
   readonly wake: MutableRefObject<(() => void) | null>;
 }
-export const readOrbColor = () => parseOrbColor(readLocalPreference(ORB_COLOR_KEY));
-export const rememberOrbColor = (index: number) => writeLocalPreference(ORB_COLOR_KEY, String(parseOrbColor(String(index))));
+export function readOrbColor(): number {
+  const saved = readLocalPreference(ORB_COLOR_KEY);
+  const key = saved === null ? legacyOrbIndexToKey(readLocalPreference(ORB_LEGACY_COLOR_KEY)) : parseOrbColorKey(saved);
+  if (saved === null) writeLocalPreference(ORB_COLOR_KEY, key);
+  return orbColorIndex(key);
+}
+export const rememberOrbColor = (index: number) => writeLocalPreference(ORB_COLOR_KEY, ORB_IDLE_PALETTE[index]?.key ?? 'pearl');
 const listeners = new Set<(index: number) => void>();
 export function useOrbInteraction(supplied?: OrbInteractionHandle): OrbInteractionHandle {
   const state = useRef(createOrbInteraction());
   const wake = useRef<(() => void) | null>(null);
+  const ringDragging = useRef(false);
   useEffect(() => {
     if (supplied) return;
     const apply = (index: number) => {
@@ -20,11 +27,11 @@ export function useOrbInteraction(supplied?: OrbInteractionHandle): OrbInteracti
       wake.current?.();
     };
     apply(readOrbColor()); listeners.add(apply);
-    const stored = (event: StorageEvent) => { if (event.key === ORB_COLOR_KEY) apply(parseOrbColor(event.newValue)); };
+    const stored = (event: StorageEvent) => { if (event.key === ORB_COLOR_KEY) apply(orbColorIndex(parseOrbColorKey(event.newValue))); };
     window.addEventListener('storage', stored);
     return () => { listeners.delete(apply); window.removeEventListener('storage', stored); };
   }, [supplied]);
-  const local = useMemo(() => ({ state, wake }), []);
+  const local = useMemo(() => ({ state, wake, ringDragging }), []);
   return supplied ?? local;
 }
 export function OrbPointerLayer({ interaction, fill, reducedMotion }: { interaction: OrbInteractionHandle; fill: number; reducedMotion?: boolean }) {

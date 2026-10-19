@@ -1,4 +1,4 @@
-import { beginOrbGesture, createOrbInteraction, moveOrbGesture } from '@stay-focused/shared';
+import { beginOrbGesture, createOrbInteraction, moveOrbGesture, pushOrbSpin } from '@stay-focused/shared';
 import type { OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -53,4 +53,15 @@ it('loads a single renderable reduced-motion pose on held rotation, without ambi
   expect(mocks.render).toHaveBeenCalled();
   expect(interaction.state.current.spin.velocityY).toBe(0);
   expect(frames.size).toBe(0);
+});
+
+it('loads a renderable still for deliberate ring input under reduced motion', async () => {
+  reduced = true;
+  const interaction: OrbInteractionHandle = { state: { current: createOrbInteraction() }, wake: { current: null }, ringDragging: { current: true } };
+  await act(async () => { root = create(createElement(DeferredDayOrb, { minutes: 0, size: 240, ready: true, interaction })); });
+  interaction.state.current = pushOrbSpin(interaction.state.current, 0.3, 100, true);
+  await act(async () => interaction.wake.current?.());
+  await frame(); await frame(); await act(async () => { await vi.dynamicImportSettled(); });
+  expect(mocks.render).toHaveBeenCalled(); expect(interaction.state.current.spin.y).toBe(0.3);
+  expect(interaction.state.current.spin.velocityY).toBe(0); expect(frames.size).toBe(0);
 });

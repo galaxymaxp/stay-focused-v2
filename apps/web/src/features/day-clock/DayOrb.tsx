@@ -1,9 +1,9 @@
 "use client";
+import { cancelOrbSpin } from '@stay-focused/shared';
 import { useOrbInteraction, type OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 import { createOrbInteractionSampler } from '../knowledge-core/orbInteractionFrame';
 import { memo, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { createOrbAura } from "../knowledge-core/orbAura";
 import { createOrbBody } from "../knowledge-core/orbBody";
 import { dayOrbTones, type DayOrbTones } from "./dayClock";
 export { DAY_ORB_FILL } from './orb-footprint';
@@ -70,6 +70,7 @@ export const DayOrb = memo(function DayOrb({
         document.documentElement.dataset.theme === "dark" ? "dark" : "light";
       runtime.current.reducedMotion = motion.matches;
       runtime.current.running = document.visibilityState === "visible";
+      if (!runtime.current.running) interaction.state.current = cancelOrbSpin(interaction.state.current);
       controller.current?.wake();
     };
     sync();
@@ -133,10 +134,6 @@ function buildScene(
   scene.add(root);
   const body = createOrbBody();
   root.add(body.mesh);
-  const aura = createOrbAura();
-  // A little smaller than the Knowledge Core's, so it fades before the canvas edge.
-  aura.mesh.scale.setScalar(0.86);
-  scene.add(aura.mesh);
 
   const resize = () => {
     const size = canvas.clientWidth;
@@ -185,31 +182,14 @@ function buildScene(
       camera.lookAt(0, 0, 0);
       camera.updateMatrixWorld();
       const tones = current.tones;
-      aura.update({
-        delta: current.running ? delta : 0,
-        shimmer: current.reducedMotion ? 0 : 0.25,
-        shimmerAmount: current.reducedMotion ? 0 : 0.28,
-        glow: 0.45 + tones.strength * 0.5,
-        error: 0,
-        mode: current.mode,
-        camera,
-        center: root.position,
-        color: tones.aura,
-        offset: current.reducedMotion
-          ? { x: tones.position.x * 0.16, y: tones.position.y * 0.16 }
-          : {
-              x: tones.position.x * 0.2 + Math.sin(time * 0.7) * 0.05,
-              y: tones.position.y * 0.2 + Math.cos(time * 0.5) * 0.04,
-            },
-      });
       body.update({
         idleColor: interactionFrame.idleColor,
-        bulgeDir: interactionFrame.bulgeDir, bulgeAmount: interactionFrame.bulgeAmount,
+        rippleDir: interactionFrame.rippleDir, rippleTime: interactionFrame.rippleTime,
         time,
         life: 0.22,
         stir: 0,
         glow: 0.35 + tones.strength * 0.75,
-        level: aura.shimmer.level,
+        level: 0,
         error: 0,
         spin: spinMatrix,
         mode: current.mode,
@@ -235,11 +215,11 @@ function buildScene(
     wake,
     dispose: () => {
       disposed = true;
+      interaction.state.current = cancelOrbSpin(interaction.state.current);
       if (interaction.wake.current === wake) interaction.wake.current = null;
       if (requestId !== null) cancelAnimationFrame(requestId);
       observer.disconnect();
       body.dispose();
-      aura.dispose();
       renderer.dispose();
     },
   };
