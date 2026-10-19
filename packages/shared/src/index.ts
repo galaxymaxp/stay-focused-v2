@@ -261,3 +261,5 @@ export * from './avatar';
 export * from './avatar-memory';
 export * from './app-release';
 export * from './legal';
+export * from './profile-preferences';
+export * from './orb-preference-sync';
