@@ -1,3 +1,27 @@
+<!-- LP1 begin -->
+LP1 / privacy and terms (2026-10-19): **PASS for the finite unattended local
+code scope**. Baseline be9d5dc, branch overnight/2026-10-15_feedback retained.
+STEP 0-4, shared structured copy, public server-rendered web routes, bundled
+offline native root routes, caption footer links and sign-up agreement notices
+are complete. Both apps use one dated source and contact constant. No required
+platform skipped, new dependency, API, schema, motion or ADR change.
+Implementation commits: 451b58c, 0aacc1c, 12e4aa2; docs hash in Git/LP1.status.
+FRESH PASS: all 10 prompt gates; typecheck/lint/root build each 8/8 tasks,
+0 cached; 6 existing lint warnings. Shared 593, API 2433 / 3 intentional live
+skips, mobile 1529, web 382 tests; API 36/36 and web 22/22 static pages,
+Android export and diff hygiene pass. Local Playwright 13/13, including both
+legal routes signed out at 1440/390 in light/dark, footer navigation and
+JavaScript-disabled content; 0 legal API/external requests or page errors.
+Failed first attempts are recorded. Generated declarations restored; unrelated
+owner paths preserved. Rollout/Device checks NOT RUN, skipped entirely;
+live state UNVERIFIED (owner to confirm). No remote call, deployment, migration
+application, Scheduler operation, environment-file edit or push.
+Owner must review wording/contact before publication and later use the public
+privacy URL in Play Console. Not reviewed by a lawyer. Endpoint LP1 only;
+no later slice or previously stopped task resumed. [Acceptance](acceptance/lp1-legal-pages.md).
+<!-- LP1 end -->
+
+
 <!-- OR3 begin -->
 OR3 / orb momentum, ring spin, ripple, glow and pearl (2026-10-19):
 **STOPPED before STEP 1** for a material requirements conflict. The requested

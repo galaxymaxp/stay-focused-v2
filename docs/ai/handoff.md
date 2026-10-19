@@ -8110,3 +8110,172 @@ email, deployment, environment-file access/edit, branch switch or push ran.
 
 Ignored progress/status: tmp/overnight/OR3.progress and OR3.status.
 OR3 ends at this requirements checkpoint; no later overnight work started.
+
+
+## LP1 unattended privacy and terms - PASS (2026-10-19)
+
+**Status: PASS for the finite local code scope.** Entire LP1 prompt and its
+overriding UNATTENDED rules read. Endpoint STEP 0-4, tests, all gates, docs and
+local commits only; Rollout and Device checks skipped entirely. Baseline
+be9d5dc, branch overnight/2026-10-15_feedback retained. Tracked entry tree was
+clean; original untracked UI/, apps/mobile/.gitignore, supabase/.temp/ and
+ignored tmp/ preserved and unstaged. Cached github/main was 34 ahead / 2 behind
+at entry, without fetch. No later slice or stopped prior task was resumed.
+
+Shared copy is dated 2026-10-19 with one LEGAL_CONTACT_EMAIL. Both apps render
+the same structured sections. Web has public /privacy and /terms outside the
+signed-in group, metadata, a 68ch column and UC2's auth-free theme path.
+Native root routes are reachable from both guarded groups and render bundled
+copy offline with a small public website address. Both platforms have centered
+caption links at the bottom of auth and Settings, and the sign-up agreement;
+web adds the download footer. Targets are 48px/pt minimum. The mobile email
+confirmation state keeps links too. No sidebar clutter, parser dependency,
+API/schema/auth/RLS behavior, motion, release number or ADR change.
+Web metadata/download and native offline presentation apply to their respective
+platforms; no required parity feature was skipped.
+
+### Data and processor inventory (repo evidence)
+
+- Account email, Supabase sign-in and optional linked Google/Microsoft profile:
+  apps/web/src/features/auth.tsx, components/providers.tsx;
+  apps/mobile/src/auth/authService.ts and providerAuth.ts.
+- Canvas account/address/token: apps/api/app/api/canvas/connection/route.ts,
+  apps/api/src/lib/canvas-routes.ts and canvas-token-encryption.ts.
+  Server AES-256-GCM encryption; disconnect clears stored token fields through
+  packages/db/migrations/20260928120000_canvas_credential_lifecycle.sql.
+  packages/canvas/src/client.ts issues GET requests; token permissions may be
+  broader. Policy explains revocation in Canvas, not just app disconnect.
+- Synced courses, modules, pages, files, assignments, announcements, grades and
+  own submissions: apps/api/src/lib/canvas-sync.ts, canvas-grade-sync.ts,
+  canvas-file-ingestion.ts and packages/db/migrations/202607050004_create_canvas_academic_graph.sql,
+  202607060001_add_canvas_planner_announcements.sql,
+  202607060003_add_canvas_file_ingestion_foundation.sql and
+  202607080003_add_canvas_grades_submissions_foundation.sql.
+- Uploaded files/text/source snapshots, reviewers and jobs/results:
+  apps/api/src/lib/processing-jobs/ and
+  packages/db/migrations/20260723084329_reusable_processing_assets.sql.
+  Quizzes/attempts/drafts: apps/api/src/lib/quiz/, experience/ and
+  20260912100000_activity_maker.sql / 20260912110000_quiz_maker.sql.
+  Tasks/plans/sessions: apps/api/app/api/study-plan/ and
+  20260827155438_task_study_plan_foundation.sql. Uploaded avatars:
+  apps/api/src/lib/profile-avatars.ts and 20261018000300_profile_avatars.sql.
+- Notification devices/push tokens/preferences/delivery records:
+  apps/api/src/lib/notifications/repository.ts, worker.ts and
+  20260726230833_hosted_processing_uploads_and_notifications.sql.
+  Supabase account/database/private storage: packages/db/src/client.ts and
+  apps/api/src/lib/processing-jobs/upload-intents.ts.
+- Vercel hosting/workflows: apps/web/next.config.ts, apps/api/next.config.ts,
+  apps/api/src/lib/processing-jobs/workflow-start.ts and workflow-dispatch.ts.
+  Google Cloud tasks/workers: processing-jobs/google-cloud.ts,
+  canvas-sync-jobs/google-dispatch.ts and canvas-preparation/dispatch.ts;
+  Cloud Vision OCR: apps/api/src/lib/ocr/create-server-ocr-provider.ts.
+  OpenAI material/prompts: apps/api/src/providers/openai-provider.ts and
+  packages/engine/src/providers/openai-provider.ts. No unsupported training,
+  region or provider-retention promises were added.
+- Wikimedia Commons topic-derived queries/images:
+  apps/api/src/lib/external-visuals/service.ts and commons.ts; the policy
+  explicitly discloses study-topic exposure. Resend recipient/coursework email:
+  apps/api/src/lib/transactional-email.ts and notifications/canvas-email.ts.
+  Expo push: notifications/worker.ts; app delivery/update configuration:
+  apps/mobile/app.json and src/services/appUpdateStore.ts.
+  GitHub release/APK requests: apps/web/src/features/download/DownloadPage.tsx,
+  packages/shared/src/app-release.ts and apps/api/app/api/app/latest-release/route.ts.
+- Offline study work/images/pending edits/screen snapshots:
+  apps/mobile/src/services/localLibrary/artifactStore.ts, localArtifactDatabase.ts,
+  pendingDraftSync.ts, schema.ts and apps/mobile/src/auth/AuthProvider.tsx.
+  Sign-out attempts owner cleanup, which can fail; policy does not promise
+  infallible wiping. Settings clears downloaded bodies/images through
+  apps/mobile/src/features/settings/OfflineStorageSettings.tsx. Exports are
+  outside cleanup. Web browser session/preferences/snapshots: providers.tsx
+  and apps/web/src/lib/screen-snapshots.ts.
+- Public revocable share snapshots, not live mirrors:
+  apps/api/src/lib/reviewer-shares/public.ts, owner.ts, snapshot.ts and
+  20261015050000_public_reviewer_shares.sql / 20261015050100_revoke_deleted_reviewer_shares.sql.
+- Retention: configurable job cleanup in reusable_processing_assets and
+  20260723091627_processing_lifecycle_batching.sql, not a universal account
+  deadline. No self-serve account deletion endpoint found; administrative
+  deletion hardening is not a UI. Requests go to the exported contact email.
+  Unavailable/deleted Canvas sources block affected rebuilds/retries through
+  apps/api/src/lib/reviewer-source-status.ts and
+  20261018000100_failed_generation_retry.sql; saved text/share/offline copies
+  are not promised to disappear automatically. Partial sync is not deletion.
+
+Full paths and acceptance matrix: [LP1 acceptance](acceptance/lp1-legal-pages.md).
+No processor/data flow requiring a scope decision was found. The actual web
+route directory and public-provider location differ from exploratory src/app
+paths; mobile uses root routes to avoid both group guards. These are routine
+path adaptations, not a material contradiction or unattended STOP.
+
+### Commits and gates
+
+- 451b58c feat(shared): add privacy policy and terms content
+- 0aacc1c feat(web): add public privacy and terms pages
+- 12e4aa2 feat(mobile): add offline privacy and terms screens
+- docs: complete LP1 legal pages handoff (final hash in Git and LP1.status)
+
+All commits use galaxymaxp <omgraythekid@gmail.com> via --author.
+Final evidence is FRESH for code tip 12e4aa2; tests/type/lint ran on identical
+implementation before its scoped commits. All workspaces have tests.
+Prompt gates: 10/10 PASS; additional forced root build PASS.
+
+| Exact command | FRESH result / counts |
+| --- | --- |
+| `npm run typecheck -- --force` | PASS, 8/8 tasks, 0 cached, final retry |
+| `npm run lint -- --force` | PASS, 8/8 tasks, 0 cached; 0 errors / 6 existing warnings |
+| `npm run test --workspace @stay-focused/shared` | PASS, 593/593 tests, 57 files |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | PASS, 2433 passed / 3 intentional live skips, 212 files; full suite, bounded workers |
+| `npm run test --workspace @stay-focused/mobile` | PASS, 1529/1529 tests, 160 files; final run |
+| `npm run test --workspace @stay-focused/web` | PASS, 382/382 tests, 58 files; final retry |
+| `npm run build --workspace @stay-focused/api` | PASS, 36/36 static pages |
+| `npm run build --workspace @stay-focused/web` | PASS, 22/22 static pages, including privacy and terms; sequential retry |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | PASS, 1 Android bundle exported locally |
+| `git diff --check` and `git diff --cached --check` | PASS, 0 whitespace errors; repeated at closure |
+| Additional `npm run build -- --force --env-mode=loose` | PASS, 8/8 tasks, 0 cached; includes local Android/iOS/web exports |
+| `node tmp/overnight/LP1-browser.mjs` | PASS, 13/13 scenarios; 8 signed-out legal route/width/theme combinations, 3 footer navigations, 2 no-JavaScript routes; 0 legal API/external requests and 0 page errors |
+
+Screenshots were inspected. Native physical behavior is not established by the
+renderer tests or Android export. The public legal browser contexts had empty
+sessions, no redirects, no overflow and no API/external requests; provider tests
+also cover configured auth. Download metadata was mocked locally. Server was
+stopped after use. No production or external-provider availability claim.
+
+### Failed first attempts and safeguards
+
+- First focused web run: 7 failed / 9 passed (3 files). Next Link's browser idle-callback implementation needed a Node test mock after adding the real footer. Full web first run similarly exposed the Settings test harness: 2 failed / 380 passed (58 files). Added href-preserving link mocks in both affected test files; no production workaround. Final web 382/382.
+- First forced typecheck: 6/8 tasks, 0 cached, exit 2; 3 mobile diagnostics. Expo's ignored generated route types lacked the two new files, and a renderer test compared a typed element directly to a mock string. Used the installed SDK's local route generator and String(node.type); strict typing remains intact. Final typecheck 8/8.
+- First lint passed 8/8 with 7 warnings, including one new unused mock prop. Removed it; final lint has only the 6 existing warnings (5 mobile, 1 web).
+- An extra web build was mistakenly started while the first build was collecting traces. The overlapping output invalidated the first build (exit 1, ENOENT for _not-found/page.js.nft.json). The extra process was interrupted (exit 1). A sequential web rebuild and the later forced repository build passed. This was a local verification orchestration error, not a hidden passing first attempt.
+- Python was unavailable for a draft sprint-prefix helper, so no file was written by that attempt; used Node instead. Exploratory reads of stale src/app, Page, workflow/update and SDK paths were resolved from source search. A few Windows rg wildcard paths were invalid and were corrected. No product assumption was contradicted.
+- No nondeterministic flake, weakened assertion, suppressed check or remaining failure. Existing Vite config-loader, react-test-renderer deprecation and Expo color warnings are non-failing.
+
+HTTP(S)/fetch/socket guards deny non-loopback traffic; live/telemetry flags are
+off and Expo runs offline. Loose root-build env mode preserves those guards.
+Generated Next declarations inspected/restored; logs/exports/screenshots and
+all tmp files excluded from commits. Planning files reconcile LP1 while
+preserving historical content. No local code blocker remains.
+
+**UNVERIFIED (owner to confirm):** deployed website/API/mobile revisions,
+production provider configuration/policies, database/applied-migration/Scheduler
+state, remote-ref freshness and actual signed-in/physical/offline behavior.
+No Supabase, Vercel, Google Cloud, Canvas or Resend call, remote SQL/migration
+application, Scheduler action, email, deployment, environment-file edit,
+branch switch or push ran.
+
+### Owner steps remaining
+
+- Read both policies and confirm or replace LEGAL_CONTACT_EMAIL,
+  currently omgraythekid@gmail.com; operational deletion requests go there.
+- Not reviewed by a lawyer; owner to review wording before publishing to the Play Store.
+- **Rollout - NOT RUN, skipped entirely:** owner reviews these local commits,
+  then chooses website deployment and mobile OTA/APK publication separately.
+  Later paste https://stay-focused-ten.vercel.app/privacy into Play Console.
+- **Device checks - NOT RUN, skipped entirely:** verify auth/Settings footer
+  placement, signed-out and signed-in native navigation, Back, offline legal
+  reading, 44pt-or-larger tap targets, large text and light/dark on Realme;
+  verify actual public website routes and entry links after owner rollout.
+- Confirm all UNVERIFIED states above. For later deployment/env/log tooling,
+  installing the missing Vercel CLI with npm i -g vercel is strongly recommended;
+  no installation or invocation ran here.
+
+Ignored progress/status: tmp/overnight/LP1.progress and LP1.status.
+Endpoint LP1 only; no rollout, device work or later slice started.
