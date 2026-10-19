@@ -3,7 +3,7 @@ import { Alert, Pressable, Text } from 'react-native';
 import { Download } from 'lucide-react-native';
 import type { StudyImageDownload } from '@stay-focused/shared';
 import { useTheme } from '../../design/theme';
-import { hitTarget, spacing } from '../../design/tokens';
+import { hitTarget, spacing, typography } from '../../design/tokens';
 import { saveImage } from './saveImage';
 
 export function SaveImageButton({ image, offline, refreshUri }: { image: StudyImageDownload; offline: boolean; refreshUri?: () => Promise<string> }) {
@@ -21,8 +21,8 @@ export function SaveImageButton({ image, offline, refreshUri }: { image: StudyIm
     } finally { pending.current = false; setBusy(false); }
   }
   return <Pressable accessibilityRole="button" accessibilityLabel="Save image" disabled={busy || offline} accessibilityState={{ busy, disabled: busy || offline }}
-    onPress={() => void save()} style={{ minHeight: hitTarget.min, flexDirection: 'row', alignItems: 'center', gap: spacing[2], opacity: busy || offline ? 0.5 : 1 }}>
+    onPress={() => void save()} style={{ width: '100%', minHeight: hitTarget.min, flexDirection: 'row', alignItems: 'center', gap: spacing[2], opacity: busy || offline ? 0.5 : 1 }}>
     <Download size={20} color={colors.accent} accessible={false} />
-    <Text style={{ color: colors.accent }}>{busy ? 'Saving…' : 'Save image'}</Text>
+    <Text style={{ color: colors.accent, fontSize: typography.body, fontWeight: '400' }}>{busy ? 'Saving…' : 'Save image'}</Text>
   </Pressable>;
 }

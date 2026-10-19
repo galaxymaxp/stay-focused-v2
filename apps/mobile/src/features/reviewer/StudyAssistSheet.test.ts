@@ -32,7 +32,7 @@ vi.mock('react-native', () => ({ Platform: { OS: 'android' }, View: 'View', Moda
     loop: () => ({ start: () => {}, stop: () => {} }), sequence: () => ({}) },
 }));
 vi.mock('lucide-react-native', () => Object.fromEntries(['ChevronDown', 'ChevronUp', 'FileQuestion', 'CheckCircle2', 'Circle', 'Sparkles', 'X', 'AlertCircle',
-  'AlignLeft', 'ArrowLeftRight', 'Check', 'FlaskConical', 'Lightbulb', 'RotateCcw', 'Download', 'Ellipsis', 'Globe'].map(name => [name, name])));
+  'AlignLeft', 'ArrowLeftRight', 'Check', 'FlaskConical', 'Lightbulb', 'RotateCcw', 'Download', 'CircleHelp', 'Ellipsis', 'Globe'].map(name => [name, name])));
 vi.mock('../../design/primitives', () => ({ Action: 'Action', IconAction: 'IconAction', Copy: 'Copy', Notice: 'Notice', Page: 'Page', SearchField: 'SearchField', SegmentedControl: 'SegmentedControl', Sheet: 'Sheet', Surface: 'Surface', SkeletonBlock: 'SkeletonBlock' }));
 vi.mock('../../design/haptics', () => ({ haptic: { tap: vi.fn(), select: vi.fn(), press: vi.fn(), success: vi.fn(), warning: vi.fn(), error: vi.fn() } }));
 vi.mock('expo-router', () => ({ router: { push: vi.fn() } }));

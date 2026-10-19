@@ -5,7 +5,7 @@ import { ActivityIndicator, Image, Modal, Pressable, Text, View } from 'react-na
 import { SourcePageSnapshot, ZoomablePage } from './SourcePageSnapshot';
 import { SaveImageButton } from './SaveImageButton';
 
-vi.mock('lucide-react-native', () => ({ Download: 'Download' }));
+vi.mock('lucide-react-native', () => ({ Download: 'Download', CircleHelp: 'CircleHelp' }));
 const mocks = vi.hoisted(() => ({ read: vi.fn(), state: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) } }));
 vi.mock('react-native', () => ({ View: 'View', Text: 'Text', Image: 'Image', Modal: 'Modal', Pressable: 'Pressable', ScrollView:'ScrollView', useWindowDimensions:()=>({width:360,height:800}), Animated:{View:'AnimatedView',Value:class {setValue(){} stopAnimation(){}},spring:()=>({start(){}})}, ActivityIndicator: 'ActivityIndicator', AppState: mocks.state }));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
@@ -163,20 +163,32 @@ describe('source-page thumbnail and viewer', () => {
     await act(async()=>tree!.update(createElement(SourcePageSnapshot,{...props,visible:false})));expect(signal.aborted).toBe(true);
     await act(async()=>resolve({available:true,status:'unrendered',page:2}));expect(mocks.read).toHaveBeenCalledOnce();expect(buttons()).toHaveLength(0);
   });
-  it('handles double-tap reset and bounded pinch/pan in the full-screen image', async () => {
+  it('toggles single-tap zoom at the tapped point and retains bounded pinch/pan', async () => {
     mocks.read.mockResolvedValue(ready); await mount(); await act(async () => buttons()[0]!.props.onPress());
     const page = tree!.root.findAllByType(View).find(node => node.props.accessibilityLabel?.startsWith('Source page.'))!;
     await act(async () => page.props.onLayout({ nativeEvent: { layout: { width: 360, height: 640 } } }));
     const touch = (positions: { pageX: number; pageY: number }[]) => ({ nativeEvent: { touches: positions } });
-    vi.spyOn(Date, 'now').mockReturnValue(1000);
-    await act(async () => { page.props.onResponderGrant(touch([{ pageX: 100, pageY: 100 }])); page.props.onResponderRelease(); });
-    vi.mocked(Date.now).mockReturnValue(1200);
-    await act(async () => { page.props.onResponderGrant(touch([{ pageX: 100, pageY: 100 }])); page.props.onResponderRelease(); });
-    expect(page.findByType(Image).props.style.transform.at(-1)).toEqual({ scale: 2 });
+    await act(async () => { page.props.onResponderGrant(touch([{ pageX: 100, pageY: 100 }])); page.props.onResponderRelease({nativeEvent:{locationX:100,locationY:100}}); });
+    expect(page.findByType(Image).props.style.transform[0]).toEqual({translateX:120});
+    expect(page.findByType(Image).props.style.transform[1].translateY).toBeCloseTo((360 * 1867 / 1400 * 2.5 - 640) / 2);
+    expect(page.findByType(Image).props.style.transform[2]).toEqual({scale:2.5});
+    await act(async () => { page.props.onResponderGrant(touch([{ pageX: 100, pageY: 100 }])); page.props.onResponderRelease({nativeEvent:{locationX:100,locationY:100}}); });
+    expect(page.findByType(Image).props.style.transform).toEqual([{translateX:0},{translateY:0},{scale:1}]);
     await act(async () => page.props.onResponderGrant(touch([{ pageX: 100, pageY: 100 }, { pageX: 200, pageY: 100 }])));
     await act(async () => page.props.onResponderMove(touch([{ pageX: 100, pageY: 100 }, { pageX: 400, pageY: 100 }])));
+    expect(page.findByType(Image).props.style.transform.at(-1)).toEqual({ scale: 3 });
+    await act(async () => page.props.onResponderMove(touch([{ pageX: 100, pageY: 100 }, { pageX: 900, pageY: 100 }])));
     expect(page.findByType(Image).props.style.transform.at(-1)).toEqual({ scale: 4 });
-    vi.mocked(Date.now).mockRestore();
+    await act(async () => page.props.onResponderMove(touch([{ pageX: 100, pageY: 100 }])));
+    await act(async () => page.props.onResponderRelease({nativeEvent:{locationX:100,locationY:100}}));
+    expect(page.findByType(Image).props.style.transform.at(-1)).toEqual({ scale: 4 });
+    await act(async () => page.props.onResponderGrant(touch([{ pageX: 100, pageY: 100 }])));
+    await act(async () => page.props.onResponderMove(touch([{ pageX: 9999, pageY: -9999 }])));
+    const transformed=page.findByType(Image).props.style.transform;
+    expect(transformed[0].translateX).toBeCloseTo(540);
+    expect(transformed[1].translateY).toBeCloseTo(-(360*1867/1400*4-640)/2);
+    await act(async () => page.props.onResponderRelease({nativeEvent:{locationX:100,locationY:100}}));
+    expect(page.findByType(Image).props.style.transform.at(-1)).toEqual({scale:4});
   });
 });
 

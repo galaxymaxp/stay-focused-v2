@@ -1,17 +1,18 @@
 import { STUDY_OFFLINE, type StudyImageTarget } from '@stay-focused/shared';
 import { Pressable, Text, View } from 'react-native';
+import { CircleHelp } from 'lucide-react-native';
 import { useTheme } from '../../design/theme';
-import { hitTarget, spacing } from '../../design/tokens';
+import { hitTarget, spacing, typography } from '../../design/tokens';
 
-export function AskImageButton({ image, offline, onAsk }: { image?: StudyImageTarget; offline: boolean; onAsk?: (image: StudyImageTarget) => void }) {
+export function AskImageButton({ image, offline, onAsk, hideOfflineNote = false }: { image?: StudyImageTarget; offline: boolean; onAsk?: (image: StudyImageTarget) => void; hideOfflineNote?: boolean }) {
   const { colors } = useTheme();
   const disabled = offline || !image || !onAsk;
   return <View>
     <Pressable accessibilityRole="button" accessibilityLabel="Ask about this image" accessibilityState={{ disabled }} disabled={disabled}
-      onPress={() => image && onAsk?.(image)} style={{ minHeight: hitTarget.min, flexDirection: 'row', alignItems: 'center', gap: spacing[2], opacity: disabled ? 0.5 : 1 }}>
-      <Text accessible={false} style={{ color: colors.accent, borderWidth: 1, borderColor: colors.accent, borderRadius: 12, width: 22, textAlign: 'center' }}>?</Text>
-      <Text style={{ color: colors.accent }}>Ask about this image</Text>
+      onPress={() => image && onAsk?.(image)} style={{ width: '100%', minHeight: hitTarget.min, flexDirection: 'row', alignItems: 'center', gap: spacing[2], opacity: disabled ? 0.5 : 1 }}>
+      <CircleHelp size={20} color={colors.accent} accessible={false} />
+      <Text style={{ color: colors.accent, fontSize: typography.body, fontWeight: '400' }}>Ask about this image</Text>
     </Pressable>
-    {offline ? <Text style={{ color: colors.textMuted, fontSize: 12 }}>{STUDY_OFFLINE}</Text> : null}
+    {offline && !hideOfflineNote ? <Text style={{ color: colors.textMuted, fontSize: 12 }}>{STUDY_OFFLINE}</Text> : null}
   </View>;
 }

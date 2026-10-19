@@ -1,13 +1,13 @@
 import { refreshSnapshotUri } from '../../services/studyImageFile';
 import type { StudyImageTarget } from '@stay-focused/shared';
 import { AskImageButton } from './AskImageButton';
-import { SaveImageButton } from './SaveImageButton';
+import { ImageActions } from './ImageActions';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Image, Pressable, Text, View, useWindowDimensions, type GestureResponderEvent } from 'react-native';
 import { ImageViewer } from './ImageViewer';
 import { useTheme } from '../../design/theme';
 import { hitTarget, radius, spacing } from '../../design/tokens';
-import { clampPagePan, clampPageZoom, readPageSnapshot, type PageSnapshot } from '../../services/sourcePageSnapshots';
+import { clampPageZoom, readPageSnapshot, type PageSnapshot } from '../../services/sourcePageSnapshots';
 import type { ExperienceClient } from '../../services/experienceApi';
 
 /** Discover and render the exact cited page only when its topic approaches view. */
@@ -130,8 +130,8 @@ export function SourcePageSnapshot({ client, artifactId, sectionId, offline, vis
             <Text style={{ color: colors.textMuted }}>{exhausted ? 'The page is still preparing. Close and open it again in a moment.' : 'Preparing source page'}</Text>
           </View>}
         </View>
-        {ready ? <AskImageButton image={image} offline={offline} onAsk={target => {setOpen(false);onAsk?.(target);}} /> : null}
-        {ready ? <SaveImageButton offline={offline} image={{ uri: ready.url, reviewerTitle, sectionTitle, kind: 'page_snapshot' }} refreshUri={() => refreshSnapshotUri(client,artifactId,sectionId,ready)} /> : null}
+        {ready ? <ImageActions image={image} offline={offline} onAsk={target => {setOpen(false);onAsk?.(target);}}
+          download={{ uri: ready.url, reviewerTitle, sectionTitle, kind: 'page_snapshot' }} refreshUri={() => refreshSnapshotUri(client,artifactId,sectionId,ready)} /> : null}
         <Text style={{ color: colors.textPrimary, textAlign: 'center', padding: spacing[4] }}>
           {ready ? `${ready.sourceLabel} · ${captionUnit} ${ready.page}` : `${captionUnit} ${snapshot.page}`}
         </Text>
@@ -147,35 +147,42 @@ export function ZoomablePage({ url, headers, width, height, onError, label = 'So
   const zoomCallback = useRef(onZoomChange); zoomCallback.current = onZoomChange;
   useEffect(() => { zoomCallback.current?.(transform.scale); }, [transform.scale]);
   const start = useRef({ distance: 0, scale: 1, x: 0, y: 0, touchX: 0, touchY: 0 });
-  const lastTap = useRef(0);
   const moved = useRef(false);
+  const ratio = Math.min(frame.width / width, frame.height / height);
+  const pan = (offset: number, image: number, viewport: number, scale: number) => {
+    const limit = Math.max(0, (image * scale - viewport) / 2);
+    return Math.max(-limit, Math.min(limit, offset));
+  };
   const measure = (event: GestureResponderEvent) => {
     const [first, second] = event.nativeEvent.touches;
     return { distance: first && second ? Math.hypot(second.pageX - first.pageX, second.pageY - first.pageY) : 0,
       touchX: first?.pageX ?? 0, touchY: first?.pageY ?? 0 };
   };
   const capture = (event: GestureResponderEvent) => {
-    start.current = { ...measure(event), ...current.current }; moved.current = false;
+    start.current = { ...measure(event), ...current.current }; moved.current = !!start.current.distance;
   };
   const move = (event: GestureResponderEvent) => {
     const touch = measure(event);
-    if (!!touch.distance !== !!start.current.distance) { capture(event); return; }
+    if (!!touch.distance !== !!start.current.distance) { capture(event); moved.current = true; return; }
     if (Math.abs(touch.touchX - start.current.touchX) > 4 || Math.abs(touch.touchY - start.current.touchY) > 4 || touch.distance) moved.current = true;
     const scale = touch.distance && start.current.distance ? clampPageZoom(start.current.scale * touch.distance / start.current.distance) : start.current.scale;
-    setTransform({ scale, x: clampPagePan(start.current.x + touch.touchX - start.current.touchX, frame.width, scale),
-      y: clampPagePan(start.current.y + touch.touchY - start.current.touchY, frame.height, scale) });
+    setTransform({ scale, x: pan(start.current.x + touch.touchX - start.current.touchX, width * ratio, frame.width, scale),
+      y: pan(start.current.y + touch.touchY - start.current.touchY, height * ratio, frame.height, scale) });
   };
-  const release = () => {
-    if (moved.current) { lastTap.current = 0; return; }
-    const now = Date.now();
-    if (now - lastTap.current < 300) { setTransform({ scale: current.current.scale > 1 ? 1 : 2, x: 0, y: 0 }); lastTap.current = 0; }
-    else lastTap.current = now;
+  const release = (event: GestureResponderEvent) => {
+    if (moved.current) return;
+    const { locationX = frame.width / 2, locationY = frame.height / 2 } = event.nativeEvent;
+    setTransform(current.current.scale > 1 ? { scale: 1, x: 0, y: 0 } : {
+      scale: 2.5, x: pan((frame.width / 2 - locationX) * 1.5, width * ratio, frame.width, 2.5),
+      y: pan((frame.height / 2 - locationY) * 1.5, height * ratio, frame.height, 2.5),
+    });
   };
-  const ratio = Math.min(frame.width / width, frame.height / height);
-  return <View accessibilityLabel={`${label}. Pinch or double tap to zoom.`} style={{ flex: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}
-    onLayout={event => setFrame(event.nativeEvent.layout)} onStartShouldSetResponder={() => true}
-    onMoveShouldSetResponder={() => true} onResponderTerminationRequest={() => current.current.scale === 1 && !start.current.distance} onResponderTerminate={() => { lastTap.current = 0; }} onResponderGrant={capture} onResponderMove={move} onResponderRelease={release}>
-    <Image source={{ uri: url, ...(headers ? {headers} : {}) }} resizeMode="contain" accessibilityIgnoresInvertColors onError={onError}
-      style={{ width: width * ratio, height: height * ratio, transform: [{ translateX: transform.x }, { translateY: transform.y }, { scale: transform.scale }] }} />
+  return <View accessibilityLabel={`${label}. Pinch or tap to zoom.`} style={{ flex: 1, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}
+    onLayout={event => { setFrame(event.nativeEvent.layout); setTransform({ scale: 1, x: 0, y: 0 }); }} onStartShouldSetResponder={() => true}
+    onMoveShouldSetResponder={() => true} onResponderTerminationRequest={() => current.current.scale === 1 && !start.current.distance} onResponderTerminate={() => { moved.current = true; }} onResponderGrant={capture} onResponderMove={move} onResponderRelease={release}>
+    <View pointerEvents="none">
+      <Image source={{ uri: url, ...(headers ? {headers} : {}) }} resizeMode="contain" accessibilityIgnoresInvertColors onError={onError}
+        style={{ width: width * ratio, height: height * ratio, transform: [{ translateX: transform.x }, { translateY: transform.y }, { scale: transform.scale }] }} />
+    </View>
   </View>;
 }

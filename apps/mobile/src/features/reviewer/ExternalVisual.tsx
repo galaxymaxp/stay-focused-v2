@@ -1,6 +1,6 @@
 import type { StudyImageTarget } from '@stay-focused/shared';
 import { AskImageButton } from './AskImageButton';
-import { SaveImageButton } from './SaveImageButton';
+import { ImageActions } from './ImageActions';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { ImageViewer } from './ImageViewer';
@@ -54,8 +54,8 @@ export function ExternalVisual({client,artifactId,sectionId,online,hasSourceVisu
       <View style={{height:Math.min(height*0.5,spacing[12]*8)}}>
         {imageFailed?<ExternalImageError onRetry={()=>{onZoomChange(1);retryImage();}} sourceUrl={result.sourceUrl}/>:<ZoomablePage key={imageKey} url={result.image} headers={EXTERNAL_IMAGE_HEADERS} width={result.width} height={result.height} label={result.title} onZoomChange={onZoomChange} onError={failed}/>}
       </View>
-      <AskImageButton image={image} offline={!online} onAsk={target=>{setOpen(false);onAsk?.(target);}} />
-      <SaveImageButton offline={!online} image={{uri:result.image,headers:EXTERNAL_IMAGE_HEADERS,reviewerTitle,sectionTitle,kind:'external_visual',sourceTitle:result.title,attribution:`${result.credit} · ${result.license}`}} />
+      <ImageActions image={image} offline={!online} onAsk={target=>{setOpen(false);onAsk?.(target);}}
+        download={{uri:result.image,headers:EXTERNAL_IMAGE_HEADERS,reviewerTitle,sectionTitle,kind:'external_visual',sourceTitle:result.title,attribution:`${result.credit} · ${result.license}`}} />
       <Text style={{color:colors.textPrimary}}>{result.title}</Text>
       <Pressable accessibilityRole="link" accessibilityLabel="View attribution on Wikimedia Commons" onPress={()=>{void Linking.openURL(result.sourceUrl).catch(()=>{});}} style={{minHeight:hitTarget.min,justifyContent:'center'}}>
         <Text style={{color:colors.accent}}>{result.credit} · {result.license}</Text>

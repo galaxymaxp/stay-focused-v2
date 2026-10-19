@@ -1,7 +1,7 @@
 import { refreshFigureUri } from '../../services/studyImageFile';
 import type { StudyImageTarget } from '@stay-focused/shared';
 import { AskImageButton } from './AskImageButton';
-import { SaveImageButton } from './SaveImageButton';
+import { ImageActions } from './ImageActions';
 import { useEffect, useRef, useState } from 'react';
 import { Image, AppState, Pressable, Text, View, useWindowDimensions } from 'react-native';
 import { ImageViewer } from './ImageViewer';
@@ -94,8 +94,8 @@ export function SourceFigures({client,artifactId,sectionId,hasFigures,offline,vi
           <ZoomablePage key={figure.id} url={figure.url} width={figure.width} height={figure.height} label="Source figure" onZoomChange={onZoomChange}
             onError={failed}/>
         </View>
-        <AskImageButton offline={offline} onAsk={target=>{close();onAsk?.(target);}} image={{reference:{kind:'figure',id:figure.id},thumbnail:figure.url,label}} />
-        <SaveImageButton offline={offline} image={{uri:figure.url,reviewerTitle,sectionTitle,kind:'figure'}} refreshUri={() => refreshFigureUri(client,artifactId,sectionId,figure.id)} />
+        <ImageActions offline={offline} onAsk={target=>{close();onAsk?.(target);}} image={{reference:{kind:'figure',id:figure.id},thumbnail:figure.url,label}}
+          download={{uri:figure.url,reviewerTitle,sectionTitle,kind:'figure'}} refreshUri={() => refreshFigureUri(client,artifactId,sectionId,figure.id)} />
         {figures.length>1?<View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:spacing[2]}}>
           <Pressable accessibilityRole="button" accessibilityLabel="Previous figure" accessibilityState={{disabled:index===0}} disabled={index===0}
             onPress={()=>setIndex(n=>Math.max(0,n-1))} style={{minHeight:hitTarget.min,padding:spacing[2]}}><Text style={{color:index===0?colors.textMuted:colors.accent}}>Previous</Text></Pressable>

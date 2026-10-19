@@ -7,7 +7,7 @@ import { ExternalVisual } from './ExternalVisual';
 import { SaveImageButton } from './SaveImageButton';
 import { EXTERNAL_IMAGE_HEADERS, EXTERNAL_VISUAL_LABEL, type ExternalReferenceVisual } from '../../services/externalVisuals';
 import { apiFoundVisual } from '../../services/externalVisuals.testSupport';
-vi.mock('lucide-react-native', () => ({ Download: 'Download' }));
+vi.mock('lucide-react-native', () => ({ Download: 'Download', CircleHelp: 'CircleHelp' }));
 vi.mock('expo-constants',()=>({default:{expoConfig:{version:'2.2.0'}}}));
 const mocks=vi.hoisted(()=>({find:vi.fn(),close:vi.fn(),link:vi.fn(async()=>{})}));
 vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',ActivityIndicator:'ActivityIndicator',Pressable:'Pressable',Modal:'Modal',ScrollView:'ScrollView',Animated:{View:'AnimatedView',Value:class {setValue(){} stopAnimation(){}},spring:()=>({start(){}})},Linking:{openURL:mocks.link},useWindowDimensions:()=>({width:360,height:800})}));

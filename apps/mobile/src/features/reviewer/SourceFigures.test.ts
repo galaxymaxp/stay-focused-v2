@@ -9,7 +9,7 @@ const mocks=vi.hoisted(()=>({read:vi.fn(),availability:vi.fn(),state:{currentSta
 vi.mock('react-native',()=>({View:'View',Text:'Text',Image:'Image',Pressable:'Pressable',Modal:'Modal',ScrollView:'ScrollView',Animated:{View:'AnimatedView',Value:class {setValue(){} stopAnimation(){}},spring:()=>({start(){}})},ActivityIndicator:'ActivityIndicator',
   AppState:mocks.state,useWindowDimensions:()=>({width:360,height:800})}));
 vi.mock('react-native-safe-area-context',()=>({SafeAreaView:'SafeAreaView'}));
-vi.mock('lucide-react-native',()=>({Image:'ImageIcon',Download:'Download'}));
+vi.mock('lucide-react-native',()=>({Image:'ImageIcon',Download:'Download',CircleHelp:'CircleHelp'}));
 vi.mock('../../design/primitives',()=>({Sheet:({children,...props}:{children:unknown})=>createElement('Sheet',props,children as never)}));
 vi.mock('../../design/theme',async()=>{
   const tokens=await import('../../design/themeTokens');return {useTheme:()=>({colors:tokens.palettes.light,reducedMotion:true})};
