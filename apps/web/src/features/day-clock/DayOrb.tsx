@@ -3,12 +3,13 @@ import { cancelOrbSpin } from '@stay-focused/shared';
 import { useOrbInteraction, type OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 import { createOrbInteractionSampler } from '../knowledge-core/orbInteractionFrame';
 import { memo, useEffect, useRef, useState } from "react";
+import { OrbStill } from '../knowledge-core/OrbStill';
 import * as THREE from "three";
 import { createClockGlass } from '@stay-focused/shared/clock-glass-renderer';
 import type { ClockGlassReadout } from '@stay-focused/shared';
 import clockMetrics from '../../../public/clock/clock-atlas.json';
 import { createOrbBody } from "../knowledge-core/orbBody";
-import { orbShimmerLevel, SHIMMER_SPEED } from "../knowledge-core/orbAura";
+import { createOrbAura, orbShimmerLevel, SHIMMER_SPEED } from "../knowledge-core/orbAura";
 import {
   coreLevelsExtra,
   createCoreLevels,
@@ -94,14 +95,17 @@ export const DayOrb = memo(function DayOrb({
     canvas.setAttribute("aria-hidden", "true");
     frame.prepend(canvas);
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let focused = true;
     const sync = () => {
       runtime.current.mode =
         document.documentElement.dataset.theme === "dark" ? "dark" : "light";
       runtime.current.reducedMotion = motion.matches;
-      runtime.current.running = document.visibilityState === "visible";
+      runtime.current.running = document.visibilityState === "visible" && focused;
       if (!runtime.current.running) interaction.state.current = cancelOrbSpin(interaction.state.current);
       controller.current?.wake();
     };
+    const focus = () => { focused = true; sync(); };
+    const blur = () => { focused = false; sync(); };
     sync();
     const lost = (event: Event) => {
       event.preventDefault();
@@ -127,10 +131,12 @@ export const DayOrb = memo(function DayOrb({
     });
     motion.addEventListener("change", sync);
     document.addEventListener("visibilitychange", sync);
+    window.addEventListener('focus', focus); window.addEventListener('blur', blur);
     return () => {
       theme.disconnect();
       motion.removeEventListener("change", sync);
       document.removeEventListener("visibilitychange", sync);
+      window.removeEventListener('focus', focus); window.removeEventListener('blur', blur);
       controller.current?.dispose();
       controller.current = null;
       canvas.remove();
@@ -147,7 +153,7 @@ export const DayOrb = memo(function DayOrb({
       aria-hidden="true"
       data-state={state}
     >
-      {unsupported && <div className="day-orb-fallback" />}
+      {unsupported && <OrbStill interaction={interaction} tones={runtime.current.tones} className="day-orb-fallback" />}
     </div>
   );
 });
@@ -176,6 +182,8 @@ function buildScene(
   scene.add(root);
   const body = createOrbBody();
   root.add(body.mesh);
+  const aura = createOrbAura();
+  scene.add(aura.mesh);
 
   let glass: ReturnType<typeof createClockGlass> | null = null;
   let atlas: THREE.Texture | null = null;
@@ -223,7 +231,7 @@ function buildScene(
 
   const draw = () => {
     requestId = null;
-    if (disposed) return;
+    if (disposed || !runtime.current.running) return;
     const now = Date.now();
     const current = runtime.current;
     const settled = levels ? coreLevelsExtra(levels, current.reducedMotion) : null;
@@ -269,6 +277,9 @@ function buildScene(
         tones: { base: tones.base, deep: tones.deep, glow: tones.light },
         light: tones.position,
       });
+      aura.update({ delta, shimmer: 0, shimmerAmount: 0, glow: body.uniforms.uGlow.value,
+        error: extra?.error ?? 0, mode: current.mode, camera, center: root.position,
+        source: body.uniforms, reducedMotion: current.reducedMotion });
       if (glass && current.clock) {
         try {
           glass.render(scene, camera, current.clock, canvas.clientWidth, [tones.position.x, tones.position.y], current.mode === 'dark');
@@ -284,6 +295,11 @@ function buildScene(
   };
 
   const wake = () => {
+    if (disposed || !runtime.current.running) {
+      if (requestId !== null) cancelAnimationFrame(requestId);
+      requestId = null;
+      return;
+    }
     dirty = true;
     settleUntil = Date.now() + 400;
     if (requestId === null) {
@@ -302,6 +318,7 @@ function buildScene(
       if (requestId !== null) cancelAnimationFrame(requestId);
       observer.disconnect();
       body.dispose();
+      aura.dispose();
       glass?.dispose(); atlas?.dispose(); report(false);
       renderer.dispose();
     },

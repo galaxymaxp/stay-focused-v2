@@ -3,6 +3,7 @@ import { cancelOrbSpin } from '@stay-focused/shared';
 import { OrbPointerLayer, useOrbInteraction, type OrbInteractionHandle } from './orbInteraction';
 import { createOrbInteractionSampler } from './orbInteractionFrame';
 import { useEffect, useRef, useState } from "react";
+import { OrbStill } from './OrbStill';
 import * as THREE from "three";
 import {
   CORE_MOTION_PROFILES,
@@ -64,18 +65,28 @@ export function KnowledgeCore({ state }: { state: CoreState }) {
     const canvas = document.createElement("canvas");
     frame.prepend(canvas);
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let focused = true;
     const sync = () => {
       runtime.current.mode = readMode();
       runtime.current.reducedMotion = motion.matches;
-      runtime.current.active = document.visibilityState === "visible";
+      runtime.current.active = document.visibilityState === "visible" && focused;
       if (!runtime.current.active) interaction.state.current = cancelOrbSpin(interaction.state.current);
       controller.current?.renderForChange();
     };
+    const focus = () => { focused = true; sync(); };
+    const blur = () => { focused = false; sync(); };
     sync();
+    const lost = (event: Event) => {
+      event.preventDefault();
+      controller.current?.dispose(); controller.current = null;
+      canvas.remove(); setUnsupported(true);
+    };
+    canvas.addEventListener?.('webglcontextlost', lost);
     try {
       controller.current = buildScene(canvas, runtime, interaction);
     } catch {
       canvas.remove();
+      canvas.removeEventListener?.('webglcontextlost', lost);
       setUnsupported(true);
       return;
     }
@@ -87,13 +98,16 @@ export function KnowledgeCore({ state }: { state: CoreState }) {
     });
     motion.addEventListener("change", sync);
     document.addEventListener("visibilitychange", sync);
+    window.addEventListener('focus', focus); window.addEventListener('blur', blur);
     return () => {
       theme.disconnect();
       motion.removeEventListener("change", sync);
       document.removeEventListener("visibilitychange", sync);
+      window.removeEventListener('focus', focus); window.removeEventListener('blur', blur);
       controller.current?.dispose();
       controller.current = null;
       canvas.remove();
+      canvas.removeEventListener?.('webglcontextlost', lost);
     };
   }, [interaction]);
 
@@ -107,7 +121,7 @@ export function KnowledgeCore({ state }: { state: CoreState }) {
       data-state={state}
 
     >
-      {unsupported && <div className="knowledge-core-fallback" />}
+      {unsupported && <OrbStill interaction={interaction} idle={state === 'idle'} />}
       <OrbPointerLayer interaction={interaction} fill={ORB_FILL} />
     </div>
   );
@@ -209,19 +223,7 @@ function buildScene(
     camera.updateMatrixWorld();
 
     const glow = 0.55 + activity * 0.5 + completion * 0.15;
-    aura.update({
-      delta: current.reducedMotion ? 0 : delta,
-      shimmer,
-      glow,
-      error,
-      mode: current.mode,
-      camera,
-      center: root.position,
-      color: current.state === 'idle' ? interactionFrame.idleColor : undefined,
-      // The generation light is centered, so rotation keeps its aura centered.
-      // Reduced Motion keeps a steady glow.
-      shimmerAmount: current.reducedMotion ? 0 : 0.4 + activity * 0.6,
-    });
+    aura.stepShimmer(current.reducedMotion ? 0 : delta, shimmer, current.reducedMotion ? 0 : 0.4 + activity * 0.6, error);
     body.update({
       time: animatedTime,
       life,
@@ -234,6 +236,8 @@ function buildScene(
       idleColor: current.state === 'idle' ? interactionFrame.idleColor : undefined,
       rippleDir: interactionFrame.rippleDir, rippleTime: interactionFrame.rippleTime,
     });
+    aura.update({ delta, shimmer, glow, error, mode: current.mode, camera, center: root.position,
+      shimmerAmount: aura.shimmer.amount, source: body.uniforms, reducedMotion: current.reducedMotion });
     renderer.render(scene, camera);
     const settling =
       now < settleUntil ||
@@ -246,7 +250,11 @@ function buildScene(
   };
 
   function renderForChange() {
-    if (disposed) return;
+    if (disposed || !runtime.current.active) {
+      if (requestId !== null) cancelAnimationFrame(requestId);
+      requestId = null;
+      return;
+    }
     settleUntil =
       Date.now() + (runtime.current.reducedMotion ? 360 : 1100);
     if (requestId === null) {

@@ -84,7 +84,11 @@ describe("QueueButton", () => {
     const root = await render();
     expect(
       root.findAll((node) => String(node.type) === "AnimatedImage"),
-    ).toHaveLength(1);
+    ).toHaveLength(2);
+    const images = root.findAll(node => String(node.type) === 'AnimatedImage');
+    expect(images[0]!.props.source).toBe(images[1]!.props.source);
+    expect(images[0]!.props.blurRadius).toBe(7);
+    expect(images[0]!.props.style.transform).toEqual(images[1]!.props.style.transform);
     expect(
       root.findAll((node) => node.props.testID === "queue-count"),
     ).toHaveLength(0);

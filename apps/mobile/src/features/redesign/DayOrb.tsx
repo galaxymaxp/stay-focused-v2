@@ -4,13 +4,14 @@ import { createOrbInteractionSampler } from '../generation-core/orbInteractionFr
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Image, View } from "react-native";
+import { OrbImageSpill } from '../generation-core/OrbImageSpill';
 import * as THREE from "three";
 import { createClockGlass } from '@stay-focused/shared/clock-glass-renderer';
 import type { ClockGlassReadout } from '@stay-focused/shared';
 import clockMetrics from '../../../assets/clock/clock-atlas.json';
 
 import { coreLevelsExtra, createCoreLevels, stepCoreLevels, type CoreLevels, type CoreState } from "../generation-core/coreModel";
-import { orbShimmerLevel, SHIMMER_SPEED } from "../generation-core/orbAura";
+import { createOrbAura, orbShimmerLevel, SHIMMER_SPEED } from "../generation-core/orbAura";
 import { createOrbBody } from "../generation-core/orbBody";
 import { threeContext } from "../generation-core/threeContext";
 import { dayOrbTones, type DayOrbTones } from "./dayClock";
@@ -119,9 +120,9 @@ export const DayOrb = memo(function DayOrb({
   const inner = size * RENDER_SCALE;
   return (
     <View pointerEvents="none" style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {/* OR3b: no external halo; native gradient stops require React updates. */}
+      {/* Ambient spill renders inside the same transparent GL view. */}
       {renderingFailed
-        ? <Image source={require("../../../assets/branding/orb-adaptive-foreground.png")} style={{ width: size, height: size }} resizeMode="contain" />
+        ? <><OrbImageSpill source={require("../../../assets/branding/orb-adaptive-foreground.png")} size={size} mode={mode} /><Image source={require("../../../assets/branding/orb-adaptive-foreground.png")} style={{ width: size, height: size }} resizeMode="contain" /></>
         : <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />}
     </View>
   );
@@ -151,6 +152,8 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   scene.add(root);
   const body = createOrbBody();
   root.add(body.mesh);
+  const aura = createOrbAura();
+  scene.add(aura.mesh);
 
   let glass: ReturnType<typeof createClockGlass> | null = null;
   let atlas: THREE.Texture | null = null;
@@ -184,7 +187,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
 
   const draw = () => {
     requestId = null;
-    if (disposed) return;
+    if (disposed || !runtime.current.running) return;
     const now = Date.now();
     const current = runtime.current;
     const settled = levels ? coreLevelsExtra(levels, current.reducedMotion) : null;
@@ -233,6 +236,9 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
         tones: { base: tones.base, deep: tones.deep, glow: tones.light },
         light: tones.position,
       });
+      aura.update({ delta, shimmer: 0, shimmerAmount: 0, glow: body.uniforms.uGlow.value,
+        error: extra?.error ?? 0, mode: current.mode, camera, center: root.position,
+        source: body.uniforms, reducedMotion: current.reducedMotion });
       if (glass && current.clock) {
         try {
           glass.render(scene, camera, current.clock, current.canvasSize, [tones.position.x, tones.position.y], current.mode === 'dark');
@@ -248,6 +254,11 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   };
 
   const wake = () => {
+    if (disposed || !runtime.current.running) {
+      if (requestId !== null) cancelAnimationFrame(requestId);
+      requestId = null;
+      return;
+    }
     dirty = true;
     settleUntil = Date.now() + 400;
     if (requestId === null) {
@@ -265,6 +276,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
       if (interaction.wake.current === wake) interaction.wake.current = null;
       if (requestId !== null) cancelAnimationFrame(requestId);
       body.dispose();
+      aura.dispose();
       glass?.dispose(); atlas?.dispose(); report(false);
       renderer.dispose();
     },

@@ -11,6 +11,17 @@ export { countActiveJobs } from "../features/queue-items";
 
 export function QueueButton() {
   const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    let focused = true;
+    const sync = () => setHidden(document.visibilityState === 'hidden' || !focused);
+    const focus = () => { focused = true; sync(); };
+    const blur = () => { focused = false; sync(); };
+    sync(); document.addEventListener('visibilitychange', sync);
+    window.addEventListener('focus', focus); window.addEventListener('blur', blur);
+    return () => { document.removeEventListener('visibilitychange', sync);
+      window.removeEventListener('focus', focus); window.removeEventListener('blur', blur); };
+  }, []);
   const { prefs, hide } = useListPreferences();
   const queue = useQueueItems(open, prefs.hidden.queue);
   const root = useRef<HTMLDivElement>(null);
@@ -81,6 +92,7 @@ export function QueueButton() {
         aria-controls="queue-popover"
         aria-haspopup="dialog"
         data-testid="queue-button"
+        data-hidden={hidden}
         onClick={() => (open ? close() : show())}
       >
         {count > 0 ? (

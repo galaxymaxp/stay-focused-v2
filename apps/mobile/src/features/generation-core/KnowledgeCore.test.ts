@@ -11,7 +11,12 @@ vi.mock('expo-gl', () => ({ GLView: 'GLView' }));
 vi.mock('react-native', () => ({ View: 'View', Image: 'Image', StyleSheet: { create: (s: unknown) => s, absoluteFill: {} }, AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } }));
 vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: async () => 'pearl', setItem: vi.fn() } }));
 vi.mock('./threeContext', () => ({ threeContext: (gl: unknown) => gl }));
-vi.mock('./orbBody', async () => { const THREE = await import('three'); return { ORB_RADIUS: 0.95, createOrbBody: () => ({ mesh: new THREE.Object3D(), update: mocks.update, dispose() {} }) }; });
+vi.mock('./orbBody', async original => {
+  const actual = await original<typeof import('./orbBody')>();
+  return { ...actual, createOrbBody: () => { const body = actual.createOrbBody();
+    return { ...body, update: (frame: Parameters<typeof body.update>[0]) => { mocks.update(frame); body.update(frame); } };
+  } };
+});
 vi.mock('./orbAura', async original => { const actual = await original<typeof import('./orbAura')>(); return { ...actual, createOrbAura: () => {
   const aura = actual.createOrbAura(); return { ...aura, update: (frame: Parameters<typeof aura.update>[0]) => { mocks.aura(frame); aura.update(frame); } };
 } }; });
@@ -36,7 +41,7 @@ it.each<CoreState>(['reading', 'generating', 'finalizing', 'complete', 'error'])
   p.onResponderGrant(event); vi.advanceTimersByTime(50); p.onResponderRelease(event);
   vi.advanceTimersByTime(100); draw();
   expect(mocks.update.mock.lastCall![0].idleColor).toBeUndefined();
-  expect(mocks.aura.mock.lastCall![0].color).toBeUndefined();
+  expect(mocks.aura.mock.lastCall![0].source.uBase.value.getHexString()).toBe('dde3ee');
   expect(mocks.update.mock.lastCall![0].rippleTime).toBeCloseTo(0.1);
   expect(tree!.root.findByProps({ testID: 'knowledge-core' }).props.accessibilityElementsHidden).toBe(true);
 });
@@ -53,8 +58,8 @@ it('crossfades idle body and aura together then restores generation colors', asy
   const p = tree!.root.findByProps({ testID: 'orb-touch' }).props;
   p.onResponderGrant(event); vi.advanceTimersByTime(50); p.onResponderRelease(event);
   vi.advanceTimersByTime(300); draw();
-  expect(mocks.aura.mock.lastCall![0].color).toBe(mocks.update.mock.lastCall![0].idleColor);
-  expect(mocks.aura.mock.lastCall![0].color).not.toBe('#e6eaf1');
+  expect('#' + mocks.aura.mock.lastCall![0].source.uBase.value.getHexString()).toBe(mocks.update.mock.lastCall![0].idleColor);
+  expect(mocks.aura.mock.lastCall![0].source.uBase.value.getHexString()).not.toBe('e6eaf1');
   await act(async () => tree!.update(createElement(KnowledgeCore, { state: 'reading', colors: palettes.dark, mode: 'dark', size: 320, reducedMotion: false }))); draw();
-  expect(mocks.update.mock.lastCall![0].idleColor).toBeUndefined(); expect(mocks.aura.mock.lastCall![0].color).toBeUndefined();
+  expect(mocks.update.mock.lastCall![0].idleColor).toBeUndefined(); expect(mocks.aura.mock.lastCall![0].source.uBase.value.getHexString()).toBe('dde3ee');
 });

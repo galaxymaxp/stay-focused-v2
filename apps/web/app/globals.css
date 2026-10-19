@@ -2812,21 +2812,21 @@ details[open] > :not(summary) {
   position: absolute;
   inset: -7px;
   border-radius: 50%;
-  background: var(--accent);
-  opacity: 0;
-  transform: scale(0.7);
+  background: url("/queue/orb-light.png") center / contain no-repeat;
+  filter: blur(7px);
+  opacity: 0.1;
   transition:
     opacity var(--motion-spatial) var(--ease-out),
     transform var(--motion-spatial) var(--ease-out);
 }
 .queue-button.working .queue-glow {
-  opacity: 0.16;
+  opacity: 0.22;
   transform: none;
 }
 :root[data-theme="dark"] .queue-button.working .queue-glow {
-  opacity: 0.22;
+  opacity: 0.4;
 }
-.queue-button.working .queue-orb-frame {
+.queue-button.working .queue-orb {
   animation: queue-turn 9s linear infinite;
 }
 @keyframes queue-turn {
@@ -5399,3 +5399,15 @@ mark.find-active {
 .clock-options-menu label { display: flex; flex-direction: column; gap: 4px; color: var(--secondary); }
 .clock-options-menu input { min-height: 44px; width: 100%; }
 .clock-options-menu > button { min-height: 44px; display: flex; justify-content: space-between; }
+
+/* Static and failed-GL orbs diffuse their own displayed color field. */
+.orb-static-source { position: relative; isolation: isolate; }
+.orb-static-source::before {
+  content: ''; position: absolute; inset: -22%; z-index: -1;
+  border-radius: 50%; background: inherit; filter: blur(16px); opacity: 0.18;
+  mask-image: radial-gradient(closest-side, #000 45%, transparent 100%);
+  pointer-events: none;
+}
+:root[data-theme="dark"] .orb-static-source::before { opacity: 0.38; }
+:root[data-theme="dark"] .queue-glow { background-image: url("/queue/orb-dark.png"); opacity: 0.2; }
+.queue-button[data-hidden="true"] .queue-orb { animation-play-state: paused; }

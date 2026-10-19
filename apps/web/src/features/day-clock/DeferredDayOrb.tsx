@@ -49,7 +49,7 @@ export function DeferredDayOrb({ minutes, size, ready, clock, onGlassReady, inte
   const tones = dayOrbTones(minutes);
   const diameter = size * DAY_ORB_FILL;
   return <div className="day-orb" data-testid="day-orb-still" aria-hidden="true" style={{ width: size, height: size, display: 'grid', placeItems: 'center' }}>
-    <div ref={still} style={{ width: diameter, height: diameter, borderRadius: '50%',
+    <div ref={still} className="orb-static-source" style={{ width: diameter, height: diameter, borderRadius: '50%',
       background: `radial-gradient(circle at 40% 32%, ${tones.light} 0%, ${orbIdleColor(interaction.state.current, Date.now(), true)} 45%, ${tones.deep} 100%)` }} />
   </div>;
 }

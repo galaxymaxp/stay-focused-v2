@@ -5,6 +5,7 @@ import { useIsFocused } from "expo-router/react-navigation";
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Image, StyleSheet, View } from "react-native";
+import { OrbImageSpill } from './OrbImageSpill';
 import * as THREE from "three";
 
 import type { ThemeColors } from "../../design/theme";
@@ -79,7 +80,7 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
   return (
     <View style={[styles.frame, { width: size, height: size }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" testID="knowledge-core">
       {renderingFailed
-        ? <Image source={require("../../../assets/branding/orb-adaptive-foreground.png")} style={{ width: size, height: size }} resizeMode="contain" />
+        ? <><OrbImageSpill source={require("../../../assets/branding/orb-adaptive-foreground.png")} size={size} mode={mode} /><Image source={require("../../../assets/branding/orb-adaptive-foreground.png")} style={{ width: size, height: size }} resizeMode="contain" /></>
         : <GLView onContextCreate={createScene} style={styles.canvas} />}
       <OrbTouchLayer interaction={interaction} size={size * ORB_FILL} left={size * (1 - ORB_FILL) / 2} top={size * (1 - ORB_FILL) / 2} reducedMotion={reducedMotion} />
     </View>
@@ -167,13 +168,7 @@ function buildScene(
     camera.updateMatrixWorld();
 
     const glow = 0.55 + activity * 0.5 + completion * 0.15;
-    aura.update({
-      delta: current.reducedMotion ? 0 : delta, shimmer, glow, error, mode: current.mode, camera, center: root.position,
-      color: current.state === 'idle' ? interactionFrame.idleColor : undefined,
-      // The generation light is centered, so rotation keeps its aura centered.
-      // Reduced Motion keeps a steady glow.
-      shimmerAmount: current.reducedMotion ? 0 : 0.4 + activity * 0.6,
-    });
+    aura.stepShimmer(current.reducedMotion ? 0 : delta, shimmer, current.reducedMotion ? 0 : 0.4 + activity * 0.6, error);
     body.update({
       time: animatedTime, life, glow, error, spin: spinMatrix, mode: current.mode,
       level: aura.shimmer.level,
@@ -181,6 +176,8 @@ function buildScene(
       idleColor: current.state === 'idle' ? interactionFrame.idleColor : undefined,
       rippleDir: interactionFrame.rippleDir, rippleTime: interactionFrame.rippleTime,
     });
+    aura.update({ delta, shimmer, glow, error, mode: current.mode, camera, center: root.position,
+      shimmerAmount: aura.shimmer.amount, source: body.uniforms, reducedMotion: current.reducedMotion });
     renderer.render(scene, camera);
     gl.endFrameEXP();
     const settling = now < settleUntil || Math.abs(activity - profile.activity) > 0.006
@@ -190,6 +187,11 @@ function buildScene(
   };
 
   const renderForChange = () => {
+      if (disposed || !runtime.current.active || !runtime.current.focused) {
+        if (requestId !== null) cancelAnimationFrame(requestId);
+        requestId = null;
+        return;
+      }
       settleUntil = Date.now() + (runtime.current.reducedMotion ? 360 : 1100);
       if (requestId === null) { lastFrame = Date.now(); requestId = requestAnimationFrame(draw); }
     };

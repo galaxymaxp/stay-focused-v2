@@ -41,7 +41,7 @@ export const QueueButton = memo(function QueueButton() {
 
   useEffect(() => {
     const to = active ? 1 : 0;
-    if (reducedMotion) working.setValue(to);
+    if (reducedMotion || !appActive || !focused) { working.stopAnimation(); working.setValue(to); }
     else
       Animated.timing(working, {
         toValue: to,
@@ -49,18 +49,20 @@ export const QueueButton = memo(function QueueButton() {
         easing: Easing.out(Easing.cubic),
         useNativeDriver: true,
       }).start();
-  }, [active, reducedMotion, working]);
+    return () => working.stopAnimation();
+  }, [active, appActive, focused, reducedMotion, working]);
 
   useEffect(() => {
     const to = count > 0 ? 1 : 0;
-    if (reducedMotion) badge.setValue(to);
+    if (reducedMotion || !appActive || !focused) { badge.stopAnimation(); badge.setValue(to); }
     else
       Animated.spring(badge, {
         toValue: to,
         ...motion.spring,
         useNativeDriver: true,
       }).start();
-  }, [badge, count, reducedMotion]);
+    return () => badge.stopAnimation();
+  }, [appActive, badge, count, focused, reducedMotion]);
 
   const spinning = active && shouldAnimate(reducedMotion, appActive, focused);
   useEffect(() => {
@@ -160,6 +162,7 @@ export const QueueButton = memo(function QueueButton() {
         />
       ) : null}
       <View
+        pointerEvents="none"
         style={{
           width: ORB_SIZE,
           height: ORB_SIZE,
@@ -167,26 +170,14 @@ export const QueueButton = memo(function QueueButton() {
           justifyContent: "center",
         }}
       >
-        <Animated.View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            width: ORB_SIZE + 14,
-            height: ORB_SIZE + 14,
-            borderRadius: (ORB_SIZE + 14) / 2,
-            backgroundColor: colors.accent,
-            opacity: working.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0, mode === "dark" ? 0.22 : 0.16],
-            }),
-            transform: [
-              {
-                scale: working.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.7, 1],
-                }),
-              },
-            ],
+        <Animated.Image
+          testID="queue-orb-spill"
+          accessible={false}
+          source={ORB[mode]}
+          blurRadius={7}
+          style={{ position: 'absolute', width: ORB_SIZE + 14, height: ORB_SIZE + 14,
+            opacity: working.interpolate({ inputRange: [0, 1], outputRange: [mode === 'dark' ? 0.2 : 0.1, mode === 'dark' ? 0.4 : 0.22] }),
+            transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
           }}
         />
         <Animated.Image

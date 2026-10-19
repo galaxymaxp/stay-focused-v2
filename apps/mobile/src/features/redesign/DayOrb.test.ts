@@ -10,6 +10,7 @@ import { DayOrb, DAY_ORB_FILL, dayOrbTouch } from "./DayOrb";
 import { CLOCK } from "./dayClock";
 
 const mocks = vi.hoisted(() => ({
+  appState: null as ((state: string) => void) | null,
   fail: false,
   render: vi.fn(),
   animatedValue: vi.fn(),
@@ -22,7 +23,7 @@ vi.mock('expo-asset', () => ({ Asset: { fromModule: () => ({ localUri: 'file:///
 vi.mock('@stay-focused/shared/clock-glass-renderer', () => ({ createClockGlass: () => ({ render: mocks.glass, dispose: mocks.glassDispose }) }));
 vi.mock("react-native", () => ({
   View: "View", Image: "Image", Platform: { OS: 'android' },
-  AppState: { currentState: "active", addEventListener: () => ({ remove: vi.fn() }) },
+  AppState: { currentState: "active", addEventListener: (_event: string, listener: (state: string) => void) => { mocks.appState = listener; return { remove: vi.fn() }; } },
   Animated: { Value: mocks.animatedValue },
 }));
 vi.mock("react-native-svg", () => ({
@@ -115,7 +116,7 @@ it('withdraws glass readiness and disposes the composite on a draw failure', asy
   expect(mocks.glassDispose).toHaveBeenCalledOnce(); expect(mocks.render).toHaveBeenCalledOnce();
 });
 
-describe("Today orb without an external glow", () => {
+describe("Today orb with one in-scene ambient spill", () => {
   it("keeps the glass footprint and passes touches through its decorative host", async () => {
     const root = await render();
     expect(root.findAllByProps({ testID: 'day-orb-halo' })).toHaveLength(0);
@@ -126,11 +127,15 @@ describe("Today orb without an external glow", () => {
     expect(gl.parent!.props.accessibilityElementsHidden).toBe(true);
     await startGL(); vi.advanceTimersByTime(80); mocks.frame.mock.lastCall![0](Date.now());
     const scene = mocks.render.mock.lastCall![0];
-    expect(scene.children).toHaveLength(1); // Root/body only; no aura mesh.
+    expect(scene.children).toHaveLength(2); // Root/body and exactly one ambient plane.
+    const body = scene.children[0].children[0].material.uniforms;
+    const spill = scene.children[1].material.uniforms;
+    expect(spill.uBase.value.equals(body.uBase.value)).toBe(true);
+    expect(spill.uTime.value).toBe(body.uTime.value);
   });
   it.each([
     { reducedMotion: true, live: true },
-    { reducedMotion: false, live: false },
+
   ])("renders one still frame without an extra loop: %j", async overrides => {
     await render(overrides); expect(mocks.frame).not.toHaveBeenCalled();
     await startGL(); vi.advanceTimersByTime(1000); mocks.frame.mock.calls[0]![0](Date.now());
@@ -156,11 +161,11 @@ describe("Today orb without an external glow", () => {
     vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
     expect(mocks.render.mock.calls.length).toBe(after);
   });
-  it('keeps the PNG fallback without a misleading halo when GL fails', async () => {
+  it('keeps the PNG fallback with a static image-derived spill when GL fails', async () => {
     await render({ reducedMotion: true, live: false }); mocks.fail = true; await startGL();
     const root = rendered!.root;
-    expect(root.findAllByType(GLView)).toHaveLength(0); expect(root.findByType(Image).props.resizeMode).toBe('contain');
-    expect(root.findAllByProps({ testID: 'day-orb-halo' })).toHaveLength(0);
+    expect(root.findAllByType(GLView)).toHaveLength(0); expect(root.findAllByType(Image).find(image => !image.props.blurRadius)!.props.resizeMode).toBe('contain');
+    expect(root.findAllByProps({ testID: 'orb-image-spill' })).toHaveLength(1);
     expect(mocks.frame).not.toHaveBeenCalled();
   });
 });
@@ -200,4 +205,22 @@ describe("Today orb with a generation state", () => {
     expect(bright).toBeGreaterThan(settledGlow() + 0.2);
     expect(uniforms().uLife!.value).toBeCloseTo(0.22, 2);
   });
+});
+
+it('does not draw while unfocused or backgrounded and disposes the ambient mesh', async () => {
+  await render({ live: false }); await startGL();
+  expect(mocks.frame).not.toHaveBeenCalled();
+  await act(async () => rendered!.update(createElement(DayOrb, props)));
+  vi.advanceTimersByTime(80); mocks.frame.mock.lastCall![0](Date.now());
+  const aura = mocks.render.mock.lastCall![0].children[1];
+  const dispose = vi.spyOn(aura.geometry, 'dispose');
+  const count = mocks.render.mock.calls.length;
+  await act(async () => mocks.appState?.('background'));
+  vi.advanceTimersByTime(80); mocks.frame.mock.lastCall![0](Date.now());
+  expect(mocks.render).toHaveBeenCalledTimes(count);
+  await act(async () => mocks.appState?.('active'));
+  vi.advanceTimersByTime(80); mocks.frame.mock.lastCall![0](Date.now());
+  expect(mocks.render.mock.calls.length).toBe(count + 1);
+  await act(async () => rendered!.unmount()); rendered = undefined;
+  expect(dispose).toHaveBeenCalledOnce();
 });

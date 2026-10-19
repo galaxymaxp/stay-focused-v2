@@ -12,8 +12,20 @@ export function GenerationOrb({ state }: { state: CoreState }) {
   const interaction = useOrbInteraction();
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 30000);
-    return () => clearInterval(timer);
+    let timer: ReturnType<typeof setInterval> | undefined;
+    let focused = true;
+    const sync = () => {
+      clearInterval(timer); timer = undefined;
+      if (document.visibilityState === 'hidden' || !focused) return;
+      setNow(new Date());
+      timer = setInterval(() => setNow(new Date()), 30000);
+    };
+    const focus = () => { focused = true; sync(); };
+    const blur = () => { focused = false; sync(); };
+    sync(); document.addEventListener('visibilitychange', sync);
+    window.addEventListener('focus', focus); window.addEventListener('blur', blur);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', sync);
+      window.removeEventListener('focus', focus); window.removeEventListener('blur', blur); };
   }, []);
   return (
     <div className="generation-orb" data-testid="generation-orb" data-state={state} aria-hidden="true">

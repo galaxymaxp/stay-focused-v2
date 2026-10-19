@@ -128,6 +128,9 @@ describe("generation page in a real browser (local only)", () => {
       expect(orb).toMatchObject({ canvas: true, hit: "orb-touch", color: "pearl" });
       await page.mouse.click(orb.x, orb.y);
       expect(await page.evaluate(() => localStorage.getItem("sf.orb.colorKey"))).toBe("gold");
+      // Progress eases toward the server value. Wait for that exact value,
+      // rather than sampling a transitional integer on a busy software GPU.
+      await page.waitForFunction(() => document.querySelector('ol.generation-steps')?.textContent?.includes('3 of 18 sections'));
       const list = await page.evaluate(() => {
         const ol = document.querySelector("ol.generation-steps")!;
         return { style: getComputedStyle(ol).listStyleType, text: (ol as HTMLElement).innerText };
