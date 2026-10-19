@@ -6,10 +6,12 @@ import { Heading, Icon } from '../../components/ui';
 import { dateLabel } from '../../lib/api';
 import { ShareReviewer, type ShareReviewerTrigger } from './share-reviewer';
 
-export function ReviewerHeader({ artifact, reviewer, onSave, onQuiz, quizDisabled }: {
+export function ReviewerHeader({ artifact, reviewer, onSave, onExport, exportBusy, onQuiz, quizDisabled }: {
   artifact: LibraryArtifactSummary;
   reviewer: ReviewerReaderModel;
   onSave: () => void;
+  onExport: () => void;
+  exportBusy: boolean;
   onQuiz: () => void;
   quizDisabled: boolean;
 }) {
@@ -21,7 +23,7 @@ export function ReviewerHeader({ artifact, reviewer, onSave, onQuiz, quizDisable
       action={<div className="row wrap reviewer-heading-actions">
         <button className="primary" disabled={quizDisabled} onClick={onQuiz}>Generate Quiz</button>
         {artifact.id.startsWith('artifact:') ? <ShareReviewer artifactId={artifact.id.slice('artifact:'.length)} reviewer={reviewer}
-          renderTrigger={share => <ReviewerActions onSave={onSave} share={share} />} /> : <ReviewerActions onSave={onSave} />}
+          renderTrigger={share => <ReviewerActions onExport={onExport} busy={exportBusy} onSave={onSave} share={share} />} /> : <ReviewerActions onExport={onExport} busy={exportBusy} onSave={onSave} />}
       </div>} />
     {reviewer.reviewMinutes || reviewer.sections.length > 1 ? <div className="meta reviewer-meta">
       {reviewer.reviewMinutes ? <span>{`~${reviewer.reviewMinutes} min review`}</span> : null}
@@ -31,7 +33,7 @@ export function ReviewerHeader({ artifact, reviewer, onSave, onQuiz, quizDisable
 }
 
 /** Uses the existing AccountMenu popover pattern, scoped to this reviewer. */
-function ReviewerActions({ onSave, share }: { onSave: () => void; share?: ShareReviewerTrigger }) {
+function ReviewerActions({ onSave, onExport, busy, share }: { onSave: () => void; onExport: () => void; busy: boolean; share?: ShareReviewerTrigger }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -75,7 +77,8 @@ function ReviewerActions({ onSave, share }: { onSave: () => void; share?: ShareR
         items[next]?.focus();
       }}>
       {share && <button role="menuitem" disabled={share.disabled} onClick={() => select(share.onClick)}><Icon name="globe" />Share</button>}
-      <button role="menuitem" onClick={() => select(onSave)}><Icon name="download" />Save to file</button>
+      <button role="menuitem" disabled={busy} onClick={() => select(onExport)}><Icon name="download" />{busy ? 'Creating file...' : 'Export PDF'}</button>
+      <button role="menuitem" disabled={busy} onClick={() => select(onSave)}><Icon name="download" />Text (.txt)</button>
     </div>}
   </div>;
 }

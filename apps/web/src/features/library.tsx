@@ -40,6 +40,7 @@ import { useAction, useResource } from "../lib/hooks";
 import { useListPreferences } from "../lib/list-preferences";
 import { useSavedLibrary } from '../lib/use-saved-library';
 import { DraftInstructions } from './draft-instructions';
+import { StudyExportControl } from './study-export-control';
 type Artifact = {
   artifact: LibraryArtifactSummary;
   reviewer?: ReviewerReaderModel;
@@ -520,7 +521,7 @@ export function ArtifactScreen({ id }: { id: string }) {
           Open Quiz
         </Link>
       )}
-      {data?.draft && <DraftEditor draft={data.draft} />}
+      {data?.draft && <DraftEditor key={data.draft.id} draft={data.draft} artifact={data.artifact} />}
     </>
   );
 }
@@ -554,13 +555,14 @@ function DraftTextarea(props: ComponentPropsWithoutRef<"textarea">) {
   }} />;
 }
 
-function DraftEditor({ draft }: { draft: ActivityDraft }) {
+function DraftEditor({ draft, artifact }: { draft: ActivityDraft; artifact: LibraryArtifactSummary }) {
   const { api } = useAuth(),
     [content, setContent] = useState<ActivityDraftContent>({
       title: draft.title,
       sections: draft.sections,
       slides: draft.slides,
     }),
+    [savedDraft, setSavedDraft] = useState(draft),
     [revision, setRevision] = useState(draft.revision),
     [dirty, setDirty] = useState(false),
     action = useAction();
@@ -657,6 +659,7 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
           ))}
         </nav> : null} />
         <p className="meta" role="status">{dirty ? "Unsaved changes" : "Saved draft"}</p>
+        <StudyExportControl detail={{ artifact: { ...artifact, title: savedDraft.title }, draft: savedDraft }} disabled={action.busy} unsaved={dirty} />
         {draft.warnings.length > 0 && (
           <Notice>
             Some sections need information from you. Check this draft against your
@@ -672,6 +675,7 @@ function DraftEditor({ draft }: { draft: ActivityDraft }) {
                 `/api/experience/activity-drafts/${draft.id}`,
                 { method: "PATCH", body: { revision, content } },
               );
+              setSavedDraft(updated);
               setRevision(updated.revision);
               setDirty(false);
               action.setMessage("Draft saved.");

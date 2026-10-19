@@ -42,6 +42,8 @@ import { StudyAssistPanel } from "./study-assist-panel";
 import { SectionVisual } from "./section-visual";
 import { useReviewerImages } from './use-reviewer-images';
 import { ReviewerHeader } from './reviewer-header';
+import { useAction } from '../../lib/hooks';
+import { downloadStudyFile, EXPORT_FAILURE } from '../study-export';
 
 // Web counterpart of apps/mobile/src/features/reviewer/ReviewerReader.tsx:
 // topics and search on the left, the Reviewer in a reading column, and Study
@@ -302,6 +304,7 @@ export function ReviewerReader({
   };
 
   const [quizOpen, setQuizOpen] = useState(false);
+  const exportAction = useAction();
   function saveText() {
     const body = [
       reviewer.title,
@@ -322,8 +325,13 @@ export function ReviewerReader({
 
   return (
     <StudyAnswerScrollContext.Provider value={topicScroll}>
-      <ReviewerHeader artifact={artifact} reviewer={reviewer} onSave={saveText}
+      <ReviewerHeader artifact={artifact} reviewer={reviewer} exportBusy={exportAction.busy}
+        onExport={() => void exportAction.run(() => downloadStudyFile({ artifact, reviewer }, 'pdf'))}
+        onSave={() => void exportAction.run(async () => {
+          try { saveText(); } catch { throw new Error(EXPORT_FAILURE); }
+        })}
         onQuiz={() => setQuizOpen(true)} quizDisabled={!generationEnabled} />
+      {exportAction.message && <Notice>{exportAction.message}</Notice>}
       {snapshotStatus}
       {reviewer.generationNotice ? <Notice>{reviewer.generationNotice}</Notice> : null}
       <div className={`reviewer-layout${passage ? " with-panel" : ""}${picking ? " picking" : ""}`}>

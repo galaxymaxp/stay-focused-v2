@@ -3,7 +3,7 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { LibraryArtifactSummary, ReviewerReaderModel } from '@stay-focused/shared';
 import { ReviewerHeader } from './reviewer-header';
-const mocks = vi.hoisted(() => ({ api: vi.fn(), save: vi.fn(), quiz: vi.fn(), focus: vi.fn(), firstFocus: vi.fn() }));
+const mocks = vi.hoisted(() => ({ api: vi.fn(), save: vi.fn(), pdf: vi.fn(), quiz: vi.fn(), focus: vi.fn(), firstFocus: vi.fn() }));
 vi.mock('../../components/providers', () => ({ useAuth: () => ({ api: mocks.api, session: { user: { id: 'owner' } } }) }));
 vi.mock('../../components/ui', () => ({
   Icon: 'Icon',
@@ -13,7 +13,7 @@ const reviewer: ReviewerReaderModel = { id: 'artifact:one', title: 'Cells', cour
   sections: [{ id: 's', title: 'Structure', blocks: [] }, { id: 's2', title: 'Membrane', blocks: [] }] };
 const artifact: LibraryArtifactSummary = { id: reviewer.id, title: reviewer.title, type: 'reviewer', course: reviewer.course, sourceId: 'source', sourceTitle: 'Lecture', activityId: null,
   createdAt: reviewer.generatedAt, updatedAt: reviewer.generatedAt, lastOpenedAt: null, status: 'completed', relatedArtifactIds: [] };
-const props = { artifact, reviewer, onSave: mocks.save, onQuiz: mocks.quiz, quizDisabled: false };
+const props = { artifact, reviewer, onSave: mocks.save, onExport: mocks.pdf, exportBusy: false, onQuiz: mocks.quiz, quizDisabled: false };
 let tree: ReactTestRenderer | undefined;
 let listeners: Map<string, (event: unknown) => void>;
 beforeEach(() => {
@@ -37,12 +37,13 @@ const trigger = () => tree!.root.findAllByType('button').find(node => node.props
 const items = () => tree!.root.findAllByType('button').filter(node => node.props.role === 'menuitem');
 const menu = () => tree!.root.findAllByType('div').find(node => node.props.role === 'menu');
 const open = async () => act(async () => trigger().props.onClick());
-it('offers Share and Save to file in the menu, and keeps Generate Quiz visible', async () => {
+it('offers Share, Export PDF and Text in the menu, and keeps Generate Quiz visible', async () => {
   await mount(); expect(trigger().props['aria-haspopup']).toBe('menu'); expect(trigger().props['aria-expanded']).toBe(false);
   expect(items()).toHaveLength(0); expect(mocks.api).not.toHaveBeenCalled();
   await open(); expect(trigger().props['aria-expanded']).toBe(true);
-  expect(items().map(item => item.props.children[1])).toEqual(['Share', 'Save to file']); expect(mocks.firstFocus).toHaveBeenCalledOnce();
-  await act(async () => items()[1]!.props.onClick()); expect(mocks.save).toHaveBeenCalledOnce(); expect(items()).toHaveLength(0);
+  expect(items().map(item => item.props.children[1])).toEqual(['Share', 'Export PDF', 'Text (.txt)']); expect(mocks.firstFocus).toHaveBeenCalledOnce();
+  await act(async () => items()[1]!.props.onClick()); expect(mocks.pdf).toHaveBeenCalledOnce();
+  await open(); await act(async () => items()[2]!.props.onClick()); expect(mocks.save).toHaveBeenCalledOnce(); expect(items()).toHaveLength(0);
   const quiz = tree!.root.findAllByType('button').find(node => node.props.children === 'Generate Quiz')!;
   await act(async () => quiz.props.onClick()); expect(mocks.quiz).toHaveBeenCalledOnce();
 });
@@ -54,7 +55,7 @@ it('opens the existing Share interface using its unchanged request', async () =>
 });
 it('omits Share for non-artifact ids', async () => {
   await mount({ artifact: { ...artifact, id: 'local:one' } }); await open();
-  expect(items().map(item => item.props.children[1])).toEqual(['Save to file']);
+  expect(items().map(item => item.props.children[1])).toEqual(['Export PDF', 'Text (.txt)']);
 });
 it('handles Escape with focus restoration, outside taps and Tab leaving the menu', async () => {
   await mount(); await open();
@@ -92,4 +93,10 @@ it('omits empty meta and preserves the generation-disabled state', async () => {
   await mount({ reviewer: { ...reviewer, reviewMinutes: undefined, sections: reviewer.sections.slice(0, 1) }, quizDisabled: true });
   expect(tree!.root.findAllByType('div').some(node => node.props.className === 'meta reviewer-meta')).toBe(false);
   expect(tree!.root.findAllByType('button').find(node => node.props.children === 'Generate Quiz')!.props.disabled).toBe(true);
+});
+
+it('disables both export formats while a file is being created', async () => {
+  await mount({ exportBusy: true }); await open();
+  expect(items().slice(1).map(item => item.props.disabled)).toEqual([true, true]);
+  expect(JSON.stringify(tree!.toJSON())).toContain('Creating file');
 });
