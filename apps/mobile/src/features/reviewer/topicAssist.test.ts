@@ -2,9 +2,20 @@ import { createElement } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { selectTopic, TOPIC_PROMPT_VERSION, type TopicAction, type TopicResult, type ReviewerReaderModel } from '@stay-focused/shared';
-vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable' }));
+import { palettes } from '../../design/themeTokens';
+import { radius } from '../../design/tokens';
+const motion = vi.hoisted(() => ({ timing: vi.fn(), stop: vi.fn(), reduced: false, mode: 'light' as 'light' | 'dark' }));
+vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView', Pressable: 'Pressable',
+  Easing: { ease: (value: number) => value, inOut: (fn: unknown) => fn },
+  Animated: { View: 'AnimatedView', Value: class { constructor(public value: number) {} setValue(value: number) { this.value = value; } },
+    timing: (value: { setValue: (next: number) => void }, config: { toValue: number }) => {
+      motion.timing(config); return { start: () => value.setValue(config.toValue), stop: motion.stop };
+    },
+    parallel: (animations: { start: () => void }[]) => ({ start: () => animations.forEach(animation => animation.start()), stop: motion.stop }),
+  },
+}));
 vi.mock('../../design/primitives', () => ({ Copy: 'Copy' }));
-vi.mock('../../design/theme', () => ({ useTheme: () => ({ colors: { blueSoft: 'selected', accent: 'accent', textSecondary: 'secondary', separator: 'border', surfaceSecondary: 'surface' } }) }));
+vi.mock('../../design/theme', () => ({ useTheme: () => ({ colors: palettes[motion.mode], reducedMotion: motion.reduced }) }));
 const mocks = vi.hoisted(() => ({ peek: vi.fn(), run: vi.fn(), begin: vi.fn(() => 1), complete: vi.fn(), cancel: vi.fn() }));
 vi.mock('./assistStore', () => ({ topicAssist: { peek: mocks.peek, run: mocks.run } }));
 vi.mock('./studyAnswerScroll', () => ({ useAnswerReveal: () => ({ begin: mocks.begin, complete: mocks.complete, cancel: mocks.cancel }), StudyAnswerArea: 'Answer' }));
@@ -14,10 +25,13 @@ const reviewer: ReviewerReaderModel = { id: 'artifact:aaaaaaaa-aaaa-4aaa-8aaa-aa
 const selection = selectTopic(reviewer, 's')!;
 const result = (action: TopicAction): TopicResult => ({ reviewerId: reviewer.id, sectionId: 's', action, contentHash: selection.contentHash, promptVersion: TOPIC_PROMPT_VERSION, grounding: 'source', text: action + '\n- **DNA** is inside.', createdAt: '2026-10-16T00:00:00Z' });
 let tree: ReactTestRenderer | undefined;
-beforeEach(() => { Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); vi.clearAllMocks(); mocks.peek.mockResolvedValue(null); mocks.run.mockImplementation(async (_owner: string, _client: unknown, _selection: unknown, action: TopicAction) => result(action)); });
+beforeEach(() => { Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); vi.clearAllMocks(); motion.reduced = false; motion.mode = 'light'; mocks.peek.mockResolvedValue(null); mocks.run.mockImplementation(async (_owner: string, _client: unknown, _selection: unknown, action: TopicAction) => result(action)); });
 afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; });
 const props = { reviewer, sectionId: 's', owner: 'owner', client: { baseUrl: 'https://example.test', accessToken: 'synthetic' }, online: true, children: 'CANONICAL_BODY' };
-async function mount(online = true) { await act(async () => { tree = create(createElement(TopicAssist, { ...props, online })); }); }
+async function mount(online = true) {
+  await act(async () => { tree = create(createElement(TopicAssist, { ...props, online })); });
+  await act(async () => ['Original', 'Simplify', 'Explain simply'].forEach((label, index) => button(label).props.onLayout({ nativeEvent: { layout: { x: [0, 65, 135][index], width: [65, 70, 95][index] } } })));
+}
 function button(label: string) { return tree!.root.findAllByType('Pressable' as never).find(node => node.props.accessibilityLabel === label)!; }
 async function press(label: string) { await act(async () => button(label).props.onPress()); }
 const body = () => JSON.stringify(tree!.toJSON());
@@ -34,41 +48,79 @@ it('keeps full radio labels and an independent Expound button together without s
     expect(button(label).props.accessibilityState).toEqual({ checked: label === 'Original', disabled: false });
   }
   expect(button('Expound').props.accessibilityState.expanded).toBe(false);
-  expect(button('Expound').findByType('Copy' as never).props.color).toBe('secondary');
+  expect(button('Expound').findByType('Copy' as never).props.color).toBe(palettes.light.textPrimary);
+  expect(pill.findAllByProps({ testID: 'topic-level-thumb' })).toHaveLength(1);
+  expect(pill.findAllByProps({ testID: 'topic-expound-thumb' })).toHaveLength(0);
+  expect(pill.findAll(node => node.props.style?.width === 1)).toHaveLength(0);
   await press('Simplify'); await press('Expound');
   expect(button('Simplify').props.accessibilityState.checked).toBe(true);
   expect(button('Expound').props.accessibilityRole).toBe('button');
   expect(button('Expound').props.accessibilityState).toEqual({ expanded: true, disabled: false });
-  expect(button('Expound').props.style.backgroundColor).toBe('selected');
+  expect(pill.findByProps({ testID: 'topic-expound-thumb' }).props.style.backgroundColor).toBe(palettes.light.surfaceElevated);
   expect(body()).toContain('topic_expound');
   await press('Explain simply');
   expect(button('Expound').props.accessibilityState.expanded).toBe(true);
   await press('Expound');
   expect(button('Explain simply').props.accessibilityState.checked).toBe(true);
   expect(button('Expound').props.style.backgroundColor).toBeUndefined();
+  expect(pill.findAllByProps({ testID: 'topic-expound-thumb' })).toHaveLength(0);
   expect(body()).not.toContain('topic_expound');
 });
 it('uses compact labels below 380 measured points with centered single-line text and vertical 44pt targets', async () => {
   await mount();
   const pill = tree!.root.findByProps({ testID: 'topic-level-pill' });
+  const available = tree!.root.findByProps({ testID: 'topic-level-available-width' });
   const visible = (label: string) => button(label).findByType('Copy' as never).props.children;
   for (const width of [360, 379, 380, 500, 320]) {
-    await act(async () => pill.props.onLayout({ nativeEvent: { layout: { width } } }));
+    await act(async () => available.props.onLayout({ nativeEvent: { layout: { width } } }));
     expect(visible('Simplify')).toBe(width < 380 ? 'Simpler' : 'Simplify');
     expect(visible('Explain simply')).toBe(width < 380 ? 'Simplest' : 'Explain simply');
     for (const label of ['Original', 'Simplify', 'Explain simply', 'Expound']) {
       const segment = button(label), text = segment.findByType('Copy' as never);
       expect(text.props.numberOfLines).toBe(1); expect(text.props.style.textAlign).toBe('center');
-      expect(segment.props.style.minHeight).toBe(32);
+      expect(segment.props.style.minHeight).toBe(44);
       expect(segment.props.style.minHeight + segment.props.hitSlop.top + segment.props.hitSlop.bottom).toBeGreaterThanOrEqual(44);
       expect(segment.props.hitSlop.left).toBeUndefined(); expect(segment.props.hitSlop.right).toBeUndefined();
     }
     expect(pill.props.style.minHeight).toBeGreaterThanOrEqual(44);
     expect(pill.findByProps({ accessibilityRole: 'radiogroup' }).props.style.minHeight).toBeGreaterThanOrEqual(44);
-    expect(button('Expound').parent!.props.style).toEqual({ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' });
+    expect(pill.props.style.alignSelf).toBe('flex-start');
+    expect(pill.props.style.flex).toBeUndefined();
+    expect(button('Expound').parent!.props.style.minHeight).toBe(48);
   }
   await press('Simplify');
   expect(mocks.run).toHaveBeenCalledWith(props.owner, props.client, selection, 'topic_simplify', true);
+});
+it.each(['light', 'dark'] as const)('uses existing %s neutral tokens, pill radii and a 40pt track with inset 32pt thumbs', async mode => {
+  motion.mode = mode; await mount();
+  const track = tree!.root.findByProps({ testID: 'topic-level-track' });
+  expect(track.props.style).toMatchObject({ borderRadius: radius.pill, backgroundColor: palettes[mode].surfaceSecondary, top: 4, bottom: 4 });
+  const thumb = tree!.root.findByProps({ testID: 'topic-level-thumb' });
+  expect(thumb.props.style).toMatchObject({ borderRadius: radius.pill, backgroundColor: palettes[mode].surfaceElevated });
+  expect(thumb.parent!.props.style).toMatchObject({ top: 8, bottom: 8 });
+  for (const label of ['Original', 'Simplify', 'Explain simply', 'Expound']) expect(button(label).findByType('Copy' as never).props.color).toBe(palettes[mode].textPrimary);
+});
+it('slides to measured option positions and widths, stops interrupted motion, and snaps for live Reduce Motion', async () => {
+  await mount(); expect(motion.timing).not.toHaveBeenCalled();
+  await press('Simplify');
+  expect(motion.timing.mock.calls.map(call => call[0])).toEqual([
+    expect.objectContaining({ toValue: 65, duration: 200, useNativeDriver: true }),
+    expect.objectContaining({ toValue: 70, duration: 200, useNativeDriver: false }),
+  ]);
+  const thumb = () => tree!.root.findByProps({ testID: 'topic-level-thumb' });
+  expect(thumb().props.style.width.value).toBe(70);
+  expect(thumb().parent!.props.style.transform[0].translateX.value).toBe(65);
+  await press('Explain simply'); expect(motion.stop).toHaveBeenCalled();
+  expect(thumb().props.style.width.value).toBe(95);
+  motion.reduced = true;
+  await act(async () => tree!.update(createElement(TopicAssist, props)));
+  motion.timing.mockClear(); await press('Original');
+  expect(motion.timing).not.toHaveBeenCalled();
+  expect(thumb().props.style.width.value).toBe(65);
+  expect(thumb().parent!.props.style.transform[0].translateX.value).toBe(0);
+  await act(async () => button('Original').props.onLayout({ nativeEvent: { layout: { x: 2, width: 60 } } }));
+  expect(thumb().props.style.width.value).toBe(60);
+  expect(thumb().parent!.props.style.transform[0].translateX.value).toBe(2);
 });
 it('Original renders instantly without generation; each topic has one compact level control and Expound', async () => {
   await mount(); expect(body()).toContain('CANONICAL_BODY'); expect(mocks.run).not.toHaveBeenCalled();

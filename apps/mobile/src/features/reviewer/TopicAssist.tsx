@@ -1,11 +1,11 @@
 import { TOPIC_ACTIONS, TOPIC_LEVELS, TOPIC_LABELS, TOPIC_SHORT_LABELS, EXPOUND_LABEL, STUDY_OFFLINE, STUDY_GROUNDING_LABELS, selectTopic, topicLevelAction,
   type ReviewerReaderModel, type TopicAction, type TopicLevel, type TopicResult } from '@stay-focused/shared';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
+import { Animated, Easing, Pressable, View } from 'react-native';
 import type { ExperienceClient } from '../../services/experienceApi';
 import { Copy } from '../../design/primitives';
 import { useTheme } from '../../design/theme';
-import { radius, spacing } from '../../design/tokens';
+import { radius, shadows, spacing } from '../../design/tokens';
 import { topicAssist } from './assistStore';
 import { StudyText } from './StudyText';
 import { StudyAnswerArea, useAnswerReveal } from './studyAnswerScroll';
@@ -14,6 +14,34 @@ type Entry = { status: 'pending' | 'ready' | 'error'; result?: TopicResult; erro
 type Props = {
   reviewer: ReviewerReaderModel; sectionId: string; owner: string; client: ExperienceClient; online: boolean; children: ReactNode;
 };
+type OptionLayout = { x: number; width: number };
+function LevelThumb({ layout }: { layout: OptionLayout | undefined }) {
+  const { colors, reducedMotion } = useTheme();
+  const [x] = useState(() => new Animated.Value(0));
+  const [width] = useState(() => new Animated.Value(0));
+  const positioned = useRef(false);
+  const targetX = layout?.x, targetWidth = layout?.width;
+  useEffect(() => {
+    if (targetX === undefined || !targetWidth) return;
+    if (reducedMotion || !positioned.current) {
+      x.setValue(targetX); width.setValue(targetWidth); positioned.current = true;
+      return;
+    }
+    const easing = Easing.inOut(Easing.ease);
+    // Translation runs natively; width requires the layout driver on its own node.
+    const animation = Animated.parallel([
+      Animated.timing(x, { toValue: targetX, duration: 200, easing, useNativeDriver: true }),
+      Animated.timing(width, { toValue: targetWidth, duration: 200, easing, useNativeDriver: false }),
+    ]);
+    animation.start();
+    return () => animation.stop();
+  }, [targetX, targetWidth, reducedMotion, x, width]);
+  if (!layout) return null;
+  return <Animated.View pointerEvents="none" accessible={false} style={{ position: 'absolute', left: 0, top: spacing[2], bottom: spacing[2], transform: [{ translateX: x }] }}>
+    <Animated.View testID="topic-level-thumb" accessibilityElementsHidden importantForAccessibility="no-hide-descendants"
+      style={{ width, flex: 1, borderRadius: radius.pill, backgroundColor: colors.surfaceElevated, ...shadows.card }} />
+  </Animated.View>;
+}
 export function TopicAssist(props: Props) {
   const selection = useMemo(() => selectTopic(props.reviewer, props.sectionId), [props.reviewer, props.sectionId]);
   return <TopicAssistContent key={JSON.stringify([props.owner, selection?.reviewerId, selection?.sectionId, selection?.canonicalContent])} {...props} />;
@@ -23,9 +51,10 @@ function TopicAssistContent({ reviewer, sectionId, owner, client, online, childr
   const selection = useMemo(() => selectTopic(reviewer, sectionId), [reviewer, sectionId]);
   const [level, setLevel] = useState<TopicLevel>('original');
   const [expanded, setExpanded] = useState(false);
-  // Below 380pt, each quarter has less than ~85pt for the longest full label.
+  // Preserve RV2's compact labels below 380pt of available topic width.
   const [rowWidth, setRowWidth] = useState(0);
   const labels = rowWidth < 380 ? TOPIC_SHORT_LABELS : TOPIC_LABELS;
+  const [layouts, setLayouts] = useState<Partial<Record<TopicLevel, OptionLayout>>>({});
   const [entries, setEntries] = useState<Partial<Record<TopicAction, Entry>>>({});
   const alive = useRef(true);
   const reveal = useAnswerReveal();
@@ -69,24 +98,28 @@ function TopicAssistContent({ reviewer, sectionId, owner, client, online, childr
     : entry?.status === 'error' ? <View><Copy>{entry.error}</Copy><Pressable accessibilityRole="button" accessibilityLabel="Retry topic explanation" disabled={!online} onPress={retry}><Copy color={colors.accent}>Retry</Copy></Pressable></View>
     : <Copy muted>Creating your explanation…</Copy>;
   return <View style={{ gap: spacing[3] }}>
-    <View testID="topic-level-pill" onLayout={event => setRowWidth(event.nativeEvent.layout.width)}
-      style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44, paddingHorizontal: spacing[1], borderRadius: radius.control, backgroundColor: colors.surfaceSecondary }}>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Topic level" style={{ flex: 3, minWidth: 0, minHeight: 44, flexDirection: 'row', alignItems: 'center' }}>
+    <View onLayout={event => setRowWidth(event.nativeEvent.layout.width)} testID="topic-level-available-width">
+    <View testID="topic-level-pill" style={{ alignSelf: 'flex-start', maxWidth: '100%', flexDirection: 'row', alignItems: 'center', minHeight: spacing[12], paddingHorizontal: spacing[1], gap: spacing[1] }}>
+      <View testID="topic-level-track" pointerEvents="none" accessible={false} style={{ position: 'absolute', left: 0, right: 0, top: spacing[1], bottom: spacing[1], borderRadius: radius.pill, backgroundColor: colors.surfaceSecondary }} />
+      <View accessibilityRole="radiogroup" accessibilityLabel="Topic level" style={{ minWidth: 0, minHeight: spacing[12], flexDirection: 'row', alignItems: 'center', flexShrink: 1 }}>
+        <LevelThumb layout={layouts[level]} />
         {TOPIC_LEVELS.map(item => { const a = topicLevelAction(item), disabled = !!a && !canUse(a); return <Pressable key={item}
           accessibilityRole="radio" accessibilityLabel={TOPIC_LABELS[item]} accessibilityState={{ checked: level === item, disabled }}
-          disabled={disabled} onPress={() => choose(item)} hitSlop={{ top: spacing[1] + 2, bottom: spacing[1] + 2 }}
-          style={{ flex: 1, minWidth: 0, minHeight: spacing[8], paddingHorizontal: spacing[1], justifyContent: 'center', borderRadius: radius.control, backgroundColor: level === item ? colors.blueSoft : undefined, opacity: disabled ? 0.45 : 1 }}>
-          <Copy size="caption" numberOfLines={1} style={{ textAlign: 'center' }} color={level === item ? colors.accent : colors.textSecondary}>{labels[item]}</Copy>
+          onLayout={event => { const { x, width } = event.nativeEvent.layout; setLayouts(old => old[item]?.x === x && old[item]?.width === width ? old : { ...old, [item]: { x, width } }); }}
+          disabled={disabled} onPress={() => choose(item)} hitSlop={{ top: 2, bottom: 2 }}
+          style={{ minWidth: 0, flexShrink: 1, minHeight: 44, paddingHorizontal: spacing[2], justifyContent: 'center', borderRadius: radius.pill, opacity: disabled ? 0.45 : 1 }}>
+          <Copy size="caption" numberOfLines={1} style={{ textAlign: 'center' }} color={colors.textPrimary}>{labels[item]}</Copy>
         </Pressable>; })}
       </View>
-      <View importantForAccessibility="no" style={{ width: 1, height: spacing[5], backgroundColor: colors.separator }} />
-      <View style={{ flex: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' }}>
+      <View style={{ minWidth: 0, minHeight: spacing[12], justifyContent: 'center' }}>
         <Pressable accessibilityRole="button" accessibilityLabel={EXPOUND_LABEL} accessibilityState={{ expanded, disabled: !expanded && !canUse('topic_expound') }}
-          disabled={!expanded && !canUse('topic_expound')} onPress={toggleExpound} hitSlop={{ top: spacing[1] + 2, bottom: spacing[1] + 2 }}
-          style={{ minHeight: spacing[8], paddingHorizontal: spacing[1], justifyContent: 'center', borderRadius: radius.control, backgroundColor: expanded ? colors.blueSoft : undefined, opacity: canUse('topic_expound') ? 1 : 0.45 }}>
-          <Copy size="caption" numberOfLines={1} style={{ textAlign: 'center' }} color={expanded ? colors.accent : colors.textSecondary}>{EXPOUND_LABEL}</Copy>
+          disabled={!expanded && !canUse('topic_expound')} onPress={toggleExpound} hitSlop={{ top: 2, bottom: 2 }}
+          style={{ minHeight: 44, paddingHorizontal: spacing[2], justifyContent: 'center', borderRadius: radius.pill, opacity: expanded || canUse('topic_expound') ? 1 : 0.45 }}>
+          {expanded && <View testID="topic-expound-thumb" pointerEvents="none" accessible={false} style={{ position: 'absolute', left: 0, right: 0, top: spacing[1] + 2, bottom: spacing[1] + 2, borderRadius: radius.pill, backgroundColor: colors.surfaceElevated, ...shadows.card }} />}
+          <Copy size="caption" numberOfLines={1} style={{ textAlign: 'center' }} color={colors.textPrimary}>{EXPOUND_LABEL}</Copy>
         </Pressable>
       </View>
+    </View>
     </View>
     {!online && <Copy size="caption" muted>{STUDY_OFFLINE}</Copy>}
     <StudyAnswerArea id={bodyId}>{level === 'original' ? children : renderEntry(current, () => action && run(action, bodyId))}</StudyAnswerArea>
