@@ -64,6 +64,7 @@ export function GenerateScreen() {
   const [showHidden, setShowHidden] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [searchFocused, setSearchFocused] = useState(false);
   const searching = query.trim().length > 0;
   const allCourses = courses.data?.items ?? [];
   const matching = searching ? allCourses.filter((course) => courseMatches(course, query)) : allCourses;
@@ -130,11 +131,14 @@ export function GenerateScreen() {
       title="Generate"
       subtitle="Canvas material or your own notes."
       onRefresh={courses.refresh}
+      hideHeaderBelowOnScroll
+      headerBelowAlwaysVisible={searchFocused || query.length > 0}
       headerBelow={<>
         <SnapshotStatus {...courses} />
         {allCourses.length > 0 ? (
           <View style={{ paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
-            <SearchField value={query} onChangeText={setQuery} placeholder="Search courses" label="Search courses" />
+            <SearchField value={query} onChangeText={setQuery} placeholder="Search courses" label="Search courses"
+              onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)} />
           </View>
         ) : null}
       </>}

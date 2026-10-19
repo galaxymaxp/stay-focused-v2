@@ -464,6 +464,31 @@ const ringAt = (minutes: number, offset = 0) => {
   return { x: 170 + (136 + offset) * Math.cos(angle), y: 170 + (136 + offset) * Math.sin(angle) };
 };
 describe("B25 screen interactions", () => {
+  it("collapses Generate search unless focused or containing any text, preserving refresh", async () => {
+    mocks.data["/api/experience/courses"] = { items: [generateCourse({ id: "search-course" })] };
+    const root = await render(createElement(GenerateScreen));
+    const page = () => root.findAll(node => String(node.type) === "Page")[0]!;
+    const search = () => root.findAll(node => String(node.type) === "SearchField" && node.props.label === "Search courses")[0]!;
+    expect(page().props.hideHeaderBelowOnScroll).toBe(true);
+    expect(page().props.headerBelowAlwaysVisible).toBe(false);
+    const refresh = page().props.onRefresh;
+    await act(async () => search().props.onFocus());
+    expect(page().props.headerBelowAlwaysVisible).toBe(true);
+    await act(async () => search().props.onBlur());
+    expect(page().props.headerBelowAlwaysVisible).toBe(false);
+    for (const text of ["course", " "]) {
+      await act(async () => search().props.onChangeText(text));
+      expect(page().props.headerBelowAlwaysVisible).toBe(true);
+    }
+    await act(async () => search().props.onFocus());
+    await act(async () => search().props.onChangeText(""));
+    expect(page().props.headerBelowAlwaysVisible).toBe(true);
+    await act(async () => search().props.onBlur());
+    expect(page().props.headerBelowAlwaysVisible).toBe(false);
+    expect(page().props.onRefresh).toBe(refresh);
+    await act(async () => page().props.onRefresh());
+    expect(mocks.sync).not.toHaveBeenCalled();
+  });
   it.each([TodayScreen, TasksScreen, TasksCourseScreen, LibraryCourseScreen])("opts the reading screen into secondary-header collapse: %s", async Screen => {
     const root = await render(createElement(Screen));
     const page = root.findAll(node => String(node.type) === "Page")[0]!;
