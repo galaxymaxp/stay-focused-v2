@@ -1,5 +1,5 @@
 import { strToU8, zipSync } from 'fflate';
-import { styledRuns, type ExportBlock, type ExportDocument } from './exportLayout';
+import { styledRuns, type ExportBlock, type ExportDocument } from './layout';
 
 const esc = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const EMU = 914400;

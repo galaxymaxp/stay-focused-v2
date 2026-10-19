@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
 import { strFromU8, unzipSync } from 'fflate';
 import type { LibraryArtifactSummary, ReviewerReaderModel, ActivityDraft, LibraryArtifactDetail } from '@stay-focused/shared';
-import { activityExport, exportFileName, reviewerExport } from './exportLayout';
-import { createStudyPdf } from './pdfExport';
-import { createStudyDocx } from './docxExport';
-import { createStudyPptx } from './pptxExport';
-import { formatsFor } from './studyExport';
+import { activityExport, exportFileName, reviewerExport } from './layout';
+import { createStudyPdf } from './pdf';
+import { createStudyDocx } from './docx';
+import { createStudyPptx } from './pptx';
+import { createStudyFile, formatsFor, STUDY_MIME } from './index';
 
 const summary: LibraryArtifactSummary = { id: 'artifact:one', type: 'reviewer', title: 'Firewall & Network / Basics', course: { id: 'c', code: 'CIT4', name: 'Security' },
   sourceId: null, sourceTitle: 'Lecture.pdf', activityId: null, createdAt: '2026-09-28', updatedAt: '2026-09-28', lastOpenedAt: null,
@@ -20,6 +20,17 @@ const text = (bytes: Uint8Array, path: string) => strFromU8(unzipSync(bytes)[pat
 const activity = { title: 'Activity', sections: [{ id: 's1', heading: 'Explain the firewall', level: 1, content: 'Generated draft', order: 1, sourceRefs: [] }], slides: [] } as unknown as ActivityDraft;
 
 describe('offline study exports', () => {
+  it('rejects unsupported formats and quiz exports before building a file', async () => {
+    await expect(createStudyFile({ artifact: summary, reviewer }, 'docx')).rejects.toThrow('unsupported_export_format');
+    await expect(createStudyFile({ artifact: { ...summary, type: 'quiz' }, quiz: {} } as LibraryArtifactDetail, 'pdf')).rejects.toThrow('unsupported_export_format');
+  });
+  it.each(['pdf', 'docx', 'pptx'] as const)('builds a named saved Draft %s file with the shared MIME', async format => {
+    const file = await createStudyFile({ artifact: { ...summary, type: 'activity_output' }, draft: activity }, format);
+    expect(file.name).toBe(`CIT4_Firewall_Network_Basics_Draft.${format}`);
+    expect(STUDY_MIME[format]).toContain('application/');
+    if (format === 'pdf') expect(new TextDecoder().decode(file.bytes.slice(0, 5))).toBe('%PDF-');
+    else expect(Object.keys(unzipSync(file.bytes))).toContain(format === 'docx' ? 'word/document.xml' : 'ppt/presentation.xml');
+  });
   it('limits export formats to Reviewer PDF and saved Draft PDF, DOCX, PPTX', () => {
     expect(formatsFor({ artifact: summary, reviewer })).toEqual(['pdf']);
     expect(formatsFor({ artifact: { ...summary, type: 'activity_output' }, draft: activity })).toEqual(['pdf', 'docx', 'pptx']);

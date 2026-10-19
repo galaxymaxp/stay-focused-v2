@@ -1,5 +1,5 @@
 import { strToU8, zipSync } from 'fflate';
-import { styledRuns, type ExportBlock, type ExportDocument } from './exportLayout';
+import { styledRuns, type ExportBlock, type ExportDocument } from './layout';
 
 const xml = (value: string) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 // A line break is run content: it must sit inside <w:r>, or viewers drop it and lines run together.

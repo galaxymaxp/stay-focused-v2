@@ -1,22 +1,6 @@
 import type { LibraryArtifactDetail } from '@stay-focused/shared';
-import { activityExport, exportFileName, reviewerExport, type StudyFormat } from './exportLayout';
-import { createStudyPdf } from './pdfExport';
-import { createStudyDocx } from './docxExport';
-import { createStudyPptx } from './pptxExport';
-
-export function formatsFor(detail: LibraryArtifactDetail): readonly StudyFormat[] {
-  return 'reviewer' in detail ? ['pdf'] : 'draft' in detail ? ['pdf', 'docx', 'pptx'] : [];
-}
-
-/** No provider request: all bytes are produced from the saved artifact. */
-export async function createStudyFile(detail: LibraryArtifactDetail, format: StudyFormat): Promise<{ name: string; bytes: Uint8Array }> {
-  if (!formatsFor(detail).includes(format)) throw new Error('unsupported_export_format');
-  if ('quiz' in detail) throw new Error('unsupported_export_format');
-  const document = 'reviewer' in detail ? reviewerExport(detail.artifact, detail.reviewer) :
-    activityExport(detail.artifact, detail.draft);
-  const bytes = format === 'pdf' ? await createStudyPdf(document) : format === 'docx' ? createStudyDocx(document) : createStudyPptx(document);
-  return { name: exportFileName(detail.artifact, format), bytes };
-}
+import { createStudyFile, STUDY_MIME, type StudyFormat } from '@stay-focused/shared/study-export';
+export { formatsFor, createStudyFile } from '@stay-focused/shared/study-export';
 
 const base64 = (bytes: Uint8Array): string => {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -35,10 +19,7 @@ export async function saveStudyFile(detail: LibraryArtifactDetail, format: Study
   const { name, bytes } = await createStudyFile(detail, format);
   const permission = await StorageAccessFramework.requestDirectoryPermissionsAsync();
   if (!permission.granted) return null;
-  const mime = format === 'pdf' ? 'application/pdf' : format === 'docx' ?
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document' :
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-  const target = await StorageAccessFramework.createFileAsync(permission.directoryUri, name.replace(/\.[^.]+$/, ''), mime);
+  const target = await StorageAccessFramework.createFileAsync(permission.directoryUri, name.replace(/\.[^.]+$/, ''), STUDY_MIME[format]);
   await StorageAccessFramework.writeAsStringAsync(target, base64(bytes), { encoding: EncodingType.Base64 });
   return name;
 }

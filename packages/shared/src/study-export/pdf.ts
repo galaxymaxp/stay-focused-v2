@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib';
-import { styledRuns, type ExportDocument, type ExportBlock } from './exportLayout';
+import { styledRuns, type ExportDocument, type ExportBlock } from './layout';
 
 const PAGE_WIDTH = 612, PAGE_HEIGHT = 792, MARGIN = 48, BODY_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const ink = rgb(0.12, 0.16, 0.15), muted = rgb(0.38, 0.42, 0.41), accent = rgb(0.09, 0.35, 0.25), highlight = rgb(0.90, 0.94, 0.70);

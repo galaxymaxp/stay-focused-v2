@@ -8,7 +8,8 @@
     "./grade-estimator": "./src/grade-estimator.ts",
     "./clock-glass-renderer": "./src/clock-glass-renderer.ts",
     "./task-planning": "./src/task-planning.ts",
-    "./notification-preferences": "./src/notification-preferences.ts"
+    "./notification-preferences": "./src/notification-preferences.ts",
+    "./study-export": "./src/study-export/index.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
@@ -18,7 +19,9 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "three": "0.166.1"
+    "three": "0.166.1",
+    "pdf-lib": "^1.17.1",
+    "fflate": "^0.8.3"
   },
   "devDependencies": {
     "@types/three": "^0.166.0",

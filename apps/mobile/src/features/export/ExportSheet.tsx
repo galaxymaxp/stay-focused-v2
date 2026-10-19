@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { useAuth } from '../../auth';
 import { Action, Copy, Notice, Sheet } from '../../design/primitives';
 import { formatsFor, saveStudyFile } from './studyExport';
-import type { StudyFormat } from './exportLayout';
+import type { StudyFormat } from '@stay-focused/shared/study-export';
 
 const label: Record<StudyFormat, string> = { pdf: 'PDF', docx: 'Word (.docx)', pptx: 'PowerPoint (.pptx)' };
 export function ExportSheet({ detail, onClose }: { detail: LibraryArtifactDetail; onClose: () => void }) {
