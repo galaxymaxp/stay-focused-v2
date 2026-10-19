@@ -1,5 +1,32 @@
 # Roadmap
 
+<!-- AN1b begin -->
+AN1b / announcement read on open (2026-10-19): **PASS for the finite unattended
+local code scope**. STEP 0-3, both apps, regression tests, all 10 prompt gates,
+additional forced root build, docs and local commits complete. Baseline ebcf59c;
+branch overnight/2026-10-15_feedback retained. Owner answers supersede AN1's
+row-write conflict: mobile row taps and swipes stay unchanged. Both detail
+screens now wait for resolved/displayed data and the preference owner, then
+mark once per opened id/owner. Explicit unread persists until a new open.
+Stores keep existing per-device/browser owner keys and notifications; actual
+mounted list/Today tests prove immediate dot/count/card updates. No hydration
+overwrite, owner loss, id mismatch or stale Today subscription reproduced.
+The symptom most likely reflects older deployed builds: UNVERIFIED (owner to
+confirm), not a live diagnosis. No Today implementation change needed.
+Commits: 50d4ccc (mobile), e881082 (web); docs hash in Git/AN1b.status.
+FRESH PASS: typecheck/lint/root build 8/8 tasks each, 0 cached; 6 existing lint
+warnings. Shared 596, API 2433 / 3 intentional live skips, mobile 1535, web 387
+tests pass. API/web builds 36/36 and 22/22 static pages; Android export and
+diff hygiene pass. New regressions 6 mobile / 5 web; failed first attempts and
+web browser-teardown flake recorded. No platform feature skipped, dependency,
+API, schema, release-version, motion or ADR change. Owner steps: Rollout and
+Device checks NOT RUN, skipped entirely; verify Realme/website, notification,
+deep-link and direct URL flows later. Live state UNVERIFIED (owner to confirm).
+No deployment, remote SQL/migration, Scheduler, email, environment-file edit or
+push; unrelated owner paths preserved. Endpoint AN1b only; no later task started.
+[Acceptance and exact gates](ai/acceptance/an1b-announcement-read-on-open.md).
+<!-- AN1b end -->
+
 <!-- LP1 begin -->
 LP1 / privacy and terms (2026-10-19): **PASS for the finite unattended local
 code scope**. Baseline be9d5dc, branch overnight/2026-10-15_feedback retained.
@@ -149,21 +176,12 @@ no later slice started and AN1 is not resumed by this work.
 <!-- GB1 end -->
 
 <!-- AN1 begin -->
-AN1 / opening announcements marks them read (2026-10-19): **STOPPED at STEP 0**
-from baseline `b38c46a` on `overnight/2026-10-15_feedback`. Finite endpoint:
-AN1 STEP 0-3, tests/gates/docs/local commits only; rollout/device checks excluded.
-Both detail screens already write read before data resolution; mobile rows
-also write before navigation. Loaded-detail timing requires removing that row
-write, conflicting with STEP 1's "No change to list rows or swipes."
-Unattended rules 3/4 triggered; no application/test code changed, no later
-slice started. Owner decision: allow removing only the early mobile row write,
-then complete both detail guards and requested regressions. Both Today screens
-already subscribe in source; runtime acceptance is still open.
-Prompt gates: 1/10 FRESH PASS (diff hygiene), 9/10 NOT RUN, 0 failed;
-additional root build NOT RUN. Documentation checkpoint hash in Git/AN1.status.
-Rollout and Device checks NOT RUN, skipped entirely; live/device state
-UNVERIFIED (owner to confirm). No remote action, environment-file edit or push.
-[AN1 evidence and exact owner question](ai/acceptance/an1-announcement-read-on-open.md).
+AN1 / announcement read-on-open preflight (2026-10-19): **historical STOPPED
+checkpoint, superseded by AN1b above**. Commit 795fbba preserved the original
+row-write conflict without application changes. Owner's AN1b answers retain
+mobile row-tap marking and authorize resolved-data once-per-open detail guards
+on both apps. The original question is resolved; AN1b implements and tests the
+revised scope. Historical evidence remains in the AN1 acceptance/handoff.
 <!-- AN1 end -->
 
 <!-- LG1 begin -->

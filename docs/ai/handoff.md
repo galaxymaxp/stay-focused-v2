@@ -8279,3 +8279,132 @@ branch switch or push ran.
 
 Ignored progress/status: tmp/overnight/LP1.progress and LP1.status.
 Endpoint LP1 only; no rollout, device work or later slice started.
+
+## AN1b / announcement read on open - PASS locally (2026-10-19)
+
+**Status: PASS for the finite unattended local code scope.** Read the entire
+AN1b prompt and its overriding UNATTENDED rules. STEP 0-3, both apps, tests,
+all 10 prompt gates, additional forced root build, docs and local commits are
+complete. Baseline `ebcf59c`; branch `overnight/2026-10-15_feedback` retained.
+Tracked entry tree was clean. Reused AN1's `795fbba` preflight/acceptance
+evidence; its row-write scope question is resolved by the AN1b owner answers.
+No later overnight task or previously stopped slice was started.
+
+### What changed and where state lives
+
+- Mobile `app/(app)/announcement.tsx` re-exports `AnnouncementDetailScreen`.
+  It resolves the route id from `useExperience`'s announcement list response.
+  Web `announcements/[id]/page.tsx` decodes id and renders `AnnouncementDetail`
+  in the layout's `AnnouncementsWorkspace` context, backed by `useResource`.
+  Both use `/api/experience/announcements?limit=100` for detail source data.
+- Both detail effects now wait for resolved/displayed content and an owner,
+  then mark once per opened route id/owner using a ref. Missing/loading data
+  never auto-marks. Explicit unread remains unread across preference renders
+  and refreshed source objects; route changes or unmount/reopen can read again.
+  Guard reset waits for owner readiness and preserves account isolation.
+- Mobile row-tap read marking before navigation and all swipes are unchanged,
+  as explicitly required by owner answer 1. List render does not mark read.
+  Web rows remain links. No new UI, motion or design-token change.
+- Existing writes remain in mobile `useListPreferences.markRead` through
+  owner cache + emit + serialized `sessionStore` writes, and web
+  `useListPreferences.read` through owner cache + emit + `localStorage`.
+  Both hooks expose their existing owner id for the guard. Storage schema/key
+  remains `sf.list-preferences.v1.${owner}`; Canvas is never changed.
+- Actual mounted Today/list/detail tests use the real preference hooks and
+  controlled local storage, verifying immediate dot/count/Today removal,
+  explicit unread and reopen. Mobile delayed hydration preserves an early
+  read and a subsequent early unread plus saved pins/read ids. Web merges
+  saved state before parent hydration effects. Owner arrival/switch and
+  encoded web `[id]` navigation use the same canonical id. The API mapper
+  returns `row.id` for both standalone and bundled Today announcements.
+- No dropped/overwritten mark, id mismatch or stale Today subscription was
+  reproduced. Both Today surfaces already subscribe, so neither needed a
+  source change. The symptom is most likely deployed builds predating the
+  existing auto-mark code: **UNVERIFIED (owner to confirm)**. This is a
+  source/test-based inference, not a deployed diagnosis or a claimed race fix.
+
+No required platform behavior was skipped. Native sheet/gestures and browser
+links keep their existing roles. No API, schema, migration, dependency,
+release-version, auth/RLS, generation or ADR change. React best-practices skill
+applied; strict mocks, unconditional hooks and effect-confined refs verified.
+
+### Commits and gate counts
+
+- `50d4ccc feat(mobile): guard announcement read on detail open`
+- `e881082 feat(web): guard announcement read on detail open`
+- `docs: complete AN1b announcement read handoff` (final hash in Git and
+  ignored `tmp/overnight/AN1b.status`).
+
+All use `--author='galaxymaxp <omgraythekid@gmail.com>'`. Evidence applies to
+code tip `e881082`; gates ran on identical implementation before/after commits.
+Every requested workspace has a test script. **Prompt gates: 10/10 PASS**;
+additional forced root build PASS. No cached result is claimed as fresh.
+
+| Exact command | FRESH result and counts |
+| --- | --- |
+| `npm run typecheck -- --force` | PASS, 8/8 tasks, 0 cached; final retry |
+| `npm run lint -- --force` | PASS, 8/8 tasks, 0 cached; 0 errors / 6 existing warnings |
+| `npm run test --workspace @stay-focused/shared` | PASS, 596/596 tests, 58 files |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | PASS, 2433 passed / 3 intentional live skips, 212 files; complete suite, bounded workers |
+| `npm run test --workspace @stay-focused/mobile` | PASS, 1535/1535 tests, 161 files |
+| `npm run test --workspace @stay-focused/web` | PASS, 387/387 tests, 59 files; retry |
+| `npm run build --workspace @stay-focused/api` | PASS, 36/36 static pages |
+| `npm run build --workspace @stay-focused/web` | PASS, 22/22 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | PASS, 1 local Android bundle exported |
+| `git diff --check` and `git diff --cached --check` | PASS, 0 whitespace errors; repeated at closure |
+| Additional `npm run build -- --force --env-mode=loose` | PASS, 8/8 tasks, 0 cached; Android/iOS/web local exports |
+
+Focused evidence: mobile 102/102 (6 new + 96 existing screen tests), web 5/5
+through the actual async `[id]` page. No additional API workflow/provider
+contract suite applies; those implementations did not change. API live flags
+were explicitly disabled; all 3 live cases skipped. Renderer tests use local
+fictional fixtures and mocked data/auth/storage boundaries, not live providers.
+
+Failed first attempts are retained in the
+[AN1b acceptance report](acceptance/an1b-announcement-read-on-open.md): focused
+mobile 100 pass / 1 fail (icon prop assertion); focused web 4 pass / 1 fail
+(read-row regrouping invalidated index assumption); root typecheck 5/8 tasks,
+exit 2 (3 web test typing diagnostics); root lint 5/8, exit 1 (2 web test
+children-prop errors). Fixed test code without weakening production typing or
+assertions. First full web had 387 passing tests but 1 failed suite / 58 passed
+from existing browser teardown exceeding 10 seconds under concurrent gates;
+unchanged full-suite retry passed all 59 files. No timeout was increased.
+First extra root-build launch failed before any task due to Windows backslash
+parsing in the Node preload path; forward slashes fixed the launch.
+
+Final root build disables telemetry/live flags, puts Expo offline and carries
+an ignored HTTP(S)/fetch/socket guard denying non-loopback traffic through
+Turbo loose env mode. Earlier local workspace scripts ran without this guard;
+they did not run deploy/provider scripts. Exploratory stale filenames and
+Windows rg wildcard misses were corrected, not gate failures. Existing Vite,
+react-test-renderer and Expo color warnings remain non-failing.
+
+Generated Next declarations were inspected/restored. Current-state, roadmap and
+sprint reconcile AN1b and identify AN1 as superseded historical evidence.
+Only owned paths are staged; no tmp file, generated output, credential or
+private fixture is committed. Original `UI/`, `apps/mobile/.gitignore`,
+`supabase/.temp/` and ignored `tmp/` remain untouched/unstaged. Baseline cached
+tracking ahead 38 / behind 2, without fetch. No local blocker remains.
+
+**UNVERIFIED (owner to confirm):** deployed API/web/mobile revisions, the
+reported symptom on those revisions, production/database/applied-migration/
+Scheduler state, remote-ref freshness and actual browser/Realme behavior.
+No live state is inferred from passing local tests. No deployment, remote SQL,
+migration application, Scheduler action, email, environment-file edit, branch
+switch or push ran; no Supabase/Vercel/Google Cloud/Canvas/Resend operation was
+requested or invoked by the implementation workflow.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** review local commits, choose
+  website/mobile publication separately and confirm deployed revisions.
+- **Device checks - NOT RUN, skipped entirely:** on Realme and actual website,
+  open unread announcements from Today/list, return and confirm read dot/count
+  and Today removal. Verify explicit unread while open, reopen, notification,
+  deep-link and direct URL entry points as applicable.
+- Confirm UNVERIFIED state and the older-build inference. For later Vercel
+  deployment/env/log work, installing the missing CLI with `npm i -g vercel`
+  is strongly recommended; no installation or CLI command ran here.
+
+Ignored progress/status: `tmp/overnight/AN1b.progress` and `AN1b.status`.
+Endpoint AN1b only; no rollout, device work or later task started.
