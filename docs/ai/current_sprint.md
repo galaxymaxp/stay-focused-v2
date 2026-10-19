@@ -1,3 +1,21 @@
+<!-- WA1 begin -->
+WA1 / Website password recovery (2026-10-19): **PASS for the finite unattended
+local code scope**, recovered on Windows from interrupted bb1ed7fe on
+overnight/2026-10-15_feedback. Implementation: 3fe40518. Reset request, public
+reset route, owner-bound recovery guard and final malformed/expired callback
+handling are complete. FRESH PASS: forced typecheck/lint/root build 8/8 each,
+0 cached; 6 existing lint warnings. Shared 632, API 2452 / 3 intentional live
+skips, mobile 1587, web 502 tests / 69 files, including 20 local browser cases.
+API/web builds 37/37 and 23/23 pages, Android export and diff checks pass.
+Planning/parity/acceptance reconciled; scoped commits and WA1.status close WA1.
+Rollout and Device checks NOT RUN for WA1; live email/allowlist/template behavior
+UNVERIFIED (owner to confirm). Unrelated paths preserved. Owner Pause remains
+set, no worker restarted and WX1 not started. The owner separately authorized
+FULLSEND recovery/preparation; it requires independent fresh release gates and
+an APK, and is not established by these local WA1 passes.
+[Acceptance](acceptance/wa1-web-password-reset.md).
+<!-- WA1 end -->
+
 <!-- GL1 begin -->
 GL1 / Today glass clock (2026-10-19): **PASS for the finite unattended local
 code scope**. Both apps use one shared MSDF refraction composite in the existing

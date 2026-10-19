@@ -9025,3 +9025,53 @@ operation, email, environment-file edit, branch switch or push occurred.
 
 Ignored progress/status: tmp/overnight/GL1.progress and GL1.status. Unrelated
 untracked paths remain untouched. Endpoint GL1 only; no later task started.
+
+## WA1 / Website password recovery — recovered 2026-10-19
+
+**PASS for the finite unattended local code scope.** Implementation commit
+`3fe40518 feat(web): add guarded password recovery`; documentation commit is
+recorded in Git and ignored WA1.status. The interrupted worker's final callback
+changes were reviewed and freshly verified without changing its implementation.
+Request normalization/validation, neutral safe notices, busy lock, PKCE and
+explicit legacy recovery, expired/used links, min-eight matching passwords and
+owner-bound recovery guards are complete. Normal sign-in/OAuth remain intact.
+No mobile/API/database implementation change or new styling/motion.
+
+**FRESH verification on final source:** typecheck/lint/root build 8/8 each,
+0 cached, 6 existing warnings; shared 632/64 files, API 2452/213 files with
+3 intentional live skips, mobile 1587/166 files, web 502/69 files including
+20 local browser cases. API/web production builds generate 37/37 and 23/23
+pages; Android export and diff/staged-diff checks pass. All four 1440/390
+screenshots were visually reviewed. Node gates blocked external service traffic;
+public documentation was read separately. Full commands/exits/times and source
+hashes are in ignored tmp/overnight/WA1-recovery-*.
+
+**Recovery evidence and limitations:** Windows/source checkout and applicable
+instructions were verified. PID 20872 and its worker/toolchain were gone; the
+other Node process is the local panel. The old Metro PID had been reused by Edge
+and was not killed. No second worker or queue item was started. Owner Pause
+retains its original contents/timestamp. The previous closure log had 502 tests,
+but the earlier 498/499 passes did not cover the final callback; the prior Android
+export had no completion result. All required gates were rerun, including root
+build. Existing Vite/Expo warnings and prior assertion failures are retained;
+no recovery test failure or flaky retry occurred. An inline declaration-restore
+command hit a quoting error before writes, then a checked script restored only
+the two inspected task-generated declarations. Unrelated UI/, mobile .gitignore
+and supabase/.temp/ have unchanged hashes and remain uncommitted.
+
+### Owner steps remaining
+
+- **Rollout — NOT RUN for WA1:** verify Supabase Auth Redirect URLs include
+  https://stay-focused-ten.vercel.app/auth/reset and the reset email template
+  uses {{ .ConfirmationURL }}; publish through the separately authorized release.
+- **Device/live checks — NOT RUN:** test a real email/password recovery link,
+  invalid/expired link and normal OAuth on the deployed website. These remain
+  UNVERIFIED (owner to confirm); local stubbed tests do not prove live behavior.
+- The owner separately authorized exact FULLSEND recovery: reviewed main,
+  fresh gates, normal push, exact-commit READY website, preview APK and selected
+  realme RMX3151 adb install -r. No FULLSEND step is claimed by this WA1 closure.
+
+No product-service API call, email, remote SQL/migration, Scheduler operation,
+environment-file edit, push or deployment occurred during WA1 recovery. Runner
+checkpoint: tmp/overnight/WA1.progress and WA1.status. WX1 remains unstarted and
+Autopilot paused. Endpoint is WA1 plus the separately authorized FULLSEND only.

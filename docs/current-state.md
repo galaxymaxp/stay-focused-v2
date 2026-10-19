@@ -1,5 +1,26 @@
 # Current State
 
+<!-- WA1 begin -->
+WA1 / Website password recovery (2026-10-19): **PASS for the finite unattended
+local code scope**, recovered from interrupted bb1ed7fe on Windows. Implementation
+3fe40518 adds sign-in-only reset requests, a public reset screen, owner-bound
+recovery persistence and callback routing for malformed/expired recovery links.
+Normal sign-in/OAuth and server bearer-JWT/ownership boundaries remain unchanged.
+FRESH PASS on final code: forced typecheck/lint/root build 8/8 each, 0 cached;
+6 existing lint warnings. Shared 632, API 2452 / 3 intentional live skips,
+mobile 1587, web 502 tests / 69 files (20 local browser cases). API/web builds
+37/37 and 23/23 pages, Android export and diff checks pass. Four screenshots
+reviewed at 1440/390. Prior failed assertions and the interrupted export are
+retained in acceptance. Generated Next declarations restored after inspection;
+unrelated UI/, mobile .gitignore and supabase/.temp/ remain untouched.
+Rollout and Device checks NOT RUN for WA1; live redirect allowlist, email template
+and real recovery round trip UNVERIFIED (owner to confirm). Owner Pause remains
+set; no surviving WA1 worker, queue restart or later task. The separate owner
+FULLSEND request is authorized but still requires its own reviewed main candidate,
+prerequisites and fresh release gates; these local checks are not release proof.
+[Acceptance](ai/acceptance/wa1-web-password-reset.md).
+<!-- WA1 end -->
+
 <!-- GL1 begin -->
 GL1 / Today glass clock (2026-10-19): **PASS for the finite unattended local
 code scope**. Both apps use one shared MSDF refraction composite in the existing
