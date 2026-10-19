@@ -20,6 +20,7 @@ beforeAll(async () => {
     insert into storage.objects values('profile-avatars','${path}'),('another-bucket','other');
     insert into auth.users values('${owner}'),('${other}');`);
   await db.exec(readFileSync(resolve(__dirname, '../../../../packages/db/migrations/20261018000300_profile_avatars.sql'), 'utf8'));
+  await db.exec(readFileSync(resolve(__dirname, '../../../../packages/db/migrations/20261018000301_profile_preferences.sql'), 'utf8'));
 }, 30_000);
 afterAll(async () => { await db?.close(); });
 beforeEach(async () => { await db.exec('reset role; truncate user_profiles;'); });
@@ -53,4 +54,26 @@ it.each(['anon', 'authenticated'])('denies %s direct Storage access even with an
   expect((await db.query('select bucket_id from storage.objects')).rows).toEqual([{ bucket_id: 'another-bucket' }]);
   await expect(db.query("insert into storage.objects values('profile-avatars','injected')")).rejects.toThrow(/row-level security/);
   expect((await db.query("delete from storage.objects where bucket_id='profile-avatars' returning name")).rows).toEqual([]);
+});
+
+it('keeps orb metadata owner-readable and service-writable only with valid keys', async () => {
+  await db.query('insert into user_profiles(user_id,orb_color) values($1,$2),($3,null)', [owner,'violet',other]);
+  await db.exec(`set role authenticated; set request.jwt.claim.sub='${owner}'`);
+  expect((await db.query('select user_id,orb_color from user_profiles')).rows).toEqual([{user_id:owner,orb_color:'violet'}]);
+  await expect(db.query("update user_profiles set orb_color='gold'")).rejects.toThrow(/permission denied/);
+  await db.exec('reset role; set role anon');
+  await expect(db.query('select orb_color from user_profiles')).rejects.toThrow(/permission denied/);
+  await db.exec('reset role; set role service_role');
+  await expect(db.query("update user_profiles set orb_color='blue'")).rejects.toThrow(/user_profiles_orb_color_key/);
+});
+it('timestamps last writes by database time, accepts all palette keys/null and preserves avatars', async () => {
+  await db.query('insert into user_profiles(user_id,avatar_path) values($1,$2)', [owner,path]);
+  await db.exec('set role service_role');
+  let previous = 0;
+  for (const color of ['pearl','gold','green','violet','orange',null]) {
+    await db.query('insert into user_profiles(user_id,orb_color) values($1,$2) on conflict(user_id) do update set orb_color=excluded.orb_color', [owner,color]);
+    const row = (await db.query<{orb_color:string|null;orb_color_updated_at:Date;avatar_path:string}>('select orb_color,orb_color_updated_at,avatar_path from user_profiles')).rows[0]!;
+    expect(row.orb_color).toBe(color); expect(row.avatar_path).toBe(path);
+    expect(row.orb_color_updated_at.getTime()).toBeGreaterThanOrEqual(previous); previous=row.orb_color_updated_at.getTime();
+  }
 });
