@@ -55,8 +55,8 @@ async function setup(count = 1, path?: string) {
 describe('offline reviewer images', () => {
   it('has a forward schema v9 and preserves pre-v9 bodies on upgrade', async () => {
     const h = await setup();
-    expect(LOCAL_LIBRARY_SCHEMA_VERSION).toBe(9);
-    h.raw.exec('DROP TABLE offline_image_manifests; PRAGMA user_version=8;');
+    expect(LOCAL_LIBRARY_SCHEMA_VERSION).toBe(10);
+    h.raw.exec('ALTER TABLE library_artifacts DROP COLUMN body_failure_version; ALTER TABLE library_artifacts DROP COLUMN body_failure_permanent; ALTER TABLE library_artifacts DROP COLUMN body_failure_attempts; ALTER TABLE library_artifacts DROP COLUMN body_retry_at; DROP TABLE offline_image_manifests; PRAGMA user_version=8;');
     await migrateLocalLibrary(h.db);
     expect((await h.store.readDetail(OWNER_A, h.detail.artifact.id))?.detail).toEqual(h.detail);
     await h.store.upsertDetail(OWNER_A, h.detail.artifact.id, h.detail);
@@ -136,7 +136,7 @@ describe('offline reviewer images', () => {
     expect(await h.store.offlineStats(OWNER_A)).toMatchObject({ current: 0, total: 1 });
     expect(await h.store.readDetail(OWNER_A, h.detail.artifact.id)).not.toBeNull();
     await cacheReviewerImages(h.input);
-    expect(await h.store.offlineStats(OWNER_A)).toEqual({ current: 1, total: 1, approximateBytes: bytes + 20 });
+    expect(await h.store.offlineStats(OWNER_A)).toEqual({ current: 1, total: 1, approximateBytes: bytes + 20, failedPermanent: 0 });
     expect((await h.store.listSummaries(OWNER_A))[0]?.offlineReady).toBe(true);
     expect(imagesNeedConnection(await h.manifest())).toBe(false);
   });

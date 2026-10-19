@@ -23,7 +23,7 @@ describe('offline Draft SQLite queue', () => {
     const h = openNodeSqlite(); handles.push(h);
     await migrateLocalLibrary(h.db);
     // Reconstruct the shipped v6 schema, which has no offline Draft tables.
-    h.raw.exec('DROP TABLE pending_draft_edits; DROP TABLE draft_sync_receipts; PRAGMA user_version = 6;');
+    h.raw.exec('ALTER TABLE library_artifacts DROP COLUMN body_failure_version; ALTER TABLE library_artifacts DROP COLUMN body_failure_permanent; ALTER TABLE library_artifacts DROP COLUMN body_failure_attempts; ALTER TABLE library_artifacts DROP COLUMN body_retry_at; DROP TABLE pending_draft_edits; DROP TABLE draft_sync_receipts; PRAGMA user_version = 6;');
     const store = createLocalArtifactStore(h.db);
     const body = reviewerDetail(), detail = draftDetail(), quiz = quizDetail();
     if (!('draft' in detail) || !('quiz' in quiz)) throw new Error('upgrade_fixture');

@@ -46,9 +46,11 @@ describe("offline availability copy", () => {
   it("describes current counts and saving progress without an empty header", () => {
     expect(offlineLibraryCaption(null, false)).toBeNull();
     expect(offlineLibraryCaption({ total: 0, current: 0 }, true)).toBeNull();
-    expect(offlineLibraryCaption({ total: 24, current: 24 }, true)).toBe("All 24 items are saved for offline use.");
-    expect(offlineLibraryCaption({ total: 24, current: 22 }, false)).toBe("22 of 24 saved for offline use.");
-    expect(offlineLibraryCaption({ total: 24, current: 22 }, true)).toBe("22 of 24 saved for offline use. Saving the rest…");
+    expect(offlineLibraryCaption({ total: 24, current: 24 }, true)).toBe("24 saved for offline use");
+    expect(offlineLibraryCaption({ total: 24, current: 22 }, false)).toBe("22 of 24 saved for offline use · the rest saves when you're online");
+    expect(offlineLibraryCaption({ total: 24, current: 22 }, true)).toBe("Saving for offline use… 22 of 24");
+    expect(offlineLibraryCaption({ total: 72, current: 70, failedPermanent: 2 }, false)).toBe('70 saved for offline use · 2 need a connection to open');
+    expect(offlineLibraryCaption({ total: 72, current: 70, failedPermanent: 2 }, true)).toBe('70 saved for offline use · 2 need a connection to open');
     expect(OFFLINE_LIBRARY_NOTICE).toBe("You're offline. Items marked Saved offline still open.");
     expect(OFFLINE_MISSING_NOTICE).toBe("This one isn't saved on your device yet. Connect once and it will be saved for offline use.");
   });

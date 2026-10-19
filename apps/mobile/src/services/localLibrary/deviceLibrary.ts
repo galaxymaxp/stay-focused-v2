@@ -48,7 +48,7 @@ export async function storeCompletedGeneration(
   });
   if (outcome !== null) {
     const { runOfflineCatchUp } = await import("./offlineCatchUp");
-    void runOfflineCatchUp(ownerUserId, client, { force: true });
+    void runOfflineCatchUp(ownerUserId, client, { force: true, changed: true });
   }
   return outcome;
 }

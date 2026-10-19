@@ -41,6 +41,7 @@ export interface OfflineStats {
   readonly total: number;
   readonly current: number;
   readonly approximateBytes: number;
+  readonly failedPermanent: number;
 }
 export type LocalLibrarySummary = LibraryArtifactSummary & { readonly offlineReady: boolean };
 
@@ -70,6 +71,10 @@ export interface LocalArtifactStore extends ImageManifestStore, AssistCache, Top
     detail: LibraryArtifactDetail,
   ): Promise<LocalUpsertOutcome>;
   idsNeedingBody(ownerUserId: string, limit: number, includeQuizKeys?: boolean): Promise<string[]>;
+  bodyAttempt(ownerUserId: string, artifactId: string): Promise<{ version: string; attempts: number } | null>;
+  recordBodyFailure(ownerUserId: string, artifactId: string, version: string, permanent: boolean, retryAt: number): Promise<void>;
+  clearBodyFailure(ownerUserId: string, artifactId: string): Promise<void>;
+  nextBodyRetryAt(ownerUserId: string, includeQuizKeys?: boolean): Promise<number | null>;
   removeArtifact(ownerUserId: string, artifactId: string): Promise<void>;
   purgeOwner(ownerUserId: string): Promise<void>;
 }
@@ -84,6 +89,12 @@ interface ArtifactRow {
 }
 
 const ARTIFACT_TYPES: readonly LibraryArtifactType[] = ["reviewer", "quiz", "activity_output"];
+const BODY_NEEDED_SQL = `(payload_json IS NULL OR payload_schema IS NOT ?
+  OR payload_cloud_updated_at IS NULL OR payload_cloud_updated_at < cloud_updated_at
+  OR (? = 1 AND artifact_type = 'quiz' AND NOT EXISTS (
+    SELECT 1 FROM quiz_answer_keys k WHERE k.owner_user_id = library_artifacts.owner_user_id
+      AND 'quiz:' || k.quiz_id = library_artifacts.artifact_id
+      AND k.updated_at = library_artifacts.cloud_updated_at)))`;
 
 /**
  * Device copy of completed, cloud-persisted Library artifacts.
@@ -336,22 +347,49 @@ export function createLocalArtifactStore(
       return outcome;
     },
 
+    async bodyAttempt(ownerUserId, artifactId) {
+      requireOwner(ownerUserId);
+      const row = await db.getFirstAsync<{ cloud_updated_at: string; attempts: number }>(
+        `SELECT cloud_updated_at, CASE WHEN body_failure_version = cloud_updated_at
+          THEN body_failure_attempts ELSE 0 END AS attempts FROM library_artifacts
+          WHERE owner_user_id=? AND artifact_id=?`, [ownerUserId, artifactId]);
+      return row ? { version: row.cloud_updated_at, attempts: row.attempts } : null;
+    },
+    async recordBodyFailure(ownerUserId, artifactId, version, permanent, retryAt) {
+      requireOwner(ownerUserId);
+      await db.runAsync(`UPDATE library_artifacts SET
+        body_failure_attempts = CASE WHEN body_failure_version = cloud_updated_at THEN body_failure_attempts + 1 ELSE 1 END,
+        body_failure_version = cloud_updated_at, body_failure_permanent = ?, body_retry_at = ?
+        WHERE owner_user_id=? AND artifact_id=? AND cloud_updated_at=?`,
+      [permanent ? 1 : 0, retryAt, ownerUserId, artifactId, version]);
+      notifyOfflineImages(ownerUserId);
+    },
+    async clearBodyFailure(ownerUserId, artifactId) {
+      requireOwner(ownerUserId);
+      await db.runAsync(`UPDATE library_artifacts SET body_failure_version=NULL,
+        body_failure_permanent=0, body_failure_attempts=0, body_retry_at=0
+        WHERE owner_user_id=? AND artifact_id=?`, [ownerUserId, artifactId]);
+    },
+    async nextBodyRetryAt(ownerUserId, includeQuizKeys = false) {
+      requireOwner(ownerUserId);
+      const row = await db.getFirstAsync<{ retry_at: number | null }>(
+        `SELECT MIN(CASE WHEN body_failure_version = cloud_updated_at THEN body_retry_at ELSE 0 END) AS retry_at
+          FROM library_artifacts WHERE owner_user_id=? AND ${BODY_NEEDED_SQL}
+          AND (body_failure_version IS NOT cloud_updated_at OR body_failure_permanent = 0)`,
+        [ownerUserId, LOCAL_PAYLOAD_SCHEMA, includeQuizKeys ? 1 : 0]);
+      return row?.retry_at ?? null;
+    },
     async idsNeedingBody(ownerUserId, limit, includeQuizKeys = false) {
       requireOwner(ownerUserId);
       const rows = await db.getAllAsync<{ artifact_id: string }>(
         `SELECT artifact_id FROM library_artifacts
           WHERE owner_user_id = ?
-            AND (payload_json IS NULL
-                 OR payload_schema IS NOT ?
-                 OR payload_cloud_updated_at IS NULL
-                 OR payload_cloud_updated_at < cloud_updated_at
-                 OR (? = 1 AND artifact_type = 'quiz' AND NOT EXISTS (
-                   SELECT 1 FROM quiz_answer_keys k WHERE k.owner_user_id = library_artifacts.owner_user_id
-                     AND 'quiz:' || k.quiz_id = library_artifacts.artifact_id
-                     AND k.updated_at = library_artifacts.cloud_updated_at)))
+            AND ${BODY_NEEDED_SQL}
+            AND (body_failure_version IS NOT cloud_updated_at
+              OR (body_failure_permanent = 0 AND body_retry_at <= ?))
           ORDER BY cloud_updated_at DESC, artifact_id ASC
           LIMIT ?`,
-        [ownerUserId, LOCAL_PAYLOAD_SCHEMA, includeQuizKeys ? 1 : 0, Math.max(0, Math.floor(limit))],
+        [ownerUserId, LOCAL_PAYLOAD_SCHEMA, includeQuizKeys ? 1 : 0, Date.now(), Math.max(0, Math.floor(limit))],
       );
       return rows.map((row) => row.artifact_id);
     },
@@ -394,7 +432,13 @@ export function createLocalArtifactStore(
         [LOCAL_PAYLOAD_SCHEMA, ownerUserId, ownerUserId]);
       const images = await db.getFirstAsync<{ bytes: number }>('SELECT COALESCE(SUM(bytes), 0) AS bytes FROM offline_image_manifests WHERE owner_user_id=?', [ownerUserId]);
       const summaries = await this.listSummaries(ownerUserId);
-      return { total: row?.total ?? 0, current: summaries.filter(item => item.offlineReady).length, approximateBytes: (row?.approximate_bytes ?? 0) + (images?.bytes ?? 0) };
+      const failures = await db.getAllAsync<{ artifact_id: string }>(
+        `SELECT artifact_id FROM library_artifacts WHERE owner_user_id=?
+          AND body_failure_version=cloud_updated_at AND body_failure_permanent=1`, [ownerUserId]);
+      const failedIds = new Set(failures.map(item => item.artifact_id));
+      return { total: row?.total ?? 0, current: summaries.filter(item => item.offlineReady).length,
+        failedPermanent: summaries.filter(item => !item.offlineReady && failedIds.has(item.id)).length,
+        approximateBytes: (row?.approximate_bytes ?? 0) + (images?.bytes ?? 0) };
     },
 
     async clearBodies(ownerUserId) {
@@ -402,6 +446,8 @@ export function createLocalArtifactStore(
       await withOfflineImageLock(() => db.withExclusiveTransactionAsync(async (transaction) => {
         await invalidateImages(transaction, ownerUserId);
         await removeImageDirectory(ownerUserId);
+        await transaction.runAsync(`UPDATE library_artifacts SET body_failure_version=NULL,
+          body_failure_permanent=0, body_failure_attempts=0, body_retry_at=0 WHERE owner_user_id=?`, [ownerUserId]);
         await transaction.runAsync(`UPDATE library_artifacts
           SET payload_json = NULL, payload_schema = NULL, payload_cloud_updated_at = NULL
           WHERE owner_user_id = ? AND NOT EXISTS (SELECT 1 FROM pending_draft_edits p

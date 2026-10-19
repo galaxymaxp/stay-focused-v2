@@ -41,7 +41,7 @@ describe('owner-scoped device quiz keys', () => {
     const { db, raw, store } = await setup();
     await store.upsertDetail(OWNER_A, detail.artifact.id, detail);
     await store.saveQuizPractice(OWNER_A, key.quizId, { attempt: null, result: null, selected: ['draft'], dirty: true });
-    raw.exec('DROP TABLE quiz_answer_keys; PRAGMA user_version = 5;');
+    raw.exec('ALTER TABLE library_artifacts DROP COLUMN body_failure_version; ALTER TABLE library_artifacts DROP COLUMN body_failure_permanent; ALTER TABLE library_artifacts DROP COLUMN body_failure_attempts; ALTER TABLE library_artifacts DROP COLUMN body_retry_at; DROP TABLE quiz_answer_keys; PRAGMA user_version = 5;');
     await expect(migrateLocalLibrary(db)).resolves.toBe(LOCAL_LIBRARY_SCHEMA_VERSION);
     expect(await store.readDetail(OWNER_A, detail.artifact.id)).not.toBeNull();
     expect(await store.readQuizPractice(OWNER_A, key.quizId)).toMatchObject({ selected: ['draft'] });
@@ -85,10 +85,13 @@ describe('owner-scoped device quiz keys', () => {
     await store.upsertSummaries(OWNER_A, [detail.artifact]);
     const remote = { fetchPage: vi.fn(), fetchDetail: vi.fn(async () => detail), fetchQuizAnswerKey: vi.fn(async () => key) };
     remote.fetchQuizAnswerKey.mockRejectedValueOnce(new Error('unavailable'));
-    expect(await hydrateLibraryBodies({ store, ownerUserId: OWNER_A, remote })).toMatchObject({ hydrated: 1, stoppedBy: 'done' });
+    expect(await hydrateLibraryBodies({ store, ownerUserId: OWNER_A, remote })).toMatchObject({ hydrated: 0, stoppedBy: 'retry' });
     expect(await store.readDetail(OWNER_A, detail.artifact.id)).not.toBeNull();
     expect(await store.readQuizAnswerKey(OWNER_A, key.quizId, detail.artifact.updatedAt)).toBeNull();
+    const retryAt = await store.nextBodyRetryAt(OWNER_A, true);
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(retryAt!);
     await hydrateLibraryBodies({ store, ownerUserId: OWNER_A, remote });
+    clock.mockRestore();
     expect(await store.readQuizAnswerKey(OWNER_A, key.quizId, detail.artifact.updatedAt)).toEqual(key);
     expect(await hydrateLibraryBodies({ store, ownerUserId: OWNER_A, remote })).toMatchObject({ hydrated: 0 });
     const newer = quizDetail({ updatedAt: '2026-10-13T00:00:00Z' });
@@ -98,6 +101,17 @@ describe('owner-scoped device quiz keys', () => {
     remote.fetchQuizAnswerKey.mockResolvedValue({ ...key, versionId: 'version-two' });
     await hydrateLibraryBodies({ store, ownerUserId: OWNER_A, remote });
     expect(await store.readQuizAnswerKey(OWNER_A, key.quizId, newer.artifact.updatedAt)).toMatchObject({ versionId: 'version-two' });
+  });
+  it('retains the readable body without endlessly retrying an authoritative missing key', async () => {
+    const { store } = await setup();
+    await store.upsertSummaries(OWNER_A, [detail.artifact]);
+    const remote = { fetchPage: vi.fn(), fetchDetail: vi.fn(async () => detail),
+      fetchQuizAnswerKey: vi.fn().mockRejectedValue({ code: 'not_found' }) };
+    await hydrateLibraryBodies({ store, ownerUserId: OWNER_A, remote });
+    expect(await store.readDetail(OWNER_A, detail.artifact.id)).not.toBeNull();
+    expect(await store.nextBodyRetryAt(OWNER_A, true)).toBeNull();
+    await hydrateLibraryBodies({ store, ownerUserId: OWNER_A, remote });
+    expect(remote.fetchQuizAnswerKey).toHaveBeenCalledTimes(1);
   });
   it('does not save an in-flight key after cancellation', async () => {
     const { store } = await setup(); let cancelled = false;

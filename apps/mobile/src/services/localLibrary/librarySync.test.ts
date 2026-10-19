@@ -90,6 +90,16 @@ describe("cloud reconciliation", () => {
     await expect(store.listSummaries(OWNER_A)).resolves.toHaveLength(3);
   });
 
+  it('does not strand inventory beyond ten advancing pages', async () => {
+    const store = await setup();
+    const details = Array.from({ length: 11 }, (_, n) => draftDetail({ id: `page-${n}` }));
+    const remote = remoteWith(details, 1);
+    const result = await reconcileLibrary({ store, ownerUserId: OWNER_A, remote });
+    expect(result.listComplete).toBe(true);
+    expect(remote.fetchPage).toHaveBeenCalledTimes(11);
+    expect(await store.offlineStats(OWNER_A)).toMatchObject({ total: 11, current: 11 });
+  });
+
   it('downloads only a changed version during repeated background catch-up', async () => {
     const store = await setup();
     const original = reviewerDetail();
@@ -235,11 +245,11 @@ describe('batched body hydration', () => {
     await store.upsertSummaries(OWNER_A, details.map(detail => detail.artifact));
     return { store, remote: remoteWith(details), ownerUserId: OWNER_A };
   }
-  it('hydrates 45 bodies in three batches', async () => {
+  it('publishes all 45 committed bodies individually', async () => {
     const input = await missing(45);
     const progress = vi.fn();
     expect(await hydrateLibraryBodies({ ...input, onProgress: progress })).toEqual({ hydrated: 45, stoppedBy: 'done' });
-    expect(progress).toHaveBeenCalledTimes(3);
+    expect(progress).toHaveBeenCalledTimes(45);
     expect((await input.store.offlineStats(OWNER_A)).current).toBe(0);
     expect(await input.store.idsNeedingBody(OWNER_A, 100)).toEqual([]);
   });
@@ -252,7 +262,7 @@ describe('batched body hydration', () => {
   it('skips artifact failures with no loop, allowing later bodies to hydrate', async () => {
     const input = await missing(45);
     input.remote.fetchDetail.mockRejectedValueOnce(new RemoteError('unavailable'));
-    expect(await hydrateLibraryBodies(input)).toEqual({ hydrated: 44, stoppedBy: 'done' });
+    expect(await hydrateLibraryBodies(input)).toEqual({ hydrated: 44, stoppedBy: 'retry' });
     expect(input.remote.fetchDetail).toHaveBeenCalledTimes(45);
   });
   it('cancels before saving an in-flight body', async () => {

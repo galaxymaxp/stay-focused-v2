@@ -125,7 +125,7 @@ export function CanvasSyncProvider({ children }: { children: ReactNode }) {
     setSnapshot((current) => ({ ...current, ...summary, lastSyncedAt: lastSyncedAt ?? current.lastSyncedAt }));
     setDataVersion((value) => value + 1);
     const input = request();
-    if (input) void runOfflineCatchUp(input.ownerUserId, { baseUrl: input.apiBaseUrl, accessToken: input.accessToken }, { force: true });
+    if (input) void runOfflineCatchUp(input.ownerUserId, { baseUrl: input.apiBaseUrl, accessToken: input.accessToken }, { force: true, changed: true });
   }, [refreshLastSynced, request]);
 
   // Poll the jobs this refresh started by id. The stored references are only

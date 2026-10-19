@@ -1,5 +1,6 @@
 import type { ExperienceClient } from '../experienceApi';
 import { getLocalArtifactStore } from './localArtifactDatabase';
+import { notifyOfflineImages } from './imageManifest';
 
 interface Flight { promise: Promise<void>; controller: AbortController; rerun: boolean }
 const flights = new Map<string, Flight>();
@@ -8,6 +9,9 @@ const timers = new Map<string, ReturnType<typeof setTimeout>>();
 // Only one owner normally runs at a time; a shared tail also keeps concurrency
 // at two during account transitions. No native imports at module evaluation.
 let tail: Promise<void> = Promise.resolve();
+export function offlineImageQueueRunning(owner: string): boolean {
+  return flights.has(owner) || timers.has(owner);
+}
 export function runOfflineImageQueue(owner: string, client: ExperienceClient): Promise<void> {
   clients.set(owner, client);
   const active = flights.get(owner);
@@ -49,6 +53,7 @@ export function runOfflineImageQueue(owner: string, client: ExperienceClient): P
     const rerun = flights.get(owner)?.rerun;
     flights.delete(owner);
     if (rerun && !controller.signal.aborted && clients.has(owner)) void runOfflineImageQueue(owner, clients.get(owner)!);
+    notifyOfflineImages(owner);
   });
   flights.set(owner, { promise, controller, rerun: false });
   tail = promise;

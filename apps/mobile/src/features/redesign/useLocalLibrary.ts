@@ -13,7 +13,7 @@ import { ApiConfigurationError } from "../../config/apiBaseUrlResolution";
 import { useTheme } from "../../design/theme";
 import { libraryRemote, storeLocalArtifactDetail } from "../../services/localLibrary/deviceLibrary";
 import type { OfflineStats } from "../../services/localLibrary/artifactStore";
-import { runOfflineCatchUp, subscribeOfflineLibrary, offlineCatchUpRunning } from "../../services/localLibrary/offlineCatchUp";
+import { runOfflineCatchUp, subscribeOfflineLibrary, offlineCatchUpRunning, offlineCatchUpError } from "../../services/localLibrary/offlineCatchUp";
 import { refreshArtifactDetail } from "../../services/localLibrary/librarySync";
 import { getLocalArtifactStore } from "../../services/localLibrary/localArtifactDatabase";
 import { useExperienceClient } from "./useExperience";
@@ -86,7 +86,7 @@ export function useLocalLibrary() {
       }
       const readLocal = async () => {
         const [items, offlineStats] = await Promise.all([store.listSummaries(ownerUserId), store.offlineStats(ownerUserId)]);
-        if (live) setState((old) => ({ ...old, owner: ownerUserId, items: mergeSavedData(old.items, items.filter(item => !old.supersededReviewerIds.includes(item.id))), localReady: true, offlineStats, refreshing: offlineCatchUpRunning(ownerUserId) }));
+        if (live) setState((old) => ({ ...old, owner: ownerUserId, items: mergeSavedData(old.items, items.filter(item => !old.supersededReviewerIds.includes(item.id))), localReady: true, offlineStats, refreshing: offlineCatchUpRunning(ownerUserId) && offlineCatchUpError(ownerUserId) !== 'connection', errorCode: offlineCatchUpError(ownerUserId) }));
       };
       unsubscribe = subscribeOfflineLibrary(ownerUserId, () => { void readLocal().catch(() => undefined); });
       await readLocal().catch(() => {
@@ -108,7 +108,7 @@ export function useLocalLibrary() {
           supersededReviewerIds: result?.supersededReviewerIds ?? old.supersededReviewerIds,
           owner: ownerUserId,
           savedAt: !outcome.errorCode ? new Date().toISOString() : old.savedAt,
-          categories: result?.categories ?? old.categories, refreshing: false,
+          categories: result?.categories ?? old.categories, refreshing: offlineCatchUpRunning(ownerUserId) && outcome.errorCode !== 'connection',
           error: outcome.errorCode === "connection" ? "connection" : outcome.errorCode ? "Could not refresh your Library. Try again." : null,
           errorCode: outcome.errorCode,
         }));

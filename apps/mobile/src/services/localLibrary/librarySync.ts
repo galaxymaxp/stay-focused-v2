@@ -24,11 +24,10 @@ export interface ReconcileResult {
 }
 
 const PAGE_SIZE = 100;
-const MAX_PAGES = 10;
-const BODY_BATCH = 20;
+const BODY_BATCH = 5;
 const BODY_SESSION_LIMIT = 300;
 const BODY_TIME_BUDGET_MS = 60_000;
-export type BodyStop = 'done' | 'offline' | 'limit' | 'cancelled';
+export type BodyStop = 'done' | 'offline' | 'limit' | 'cancelled' | 'retry';
 
 /**
  * Cloud → device reconciliation for one owner.
@@ -52,7 +51,7 @@ export async function reconcileLibrary(input: {
   let offset = 0;
   let listComplete = false;
   let supersededReviewerIds: readonly string[] = [];
-  for (let page = 0; page < MAX_PAGES && !cancelled(); page += 1) {
+  while (!cancelled()) {
     const overview = await remote.fetchPage(offset, PAGE_SIZE);
     categories ??= overview.categories;
     supersededReviewerIds = overview.supersededReviewerIds ?? supersededReviewerIds;
@@ -91,21 +90,34 @@ export async function hydrateLibraryBodies(input: {
     if (now() - started > BODY_TIME_BUDGET_MS) return { hydrated, stoppedBy: 'limit' };
     const batch = (await input.store.idsNeedingBody(input.ownerUserId, BODY_BATCH + attempted.size, !!input.remote.fetchQuizAnswerKey))
       .filter(id => !attempted.has(id)).slice(0, Math.min(BODY_BATCH, BODY_SESSION_LIMIT - attempted.size));
-    if (!batch.length) return { hydrated, stoppedBy: 'done' };
+    if (!batch.length) return { hydrated, stoppedBy: await input.store.nextBodyRetryAt(input.ownerUserId, !!input.remote.fetchQuizAnswerKey) === null ? 'done' : 'retry' };
     for (const artifactId of batch) {
       if (cancelled()) return { hydrated, stoppedBy: 'cancelled' };
       if (now() - started > BODY_TIME_BUDGET_MS) return { hydrated, stoppedBy: 'limit' };
       attempted.add(artifactId);
+      const attempt = await input.store.bodyAttempt(input.ownerUserId, artifactId);
       try {
-        await refreshArtifactDetail({ ...input, artifactId });
+        const { outcome } = await refreshArtifactDetail({ ...input, artifactId, reportKeyFailure: true });
+        if (outcome === 'ignored_older') throw Object.assign(new Error('stale_artifact'), { code: 'unavailable' });
+        if (cancelled()) return { hydrated, stoppedBy: 'cancelled' };
         hydrated += 1;
       } catch (error) {
+        if (cancelled()) return { hydrated, stoppedBy: 'cancelled' };
         const code = errorCode(error);
         if (code === 'connection' || code === 'sign_in_required') return { hydrated, stoppedBy: 'offline' };
-        // Do not retry failed or non-advancing cloud copies in this run.
+        if (attempt) {
+          // An exact detail not_found has already removed its row. A missing
+          // answer key leaves the readable body intact and must not spin.
+          const permanent = code === 'permission_denied' || code === 'invalid_request' || code === 'not_found';
+          await input.store.recordBodyFailure(input.ownerUserId, artifactId, attempt.version, permanent,
+            now() + Math.min(5 * 60_000, 2_000 * 2 ** Math.min(attempt.attempts, 8)));
+        }
       }
+      // A subscriber can display each committed item without waiting for the batch.
+      await input.onProgress?.();
     }
-    await input.onProgress?.();
+    // Yield to navigation/rendering between small groups of device writes.
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
   return { hydrated, stoppedBy: 'limit' };
 }
@@ -117,6 +129,7 @@ export async function refreshArtifactDetail(input: {
   readonly remote: Pick<LibraryRemote, "fetchDetail" | "fetchQuizAnswerKey" | "onDetailStored">;
   readonly artifactId: string;
   readonly isCancelled?: () => boolean;
+  readonly reportKeyFailure?: boolean;
 }): Promise<{ detail: LibraryArtifactDetail; outcome: LocalUpsertOutcome }> {
   const { store, ownerUserId, remote, artifactId } = input;
   let detail: LibraryArtifactDetail;
@@ -136,9 +149,14 @@ export async function refreshArtifactDetail(input: {
       const key = await remote.fetchQuizAnswerKey(detail.quiz.id);
       if (!input.isCancelled?.() && key.quizId === detail.quiz.id) {
         await store.saveQuizAnswerKey(ownerUserId, key, detail.artifact.updatedAt);
-      }
-    } catch { /* Key failure never blocks saving the learner body; retry next catch-up. */ }
+      } else if (!input.isCancelled?.()) throw Object.assign(new Error('invalid_answer_key'), { code: 'invalid_response' });
+    } catch (error) {
+      // The learner body is already safe. Let catch-up account/back off the key failure.
+      if (input.reportKeyFailure) throw error;
+      return { detail, outcome };
+    }
   }
+  if (!input.isCancelled?.() && outcome !== 'ignored_older') await store.clearBodyFailure(ownerUserId, artifactId);
   return { detail, outcome };
 }
 

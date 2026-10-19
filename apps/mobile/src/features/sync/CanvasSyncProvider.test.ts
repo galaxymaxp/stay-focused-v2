@@ -113,7 +113,7 @@ describe("CanvasSyncProvider", () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(4_100); });
     expect(mocks.getJob).toHaveBeenCalledTimes(4);
     expect(latest!.snapshot).toMatchObject({ phase: "limited", total: 2, finished: 2 });
-    expect(mocks.catchUp).toHaveBeenCalledWith("owner", { baseUrl: "https://api.example", accessToken: "token" }, { force: true });
+    expect(mocks.catchUp).toHaveBeenCalledWith("owner", { baseUrl: "https://api.example", accessToken: "token" }, { force: true, changed: true });
     expect(latest!.dataVersion).toBe(before + 1);
   });
 

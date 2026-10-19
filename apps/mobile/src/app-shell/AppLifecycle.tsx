@@ -4,7 +4,7 @@ import { AppState } from "react-native";
 
 import { useAuth } from "../auth";
 import { useTheme } from "../design/theme";
-import { runOfflineCatchUp, stopOfflineCatchUp } from "../services/localLibrary/offlineCatchUp";
+import { runOfflineCatchUp, stopOfflineCatchUp, setOfflineCatchUpActive } from "../services/localLibrary/offlineCatchUp";
 import { syncPendingDraftEdits, stopPendingDraftSync } from '../services/localLibrary/pendingDraftSync';
 import { getApiBaseUrl } from "../config/apiBaseUrl";
 import { readNotificationDestination, type NotificationDestination } from "../navigation/notificationRoutes";
@@ -49,11 +49,13 @@ export function AppLifecycle() {
   const { active } = useTheme();
   useEffect(() => {
     const baseUrl = getApiBaseUrl();
-    if (ownerUserId && accessToken && baseUrl && active) {
+    if (ownerUserId) setOfflineCatchUpActive(ownerUserId, active && !offline);
+    if (ownerUserId && accessToken && baseUrl && active && !offline) {
       void runOfflineCatchUp(ownerUserId, { baseUrl, accessToken });
       void syncPendingDraftEdits(ownerUserId, { baseUrl, accessToken });
     }
-  }, [ownerUserId, accessToken, active]);
+    return () => { if (ownerUserId) setOfflineCatchUpActive(ownerUserId, false); };
+  }, [ownerUserId, accessToken, active, offline]);
   useEffect(() => () => {
     if (ownerUserId) { void stopOfflineCatchUp(ownerUserId); void stopPendingDraftSync(ownerUserId); }
   }, [ownerUserId]);

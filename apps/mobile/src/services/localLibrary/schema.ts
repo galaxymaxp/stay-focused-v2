@@ -106,6 +106,10 @@ const MIGRATIONS: readonly string[] = [
      bytes INTEGER NOT NULL DEFAULT 0,
      PRIMARY KEY (owner_user_id, artifact_id)
    );`,
+  `ALTER TABLE library_artifacts ADD COLUMN body_failure_version TEXT;
+   ALTER TABLE library_artifacts ADD COLUMN body_failure_permanent INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE library_artifacts ADD COLUMN body_failure_attempts INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE library_artifacts ADD COLUMN body_retry_at INTEGER NOT NULL DEFAULT 0;`,
 ];
 
 export const LOCAL_LIBRARY_SCHEMA_VERSION = MIGRATIONS.length;

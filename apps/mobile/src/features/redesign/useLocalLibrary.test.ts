@@ -11,12 +11,13 @@ import {
   quizDetail,
   reviewerDetail,
 } from "../../services/localLibrary/localLibrary.testSupport";
-import { runOfflineCatchUp } from "../../services/localLibrary/offlineCatchUp";
+import { runOfflineCatchUp, stopOfflineCatchUp } from "../../services/localLibrary/offlineCatchUp";
 import { migrateLocalLibrary } from "../../services/localLibrary/schema";
 import { useLocalArtifact, useLocalLibrary } from "./useLocalLibrary";
 
 const mocks = vi.hoisted(() => ({
   owner: "",
+  focused: true,
   store: null as LocalArtifactStore | null,
   request: vi.fn(),
   // Production memoizes the client per access token.
@@ -26,11 +27,12 @@ vi.mock("../../auth", () => ({
   useAuth: () => ({ session: mocks.owner ? { user: { id: mocks.owner }, accessToken: "token" } : null }),
 }));
 vi.mock("../../design/theme", () => ({ useTheme: () => ({ active: true }) }));
-vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => true }));
+vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => mocks.focused }));
 vi.mock("./useExperience", () => ({
   useExperienceClient: () => mocks.client,
 }));
 vi.mock("../../services/experienceApi", () => ({ experienceRequest: mocks.request }));
+vi.mock('expo-file-system/legacy', () => ({ documentDirectory: null }));
 vi.mock("../../services/localLibrary/localArtifactDatabase", () => ({
   getLocalArtifactStore: async () => mocks.store,
 }));
@@ -75,14 +77,43 @@ beforeEach(async () => {
   await migrateLocalLibrary(db);
   mocks.store = createLocalArtifactStore(db);
   mocks.owner = OWNER_A;
+  mocks.focused = true;
   mocks.request.mockReset();
 });
 afterEach(async () => {
   if (rendered) await act(async () => rendered!.unmount());
   rendered = undefined;
+  await stopOfflineCatchUp(OWNER_A);
+  await stopOfflineCatchUp(OWNER_B);
 });
 
 describe("useLocalLibrary", () => {
+  it('keeps the shared job after blur and displays each committed item through its subscription', async () => {
+    const details = [draftDetail({ id: 'activity:a' }), draftDetail({ id: 'activity:b' }), draftDetail({ id: 'activity:c' })];
+    const pending = details.map(() => deferred<unknown>());
+    mocks.request.mockImplementation((_client: unknown, path: string) => path.includes('?')
+      ? Promise.resolve({ items: details.map(d => d.artifact), categories, nextOffset: null })
+      : pending[details.findIndex(d => path.endsWith(encodeURIComponent(d.artifact.id)))]!.promise);
+    const flight = runOfflineCatchUp(OWNER_A, mocks.client, { force: true });
+    await act(async () => { rendered = create(createElement(LibraryProbe)); });
+    await flush();
+    expect(library.offlineStats).toMatchObject({ current: 0, total: 3 });
+    expect(mocks.request.mock.calls.map(([, path]) => path)).toContain(`/api/experience/library/${encodeURIComponent(details[0]!.artifact.id)}`);
+    await act(async () => pending[0]!.resolve(details[0])); await flush();
+    expect(await mocks.store!.offlineStats(OWNER_A)).toMatchObject({ current: 1 });
+    expect(library.offlineStats).toMatchObject({ current: 1, total: 3 });
+    expect(library.refreshing).toBe(true);
+    await act(async () => pending[1]!.resolve(details[1])); await flush();
+    expect(library.offlineStats).toMatchObject({ current: 2, total: 3 });
+    mocks.focused = false;
+    await act(async () => rendered!.update(createElement(LibraryProbe)));
+    await act(async () => { pending[2]!.resolve(details[2]); await flight; });
+    expect(await mocks.store!.offlineStats(OWNER_A)).toMatchObject({ current: 3, total: 3 });
+    expect(mocks.request.mock.calls.filter(([, path]) => String(path).includes('?'))).toHaveLength(1);
+    mocks.focused = true;
+    await act(async () => rendered!.update(createElement(LibraryProbe))); await flush();
+    expect(library.offlineStats).toMatchObject({ current: 3, total: 3 });
+  });
   it("joins a foreground catch-up instead of starting another reconcile", async () => {
     const page = deferred<unknown>();
     const detail = quizDetail();
@@ -123,7 +154,7 @@ describe("useLocalLibrary", () => {
     await flush();
     // Existing rows keep their positions while newly discovered work appends.
     expect(library.items.map((item) => item.id)).toEqual([reviewerDetail().artifact.id, quizDetail().artifact.id]);
-    expect(library.refreshing).toBe(false);
+    expect(library.refreshing).toBe(true); // Missing answer key now has a scheduled retry.
     expect(library.error).toBeNull();
     expect(library.offlineStats).toMatchObject({ total: 2, current: 1 });
     expect(library.items.filter(item => item.offlineReady).map(item => item.type)).toEqual(["quiz"]);
@@ -141,7 +172,7 @@ describe("useLocalLibrary", () => {
     expect(library.errorCode).toBe("connection");
     expect(library.offlineStats).toMatchObject({ total: 1, current: 0 });
     expect(library.items[0]?.offlineReady).toBe(false);
-    expect(library.refreshing).toBe(false);
+    expect(library.refreshing).toBe(false); // Offline recovery waits quietly without a checking label.
   });
 
   it("never shows another account's device copies after an account switch", async () => {

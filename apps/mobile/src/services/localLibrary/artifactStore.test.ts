@@ -290,7 +290,7 @@ describe("local artifact store", () => {
 describe('offline storage controls', () => {
   it('counts current bodies, skips missing/stale/unknown-schema bodies and isolates owners', async () => {
     const { store, raw } = await freshStore();
-    expect(await store.offlineStats(OWNER_A)).toEqual({ total: 0, current: 0, approximateBytes: 0 });
+    expect(await store.offlineStats(OWNER_A)).toEqual({ total: 0, current: 0, approximateBytes: 0, failedPermanent: 0 });
     await store.upsertDetail(OWNER_A, 'r', reviewerDetail());
     const bytes = (await store.offlineStats(OWNER_A)).approximateBytes;
     expect(bytes).toBeGreaterThan(0);
@@ -315,7 +315,7 @@ describe('offline storage controls', () => {
     for (const owner of [OWNER_A, OWNER_B]) raw.prepare("INSERT INTO study_assists VALUES (?, 'key', 'reviewer', 'content', '{}')").run(owner);
     expect((await store.offlineStats(OWNER_A)).approximateBytes).toBeGreaterThan(0);
     await store.clearBodies(OWNER_A);
-    expect(await store.offlineStats(OWNER_A)).toEqual({ total: 1, current: 0, approximateBytes: 0 });
+    expect(await store.offlineStats(OWNER_A)).toEqual({ total: 1, current: 0, approximateBytes: 0, failedPermanent: 0 });
     expect(await store.listSummaries(OWNER_A)).toHaveLength(1);
     expect(await store.readDetail(OWNER_A, 'generation:alias')).toBeNull();
     expect(raw.prepare('SELECT COUNT(*) AS n FROM library_artifact_aliases WHERE owner_user_id = ?').get(OWNER_A)).toEqual({ n: 1 });
