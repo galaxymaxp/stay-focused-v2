@@ -19,6 +19,7 @@ import { Avatar } from '../../design/Avatar';
 import { useProfileAvatar } from '../../design/ProfileAvatarProvider';
 import { ProfilePhotoSettings } from './ProfilePhotoSettings';
 import { AppUpdateAbout } from './AppUpdateAbout';
+import { LegalLinks } from '../legal/LegalLinks';
 
 const modes: readonly { value: ThemePreference; label: string }[] = [
   { value: "system", label: "Automatic" },
@@ -178,6 +179,7 @@ export function SettingsScreen() {
       </Section>
       <Section title="About"><AppUpdateAbout /></Section>
       {error ? <Notice>{error}</Notice> : null}
+      <LegalLinks />
     </Page>
   );
 }

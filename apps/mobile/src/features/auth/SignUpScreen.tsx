@@ -8,6 +8,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { spacing, typography } from "../../design/tokens";
+import { LegalLinks } from '../legal/LegalLinks';
 
 interface SignUpScreenProps {
   readonly onSignInInstead: () => void;
@@ -62,6 +63,7 @@ export function SignUpScreen({ onSignInInstead }: SignUpScreenProps) {
             Back to sign in
           </Button>
         </Card>
+        <LegalLinks />
       </Screen>
     );
   }
@@ -154,12 +156,14 @@ export function SignUpScreen({ onSignInInstead }: SignUpScreenProps) {
           >
             Create account
           </Button>
+          <Text style={{ color: colors.textMuted, fontSize: typography.caption, textAlign: 'center' }}>By creating an account you agree to the Terms and Privacy Policy.</Text>
 
           <View style={styles.divider} />
           <Button fullWidth onPress={onSignInInstead} variant="ghost">
             I already have an account
           </Button>
         </Card>
+        <LegalLinks />
       </KeyboardAvoidingView>
     </Screen>
   );

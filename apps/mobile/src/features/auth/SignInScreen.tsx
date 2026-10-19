@@ -10,6 +10,7 @@ import { Card } from "../../components/Card";
 import { Screen } from "../../components/Screen";
 import { TextField } from "../../components/TextField";
 import { spacing, typography } from "../../design/tokens";
+import { LegalLinks } from '../legal/LegalLinks';
 
 interface SignInScreenProps {
   readonly onCreateAccount: () => void;
@@ -121,6 +122,7 @@ export function SignInScreen({ onCreateAccount }: SignInScreenProps) {
             Create an account
           </Button>
         </Card>
+        <LegalLinks />
       </KeyboardAvoidingView>
     </Screen>
   );
