@@ -1,5 +1,28 @@
 # Current State
 
+<!-- WX1 begin -->
+WX1 / Website saved study exports (2026-10-19): **PASS for the finite
+unattended local code scope**. Pure layout/PDF/DOCX/PPTX builders now live in
+`@stay-focused/shared/study-export`; mobile retains SAF saves. The website
+lazily downloads Reviewer PDF (with existing TXT retained) and saved Draft
+PDF/DOCX/PPTX. Unsaved Draft edits disable export with the save-first hint;
+exports use the confirmed save response. Existing menu/aside, tokens, busy
+locks and safe Notices are used; no API/schema or motion change.
+Commits: 255081e3 (shared/mobile), f787b490 (web); docs hash in Git/WX1.status.
+FRESH PASS: forced typecheck/lint/root build 8/8 tasks each, 0 cached;
+6 existing lint warnings. Shared 643/65 files, API 2452/213 files with
+3 intentional live skips, mobile 1582/166 files, web 515/71 files.
+API/web builds 37/37 and 23/23 pages; Android export and diff checks pass.
+Original builders are identical after import-path normalization; the web builder
+chunk is absent from all initial page bundles. First failures/retries are
+recorded in acceptance. Rollout and Device checks NOT RUN, skipped entirely;
+live deployed state and actual viewers are UNVERIFIED (owner to confirm).
+No service call, deployment, remote SQL/migration, Scheduler, environment-file
+edit or push. Unrelated paths and Owner Pause remain; no later task started.
+This supersedes earlier WX1-unstarted checkpoint notes without resuming FULLSEND.
+[Acceptance and exact gates](ai/acceptance/wx1-web-study-export.md).
+<!-- WX1 end -->
+
 <!-- FULLSEND recovery begin -->
 FULLSEND recovery (2026-10-19): **BLOCKED before step 1**. WA1 is recovered and
 locally committed (3fe40518, 1a808907), with all final-code gates FRESH PASS.

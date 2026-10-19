@@ -9075,3 +9075,60 @@ No product-service API call, email, remote SQL/migration, Scheduler operation,
 environment-file edit, push or deployment occurred during WA1 recovery. Runner
 checkpoint: tmp/overnight/WA1.progress and WA1.status. WX1 remains unstarted and
 Autopilot paused. Endpoint is WA1 plus the separately authorized FULLSEND only.
+
+
+## WX1 / Website saved study exports - 2026-10-19
+
+WX1 / Website saved study exports (2026-10-19): **PASS for the finite
+unattended local code scope**. Pure layout/PDF/DOCX/PPTX builders now live in
+`@stay-focused/shared/study-export`; mobile retains SAF saves. The website
+lazily downloads Reviewer PDF (with existing TXT retained) and saved Draft
+PDF/DOCX/PPTX. Unsaved Draft edits disable export with the save-first hint;
+exports use the confirmed save response. Existing menu/aside, tokens, busy
+locks and safe Notices are used; no API/schema or motion change.
+Commits: 255081e3 (shared/mobile), f787b490 (web); docs hash in Git/WX1.status.
+FRESH PASS: forced typecheck/lint/root build 8/8 tasks each, 0 cached;
+6 existing lint warnings. Shared 643/65 files, API 2452/213 files with
+3 intentional live skips, mobile 1582/166 files, web 515/71 files.
+API/web builds 37/37 and 23/23 pages; Android export and diff checks pass.
+Original builders are identical after import-path normalization; the web builder
+chunk is absent from all initial page bundles. First failures/retries are
+recorded in acceptance. Rollout and Device checks NOT RUN, skipped entirely;
+live deployed state and actual viewers are UNVERIFIED (owner to confirm).
+No service call, deployment, remote SQL/migration, Scheduler, environment-file
+edit or push. Unrelated paths and Owner Pause remain; no later task started.
+This supersedes earlier WX1-unstarted checkpoint notes without resuming FULLSEND.
+
+Implementation commits:
+
+- `255081e3 refactor(shared): move study export builders to shared`
+- `f787b490 feat(web): export saved reviewers and drafts locally`
+- Documentation commit: recorded in Git and ignored WX1.status.
+
+Gate counts: FRESH forced typecheck/lint/root build 8/8 each, 0 cached; lint
+6 existing warnings. FRESH tests: shared 643/65 files, API 2452/213 files +
+3 intentional live skips, mobile 1582/166 files, web 515/71 files. FRESH API/web
+builds 37/37 and 23/23 pages; Android export and diff/staged-diff pass. First
+typecheck failed 4/6 tasks on a test mock type, fixed. First mobile/API runs
+failed 1 and 2 existing 5000ms timeouts under load (1581/2450 passed); full
+two-worker retries passed without timeout/assertion changes. The runner preload
+path failure (0 tests) and trailing blank line correction are also retained.
+[Acceptance and exact commands](acceptance/wx1-web-study-export.md).
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** deploy the website. Mobile changed
+  beyond imports (shared MIME lookup/dependency ownership), so include it in
+  the next authorized OTA when shipping the refactor. Builders retain identical
+  output behavior. No API/database release is required for WX1.
+- **Device checks - NOT RUN, skipped entirely:** on desktop and phone browsers,
+  export Reviewer PDF and Draft PDF/DOCX/PPTX and open all files in their apps;
+  check save-first gating and post-save content. Check native folder exports
+  when shipping mobile. Deployed revisions, viewers and physical behavior are
+  **UNVERIFIED (owner to confirm)**. No live state was queried.
+- For later authorized Vercel env/deploy/log work, strongly recommend installing
+  the missing CLI with `npm i -g vercel`; no Vercel command or install ran.
+
+Ignored evidence: tmp/overnight/WX1-* plus WX1.progress and WX1.status. No
+service call, deployment, remote SQL/migration, Scheduler, email, environment
+edit or push. Original untracked paths preserved; no later task started.
