@@ -4,7 +4,8 @@ import { clockTimeLabel, freeTimeDuration, containsMinute, type TodayItem } from
 import { useIsFocused } from "expo-router/react-navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClockOptions } from "./ClockOptions";
-import { Animated, PanResponder, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
+import { Animated, PanResponder, Text, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
+import { useClockFonts } from './clockFonts';
 
 import { haptic } from "../../design/haptics";
 import Svg, { Circle, Line, Path, Text as SvgText } from "react-native-svg";
@@ -169,6 +170,12 @@ export function DayRingClock({
   const [draft, setDraft] = useState<Range | null>(null);
   const [adjusting, setAdjusting] = useState<Mode | null>(null);
   const range = draft ?? { start, end };
+  const [glassReady, setGlassReady] = useState(false);
+  const fontsLoaded = useClockFonts();
+  // The atlas deliberately contains only these canonical clock glyphs.
+  const clockText = clockLabel(adjusting === 'end' ? range.end : adjusting ? range.start : nowMinutes);
+  const clockFontSize = adjusting ? 30 : 32;
+  const glassClock = useMemo(() => ({ text: clockText, fontSize: clockFontSize }), [clockText, clockFontSize]);
   const lift = useRef(new Animated.Value(0)).current;
 
   const segments = useGlidingSegments(useMemo(() => timelineSegments(timeline, date), [timeline, date]), reducedMotion);
@@ -372,7 +379,7 @@ export function DayRingClock({
     <View style={{ alignItems: "center", gap: 4 }}>
       <View style={{ width: size, height: size }} testID="day-ring">
         <View pointerEvents="none" style={{ position: "absolute", left: (CLOCK.center - orbCanvas / 2) * scale, top: (CLOCK.center - orbCanvas / 2) * scale }}>
-          <DayOrb interaction={orbInteraction} minutes={nowMinutes} size={orbCanvas * scale} mode={theme} reducedMotion={reducedMotion} live={focused && active} />
+          <DayOrb interaction={orbInteraction} minutes={nowMinutes} size={orbCanvas * scale} mode={theme} reducedMotion={reducedMotion} live={focused && active} clock={glassClock} onGlassReady={setGlassReady} />
         </View>
         <View
           pointerEvents="none"
@@ -386,7 +393,7 @@ export function DayRingClock({
             alignItems: "center",
           }}
         >
-          <CenterReadout mode={adjusting} range={range} now={now} />
+          <CenterReadout mode={adjusting} range={range} text={clockText} glassReady={glassReady} fontsLoaded={fontsLoaded} />
         </View>
         <Svg
           width={size}
@@ -493,31 +500,26 @@ function HeldHalo({ range, mode, scale, lift, color }: { range: Range; mode: Mod
   );
 }
 
-function CenterReadout({ mode, range, now }: { mode: Mode | null; range: Range; now: Date }) {
+export function CenterReadout({ mode, range, text, glassReady, fontsLoaded }: {
+  mode: Mode | null; range: Range; text: string; glassReady: boolean; fontsLoaded: boolean;
+}) {
   const shadow = { textShadowColor: "rgba(0,0,0,0.35)", textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } };
-  if (mode) {
-    const label = mode === "start" ? "Free from" : mode === "end" ? "Free until" : "Free time";
-    const time = mode === "end" ? range.end : range.start;
-    return (
-      <>
-        <Copy color="rgba(255,255,255,0.86)" size="caption" style={{ ...shadow, letterSpacing: 0.6, textTransform: "uppercase", fontWeight: "600" }}>{label}</Copy>
-        <Copy color="#FFFFFF" size="display" style={{ ...shadow, fontSize: 30, lineHeight: 37, fontVariant: ["tabular-nums"] }}>
-          {mode === "move" ? `${clockLabel(range.start)}` : clockLabel(time)}
-        </Copy>
-        <Copy color="rgba(255,255,255,0.86)" size="caption" style={{ ...shadow, fontVariant: ["tabular-nums"] }}>
-          {mode === "move" ? `until ${clockLabel(range.end)} · ` : ""}{formatFreeTime(freeTimeDuration(range.start, range.end))}
-        </Copy>
-      </>
-    );
-  }
   return (
     <>
-      <Copy color="#FFFFFF" size="display" style={{ ...shadow, fontSize: 32, lineHeight: 39, fontVariant: ["tabular-nums"] }}>
-        {now.toLocaleTimeString([], { hour: "numeric", hour12: true, minute: "2-digit" })}
-      </Copy>
-      <Copy color="rgba(255,255,255,0.86)" size="caption" style={{ ...shadow, fontWeight: "500" }}>
-        {now.toLocaleDateString([], { weekday: "long" })}
-      </Copy>
+      {mode && <Copy color="rgba(255,255,255,0.86)" size="caption" style={{ ...shadow,
+        fontFamily: fontsLoaded ? 'InterClock600' : undefined, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: fontsLoaded ? 'normal' : '600' }}>
+        {mode === 'start' ? 'Free from' : mode === 'end' ? 'Free until' : 'Free time'}
+      </Copy>}
+      <Text testID="clock-time" accessible accessibilityRole="text" accessibilityLabel={text}
+        style={{ ...shadow, color: '#FFFFFF', fontFamily: fontsLoaded ? 'InterClock700' : undefined,
+          fontWeight: fontsLoaded ? 'normal' : '700', fontSize: mode ? 30 : 32, lineHeight: mode ? 37 : 39,
+          letterSpacing: mode ? -0.6 : -0.64, fontVariant: ['tabular-nums'], opacity: glassReady ? 0 : 1 }}>
+        {text}
+      </Text>
+      {mode && <Copy color="rgba(255,255,255,0.86)" size="caption" style={{ ...shadow,
+        fontFamily: fontsLoaded ? 'InterClock500' : undefined, fontWeight: fontsLoaded ? 'normal' : '500', fontVariant: ['tabular-nums'] }}>
+        {mode === 'move' ? `until ${clockLabel(range.end)} · ` : ''}{formatFreeTime(freeTimeDuration(range.start, range.end))}
+      </Copy>}
     </>
   );
 }

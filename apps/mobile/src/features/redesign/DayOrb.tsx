@@ -5,6 +5,9 @@ import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Image, View } from "react-native";
 import * as THREE from "three";
+import { createClockGlass } from '@stay-focused/shared/clock-glass-renderer';
+import type { ClockGlassReadout } from '@stay-focused/shared';
+import clockMetrics from '../../../assets/clock/clock-atlas.json';
 
 import { coreLevelsExtra, createCoreLevels, stepCoreLevels, type CoreLevels, type CoreState } from "../generation-core/coreModel";
 import { orbShimmerLevel, SHIMMER_SPEED } from "../generation-core/orbAura";
@@ -42,6 +45,9 @@ interface Runtime {
   reducedMotion: boolean;
   running: boolean;
   state?: CoreState;
+  clock?: ClockGlassReadout;
+  canvasSize: number;
+  onGlassReady?: (ready: boolean) => void;
 }
 
 
@@ -61,6 +67,8 @@ export const DayOrb = memo(function DayOrb({
   reducedMotion,
   live,
   state,
+  clock,
+  onGlassReady,
   interaction: suppliedInteraction,
 }: {
   minutes: number;
@@ -70,6 +78,8 @@ export const DayOrb = memo(function DayOrb({
   reducedMotion: boolean;
   live: boolean;
   state?: CoreState;
+  clock?: ClockGlassReadout;
+  onGlassReady?: (ready: boolean) => void;
   interaction?: OrbInteractionHandle;
 }) {
   const localState = useRef(createOrbInteraction());
@@ -78,8 +88,8 @@ export const DayOrb = memo(function DayOrb({
   const [foreground, setForeground] = useState(AppState.currentState === "active");
   const [renderingFailed, setRenderingFailed] = useState(false);
   const tones = useMemo(() => dayOrbTones(minutes), [minutes]);
-  const runtime = useRef<Runtime>({ tones, mode, reducedMotion, running: live && foreground, state });
-  runtime.current = { tones, mode, reducedMotion, running: live && foreground, state };
+  const runtime = useRef<Runtime>({ tones, mode, reducedMotion, running: live && foreground, state, clock, canvasSize: size, onGlassReady });
+  runtime.current = { tones, mode, reducedMotion, running: live && foreground, state, clock, canvasSize: size, onGlassReady };
   const controller = useRef<{ wake: () => void; dispose: () => void } | null>(null);
   const context = useRef<ExpoWebGLRenderingContext | null>(null);
   useEffect(() => {
@@ -89,7 +99,7 @@ export const DayOrb = memo(function DayOrb({
   useEffect(() => {
     if (!live || !foreground) interaction.state.current = cancelOrbSpin(interaction.state.current);
   }, [live, foreground, interaction]);
-  useEffect(() => controller.current?.wake(), [minutes, mode, reducedMotion, live, foreground, state]);
+  useEffect(() => controller.current?.wake(), [minutes, mode, reducedMotion, live, foreground, state, size, clock?.text, clock?.fontSize]);
   useEffect(() => {
     if (context.current && !controller.current) {
       try { controller.current = buildScene(context.current, runtime, interaction); }
@@ -142,6 +152,22 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   const body = createOrbBody();
   root.add(body.mesh);
 
+  let glass: ReturnType<typeof createClockGlass> | null = null;
+  let atlas: THREE.Texture | null = null;
+  let glassReady = false;
+  const report = (ready: boolean) => {
+    if (glassReady !== ready) { glassReady = ready; runtime.current.onGlassReady?.(ready); }
+  };
+  if (runtime.current.clock) {
+    void loadClockAtlas().then(texture => {
+      if (disposed) { texture.dispose(); return; }
+      atlas = texture;
+      try { glass = createClockGlass(renderer, atlas, clockMetrics); }
+      catch { report(false); }
+      wake();
+    }).catch(() => report(false));
+  }
+
   let disposed = false;
   let requestId: number | null = null;
   let lastFrame = Date.now();
@@ -152,6 +178,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   let interacting = false;
   let levels: CoreLevels | null = null;
   let shimmerTime = 0;
+  let dirty = true;
   const spinMatrix = new THREE.Matrix3();
   const spinRotation = new THREE.Matrix4();
 
@@ -164,13 +191,14 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
     // A failed orb winds down and then stays still, as the Knowledge Core does.
     const moving = current.running && !current.reducedMotion && !(current.state === "error" && settled && !settled.lively);
     // Plain page touches pause idle work; ring motion and its coast remain visible.
-    if (dayOrbTouch.active && moving && !interaction.ringDragging?.current && !interaction.state.current.gesture?.rotating
+    if (!dirty && dayOrbTouch.active && moving && !interaction.ringDragging?.current && !interaction.state.current.gesture?.rotating
       && interaction.state.current.spin.velocityX === 0 && interaction.state.current.spin.velocityY === 0 && !interacting) {
       lastFrame = now;
       requestId = requestAnimationFrame(draw);
       return;
     }
-    if (now - lastRender >= (interacting || interaction.state.current.gesture?.rotating || settled?.lively ? 16 : FRAME_MS) || !moving) {
+    if (dirty || now - lastRender >= (interacting || interaction.ringDragging?.current || interaction.state.current.gesture?.rotating || settled?.lively ? 16 : FRAME_MS) || !moving) {
+      dirty = false;
       const delta = Math.min((now - lastFrame) / 1000, 0.08);
       lastFrame = now;
       lastRender = now;
@@ -205,13 +233,22 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
         tones: { base: tones.base, deep: tones.deep, glow: tones.light },
         light: tones.position,
       });
-      renderer.render(scene, camera);
+      if (glass && current.clock) {
+        try {
+          glass.render(scene, camera, current.clock, current.canvasSize, [tones.position.x, tones.position.y], current.mode === 'dark');
+          report(true);
+        } catch {
+          glass.dispose(); glass = null; renderer.setRenderTarget(null);
+          report(false); renderer.render(scene, camera);
+        }
+      } else renderer.render(scene, camera);
       gl.endFrameEXP();
     }
     if (!disposed && current.running && !current.reducedMotion && (moving || interacting || now < settleUntil)) requestId = requestAnimationFrame(draw);
   };
 
   const wake = () => {
+    dirty = true;
     settleUntil = Date.now() + 400;
     if (requestId === null) {
       lastFrame = Date.now();
@@ -228,7 +265,30 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
       if (interaction.wake.current === wake) interaction.wake.current = null;
       if (requestId !== null) cancelAnimationFrame(requestId);
       body.dispose();
+      glass?.dispose(); atlas?.dispose(); report(false);
       renderer.dispose();
     },
   };
+}
+
+async function loadClockAtlas(): Promise<THREE.Texture> {
+  const { Asset } = await import('expo-asset');
+  const { Platform } = await import('react-native');
+  const asset = Asset.fromModule(require('../../../assets/clock/clock-atlas.png'));
+  await asset.downloadAsync();
+  let texture: THREE.Texture;
+  if (Platform.OS === 'web') {
+    texture = await new THREE.TextureLoader().loadAsync(asset.uri);
+  } else {
+    if (!asset.localUri) throw new Error('clock_atlas_unavailable');
+    texture = new THREE.Texture();
+    // Expo GL's tex(Sub)Image2D explicitly accepts {localUri} in the pixels slot.
+    // This uses native PNG decoding, not runtime atlas generation or another GL view.
+    Object.assign(texture, { isDataTexture: true, unpackAlignment: 1,
+      image: { data: { localUri: asset.localUri }, width: clockMetrics.width, height: clockMetrics.height } });
+  }
+  texture.flipY = false; texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter; texture.magFilter = THREE.LinearFilter;
+  texture.colorSpace = THREE.NoColorSpace; texture.needsUpdate = true;
+  return texture;
 }

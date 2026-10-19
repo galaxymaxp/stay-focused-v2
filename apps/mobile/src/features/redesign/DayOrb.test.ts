@@ -14,10 +14,14 @@ const mocks = vi.hoisted(() => ({
   render: vi.fn(),
   animatedValue: vi.fn(),
   frame: vi.fn<(callback: FrameRequestCallback) => number>(),
+  glass: vi.fn(), glassDispose: vi.fn(), atlasFail: false,
 }));
 vi.mock("expo-gl", () => ({ GLView: "GLView" }));
+vi.mock('expo-asset', () => ({ Asset: { fromModule: () => ({ localUri: 'file:///clock-atlas.png',
+  downloadAsync: async () => { if (mocks.atlasFail) throw new Error('missing_atlas'); } }) } }));
+vi.mock('@stay-focused/shared/clock-glass-renderer', () => ({ createClockGlass: () => ({ render: mocks.glass, dispose: mocks.glassDispose }) }));
 vi.mock("react-native", () => ({
-  View: "View", Image: "Image",
+  View: "View", Image: "Image", Platform: { OS: 'android' },
   AppState: { currentState: "active", addEventListener: () => ({ remove: vi.fn() }) },
   Animated: { Value: mocks.animatedValue },
 }));
@@ -32,6 +36,7 @@ vi.mock("three", async (importOriginal) => ({
     setSize() {}
     setPixelRatio() {}
     setClearColor() {}
+    setRenderTarget() {}
     render = mocks.render;
     dispose() {}
   },
@@ -49,6 +54,8 @@ const size = (CLOCK.glass * 2) / DAY_ORB_FILL;
 const props = { minutes: 720, size, mode: "dark" as const, reducedMotion: false, live: true };
 beforeEach(() => {
   mocks.fail = false;
+  mocks.atlasFail = false;
+  mocks.glass.mockReset();
   vi.clearAllMocks();
   vi.useFakeTimers();
   mocks.frame.mockReturnValue(1);
@@ -71,6 +78,42 @@ async function startGL() {
     drawingBufferWidth: 192, drawingBufferHeight: 192, endFrameEXP: vi.fn(),
   }));
 }
+
+it('composites in the existing reduced-resolution GL view and redraws changed time on the next frame under Reduce Motion', async () => {
+  const ready = vi.fn();
+  await render({ clock: { text: '3:30 PM', fontSize: 32 }, reducedMotion: true, onGlassReady: ready });
+  await startGL(); await act(async () => { await vi.dynamicImportSettled(); });
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(mocks.glass.mock.lastCall!.slice(2, 4)).toEqual([{ text: '3:30 PM', fontSize: 32 }, size]);
+  expect(ready).toHaveBeenLastCalledWith(true);
+  const count = mocks.frame.mock.calls.length;
+  await act(async () => rendered!.update(createElement(DayOrb, { ...props, reducedMotion: true, clock: { text: '3:31 PM', fontSize: 30 }, onGlassReady: ready })));
+  expect(mocks.frame.mock.calls.length).toBe(count + 1);
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(mocks.glass.mock.lastCall![2]).toEqual({ text: '3:31 PM', fontSize: 30 });
+  expect(mocks.frame.mock.calls.length).toBe(count + 1);
+  expect(rendered!.root.findAllByType(GLView)).toHaveLength(1);
+});
+it('keeps the original orb and plain-text readiness when the atlas cannot load', async () => {
+  mocks.atlasFail = true; const ready = vi.fn();
+  await render({ clock: { text: '3:30 PM', fontSize: 32 }, reducedMotion: true, onGlassReady: ready });
+  await startGL(); await act(async () => { await vi.dynamicImportSettled(); });
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(mocks.glass).not.toHaveBeenCalled(); expect(ready).not.toHaveBeenCalledWith(true);
+  expect(mocks.render).toHaveBeenCalledOnce();
+});
+it('withdraws glass readiness and disposes the composite on a draw failure', async () => {
+  const ready = vi.fn();
+  await render({ clock: { text: '3:30 PM', fontSize: 32 }, reducedMotion: true, onGlassReady: ready });
+  await startGL(); await act(async () => { await vi.dynamicImportSettled(); });
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(ready).toHaveBeenLastCalledWith(true);
+  mocks.glass.mockImplementationOnce(() => { throw new Error('lost_texture'); });
+  await act(async () => rendered!.update(createElement(DayOrb, { ...props, reducedMotion: true, clock: { text: '3:31 PM', fontSize: 32 }, onGlassReady: ready })));
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(ready).toHaveBeenLastCalledWith(false);
+  expect(mocks.glassDispose).toHaveBeenCalledOnce(); expect(mocks.render).toHaveBeenCalledOnce();
+});
 
 describe("Today orb without an external glow", () => {
   it("keeps the glass footprint and passes touches through its decorative host", async () => {

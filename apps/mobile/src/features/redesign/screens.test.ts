@@ -148,6 +148,7 @@ vi.mock("../reviewer/ReviewerReader", () => ({ ReviewerReaderScreen: "ReviewerRe
 vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView", useSafeAreaInsets: () => ({ top: 24, bottom: 16, left: 0, right: 0 }) }));
 vi.mock("../../auth/sessionStore", () => ({ sessionStore: { getItem: async () => null, setItem: mocks.storageWrite } }));
 vi.mock("./DayOrb", () => ({ DayOrb: "DayOrb", DAY_ORB_FILL: 0.642, dayOrbTouch: { active: false } }));
+vi.mock('./clockFonts', () => ({ useClockFonts: () => true }));
 vi.mock("react-native", () => ({
   AppState: {
     get currentState() { return mocks.appState; },
@@ -158,6 +159,7 @@ vi.mock("react-native", () => ({
   },
   Alert: { alert: mocks.alert },
   View: "View",
+  Text: "Text",
   StyleSheet: { absoluteFill: { position: "absolute" } },
   ScrollView: "ScrollView",
   Pressable: "Pressable",
