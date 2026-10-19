@@ -7342,3 +7342,81 @@ ran. Live-state limitations did not stop authorized code work.
 
 The finite LG1 endpoint ends here; no later overnight prompt is started.
 Final progress and status are recorded in ignored tmp/overnight/LG1.*.
+
+## AN1 / announcement read-on-open preflight (2026-10-19)
+
+**Status: STOPPED at STEP 0 under unattended rules 3 and 4.** Baseline
+`b38c46a` on `overnight/2026-10-15_feedback`; expected branch retained and
+tracked baseline clean. No application/test code changed, no later slice.
+
+AN1 assumes only explicit buttons/swipes currently mark announcements read.
+Source already auto-marks on both detail screens before loaded-data checks:
+mobile `AnnouncementsScreen.tsx:201-204`, web `announcements.tsx:138-141`.
+Mobile `AnnouncementItem.open` also calls `if (!read) onRead(true)` at lines
+88-90 before navigation, used by both the list and Today. A detail-only guard
+would leave that early write in place. Removing it changes a row handler,
+explicitly forbidden by STEP 1's "No change to list rows or swipes."
+This changes the repair, rather than merely drifting a line/helper name.
+
+**Exact question for the owner:** May AN1 remove only the pre-navigation
+`if (!read) onRead(true)` call from `AnnouncementItem.open`, overriding
+STEP 1's "No change to list rows or swipes", so automatic read writes occur
+only after resolved detail data is displayed on mobile and web, with a
+once-per-open id guard and the existing explicit read/unread actions retained?
+No unattended answer was requested; work stopped before implementation.
+
+STEP 0 ownership: mobile `app/(app)/announcement.tsx` re-exports
+`AnnouncementDetailScreen`, which finds the route id in the list returned by
+`useExperience<StudentAnnouncementList>(ANNOUNCEMENT_LIST_PATH)` at
+`/api/experience/announcements?limit=100`. Mobile `useListPreferences.markRead`
+updates the per-owner cache, emits to `useSyncExternalStore` subscribers and
+serializes `sessionStore.setItem` writes. Web `[id]/page.tsx` awaits/decodes
+params and renders `AnnouncementDetail`; the announcements layout wraps it in
+`AnnouncementsWorkspace`, whose `useResource` provides list items through
+Context. Web `useListPreferences.read` updates the per-owner cache, emits and
+writes `localStorage`, with storage-event subscriptions. Both use
+`sf.list-preferences.v1.${owner}`. Canvas is not changed. Both Today screens
+already subscribe through these hooks; no stale unsubscribed snapshot found
+in source. Runtime unread dots/counts/Today updates are not claimed verified.
+
+Prompt gates: **1/10 FRESH PASS, 9/10 NOT RUN, 0 failed.** `git diff --check`
+and additional staged diff hygiene pass with 0 whitespace errors. Forced root
+typecheck/lint, shared/API/mobile/web tests, API/web builds and Android export
+are NOT RUN because of the preflight STOP. Additional AUTOPILOT forced root
+build NOT RUN; docs-only checkpoint. Every requested workspace has a test
+script. No test/build attempts or flakes. One nonexistent web store filename
+was corrected during source discovery, not a gate failure.
+[Exact evidence and gate table](acceptance/an1-announcement-read-on-open.md).
+
+Commit (author `galaxymaxp <omgraythekid@gmail.com>`):
+`docs: record AN1 preflight scope conflict`; final hash is in Git and ignored
+`tmp/overnight/AN1.status` after committing. Current-state, roadmap and sprint
+record STOPPED. No ADR, dependency or migration. No platform implementation
+was silently skipped: both remain pending the scope decision. Expected owner
+`UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` remain untouched/unstaged;
+no tmp path is committed. Baseline tracking ahead 20 / behind 2, no fetch.
+
+**UNVERIFIED (owner to confirm):** deployed API/mobile/web revisions,
+production/database/applied-migration/Scheduler state, remote-ref freshness,
+actual browser/Realme behavior and the reported symptom on deployed builds.
+Live verification was not the STOP reason. No Supabase, Vercel, Google Cloud,
+Canvas or Resend call, remote SQL/migration, Scheduler action, email,
+deployment, environment-file edit or push ran.
+
+### Owner steps remaining
+
+- Resolve the exact mobile row-write scope question before resuming AN1.
+  Implement/test both platforms' data-resolved once-per-open guards, then run
+  every required gate; this checkpoint does not complete the feature.
+- **Rollout - NOT RUN, skipped entirely:** owner chooses deployment/OTA after
+  implementation review and green gates.
+- **Device checks - NOT RUN, skipped entirely:** on Realme and the website,
+  open an unread announcement from Today and the list, return and confirm
+  it reads as read and leaves Today's card; confirm marking unread while
+  viewing persists. Verify notification/deep-link entry points as applicable.
+- Confirm the UNVERIFIED live states above. For later Vercel deployment/env/log
+  work, installing the missing CLI with `npm i -g vercel` is strongly
+  recommended; no installation or invocation ran here.
+
+Final AN1 progress/status are in ignored `tmp/overnight/AN1.*`. Stop at AN1;
+no later overnight prompt or rollout is started.

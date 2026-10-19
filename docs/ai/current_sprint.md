@@ -1,3 +1,22 @@
+<!-- AN1 begin -->
+AN1 / opening announcements marks them read (2026-10-19): **STOPPED at STEP 0**
+from baseline `b38c46a` on `overnight/2026-10-15_feedback`. Frozen finite scope:
+AN1 STEP 0-3, tests/gates/docs/local commits; exclude rollout, devices and later
+slices. Source contradicts the explicit-buttons-only assumption: both detail
+screens already write read before data resolution, and mobile list/Today rows
+write before navigation. Fixing the required timing needs a row-handler change
+forbidden by STEP 1; unattended rules 3/4 require stopping for owner judgment.
+No application/test changes. Owner decision: permit removing only the early
+row write before implementing mobile/web once-per-open resolved-data guards
+and regressions. Both Today screens already subscribe in source; no runtime
+acceptance claim. Prompt gates: 1/10 FRESH PASS (diff hygiene), 9/10 NOT RUN,
+0 failed; additional root build NOT RUN. Documentation checkpoint hash in
+Git/AN1.status. Rollout/Device checks NOT RUN, skipped entirely; live/device
+state UNVERIFIED (owner to confirm). No remote action, environment-file edit
+or push; unrelated owner paths preserved. Endpoint remains blocked at AN1;
+no later task selected. [Acceptance and question](acceptance/an1-announcement-read-on-open.md).
+<!-- AN1 end -->
+
 <!-- LG1 begin -->
 LG1 / hidden Canvas files linked from visible sources (2026-10-19): **PASS**
 for the finite unattended local code scope, baseline f709843, branch

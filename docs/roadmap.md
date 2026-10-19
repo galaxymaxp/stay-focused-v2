@@ -1,5 +1,23 @@
 # Roadmap
 
+<!-- AN1 begin -->
+AN1 / opening announcements marks them read (2026-10-19): **STOPPED at STEP 0**
+from baseline `b38c46a` on `overnight/2026-10-15_feedback`. Finite endpoint:
+AN1 STEP 0-3, tests/gates/docs/local commits only; rollout/device checks excluded.
+Both detail screens already write read before data resolution; mobile rows
+also write before navigation. Loaded-detail timing requires removing that row
+write, conflicting with STEP 1's "No change to list rows or swipes."
+Unattended rules 3/4 triggered; no application/test code changed, no later
+slice started. Owner decision: allow removing only the early mobile row write,
+then complete both detail guards and requested regressions. Both Today screens
+already subscribe in source; runtime acceptance is still open.
+Prompt gates: 1/10 FRESH PASS (diff hygiene), 9/10 NOT RUN, 0 failed;
+additional root build NOT RUN. Documentation checkpoint hash in Git/AN1.status.
+Rollout and Device checks NOT RUN, skipped entirely; live/device state
+UNVERIFIED (owner to confirm). No remote action, environment-file edit or push.
+[AN1 evidence and exact owner question](ai/acceptance/an1-announcement-read-on-open.md).
+<!-- AN1 end -->
+
 <!-- LG1 begin -->
 LG1 / hidden Canvas files linked from visible sources (2026-10-19): **PASS**
 for the finite unattended local code scope, baseline f709843, branch

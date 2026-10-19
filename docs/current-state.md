@@ -1,5 +1,23 @@
 # Current State
 
+<!-- AN1 begin -->
+AN1 / opening announcements marks them read (2026-10-19): **STOPPED at STEP 0**
+from baseline `b38c46a` on `overnight/2026-10-15_feedback`. Both detail screens
+already auto-mark read before data resolution; mobile rows also write read
+before navigation. The required loaded-detail timing would require removing
+that row write, conflicting with STEP 1's explicit prohibition on row changes.
+Unattended rules 3/4 require an owner scope decision; no application/test code
+was changed and no later slice started. Both Today screens already subscribe
+to preferences according to source; runtime behavior remains untested.
+Prompt gates: 1/10 FRESH PASS (diff hygiene), 9/10 NOT RUN, 0 failed;
+additional root build NOT RUN. Documentation-only local checkpoint; exact
+commit hash in Git/AN1.status. Owner must approve removing only the early row
+write before resuming mobile/web guards and regression tests. Rollout and
+Device checks NOT RUN, skipped entirely; live/device state UNVERIFIED (owner
+to confirm). No remote service operation, environment-file edit or push.
+[AN1 acceptance and exact owner question](ai/acceptance/an1-announcement-read-on-open.md).
+<!-- AN1 end -->
+
 <!-- LG1 begin -->
 LG1 / hidden Canvas files linked from visible sources (2026-10-19): **PASS**
 for the finite unattended local code scope, baseline f709843, branch
