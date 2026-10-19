@@ -365,7 +365,7 @@ export function GenerationScreen({ id }: { id: string }) {
               )}
               {running && (
                 <>
-                  <Link className="button primary" href="/queue">
+                  <Link className={stalled ? "button" : "button primary"} href="/queue">
                     Open Queue
                   </Link>
                   <Link className="button subtle" href="/queue">

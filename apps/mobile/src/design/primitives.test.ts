@@ -1,7 +1,8 @@
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Page, RowLink, SearchField, Sheet } from "./primitives";
+import { Action, Page, RowLink, SearchField, Sheet } from "./primitives";
+import { hitTarget, spacing } from "./tokens";
 
 vi.mock("expo-router", () => ({ router: { canGoBack: () => true, back: vi.fn() } }));
 vi.mock("expo-router/js-tabs", async () => ({ BottomTabBarHeightContext: (await import("react")).createContext(undefined) }));
@@ -48,6 +49,17 @@ async function mount(props: Partial<React.ComponentProps<typeof Page>> = {}) {
   return rendered!.root;
 }
 const event = (y: number) => ({ nativeEvent: { contentOffset: { y }, contentSize: { height: 2000 }, layoutMeasurement: { height: 700 } } });
+
+it.each([false, true])("pill actions retain comfortable padding and touch height (secondary=%s)", async secondary => {
+  const props = { pill: true, secondary, onPress: vi.fn(), children: "View Queue" };
+  await act(async () => { rendered = create(createElement(Action, props)); });
+  const target = rendered!.root.findByType("Pressable" as never);
+  for (const pressed of [false, true]) {
+    const style = target.props.style({ pressed });
+    expect(style.paddingHorizontal).toBeGreaterThanOrEqual(spacing[5]);
+    expect(style.minHeight).toBeGreaterThanOrEqual(hitTarget.min);
+  }
+});
 
 describe('required sheet dismissal', () => {
   it('disables back, backdrop, Done and drag dismissal while preserving scroll content', async () => {

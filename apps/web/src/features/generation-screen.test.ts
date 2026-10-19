@@ -70,6 +70,22 @@ async function render() {
 const output = () => JSON.stringify(rendered!.toJSON());
 
 describe("web generation layout and actions", () => {
+  it("keeps stalled cancellation as the only primary action in the shared column", async () => {
+    mocks.read.mockReturnValue({
+      job: job({ status: "queued", updatedAt: "2020-01-01T00:00:00Z" }),
+      data: { ...generation, state: "queued", updatedAt: "2020-01-01T00:00:00Z" },
+      loading: false, error: null, refresh: mocks.refresh,
+    });
+    const root = await render();
+    const column = root.findByProps({ className: "generation-actions" });
+    expect(column.findAll(node => typeof node.type === "string" && node.props.className?.split(" ").includes("primary"))).toHaveLength(1);
+    const cancel = column.findByProps({ className: "primary" });
+    expect(cancel.props.children).toBe("Cancel generation");
+    expect(column.findAllByType("a").map(node => node.props.children)).toEqual(["Open Queue", "Leave, it keeps going"]);
+    await act(async () => cancel.props.onClick());
+    expect(mocks.api).toHaveBeenCalledWith("/api/jobs/job-1/cancel", { method: "POST" });
+    expect(mocks.refresh).toHaveBeenCalledOnce();
+  });
   it("places the orb/status in the left pane and source, stages and running actions in details", async () => {
     mocks.read.mockReturnValue({
       job: job({

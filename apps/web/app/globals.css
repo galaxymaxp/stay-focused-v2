@@ -2797,8 +2797,13 @@ details[open] > :not(summary) {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
+}
+.generation-actions > button,
+.generation-actions > .button {
+  min-height: 48px;
+  padding-inline: 20px;
 }
 @media (max-width: 900px) {
   .queue-layout {

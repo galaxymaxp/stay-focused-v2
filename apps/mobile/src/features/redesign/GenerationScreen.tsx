@@ -9,6 +9,7 @@ import { useAuth } from "../../auth";
 import { Action, Copy, Notice, Page } from "../../design/primitives";
 import { useAppActivity } from "../../design/appActivity";
 import { useTheme } from "../../design/theme";
+import { spacing } from "../../design/tokens";
 import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import {
   acceptGeneration,
@@ -196,32 +197,50 @@ export function GenerationScreen() {
                 ? "You can leave this screen. We’ll keep working."
                 : "This saved request hasn’t started yet."}
           </Copy>
-          {intent && !id && (!autoStart || error) ? (
-            <View style={{ width: 240 }}><Action disabled={confirming} pill onPress={() => void confirmGeneration()}>{confirming ? "Starting…" : autoStart ? "Try again" : "Start generation"}</Action></View>
-          ) : null}
-          {stalled ? (
-            <View style={{ width: 240 }}><Action disabled={cancelling} pill onPress={() => void cancelStalled()}>{cancelling ? "Cancelling…" : "Cancel generation"}</Action></View>
-          ) : null}
           {data?.state === "failed" ? (
             <Copy muted size="bodySmall">{processingJobStoppedMessage(generation.job?.stage)}</Copy>
           ) : null}
-          {canRetry ? (
-            <View style={{ width: 240 }}><Action disabled={retrying} pill onPress={() => void retryFailed()}>{retrying ? "Retrying…" : "Try again"}</Action></View>
-          ) : null}
-          <View style={{ width: 240 }}><Action secondary pill onPress={() => queue.show()}>View Queue</Action></View>
+          <View
+            testID="generation-actions"
+            style={{ width: 240, gap: spacing[3], marginTop: spacing[4] }}
+          >
+            {data?.artifactId && (
+              <Action
+                pill
+                onPress={() =>
+                  router.replace({
+                    pathname: "/artifact",
+                    params: { id: data.artifactId!, ...(params.quiz === "1" ? { quiz: "1" } : {}) },
+                  })
+                }
+              >
+                {isDraft ? "Open Draft" : "Open in Library"}
+              </Action>
+            )}
+            {intent && !id && (!autoStart || error) ? (
+              <Action secondary={!!data?.artifactId} disabled={confirming} pill onPress={() => void confirmGeneration()}>{confirming ? "Starting…" : autoStart ? "Try again" : "Start generation"}</Action>
+            ) : null}
+            {stalled ? (
+              <Action secondary={!!data?.artifactId} disabled={cancelling} pill onPress={() => void cancelStalled()}>{cancelling ? "Cancelling…" : "Cancel generation"}</Action>
+            ) : null}
+            {canRetry ? (
+              <Action secondary={!!data?.artifactId} disabled={retrying} pill onPress={() => void retryFailed()}>{retrying ? "Retrying…" : "Try again"}</Action>
+            ) : null}
+            <Action secondary pill onPress={() => queue.show()}>View Queue</Action>
+            {error && !id && !intent && (
+              <Action secondary pill onPress={() => setAttempt((value) => value + 1)}>
+                Reconnect request
+              </Action>
+            )}
+            {generation.error && (
+              <Action secondary pill onPress={generation.refresh}>
+                Reconnect
+              </Action>
+            )}
+          </View>
         </View>
         {(error || generation.error) && (
           <Notice>{error ?? generation.error}</Notice>
-        )}
-        {error && !id && !intent && (
-          <Action secondary onPress={() => setAttempt((value) => value + 1)}>
-            Reconnect request
-          </Action>
-        )}
-        {generation.error && (
-          <Action secondary onPress={generation.refresh}>
-            Reconnect
-          </Action>
         )}
         {data?.error && (
           <Notice>
@@ -233,18 +252,6 @@ export function GenerationScreen() {
                   ? "The quiz could not be completed. Try another material."
                   : data.error.message}
           </Notice>
-        )}
-        {data?.artifactId && (
-          <Action
-            onPress={() =>
-              router.replace({
-                pathname: "/artifact",
-                params: { id: data.artifactId!, ...(params.quiz === "1" ? { quiz: "1" } : {}) },
-              })
-            }
-          >
-            {isDraft ? "Open Draft" : "Open in Library"}
-          </Action>
         )}
       </View>
     </Page>

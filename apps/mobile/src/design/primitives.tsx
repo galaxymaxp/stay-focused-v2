@@ -154,7 +154,7 @@ export function Action({
         onPressOut={press.onPressOut}
         style={({ pressed }) => ({
           minHeight: hero ? 56 : hitTarget.min,
-          paddingHorizontal: secondary ? spacing[2] : spacing[4],
+          paddingHorizontal: pill ? spacing[5] : secondary ? spacing[2] : spacing[4],
           paddingVertical: spacing[2],
           borderRadius: pill ? radius.pill : radius.control,
           alignItems: "center",

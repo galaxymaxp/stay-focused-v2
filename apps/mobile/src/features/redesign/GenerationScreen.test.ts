@@ -3,9 +3,10 @@ import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GenerationView } from "@stay-focused/shared";
 import type { GenerationIntent } from "../../services/generationRecovery";
+import { spacing } from "../../design/tokens";
 import { GenerationScreen } from "./GenerationScreen";
 
-vi.mock("../queue/useQueueItems", () => ({ useQueueItems: () => ({ show: vi.fn(), data: mocks.queueData }), useJobRead: (id: string | null) => { mocks.detailRead(id); return { data: id ? mocks.generation : null, job: { stage: 'generating_sections' }, error: null, refresh: vi.fn() }; } }));
+vi.mock("../queue/useQueueItems", () => ({ useQueueItems: () => ({ show: vi.fn(), data: mocks.queueData }), useJobRead: (id: string | null) => { mocks.detailRead(id); return { data: id ? mocks.generation : null, job: { stage: 'generating_sections' }, error: mocks.jobError, refresh: vi.fn() }; } }));
 
 const mocks = vi.hoisted(() => ({
   accept: vi.fn(),
@@ -21,6 +22,9 @@ const mocks = vi.hoisted(() => ({
   request: vi.fn(),
   key: vi.fn(),
   queueData: null as object | null,
+  jobError: null as string | null,
+  session: { user: { id: "owner" } },
+  client: { baseUrl: "https://api.example", accessToken: "token" },
 }));
 vi.mock('../../services/experienceApi', async original => ({ ...await original<typeof import('../../services/experienceApi')>(), experienceRequest: mocks.request, newRequestKey: mocks.key }));
 
@@ -29,7 +33,7 @@ vi.mock("expo-router", () => ({
   useLocalSearchParams: () => mocks.params,
 }));
 vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => mocks.focused }));
-vi.mock("../../auth", () => ({ useAuth: () => ({ session: { user: { id: "owner" } } }) }));
+vi.mock("../../auth", () => ({ useAuth: () => ({ session: mocks.session }) }));
 vi.mock("../../services/generationRecovery", () => ({
   acceptGeneration: mocks.accept,
   readGenerationIntents: mocks.read,
@@ -40,7 +44,7 @@ vi.mock("./GenerationCore", () => ({ GenerationCore: "GenerationCore" }));
 vi.mock("./useListPreferences", () => ({ useListPreferences: () => ({ prefs: { hidden: { queue: [] } }, hide: vi.fn() }) }));
 vi.mock("../../design/appActivity", () => ({ useAppActivity: () => ({ refresh: vi.fn() }) }));
 vi.mock("./useExperience", () => ({
-  useExperienceClient: () => ({ baseUrl: "https://api.example", accessToken: "token" }),
+  useExperienceClient: () => mocks.client,
   useExperience: () => ({ data: mocks.generation, error: null, refresh: vi.fn() }),
 }));
 vi.mock("../../design/theme", () => ({ useTheme: () => ({ reducedMotion: true, colors: {} }) }));
@@ -69,6 +73,7 @@ beforeEach(() => {
   mocks.generation = null;
   mocks.focused = true;
   mocks.queueData = null;
+  mocks.jobError = null;
   mocks.persistedId = null;
   mocks.storeCompleted.mockResolvedValue(undefined);
   mocks.read.mockResolvedValue([pending]);
@@ -83,6 +88,47 @@ async function render(element: ReactElement) {
   await act(async () => { rendered = create(element); });
   return rendered!.root;
 }
+
+describe("generation action spacing", () => {
+  it.each([
+    ["saved request", null, null, ["Start generation", "View Queue"]],
+    ["running", "generating", null, ["View Queue"]],
+    ["stalled", "queued", null, ["Cancel generation", "View Queue"]],
+    ["retryable failure", "failed", null, ["Try again", "View Queue"]],
+    ["saved reviewer", "completed", "artifact:saved", ["Open in Library", "View Queue"]],
+    ["saved draft", "completed", "activity:saved", ["Open Draft", "View Queue"]],
+    ["reconnect", "generating", null, ["View Queue", "Reconnect"]],
+  ] as const)("keeps %s actions in one padded, evenly spaced column", async (name, state, artifactId, labels) => {
+    if (state) {
+      mocks.params = { id: "job-id" };
+      mocks.generation = {
+        id: "job-id", state, artifactId, updatedAt: "2026-10-18T00:00:00Z", progress: null,
+        error: state === "failed" ? { code: "generation_failed", title: "Could not finish", message: "Could not finish.", retryable: true, action: "retry" } : null,
+      };
+    }
+    if (name === "reconnect") mocks.jobError = "Could not reconnect.";
+    const root = await render(createElement(GenerationScreen));
+    const column = root.findByProps({ testID: "generation-actions" });
+    expect(column.props.style).toMatchObject({ width: 240, gap: spacing[3], marginTop: spacing[4] });
+    expect(column.props.style.gap).toBeGreaterThan(0);
+    const actions = root.findAll(node => String(node.type) === "Action");
+    expect(actions.map(node => node.props.children)).toEqual(labels);
+    expect(actions.every(node => node.parent === column && node.props.pill)).toBe(true);
+    expect(actions.filter(node => !node.props.secondary).length).toBeLessThanOrEqual(1);
+    if (artifactId) expect(actions[0]!.props.secondary).not.toBe(true);
+  });
+
+  it("includes request reconnection in the same column after a missing intent", async () => {
+    mocks.read.mockResolvedValue([]);
+    const root = await render(createElement(GenerationScreen));
+    const reconnect = root.findAll(node => String(node.type) === "Action" && node.props.children === "Reconnect request")[0]!;
+    expect(reconnect.parent).toBe(root.findByProps({ testID: "generation-actions" }));
+    expect(reconnect.props).toMatchObject({ secondary: true, pill: true });
+    mocks.read.mockResolvedValue([pending]);
+    await act(async () => reconnect.props.onPress());
+    expect(root.findAll(node => String(node.type) === "Action").map(node => node.props.children)).toEqual(["Start generation", "View Queue"]);
+  });
+});
 
 describe("Queue generation confirmation safety", () => {
   it("observes an admission that finishes after the first intent read without accepting again", async () => {
