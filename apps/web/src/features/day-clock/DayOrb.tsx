@@ -4,6 +4,9 @@ import { useOrbInteraction, type OrbInteractionHandle } from '../knowledge-core/
 import { createOrbInteractionSampler } from '../knowledge-core/orbInteractionFrame';
 import { memo, useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { createClockGlass } from '@stay-focused/shared/clock-glass-renderer';
+import type { ClockGlassReadout } from '@stay-focused/shared';
+import clockMetrics from '../../../public/clock/clock-atlas.json';
 import { createOrbBody } from "../knowledge-core/orbBody";
 import { orbShimmerLevel, SHIMMER_SPEED } from "../knowledge-core/orbAura";
 import {
@@ -34,6 +37,8 @@ interface Runtime {
   reducedMotion: boolean;
   running: boolean;
   state?: CoreState;
+  clock?: ClockGlassReadout;
+  onGlassReady?: (ready: boolean) => void;
 }
 
 /**
@@ -48,12 +53,16 @@ export const DayOrb = memo(function DayOrb({
   minutes,
   size,
   state,
+  clock,
+  onGlassReady,
   interaction: suppliedInteraction,
 }: {
   minutes: number;
   /** Canvas size in CSS pixels; the ball fills DAY_ORB_FILL of it. Omit to fill the parent. */
   size?: number;
   state?: CoreState;
+  clock?: ClockGlassReadout;
+  onGlassReady?: (ready: boolean) => void;
   interaction?: OrbInteractionHandle;
 }) {
   const interaction = useOrbInteraction(suppliedInteraction);
@@ -64,6 +73,8 @@ export const DayOrb = memo(function DayOrb({
     reducedMotion: false,
     running: true,
     state,
+    clock,
+    onGlassReady,
   });
   const controller = useRef<{ wake: () => void; dispose: () => void } | null>(
     null,
@@ -71,9 +82,12 @@ export const DayOrb = memo(function DayOrb({
   const [unsupported, setUnsupported] = useState(false);
   runtime.current.tones = dayOrbTones(minutes);
   runtime.current.state = state;
-  useEffect(() => controller.current?.wake(), [minutes, state]);
+  runtime.current.clock = clock;
+  runtime.current.onGlassReady = onGlassReady;
+  useEffect(() => controller.current?.wake(), [minutes, state, clock?.text, clock?.fontSize]);
 
   useEffect(() => {
+    const currentRuntime = runtime.current;
     const frame = frameRef.current;
     if (!frame) return;
     const canvas = document.createElement("canvas");
@@ -89,10 +103,19 @@ export const DayOrb = memo(function DayOrb({
       controller.current?.wake();
     };
     sync();
+    const lost = (event: Event) => {
+      event.preventDefault();
+      controller.current?.dispose(); controller.current = null;
+      currentRuntime.onGlassReady?.(false);
+      setUnsupported(true);
+    };
+    canvas.addEventListener?.('webglcontextlost', lost);
     try {
       controller.current = buildScene(canvas, runtime, interaction);
     } catch {
       canvas.remove();
+      currentRuntime.onGlassReady?.(false);
+      canvas.removeEventListener?.('webglcontextlost', lost);
       setUnsupported(true);
       return;
     }
@@ -110,6 +133,8 @@ export const DayOrb = memo(function DayOrb({
       controller.current?.dispose();
       controller.current = null;
       canvas.remove();
+      canvas.removeEventListener?.('webglcontextlost', lost);
+      currentRuntime.onGlassReady?.(false);
     };
   }, [interaction]);
 
@@ -151,6 +176,25 @@ function buildScene(
   const body = createOrbBody();
   root.add(body.mesh);
 
+  let glass: ReturnType<typeof createClockGlass> | null = null;
+  let atlas: THREE.Texture | null = null;
+  let glassReady = false;
+  const report = (ready: boolean) => {
+    if (glassReady !== ready) { glassReady = ready; runtime.current.onGlassReady?.(ready); }
+  };
+  // Generation uses DayOrb too; only Today requests the atlas/composite.
+  if (runtime.current.clock) {
+    new THREE.TextureLoader().load('/clock/clock-atlas.png', texture => {
+      if (disposed) { texture.dispose(); return; }
+      atlas = texture; atlas.flipY = false; atlas.generateMipmaps = false;
+      atlas.minFilter = THREE.LinearFilter; atlas.magFilter = THREE.LinearFilter;
+      atlas.colorSpace = THREE.NoColorSpace; atlas.needsUpdate = true;
+      try { glass = createClockGlass(renderer, atlas, clockMetrics); }
+      catch { report(false); }
+      wake();
+    }, undefined, () => report(false));
+  }
+
   const resize = () => {
     const size = canvas.clientWidth;
     if (size > 0) renderer.setSize(size, size, false);
@@ -172,6 +216,7 @@ function buildScene(
   let interacting = false;
   let levels: CoreLevels | null = null;
   let shimmerTime = 0;
+  let dirty = true;
   const spinMatrix = new THREE.Matrix3();
   const spinRotation = new THREE.Matrix4();
 
@@ -183,7 +228,8 @@ function buildScene(
     const settled = levels ? coreLevelsExtra(levels, current.reducedMotion) : null;
     // A failed orb winds down and then stays still, as the Knowledge Core does.
     const moving = current.running && !current.reducedMotion && !(current.state === "error" && settled && !settled.lively);
-    if (now - lastRender >= (interacting || interaction.state.current.gesture?.rotating || settled?.lively ? 16 : FRAME_MS) || !moving) {
+    if (dirty || now - lastRender >= (interacting || interaction.ringDragging?.current || interaction.state.current.gesture?.rotating || settled?.lively ? 16 : FRAME_MS) || !moving) {
+      dirty = false;
       const delta = Math.min((now - lastFrame) / 1000, 0.08);
       lastFrame = now;
       lastRender = now;
@@ -222,13 +268,22 @@ function buildScene(
         tones: { base: tones.base, deep: tones.deep, glow: tones.light },
         light: tones.position,
       });
-      renderer.render(scene, camera);
+      if (glass && current.clock) {
+        try {
+          glass.render(scene, camera, current.clock, canvas.clientWidth, [tones.position.x, tones.position.y], current.mode === 'dark');
+          report(true);
+        } catch {
+          glass.dispose(); glass = null; renderer.setRenderTarget(null);
+          report(false); renderer.render(scene, camera);
+        }
+      } else renderer.render(scene, camera);
     }
     if (!disposed && current.running && !current.reducedMotion && (moving || interacting || now < settleUntil))
       requestId = requestAnimationFrame(draw);
   };
 
   const wake = () => {
+    dirty = true;
     settleUntil = Date.now() + 400;
     if (requestId === null) {
       lastFrame = Date.now();
@@ -246,6 +301,7 @@ function buildScene(
       if (requestId !== null) cancelAnimationFrame(requestId);
       observer.disconnect();
       body.dispose();
+      glass?.dispose(); atlas?.dispose(); report(false);
       renderer.dispose();
     },
   };

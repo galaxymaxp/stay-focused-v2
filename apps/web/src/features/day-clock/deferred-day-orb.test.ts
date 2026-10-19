@@ -65,3 +65,19 @@ it('loads a renderable still for deliberate ring input under reduced motion', as
   expect(mocks.render).toHaveBeenCalled(); expect(interaction.state.current.spin.y).toBe(0.3);
   expect(interaction.state.current.spin.velocityY).toBe(0); expect(frames.size).toBe(0);
 });
+
+it('loads a still glass clock under Reduce Motion without an orb gesture', async () => {
+  reduced = true;
+  await act(async () => { root = create(createElement(DeferredDayOrb, { minutes: 720, size: 240, ready: true, clock: { text: '12:00 PM', fontSize: 30 } })); });
+  await frame(); await frame(); await act(async () => { await vi.dynamicImportSettled(); });
+  expect(mocks.render).toHaveBeenCalledWith(expect.objectContaining({ clock: { text: '12:00 PM', fontSize: 30 } }));
+  expect(frames.size).toBe(0);
+});
+it('does not restart deferred loading when time changes on consecutive drag frames', async () => {
+  const props = { minutes: 720, size: 240, ready: true };
+  await act(async () => { root = create(createElement(DeferredDayOrb, { ...props, clock: { text: '3:00 PM', fontSize: 30 } })); });
+  await frame();
+  await act(async () => root!.update(createElement(DeferredDayOrb, { ...props, clock: { text: '3:01 PM', fontSize: 30 } })));
+  await frame(); await act(async () => { await vi.dynamicImportSettled(); });
+  expect(mocks.render).toHaveBeenCalledWith(expect.objectContaining({ clock: { text: '3:01 PM', fontSize: 30 } }));
+});

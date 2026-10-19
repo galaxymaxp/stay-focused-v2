@@ -2030,7 +2030,29 @@ details[open] > :not(summary) {
   border-radius: 50%;
   background: radial-gradient(circle at 40% 32%, #6090bf 0%, #2466b8 45%, #0a1128 100%);
 }
+@font-face {
+  font-family: 'Inter Clock';
+  src: url('/fonts/inter/Inter-Bold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter Clock';
+  src: url('/fonts/inter/Inter-SemiBold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter Clock';
+  src: url('/fonts/inter/Inter-Medium.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+}
 .day-readout {
+  font-family: 'Inter Clock', sans-serif;
   position: absolute;
   isolation: isolate;
   display: flex;
@@ -2063,8 +2085,14 @@ details[open] > :not(summary) {
 .readout-time {
   font-size: 30px;
   line-height: 1.2;
-  font-weight: 650;
+  font-weight: 700;
   letter-spacing: -0.02em;
+}
+.glass-ready .readout-time {
+  opacity: 0; /* Real text remains in the accessibility tree and reserves the row. */
+}
+.day-readout.glass-ready::before {
+  opacity: 0; /* The same scrim moves into the orb composite, below its glass digits. */
 }
 .readout-label {
   font-size: 11px;

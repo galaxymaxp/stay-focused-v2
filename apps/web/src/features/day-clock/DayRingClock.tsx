@@ -2,7 +2,7 @@
 import { pushOrbSpin, ringOrbRadians, cancelOrbSpin } from '@stay-focused/shared';
 import { OrbPointerLayer, useOrbInteraction } from '../knowledge-core/orbInteraction';
 import { ClockOptions } from "./clock-options";
-import { freeTimeDuration, freeTimeEnd, containsMinute } from "@stay-focused/shared";
+import { clockTimeLabel, freeTimeDuration, freeTimeEnd, containsMinute } from "@stay-focused/shared";
 import type { TodayItem } from "@stay-focused/shared";
 import {
   useCallback,
@@ -205,6 +205,7 @@ export function DayRingClock({
   const [adjusting, setAdjusting] = useState<Mode | null>(null);
   const [hover, setHover] = useState<Mode | "segment" | null>(null);
   const range = draft ?? { start, end };
+  const [glassReady, setGlassReady] = useState(false);
   const segments = useGlidingSegments(
     useMemo(() => timelineSegments(timeline, date), [timeline, date]),
     reducedMotion,
@@ -420,6 +421,9 @@ export function DayRingClock({
     reveal >= 1
       ? now
       : new Date(new Date(`${date}T00:00:00`).getTime() + Math.min(1439, Math.max(0, fromMidnight(nowMinutes))) * 60000);
+  const clockText = adjusting ? clockLabel(adjusting === 'end' ? range.end : range.start)
+    : clockTimeLabel(readoutTime.getHours() * 60 + readoutTime.getMinutes());
+  const glassClock = useMemo(() => ({ text: clockText, fontSize: 30 }), [clockText]);
 
   return (
     <div
@@ -434,10 +438,10 @@ export function DayRingClock({
           top: (CLOCK.center - orbCanvas / 2) * scale,
         }}
       >
-        <DeferredDayOrb interaction={orbInteraction} minutes={nowMinutes} size={orbCanvas * scale} ready={orbReady} />
+        <DeferredDayOrb interaction={orbInteraction} minutes={nowMinutes} size={orbCanvas * scale} ready={orbReady} clock={glassClock} onGlassReady={setGlassReady} />
       </div>
       <div
-        className="day-readout"
+        className={`day-readout${glassReady ? ' glass-ready' : ''}`}
         style={{
           left: (CLOCK.center - CLOCK.glass) * scale,
           top: (CLOCK.center - CLOCK.glass) * scale,
@@ -454,7 +458,7 @@ export function DayRingClock({
               {adjusting === "start" ? "Free from" : adjusting === "end" ? "Free until" : "Free time"}
             </span>
             <span className="readout-time">
-              {clockLabel(adjusting === "end" ? range.end : range.start)}
+              {clockText}
             </span>
             <span className="readout-sub">
               {adjusting === "move" ? `until ${clockLabel(range.end)} · ` : ""}
@@ -464,10 +468,7 @@ export function DayRingClock({
         ) : (
           <>
             <span className="readout-time">
-              {readoutTime.toLocaleTimeString([], { hour: "numeric", hour12: true, minute: "2-digit" })}
-            </span>
-            <span className="readout-sub">
-              {now.toLocaleDateString([], { weekday: "long" })}
+              {clockText}
             </span>
           </>
         )}

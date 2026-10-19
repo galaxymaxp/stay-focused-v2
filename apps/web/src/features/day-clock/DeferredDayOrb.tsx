@@ -4,17 +4,20 @@ import { dayOrbTones } from './dayClock';
 import { DAY_ORB_FILL } from './orb-footprint';
 
 import { orbIdleColor } from '@stay-focused/shared';
+import type { ClockGlassReadout } from '@stay-focused/shared';
 import { useOrbInteraction, type OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 
-type Props = { minutes: number; size: number; ready: boolean; interaction?: OrbInteractionHandle };
+type Props = { minutes: number; size: number; ready: boolean; interaction?: OrbInteractionHandle;
+  clock?: ClockGlassReadout; onGlassReady?: (ready: boolean) => void };
 
 /** Useful content and its still commit before even requesting the WebGL chunk. */
-export function DeferredDayOrb({ minutes, size, ready, interaction: suppliedInteraction }: Props) {
+export function DeferredDayOrb({ minutes, size, ready, clock, onGlassReady, interaction: suppliedInteraction }: Props) {
   const interaction = useOrbInteraction(suppliedInteraction);
   const still = useRef<HTMLDivElement>(null);
   const [Orb, setOrb] = useState<typeof import('./DayOrb').DayOrb | null>(null);
   const [interactiveStill, setInteractiveStill] = useState(false);
   const [reduced, setReduced] = useState(true);
+  const hasClock = Boolean(clock);
   useEffect(() => {
     const media = window.matchMedia('(prefers-reduced-motion: reduce)');
     const sync = () => setReduced(media.matches);
@@ -23,7 +26,7 @@ export function DeferredDayOrb({ minutes, size, ready, interaction: suppliedInte
     return () => media.removeEventListener('change', sync);
   }, []);
   useEffect(() => {
-    if (!ready || (reduced && !interactiveStill) || Orb) return;
+    if (!ready || (reduced && !interactiveStill && !hasClock) || Orb) return;
     let live = true, second = 0;
     const first = requestAnimationFrame(() => {
       second = requestAnimationFrame(() => {
@@ -31,9 +34,9 @@ export function DeferredDayOrb({ minutes, size, ready, interaction: suppliedInte
       });
     });
     return () => { live = false; cancelAnimationFrame(first); cancelAnimationFrame(second); };
-  }, [ready, reduced, interactiveStill, Orb]);
+  }, [ready, reduced, interactiveStill, Orb, hasClock]);
   useEffect(() => {
-    if (Orb && (!reduced || interactiveStill)) return;
+    if (Orb && (!reduced || interactiveStill || hasClock)) return;
     const update = () => {
       if (interaction.state.current.gesture?.rotating || interaction.ringDragging?.current) setInteractiveStill(true);
       const color = orbIdleColor(interaction.state.current, Date.now(), true);
@@ -41,8 +44,8 @@ export function DeferredDayOrb({ minutes, size, ready, interaction: suppliedInte
     };
     interaction.wake.current = update; update();
     return () => { if (interaction.wake.current === update) interaction.wake.current = null; };
-  }, [Orb, reduced, interactiveStill, interaction, minutes]);
-  if (Orb && (!reduced || interactiveStill)) return <Orb minutes={minutes} size={size} interaction={interaction} />;
+  }, [Orb, reduced, interactiveStill, interaction, minutes, hasClock]);
+  if (Orb && (!reduced || interactiveStill || hasClock)) return <Orb minutes={minutes} size={size} interaction={interaction} clock={clock} onGlassReady={onGlassReady} />;
   const tones = dayOrbTones(minutes);
   const diameter = size * DAY_ORB_FILL;
   return <div className="day-orb" data-testid="day-orb-still" aria-hidden="true" style={{ width: size, height: size, display: 'grid', placeItems: 'center' }}>
