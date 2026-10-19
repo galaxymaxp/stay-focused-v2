@@ -1,3 +1,25 @@
+<!-- GS1 begin -->
+GS1 / Generate course search hides on scroll (2026-10-19): **PASS for the
+finite unattended local code scope**. Frozen endpoint complete: STEP 0-2,
+mobile/web implementation, regressions, all 10 prompt gates, AUTOPILOT forced
+root build, docs and local commits. Baseline `149a516`, branch
+`overnight/2026-10-15_feedback`; mobile `b5a0d04`, web `5886a0b`.
+Mobile reuses SH2b Page for SnapshotStatus/search; focus or any raw query pins
+both platforms. Web adds a 12px-direction hook at <=760px, 200ms ease / instant
+Reduce Motion, sticky search and hidden accessibility exclusion. Desktop keeps
+its original layout; native refresh and independent web sync controls preserved.
+FRESH PASS: shared 590, API 2433 / 3 intentional live skips, mobile 1522,
+web 373; forced typecheck/lint/root build each 8/8 tasks, 0 cached, six existing
+warnings. API/web builds, Android export and diff hygiene pass. Focused mobile
+128/128, web 27/27; synthetic CSS/accessibility 4/4 widths, no network requests.
+Failed first attempts recorded, no nondeterministic flake. No API/schema/
+dependency/ADR change. Generated declarations restored; owner paths preserved.
+Rollout/Device checks NOT RUN, skipped entirely; live state UNVERIFIED (owner
+to confirm). No remote operation, environment-file edit, deployment or push.
+Next: owner rollout/Realme/web checks. Endpoint GS1 only; no later slice or
+AN1 resumption. [Acceptance](acceptance/gs1-generate-course-search-scroll.md).
+<!-- GS1 end -->
+
 <!-- GB1 begin -->
 GB1 / generation action spacing (2026-10-19): **PASS for the finite unattended
 local code scope**, baseline `795fbba` on `overnight/2026-10-15_feedback`.

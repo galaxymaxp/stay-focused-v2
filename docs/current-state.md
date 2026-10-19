@@ -1,5 +1,26 @@
 # Current State
 
+<!-- GS1 begin -->
+GS1 / Generate course search on scroll (2026-10-19): **PASS for the finite
+unattended local code scope**, baseline `149a516`, branch
+`overnight/2026-10-15_feedback`. Mobile `b5a0d04` opts SnapshotStatus/search
+into existing SH2b Page motion; focus or any raw query holds it visible.
+Web `5886a0b` adds a 12px-direction hook and sticky search only at <=760px,
+200ms ease / instant Reduce Motion, focus/query pinning and hidden accessibility
+exclusion. Connection/status controls stay in normal flow; desktop retains its
+original layout. Native refresh is preserved. No platform implementation skipped.
+FRESH PASS: 10/10 prompt gates; forced typecheck/lint/root build each 8/8
+tasks, 0 cached; 0 lint errors / 6 existing warnings. Shared 590, API 2433
+with 3 intentional live skips, mobile 1522, web 373 tests; API/web builds,
+Android export and diff hygiene pass. Focused mobile 128, web 27; synthetic
+CSS/accessibility 4/4 widths, 0 network requests. Failed first attempts recorded.
+No API/schema/dependency/ADR change. Generated declarations restored; owner
+paths preserved. Rollout/Device checks NOT RUN, skipped entirely; live state
+UNVERIFIED (owner to confirm). No remote service call, environment-file edit,
+deployment or push. Endpoint GS1 only; owner rollout/Realme/web checks remain.
+[GS1 acceptance](ai/acceptance/gs1-generate-course-search-scroll.md).
+<!-- GS1 end -->
+
 <!-- GB1 begin -->
 GB1 / generation action spacing (2026-10-19): **PASS for the finite unattended
 local code scope**, baseline `795fbba`, branch `overnight/2026-10-15_feedback`.

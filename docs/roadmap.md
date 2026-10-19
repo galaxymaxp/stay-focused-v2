@@ -1,5 +1,24 @@
 # Roadmap
 
+<!-- GS1 begin -->
+GS1 / Generate course search on scroll (2026-10-19): **PASS for the finite
+local code scope** from `149a516` on `overnight/2026-10-15_feedback`.
+STEP 0-2, requested regressions/gates, additional forced root build, docs and
+local commits complete. Mobile `b5a0d04` reuses SH2b Page for SnapshotStatus/
+search; web `5886a0b` provides <=760px sticky direction hiding, 12px threshold,
+200ms ease / instant Reduce Motion and hidden accessibility exclusion.
+Both pin focus/raw queries; desktop layout and native refresh are preserved.
+FRESH tests: shared 590, API 2433 / 3 intentional live skips, mobile 1522,
+web 373. Typecheck/lint/root build each 8/8 tasks, 0 cached; six existing
+warnings only. All 10 prompt gates pass, plus synthetic geometry/accessibility
+4/4 widths with no network requests. Failed first attempts are retained.
+Next: owner rollout and Realme down/up/focused/typed search checks, narrow web
+and desktop confirmation. Rollout/Device checks NOT RUN, skipped entirely.
+Live state UNVERIFIED (owner to confirm). No remote call, environment-file edit,
+deployment or push. GS1 endpoint only; no later slice selected or AN1 resumed.
+[Acceptance](ai/acceptance/gs1-generate-course-search-scroll.md).
+<!-- GS1 end -->
+
 <!-- GB1 begin -->
 GB1 / generation action spacing (2026-10-19): **PASS for the finite local code
 scope** from `795fbba` on `overnight/2026-10-15_feedback`. STEP 0-2,

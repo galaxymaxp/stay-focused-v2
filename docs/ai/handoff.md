@@ -7526,3 +7526,105 @@ branch switch or push ran. Live-state limitations did not stop this code work.
 
 Final GB1 progress/status are in ignored `tmp/overnight/GB1.*`. Endpoint GB1;
 no rollout, device work, AN1 resumption or later overnight slice is started.
+
+## GS1 / Generate course search on scroll (2026-10-19)
+
+**Status: PASS for the finite unattended local code scope.** STEP 0-2,
+regressions, all 10 requested gates, additional forced root build, docs and
+scoped local commits complete. Baseline `149a516` on
+`overnight/2026-10-15_feedback`; branch retained. No tracked edits at entry;
+unrelated `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` and ignored `tmp/`
+remain untouched and unstaged. Cached upstream was behind 2 / ahead 23 before
+these three commits; remote freshness was not checked.
+
+Mobile Generate now passes `hideHeaderBelowOnScroll` and pins visibility for
+focus or any raw query, including whitespace. Existing Page collapses the
+SnapshotStatus/search region and restores it on upward direction changes.
+SH2b's measured height, 180ms easing, 8pt hysteresis, height +24pt hide threshold,
+instant Reduce Motion, pointer/accessibility exclusion and native refresh stay
+unchanged. SearchField already exposed focus/blur; Library was the reference.
+The line references drifted without changing the described fix.
+
+No shared web equivalent exists. A small lib hook accumulates 12px direction
+changes, translates/fades the sticky search with 200ms ease, updates live media
+preferences and uses instant Reduce Motion. Focus/raw text pins it; hidden
+search is inert and aria-hidden. Passive scroll/media listeners are cleaned
+up. At <=760px only the field sticks/hides; connection and sync status remain
+in normal flow. Above 760px the original layout stays. The prompt's explicit
+<=760px rule controls its conflicting >=760px test parenthetical at exactly
+760; that boundary is covered by the local CSS probe. No platform implementation
+was skipped. No new dependency, API/schema, migration, design surface or ADR.
+
+Commits, author `galaxymaxp <omgraythekid@gmail.com>`:
+
+- `b5a0d04 feat(mobile): hide Generate search on scroll down`
+- `5886a0b feat(web): hide Generate search on scroll at narrow widths`
+- `docs: complete GS1 Generate search scroll handoff` is the documentation
+  checkpoint; its resulting hash is in Git and ignored `GS1.status`, without
+  a self-referential amendment.
+
+**FRESH PASS: 10/10 requested gates**, plus the AUTOPILOT root build:
+
+| Exact command | FRESH result / counts |
+| --- | --- |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors / 6 existing warnings |
+| `npm run test --workspace @stay-focused/shared` | 590/590 tests, 56 files, existing emitted copies included |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | 2433 passed / 3 intentional live skips, 212 files |
+| `npm run test --workspace @stay-focused/mobile` | 1522/1522 tests, 158 files |
+| `npm run test --workspace @stay-focused/web` | 373/373 tests, 56 files |
+| `npm run build --workspace @stay-focused/api` | 36/36 static pages |
+| `npm run build --workspace @stay-focused/web` | 20/20 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | 1 local Android bundle / 35 assets; no publication |
+| `git diff --check` | 0 whitespace errors; staged/baseline-to-HEAD hygiene also passes |
+| `npm run build -- --force --env-mode=loose` (additional) | 8/8 tasks, 0 cached; API/web and local Android/iOS/web exports |
+
+Every requested workspace has a test script. API's complete suite uses two
+workers to bound local database-test memory, following the prior slice.
+Focused mobile: **128/128**, 3 files; focused web: **27/27**, 2 files.
+Synthetic Playwright CSS/accessibility: **4/4 widths** (360/760/761/1440),
+**0 network requests**; sticky return at the same scroll offset, full hidden
+translation, inert focus denial, exact 48px phone / existing 36px desktop
+fields, natural-width connection action and no overflow. No authenticated
+app/device acceptance is inferred. Workflow/provider-contract suites are
+NOT APPLICABLE to these UI-only changes. Evidence and full matrix:
+[GS1 acceptance](acceptance/gs1-generate-course-search-scroll.md).
+
+Failed first attempts retained: focused mobile **127 passed / 1 failed**
+because the new test had no course data and therefore no search field; adding
+the existing synthetic fixture fixed it. The first CSS probe passed 2 widths
+then failed a mistaken desktop >=40px expectation at 761px; baseline desktop
+is 36px, now verified exactly alongside mobile 48px. No product change to
+satisfy that bad expectation, nondeterministic flake or validation suppression.
+Exploratory drifted paths were resolved through source search. Existing Vite
+config-loader, React renderer and Expo color diagnostics remain non-fatal.
+
+All code gates ran against the application/test changes subsequently committed
+above. Generated Next declarations were inspected and restored. Local TEMP/TMP,
+disabled live flags, outbound HTTP/fetch/socket guards and offline/no-telemetry
+build settings were used. Logs, exports, probe, progress/status and all tmp
+paths remain ignored and uncommitted. Current-state, roadmap and sprint are
+reconciled; no remaining local code blocker or additional scope selected.
+
+**UNVERIFIED (owner to confirm):** deployed mobile/API/website revisions,
+production/database/applied-migration/Scheduler state, remote-ref freshness,
+reported deployed symptom and real Realme/authenticated-browser behavior.
+No Supabase, Vercel, Google Cloud, Canvas or Resend call, remote SQL/migration
+application, Scheduler action, email, deployment, environment-file edit,
+branch switch or push ran. Live-state limitations did not stop local code work.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** owner reviews the local commits and
+  chooses website deployment and mobile OTA/APK publication separately.
+- **Device checks - NOT RUN, skipped entirely:** Realme Generate course list
+  down/up; focus empty search, type/filter and scroll, blur with text, then
+  clear. Confirm it stays visible while focused/typed and collapses again
+  afterward, with native refresh and Reduce Motion. Confirm web <=760px and
+  unchanged desktop >760px behavior.
+- Confirm the UNVERIFIED state above. For later deployment/env/log tooling,
+  installing the missing Vercel CLI with `npm i -g vercel` is strongly
+  recommended; no installation or invocation ran here.
+
+Final progress/status: ignored `tmp/overnight/GS1.*`. Endpoint GS1 only;
+no rollout, device work, AN1 resumption or later overnight slice is started.
