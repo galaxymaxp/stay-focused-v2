@@ -16,6 +16,7 @@ describe('effective Canvas file policy', () => {
     { name: 'date lock', change: { hidden: true, lockAt: '2026-10-18T03:00:00Z' }, references: visible, expected: 'blocked_locked' },
     { name: 'future unlock', change: { hidden: true, unlockAt: '2026-10-20T03:00:00Z' }, references: visible, expected: 'blocked_locked' },
     { name: 'unpublished Page', change: { hidden: true }, references: [{ ...visible[0]!, published: false }], expected: 'blocked_unavailable' },
+    { name: 'unknown publication', change: { hidden: true }, references: [{ ...visible[0]!, published: null }], expected: 'blocked_unavailable' },
     { name: 'invisible source', change: { hidden: true }, references: [{ ...visible[0]!, visible: false }], expected: 'blocked_unavailable' },
     { name: 'stale reference', change: { hidden: true }, references: [{ ...visible[0]!, current: false }], expected: 'blocked_unavailable' },
     { name: 'deleted file', change: { hidden: true, deleted: true }, references: visible, expected: 'blocked_unavailable' },

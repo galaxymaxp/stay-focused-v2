@@ -16,15 +16,16 @@ import {
   CANVAS_FILE_MAX_REDIRECTS,
   CANVAS_FILE_MAX_SINGLE_BYTES,
   CANVAS_SOURCE_FILE_BUCKET,
-  classifyDirectlyAccessiblePageFile,
-  ingestionStatusForEligibility,
+  canvasFilePolicyInput,
+  effectiveCanvasFileEligibility,
   isEligibleForBinaryIngestion,
-  isNewlySupportedOfficeFile,
   normalizeMimeType,
   safeObjectKeyForCanvasFile,
   validateDownloadedCanvasFileContent,
   type CanvasFileIngestionEligibility,
+  type CanvasFileAccessReference,
 } from "@/lib/canvas-file-policy";
+import { readCanvasFileAccessReferences } from './canvas-file-access';
 import { mapCanvasFile } from "@/lib/canvas-file-normalize";
 import {
   CONNECTION_SECRET_COLUMNS,
@@ -65,7 +66,6 @@ type ReserveBytes = (byteLength: number) => boolean;
 export async function ingestCanvasFiles({
   brokeredCanvasToken,
   client,
-  directlyLinkedFileId,
   fileIds,
   userId,
 }: IngestCanvasFilesInput): Promise<IngestCanvasFilesResult> {
@@ -138,8 +138,17 @@ export async function ingestCanvasFiles({
     };
   }
 
+  const references = new Map<string, readonly CanvasFileAccessReference[]>();
+  try {
+    for (const courseId of new Set(files.rows.map(file => file.course_id))) {
+      const courseReferences = await readCanvasFileAccessReferences({ client, userId,
+        connectionId: connectionRow.id, courseId });
+      for (const [id, evidence] of courseReferences) references.set(id, evidence);
+    }
+  } catch { return storageFailure(); }
+
   const declaredAggregateBytes = files.rows.reduce((sum, file) => {
-    if (!isEligibleForBinaryIngestion(eligibilityForRow(file)) && file.id !== directlyLinkedFileId) {
+    if (!isEligibleForBinaryIngestion(effectiveCanvasFileEligibility(canvasFilePolicyInput(file), references.get(file.id) ?? []))) {
       return sum;
     }
     return sum + (file.size_bytes ?? 0);
@@ -171,7 +180,7 @@ export async function ingestCanvasFiles({
         canvas,
         client,
         connectionId: connectionRow.id,
-        directlyLinked: file.id === directlyLinkedFileId,
+        references: references.get(file.id) ?? [],
         file,
         reserveBytes,
         userId,
@@ -220,7 +229,7 @@ async function ingestOneCanvasFile({
   canvas,
   client,
   connectionId,
-  directlyLinked,
+  references,
   file,
   reserveBytes,
   userId,
@@ -228,7 +237,7 @@ async function ingestOneCanvasFile({
   readonly canvas: ReturnType<typeof createCanvasClient>;
   readonly client: SupabaseClient<Database>;
   readonly connectionId: string;
-  readonly directlyLinked: boolean;
+  readonly references: readonly CanvasFileAccessReference[];
   readonly file: CanvasFileRow;
   readonly reserveBytes: ReserveBytes;
   readonly userId: string;
@@ -252,21 +261,10 @@ async function ingestOneCanvasFile({
     });
   }
 
-  let freshPayload = mapCanvasFile(freshFile);
+  const freshPayload = mapCanvasFile(freshFile, references);
   if (freshPayload.canvas_file_id !== file.canvas_file_id) {
     return recordTerminalResult({ client, connectionId,
       result: terminalResult(file.id, 'unavailable', 'canvas_file_unavailable', false), userId });
-  }
-  const hiddenPageLink = directlyLinked && freshPayload.ingestion_eligibility === 'blocked_unavailable' &&
-    (freshPayload.hidden === true || freshPayload.hidden_for_user === true);
-  if (hiddenPageLink) {
-    const eligibility = classifyDirectlyAccessiblePageFile({ contentType: freshPayload.content_type,
-      displayName: freshPayload.display_name, filename: freshPayload.filename, size: freshPayload.size_bytes,
-      locked: freshPayload.locked, hidden: freshPayload.hidden, hiddenForUser: freshPayload.hidden_for_user,
-      lockAt: freshPayload.lock_at, unlockAt: freshPayload.unlock_at, mediaClass: freshPayload.media_class,
-      mediaEntryId: freshPayload.media_entry_id });
-    if (isEligibleForBinaryIngestion(eligibility)) freshPayload = { ...freshPayload,
-      ingestion_eligibility: eligibility, ingestion_status: ingestionStatusForEligibility(eligibility) };
   }
   const isEligible = isEligibleForBinaryIngestion(
     freshPayload.ingestion_eligibility,
@@ -306,8 +304,7 @@ async function ingestOneCanvasFile({
     file.current_sha256 &&
     file.storage_bucket === CANVAS_SOURCE_FILE_BUCKET &&
     file.storage_object_key &&
-    file.content_version_fingerprint === freshPayload.content_version_fingerprint &&
-    !hiddenPageLink
+    file.content_version_fingerprint === freshPayload.content_version_fingerprint
   ) {
     const updateOk = await updateFileRow(client, file, {
       ...metadataUpdateForPayload(freshPayload),
@@ -640,29 +637,6 @@ function availabilityStatusForResult(
   status: CanvasFileIngestionResultStatus,
 ): string {
   return status === "unavailable" ? "unavailable" : "available";
-}
-
-function eligibilityForRow(file: CanvasFileRow): CanvasFileIngestionEligibility {
-  const eligibility = isNewlySupportedOfficeFile(file) ? 'eligible_document' : file.ingestion_eligibility;
-  if (isCanvasFileIngestionEligibility(eligibility)) {
-    return eligibility;
-  }
-  return "metadata_only_unsupported";
-}
-
-function isCanvasFileIngestionEligibility(
-  value: string,
-): value is CanvasFileIngestionEligibility {
-  return (
-    value === "eligible_document" ||
-    value === "eligible_image" ||
-    value === "metadata_only_media" ||
-    value === "metadata_only_unsupported" ||
-    value === "blocked_security" ||
-    value === "blocked_size" ||
-    value === "blocked_locked" ||
-    value === "blocked_unavailable"
-  );
 }
 
 async function cleanupOldObjectIfUnreferenced(

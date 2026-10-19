@@ -2,7 +2,6 @@ import type {
   CanvasAnnouncementRow,
   CanvasAssignmentRow,
   CanvasCourseSyncStateRow,
-  CanvasFileRow,
   CanvasPageRow,
   CanvasSyncCourseResultRow,
   CanvasSyncRunRow,
@@ -10,6 +9,9 @@ import type {
   ReviewerSourceSnapshotItemRow,
   ReviewerSourceSnapshotRow,
 } from "@stay-focused/db";
+import { canvasFilePolicyInput, effectiveCanvasFileEligibility, withEffectiveCanvasFileAccess,
+  type CanvasFileAccessRow as CanvasFileRow } from './canvas-file-policy';
+import { readCanvasFileAccessReferences } from './canvas-file-access';
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
@@ -579,13 +581,10 @@ function hasStableIdentity(item: ReviewerSourceSnapshotItemRow): boolean {
 }
 
 function isFileUnavailable(row: CanvasFileRow): boolean {
+  const eligibility = effectiveCanvasFileEligibility(canvasFilePolicyInput(row), row.accessReferences ?? []);
   return (
     row.availability_status !== "available" ||
-    row.locked === true ||
-    row.hidden === true ||
-    row.hidden_for_user === true ||
-    row.ingestion_eligibility === "blocked_locked" ||
-    row.ingestion_eligibility === "blocked_unavailable"
+    eligibility === 'blocked_locked' || eligibility === 'blocked_unavailable'
   );
 }
 
@@ -763,12 +762,19 @@ async function readCurrentSourceRows({
   if (!pages.ok || !assignments.ok || !announcements.ok || !files.ok) {
     return { ok: false };
   }
+  let effectiveFiles = files.value;
+  if (files.value.some(file => file.hidden || file.hidden_for_user)) {
+    try {
+      const references = await readCanvasFileAccessReferences({ client, connectionId, courseId, userId });
+      effectiveFiles = files.value.map(file => withEffectiveCanvasFileAccess(file, references.get(file.id) ?? []));
+    } catch { return { ok: false }; }
+  }
   return {
     ok: true,
     value: {
       announcements: announcements.value,
       assignments: assignments.value,
-      files: files.value,
+      files: effectiveFiles,
       pages: pages.value,
     },
   };

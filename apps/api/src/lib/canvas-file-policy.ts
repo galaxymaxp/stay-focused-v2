@@ -84,7 +84,7 @@ export function isPageAccessibleCanvasFile(
   now = new Date(),
 ): boolean {
   return !file.deleted && !isLocked(file, now) && isUnavailable(file) &&
-    references.some(reference => reference.current && reference.published !== false && reference.visible);
+    references.some(reference => reference.current && reference.published === true && reference.visible);
 }
 
 export function effectiveCanvasFileEligibility(

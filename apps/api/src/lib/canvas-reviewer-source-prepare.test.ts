@@ -66,7 +66,9 @@ describe("Canvas reviewer source preparation service", () => {
       hidden_for_user: true, ingestion_eligibility: 'blocked_unavailable', ingestion_status: 'unavailable' }],
       canvas_file_references: [{ id: 'page-reference', user_id: USER_ID,
         canvas_connection_id: CONNECTION_ID, course_id: COURSE_ID, file_id: FILE_ID,
-        reference_type: 'page', referenced_row_id: 'page-row' }],
+        reference_type: 'page', referenced_row_id: 'page-row', canvas_page_url: 'lesson' }],
+      canvas_pages: [{ id: 'page-row', user_id: USER_ID, canvas_connection_id: CONNECTION_ID, course_id: COURSE_ID,
+        canvas_page_url: 'lesson', published: true, lock_info: null, unlock_at: null, lock_at: null }],
     });
     await prepareCanvasReviewerSources({ client: fake.client, courseId: COURSE_ID,
       pageAttachmentId: 'page-row', sourceIds: [`file:${FILE_ID}`], userId: USER_ID });
@@ -229,6 +231,8 @@ interface FakeQueryResult {
 class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
   private filters: Array<(row: FakeRecord) => boolean> = [];
   private limitCount: number | null = null;
+  private rangeStart = 0;
+  private rangeEnd = Infinity;
   private orders: Array<{
     readonly column: string;
     readonly ascending: boolean;
@@ -279,6 +283,10 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     return this;
   }
 
+  public range(start: number, end: number): this {
+    this.rangeStart = start; this.rangeEnd = end; return this;
+  }
+
   public limit(count: number): this {
     this.limitCount = count;
     return this;
@@ -311,7 +319,8 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     const ordered = [...filtered].sort((left, right) =>
       compareByOrders(left, right, this.orders),
     );
-    return this.limitCount === null ? ordered : ordered.slice(0, this.limitCount);
+    const ranged = ordered.slice(this.rangeStart, this.rangeEnd + 1);
+    return this.limitCount === null ? ranged : ranged.slice(0, this.limitCount);
   }
 }
 

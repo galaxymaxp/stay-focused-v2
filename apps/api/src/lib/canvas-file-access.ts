@@ -18,7 +18,7 @@ export function canvasSourceAccessReference(source: CanvasSourceAccessInput, now
   const lockAt = Date.parse(source.lockAt ?? '');
   const unlockAt = Date.parse(source.unlockAt ?? '');
   return { current: true, published: source.published,
-    visible: source.published !== false && source.locked !== true && source.lockInfo == null &&
+    visible: source.published === true && source.locked !== true && source.lockInfo == null &&
       !['locked', 'unpublished', 'deleted'].includes(source.state ?? '') &&
       !(Number.isFinite(lockAt) && lockAt <= now.getTime()) &&
       !(Number.isFinite(unlockAt) && unlockAt > now.getTime()) };
@@ -71,13 +71,13 @@ export function storedCanvasFileAccessSources(input: {
   }, now));
   const modules = new Map(input.modules.map(module => [module.id, module]));
   for (const item of input.moduleItems) {
-    const module = modules.get(item.module_id);
+    const parentModule = modules.get(item.module_id);
     const details = item.content_details;
     const locked = typeof details === 'object' && details !== null && 'locked_for_user' in details && details.locked_for_user === true;
-    const parent = module ? canvasSourceAccessReference({ published: module.published,
-      unlockAt: module.unlock_at, state: module.canvas_state }, now) : null;
+    const parent = parentModule ? canvasSourceAccessReference({ published: parentModule.published,
+      unlockAt: parentModule.unlock_at, state: parentModule.canvas_state }, now) : null;
     sources.set(`module_item:${item.canvas_module_item_id}`, { current: true, published: item.published,
-      visible: Boolean(parent?.visible) && item.published !== false && !locked });
+      visible: Boolean(parent?.visible) && item.published === true && !locked });
   }
   return sources;
 }

@@ -306,3 +306,24 @@ function announcement(
     ...overrides,
   };
 }
+describe('Page-only hidden PDF inventory', () => {
+  it('classifies two linked PDFs and keeps an unreferenced hidden PDF unavailable on repeat inventory sync', () => {
+    const input = { announcements: [], assignments: [], canvasBaseUrl: 'https://canvas.test', canvasCourseId: 'course-1',
+      files: ['10', '11', '12'].map(id => canvasFile({ id, hiddenForUser: true })),
+      pages: [page({ body: '<a href="/courses/course-1/files/10">Lesson 1</a><a href="/courses/course-1/files/11">Lesson 2</a>' })],
+      moduleItemsByModule: [{ module: moduleFixture(), items: [moduleItem({ type: 'Page', pageUrl: 'week-one' })] }] };
+    const first = createCanvasFileInventoryPayload(input);
+    expect(first.files.map(file => file.ingestion_eligibility)).toEqual(['eligible_document', 'eligible_document', 'blocked_unavailable']);
+    expect(first.files.map(file => file.ingestion_status)).toEqual(['not_requested', 'not_requested', 'unavailable']);
+    expect(createCanvasFileInventoryPayload({ ...input, files: input.files.map(file => ({ ...file, hidden: true })) }).files
+      .map(file => file.ingestion_eligibility)).toEqual(['eligible_document', 'eligible_document', 'blocked_unavailable']);
+  });
+  it.each([
+    { published: false }, { lockInfo: { locked_for_user: true } }, { unlockAt: '2999-01-01T00:00:00Z' },
+  ])('does not elevate a reference from an unavailable Page (%s)', change => {
+    const payload = createCanvasFileInventoryPayload({ announcements: [], assignments: [], canvasBaseUrl: 'https://canvas.test',
+      canvasCourseId: 'course-1', files: [canvasFile({ hiddenForUser: true })], moduleItemsByModule: [],
+      pages: [page({ ...change, body: '<a href="/files/10">Lesson</a>' })] });
+    expect(payload.files[0]?.ingestion_eligibility).toBe('blocked_unavailable');
+  });
+});

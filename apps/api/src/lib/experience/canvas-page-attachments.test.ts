@@ -15,7 +15,7 @@ import { isInstructionalPageAttachment, resolveInstructionalPageAttachments } fr
 
 const row = { id: 'file-row', user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', canvas_file_id: '42', display_name: 'Unit 3 Lesson 1.pdf' };
 const course = { id: 'course', user_id: 'owner', canvas_connection_id: 'connection', canvas_course_id: '101' };
-const page = { id: 'page-row', user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', canvas_page_url: 'unit-3-lesson-1', body_html: '<a href="/courses/101/files/42?download=1">Lesson.pdf</a><a href="/api/v1/files/42">Duplicate</a>' };
+const page = { published: true, id: 'page-row', user_id: 'owner', course_id: 'course', canvas_connection_id: 'connection', canvas_page_url: 'unit-3-lesson-1', body_html: '<a href="/courses/101/files/42?download=1">Lesson.pdf</a><a href="/api/v1/files/42">Duplicate</a>' };
 const query = { select: vi.fn(), eq: vi.fn(), maybeSingle: vi.fn(), insert: vi.fn(), update:vi.fn() };
 const upsert = vi.fn();
 const from = vi.fn((table: string) => table === 'canvas_file_references' ? { upsert } : query);

@@ -1,7 +1,8 @@
 import type { CanvasConnectionRow, CanvasCourseRow, CanvasFileInsert, CanvasFileRow, CanvasPageRow, Database } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { discoverCanvasPageFileIds, mapCanvasFile } from '@/lib/canvas-file-normalize';
-import { CANVAS_FILE_DOWNLOAD_TIMEOUT_MS, CANVAS_FILE_MAX_REDIRECTS, CANVAS_FILE_MAX_SINGLE_BYTES, classifyDirectlyAccessiblePageFile, ingestionStatusForEligibility, validateDownloadedCanvasFileContent } from '@/lib/canvas-file-policy';
+import { CANVAS_FILE_DOWNLOAD_TIMEOUT_MS, CANVAS_FILE_MAX_REDIRECTS, CANVAS_FILE_MAX_SINGLE_BYTES, canvasFilePolicyInput, effectiveCanvasFileEligibility, ingestionStatusForEligibility, validateDownloadedCanvasFileContent } from '@/lib/canvas-file-policy';
+import { canvasSourceAccessReference } from '@/lib/canvas-file-access';
 import { CONNECTION_SECRET_COLUMNS, createCanvasClient, decryptConnectionToken, readConnection } from '@/lib/canvas-routes';
 import { ExperienceFailure } from './errors';
 import { CanvasClientError } from '@stay-focused/canvas';
@@ -32,6 +33,9 @@ export async function resolveInstructionalPageAttachments({ client, course, page
 }): Promise<readonly CanvasFileRow[]> {
   if (page.user_id !== userId || page.course_id !== course.id || page.canvas_connection_id !== course.canvas_connection_id)
     throw new ExperienceFailure(404, 'not_found');
+  const pageAccess = canvasSourceAccessReference({ published: page.published, lockInfo: page.lock_info,
+    unlockAt: page.unlock_at, lockAt: page.lock_at });
+  if (!pageAccess.visible) throw new ExperienceFailure(404, 'not_found');
   if (!/\/files\//i.test(page.body_html ?? '')) return [];
   const connection = await readConnection(client, userId, CONNECTION_SECRET_COLUMNS);
   if (!connection.ok || !connection.row || connection.row.id !== course.canvas_connection_id ||
@@ -56,13 +60,9 @@ export async function resolveInstructionalPageAttachments({ client, course, page
     catch(error) { throw attachmentUnavailable(error); }
     let payload = mapCanvasFile(file);
     if (payload.canvas_file_id !== fileId) throw new ExperienceFailure(503, 'source_attachment_unavailable');
-    if (payload.ingestion_eligibility === 'blocked_unavailable' && (payload.hidden || payload.hidden_for_user)) {
-      const candidate = classifyDirectlyAccessiblePageFile({ contentType: payload.content_type,
-        displayName: payload.display_name, filename: payload.filename, size: payload.size_bytes,
-        locked: payload.locked, hidden: payload.hidden, hiddenForUser: payload.hidden_for_user,
-        lockAt: payload.lock_at, unlockAt: payload.unlock_at, mediaClass: payload.media_class,
-        mediaEntryId: payload.media_entry_id });
-      if (isInstructionalPageAttachment(payload.display_name, candidate)) {
+    if (payload.hidden || payload.hidden_for_user) {
+      const eligibility = effectiveCanvasFileEligibility(canvasFilePolicyInput(payload), [pageAccess]);
+      if (isInstructionalPageAttachment(payload.display_name, eligibility)) {
         let downloaded;
         try { downloaded = await canvas.downloadFile(file, { maxBytes: CANVAS_FILE_MAX_SINGLE_BYTES,
           maxRedirects: CANVAS_FILE_MAX_REDIRECTS, timeoutMs: CANVAS_FILE_DOWNLOAD_TIMEOUT_MS }); }
@@ -74,8 +74,7 @@ export async function resolveInstructionalPageAttachments({ client, course, page
           lockAt: payload.lock_at, unlockAt: payload.unlock_at, mediaClass: payload.media_class,
           mediaEntryId: payload.media_entry_id });
         if (!validation.ok) throw new ExperienceFailure(503, 'source_attachment_unavailable');
-        payload = { ...payload, ingestion_eligibility: candidate,
-          ingestion_status: ingestionStatusForEligibility(candidate) };
+        payload = { ...payload, ingestion_eligibility: eligibility, ingestion_status: ingestionStatusForEligibility(eligibility) };
       }
     }
     if (!isInstructionalPageAttachment(payload.display_name, payload.ingestion_eligibility)) continue;
@@ -103,11 +102,13 @@ export async function resolveInstructionalPageAttachments({ client, course, page
       } else row = data as CanvasFileRow | null;
     }
     if (!row) throw new ExperienceFailure(503, 'unavailable');
-    if (existing && row.content_version_fingerprint !== payload.content_version_fingerprint) {
+    if (existing && (row.content_version_fingerprint !== payload.content_version_fingerprint ||
+      row.ingestion_eligibility !== payload.ingestion_eligibility || row.availability_status !== 'available')) {
       // Keep the old object, but invalidate its current-revision binding exactly
       // as inventory sync does. A concurrently changed row must be re-resolved.
       const refreshed = await client.from('canvas_files').update({ ...payload,
         ingestion_status: ingestionStatusForEligibility(payload.ingestion_eligibility),
+        availability_status: 'available',
       }).eq('id',row.id).eq('user_id',userId).eq('course_id',course.id)
         .eq('canvas_connection_id',course.canvas_connection_id)
         .eq('content_version_fingerprint',row.content_version_fingerprint).select('*').maybeSingle();

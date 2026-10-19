@@ -13,12 +13,15 @@ import { createHash } from "node:crypto";
 import type { Json } from "@stay-focused/db";
 
 import {
-  classifyCanvasFileForIngestion,
+  canvasFilePolicyInput,
+  effectiveCanvasFileEligibility,
   ingestionStatusForEligibility,
   normalizeMimeType,
   type CanvasFileIngestionEligibility,
   type CanvasFileIngestionStatus,
+  type CanvasFileAccessReference,
 } from "@/lib/canvas-file-policy";
+import { accessReferencesForFile, canvasSourceAccessReference } from './canvas-file-access';
 
 export interface CanvasFileInventoryPayload {
   readonly files: readonly CanvasSyncFilePayload[];
@@ -108,16 +111,20 @@ export function createCanvasFileInventoryPayload({
     (assignment) => assignment.attachments ?? [],
   );
   const mappedFiles = dedupeByIdentity(
-    [...files, ...attachmentFiles].map(mapCanvasFile),
+    [...files, ...attachmentFiles].map(file => mapCanvasFile(file)),
     (file) => {
     return file.canvas_file_id;
     },
   );
   const knownFileIds = new Set(mappedFiles.map((file) => file.canvas_file_id));
   const referenceAccumulator = createReferenceAccumulator(knownFileIds);
+  const accessSources = new Map<string, CanvasFileAccessReference>();
 
   for (const { items, module } of moduleItemsByModule) {
+    const parent = canvasSourceAccessReference({ published: module.published, unlockAt: module.unlockAt, state: module.state });
     for (const item of items) {
+      accessSources.set(`module_item:${item.id}`, { current: true, published: item.published,
+        visible: parent.visible && item.published === true && item.contentDetails?.locked_for_user !== true });
       const contentId = nullableIdentifier(item.contentId);
       if (
         item.type.toLowerCase() === "file" &&
@@ -139,6 +146,7 @@ export function createCanvasFileInventoryPayload({
   }
 
   for (const page of pages) {
+    accessSources.set(`page:${page.url}`, canvasSourceAccessReference(page));
     const extracted = extractCanvasFileIdsFromHtml({
       canvasBaseUrl,
       canvasCourseId,
@@ -161,6 +169,7 @@ export function createCanvasFileInventoryPayload({
   }
 
   for (const assignment of assignments) {
+    accessSources.set(`assignment:${assignment.id}`, canvasSourceAccessReference({ ...assignment, locked: assignment.assignmentVisible === false }));
     const extracted = extractCanvasFileIdsFromHtml({
       canvasBaseUrl,
       canvasCourseId,
@@ -199,6 +208,8 @@ export function createCanvasFileInventoryPayload({
   }
 
   for (const announcement of announcements) {
+    accessSources.set(`announcement:${announcement.id}`, canvasSourceAccessReference({ ...announcement,
+      unlockAt: announcement.delayedPostAt, state: announcement.workflowState }));
     const extracted = extractCanvasFileIdsFromHtml({
       canvasBaseUrl,
       canvasCourseId,
@@ -223,14 +234,25 @@ export function createCanvasFileInventoryPayload({
     }
   }
 
+  const references = referenceAccumulator.references();
+  const referencesByFile = new Map<string, CanvasSyncFileReferencePayload[]>();
+  for (const reference of references) {
+    const group = referencesByFile.get(reference.canvas_file_id) ?? [];
+    group.push(reference);
+    referencesByFile.set(reference.canvas_file_id, group);
+  }
   return {
-    files: mappedFiles,
-    references: referenceAccumulator.references(),
+    files: mappedFiles.map(file => {
+      const eligibility = effectiveCanvasFileEligibility(canvasFilePolicyInput(file),
+        accessReferencesForFile(referencesByFile.get(file.canvas_file_id) ?? [], accessSources));
+      return { ...file, ingestion_eligibility: eligibility, ingestion_status: ingestionStatusForEligibility(eligibility) };
+    }),
+    references,
     ignoredReferences: referenceAccumulator.ignored(),
   };
 }
 
-export function mapCanvasFile(file: CanvasFile): CanvasSyncFilePayload {
+export function mapCanvasFile(file: CanvasFile, references: readonly CanvasFileAccessReference[] = []): CanvasSyncFilePayload {
   const canvasFileId = requiredIdentifier(file.id, "file");
   const contentType = normalizeMimeType(file.contentType);
   const displayName = sanitizeDisplayFileName(
@@ -257,7 +279,7 @@ export function mapCanvasFile(file: CanvasFile): CanvasSyncFilePayload {
     lock_at: nullableDate(file.lockAt),
     unlock_at: nullableDate(file.unlockAt),
   };
-  const eligibility = classifyCanvasFileForIngestion({
+  const eligibility = effectiveCanvasFileEligibility({
     contentType,
     displayName: normalizedFile.display_name,
     filename: normalizedFile.filename,
@@ -269,7 +291,7 @@ export function mapCanvasFile(file: CanvasFile): CanvasSyncFilePayload {
     mediaEntryId: normalizedFile.media_entry_id,
     size: normalizedFile.size_bytes,
     unlockAt: normalizedFile.unlock_at,
-  });
+  }, references);
 
   const payloadWithoutPolicy = {
     ...normalizedFile,

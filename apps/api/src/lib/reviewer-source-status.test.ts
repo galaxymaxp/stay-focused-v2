@@ -306,6 +306,8 @@ interface FakeQueryResult {
 class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
   private readonly filters: Array<(row: FakeRecord) => boolean> = [];
   private limitCount: number | null = null;
+  private rangeStart = 0;
+  private rangeEnd = Infinity;
   private readonly orders: Array<{
     readonly column: string;
     readonly ascending: boolean;
@@ -345,6 +347,10 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     return this;
   }
 
+  public range(start: number, end: number): this {
+    this.rangeStart = start; this.rangeEnd = end; return this;
+  }
+
   public limit(count: number): this {
     this.limitCount = count;
     return this;
@@ -374,7 +380,8 @@ class FakeSupabaseQuery implements PromiseLike<FakeQueryResult> {
     const ordered = filtered.slice().sort((left, right) =>
       compareByOrders(left, right, this.orders),
     );
-    return this.limitCount === null ? ordered : ordered.slice(0, this.limitCount);
+    const ranged = ordered.slice(this.rangeStart, this.rangeEnd + 1);
+    return this.limitCount === null ? ranged : ranged.slice(0, this.limitCount);
   }
 }
 
@@ -741,3 +748,23 @@ function syncStateRow({
     updated_at: NOW,
   };
 }
+describe('hidden linked file source status', () => {
+  it.each([
+    { name: 'visible Page', published: true, linked: true, locked: false, status: 'current' },
+    { name: 'unpublished Page', published: false, linked: true, locked: false, status: 'unavailable' },
+    { name: 'no reference', published: true, linked: false, locked: false, status: 'unavailable' },
+    { name: 'locked file', published: true, linked: true, locked: true, status: 'unavailable' },
+  ])('$name', async ({ published, linked, locked, status }) => {
+    const file = { ...fileRow({ canvasFileId: 'lesson', contentType: 'application/pdf', displayName: 'Lesson.pdf' }),
+      hidden_for_user: true, locked, ingestion_status: 'stored', ingestion_eligibility: 'eligible_document',
+      storage_bucket: 'canvas-source-files', storage_object_key: 'synthetic-private-object', stored_byte_count: 1024 };
+    const fake = createFakeStatusClient({ canvas_files: [file],
+      canvas_pages: [{ ...pageRow({ canvasPageId: 'lesson-page', bodyHtml: '<a href="/files/lesson">Lesson</a>' }), published }],
+      canvas_file_references: linked ? [{ id: 'reference', user_id: USER_ID, canvas_connection_id: CONNECTION_ID,
+        course_id: COURSE_ID, file_id: file.id, reference_type: 'page', canvas_page_url: 'lesson-page' }] : [],
+      reviewer_source_snapshot_items: [snapshotItem({ ordinal: 1, sourceObjectId: 'lesson', sourceType: 'file',
+        fileKind: 'pdf', storedHash: 'a'.repeat(64), normalizedHash: 'c'.repeat(64), title: 'Lesson.pdf' })] });
+    expect(await readReviewerSourceStatus({ client: fake.client, reviewerArtifactId: REVIEWER_ID, userId: USER_ID }))
+      .toMatchObject({ ok: true, value: { items: [{ status }] } });
+  });
+});

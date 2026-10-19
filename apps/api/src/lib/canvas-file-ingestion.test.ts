@@ -8,7 +8,8 @@ import { mapCanvasFile } from './canvas-file-normalize';
 import type { Database } from '@stay-focused/db';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-const mocks = vi.hoisted(() => ({ readConnection: vi.fn(), decrypt: vi.fn() }));
+const mocks = vi.hoisted(() => ({ readConnection: vi.fn(), decrypt: vi.fn(), references: vi.fn() }));
+vi.mock('./canvas-file-access', () => ({ readCanvasFileAccessReferences: mocks.references }));
 vi.mock('@/lib/canvas-routes', () => ({
   CONNECTION_SECRET_COLUMNS: 'id,user_id,status,base_url',
   readConnection: mocks.readConnection,
@@ -31,6 +32,7 @@ const request = vi.fn<typeof fetch>();
 
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.references.mockResolvedValue(new Map());
   vi.stubGlobal('fetch', request);
   mocks.readConnection.mockResolvedValue({ ok: true, row: connection });
   mocks.decrypt.mockReturnValue('decrypted-token');
@@ -226,3 +228,28 @@ it.each([false, true])('binds retained bytes to the actual inventory revision (s
     expect(query.eq).toHaveBeenCalledWith('content_version_fingerprint', row.content_version_fingerprint);
   } finally { await db.close(); }
 }, 15_000);
+describe('hidden referenced file ingestion', () => {
+  it.each([
+    { linked: true, locked: false, expected: 'stored' },
+    { linked: false, locked: false, expected: 'unavailable' },
+    { linked: true, locked: true, expected: 'blocked' },
+  ])('uses current source evidence for hidden files (%s)', async ({ linked, locked, expected }) => {
+    mocks.references.mockResolvedValue(new Map(linked ? [[file.id, [{ current: true, published: true, visible: true }]]] : []));
+    query.in.mockResolvedValue({ data: [{ ...file, course_id: 'synthetic-course', hidden_for_user: true,
+      ingestion_eligibility: 'blocked_unavailable', ingestion_status: 'unavailable', storage_object_key: null }], error: null });
+    request.mockReset().mockResolvedValueOnce(Response.json({ id: 42, display_name: 'Lesson.pdf', filename: 'Lesson.pdf',
+      'content-type': 'application/pdf', size: 5, url: 'https://canvas.test/files/42/download', locked, hidden_for_user: true }))
+      .mockResolvedValueOnce(new Response(new Uint8Array([37, 80, 68, 70, 45]), { headers: { 'Content-Type': 'application/pdf' } }));
+    expect(await ingestCanvasFiles({ client, userId: 'owner', fileIds: [file.id], brokeredCanvasToken: 'synthetic-token' }))
+      .toMatchObject({ ok: true, response: { results: [{ status: expected }] } });
+    expect(request).toHaveBeenCalledTimes(expected === 'stored' ? 2 : 1);
+    if (expected === 'stored') expect(query.update).toHaveBeenCalledWith(expect.objectContaining({
+      hidden_for_user: true, ingestion_eligibility: 'eligible_document', ingestion_status: 'stored', availability_status: 'available' }));
+  });
+  it('fails closed before provider access if course reference evidence cannot be loaded', async () => {
+    mocks.references.mockRejectedValue(new Error('synthetic unavailable inventory'));
+    expect(await ingestCanvasFiles({ client, userId: 'owner', fileIds: [file.id], brokeredCanvasToken: 'synthetic-token' }))
+      .toMatchObject({ ok: false, code: 'canvas_storage_failed' });
+    expect(request).not.toHaveBeenCalled();
+  });
+});

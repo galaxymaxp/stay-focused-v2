@@ -1,3 +1,4 @@
+import { persistCourseFilesInventory } from './canvas-file-inventory';
 import { isPastStoredCourse } from './course-state';
 import { upsertCanvasCourseInventory } from './canvas-course-selection';
 import type {
@@ -20,7 +21,6 @@ import type {
   CanvasConnectionRow,
   CanvasCourseRow,
   CanvasCourseSyncStateRow,
-  CanvasFilesInventorySnapshotResult,
   CanvasPlannerItemsSnapshotResult,
   CanvasSyncRunRow,
   Database,
@@ -33,8 +33,6 @@ import { markCanvasReconnectRequired } from "@/lib/canvas-credential-lifecycle";
 import {
   createCanvasFileInventoryPayload,
   type CanvasFileInventoryPayload,
-  type CanvasSyncFilePayload,
-  type CanvasSyncFileReferencePayload,
 } from "@/lib/canvas-file-normalize";
 import {
   CONNECTION_SECRET_COLUMNS,
@@ -2820,49 +2818,6 @@ async function persistAnnouncementsSnapshot({
       p_user_id: userId,
       p_window_end_at: syncWindow.endDate,
       p_window_start_at: syncWindow.startDate,
-    })
-    .single();
-
-  if (error || !data) {
-    return { ok: false };
-  }
-  return { ok: true, row: data };
-}
-
-async function persistCourseFilesInventory({
-  canvasCourseId,
-  client,
-  connectionId,
-  files,
-  references,
-  runId,
-  syncedAt,
-  userId,
-}: {
-  readonly canvasCourseId: string;
-  readonly client: SupabaseClient<Database>;
-  readonly connectionId: string;
-  readonly files: readonly CanvasSyncFilePayload[];
-  readonly references: readonly CanvasSyncFileReferencePayload[];
-  readonly runId: string;
-  readonly syncedAt: string;
-  readonly userId: string;
-}): Promise<
-  | {
-      readonly ok: true;
-      readonly row: CanvasFilesInventorySnapshotResult;
-    }
-  | { readonly ok: false }
-> {
-  const { data, error } = await client
-    .rpc("replace_canvas_course_files_inventory", {
-      p_canvas_connection_id: connectionId,
-      p_canvas_course_id: canvasCourseId,
-      p_files: files as unknown as Json,
-      p_references: references as unknown as Json,
-      p_sync_run_id: runId,
-      p_synced_at: syncedAt,
-      p_user_id: userId,
     })
     .single();
 
