@@ -56,6 +56,64 @@ export interface CanvasFilePolicyInput {
   readonly unlockAt: string | null;
   readonly mediaClass: string | null;
   readonly mediaEntryId: string | null;
+  readonly deleted?: boolean;
+}
+
+/** Evidence resolved from a current, owned source, never from a bare link alone. */
+export interface CanvasFileAccessReference {
+  readonly current: boolean;
+  readonly published: boolean | null;
+  readonly visible: boolean;
+}
+
+export type CanvasFileAccessRow = CanvasFileRow & {
+  readonly accessReferences?: readonly CanvasFileAccessReference[];
+};
+
+export function canvasFilePolicyInput(file: Pick<CanvasFileRow,
+  'content_type' | 'display_name' | 'filename' | 'size_bytes' | 'locked' | 'hidden' |
+  'hidden_for_user' | 'lock_at' | 'unlock_at' | 'media_class' | 'media_entry_id'>): CanvasFilePolicyInput {
+  return { contentType: file.content_type, displayName: file.display_name, filename: file.filename,
+    size: file.size_bytes, locked: file.locked, hidden: file.hidden, hiddenForUser: file.hidden_for_user,
+    lockAt: file.lock_at, unlockAt: file.unlock_at, mediaClass: file.media_class, mediaEntryId: file.media_entry_id };
+}
+
+export function isPageAccessibleCanvasFile(
+  file: CanvasFilePolicyInput,
+  references: readonly CanvasFileAccessReference[],
+  now = new Date(),
+): boolean {
+  return !file.deleted && !isLocked(file, now) && isUnavailable(file) &&
+    references.some(reference => reference.current && reference.published !== false && reference.visible);
+}
+
+export function effectiveCanvasFileEligibility(
+  file: CanvasFilePolicyInput,
+  references: readonly CanvasFileAccessReference[],
+  now = new Date(),
+): CanvasFileIngestionEligibility {
+  // Locks and deletion always win, including on hidden linked files.
+  if (file.deleted) return 'blocked_unavailable';
+  if (isLocked(file, now)) return 'blocked_locked';
+  return isPageAccessibleCanvasFile(file, references, now)
+    ? classifyDirectlyAccessiblePageFile(file, now)
+    : classifyCanvasFileForIngestion(file, now);
+}
+
+/** Read-time repair does not claim that historical bytes are bound to this revision. */
+export function withEffectiveCanvasFileAccess(
+  file: CanvasFileRow,
+  references: readonly CanvasFileAccessReference[],
+  now = new Date(),
+): CanvasFileAccessRow {
+  const input = { ...canvasFilePolicyInput(file), deleted: file.availability_status === 'missing' };
+  const eligibility = effectiveCanvasFileEligibility(input, references, now);
+  const accessible = isPageAccessibleCanvasFile(input, references, now);
+  return { ...file, accessReferences: references,
+    ingestion_eligibility: eligibility,
+    availability_status: accessible ? 'available' : file.availability_status,
+    ingestion_status: accessible && ['blocked', 'unavailable'].includes(file.ingestion_status)
+      ? ingestionStatusForEligibility(eligibility) : file.ingestion_status };
 }
 
 export interface CanvasFileContentValidationInput extends CanvasFilePolicyInput {
@@ -105,8 +163,8 @@ export function classifyCanvasFileForIngestion(
 }
 
 /** Canvas can hide a Page-linked file from Files while allowing its authenticated download. */
-export function classifyDirectlyAccessiblePageFile(file: CanvasFilePolicyInput): CanvasFileIngestionEligibility {
-  return classifyCanvasFileForIngestion({ ...file, hidden: false, hiddenForUser: false });
+export function classifyDirectlyAccessiblePageFile(file: CanvasFilePolicyInput, now = new Date()): CanvasFileIngestionEligibility {
+  return classifyCanvasFileForIngestion({ ...file, hidden: false, hiddenForUser: false }, now);
 }
 
 export function ingestionStatusForEligibility(
