@@ -197,11 +197,17 @@ export function AnnouncementDetailScreen() {
   const announcements = useExperience<StudentAnnouncementList>(ANNOUNCEMENT_LIST_PATH);
   const announcement = announcements.data?.items.find(item => item.id === id) ?? null;
   const { colors, reducedMotion } = useTheme();
-  const { markRead } = useListPreferences();
-  // Opening an announcement, from anywhere, reads it.
+  const { ownerId, markRead } = useListPreferences();
+  const opened = useRef<{ id: string | undefined; ownerId: string; marked: boolean } | null>(null);
+  // Wait for displayed data and an owner; explicit unread stays until reopened.
   useEffect(() => {
-    if (id) markRead(id, true);
-  }, [id, markRead]);
+    if (opened.current?.id !== id || opened.current?.ownerId !== ownerId) {
+      opened.current = { id, ownerId, marked: false };
+    }
+    if (!announcement || !ownerId || opened.current.marked) return;
+    opened.current.marked = true;
+    markRead(announcement.id, true);
+  }, [id, announcement, ownerId, markRead]);
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
   const rise = useRef(new Animated.Value(reducedMotion ? 0 : 1)).current;

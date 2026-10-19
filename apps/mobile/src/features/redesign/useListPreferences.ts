@@ -92,5 +92,5 @@ export function useListPreferences() {
   const sortLibrary = useCallback((scope: string, sort: LibrarySort) => {
     if (owner) update(owner, current => setLibrarySort(current, scope, sort));
   }, [owner]);
-  return useMemo(() => ({ prefs, pin, hide, markRead, reorderLibrary, sortLibrary }), [prefs, pin, hide, markRead, reorderLibrary, sortLibrary]);
+  return useMemo(() => ({ ownerId: owner, prefs, pin, hide, markRead, reorderLibrary, sortLibrary }), [owner, prefs, pin, hide, markRead, reorderLibrary, sortLibrary]);
 }

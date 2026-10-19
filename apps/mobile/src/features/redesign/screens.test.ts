@@ -136,7 +136,7 @@ vi.mock("../sync/CanvasSyncProvider", () => ({
 }));
 vi.mock('./useLibraryCourseSequence', () => ({ useLibraryCourseSequence: () => ({ data: null, loading: false, error: false }) }));
 vi.mock("./useListPreferences", () => ({
-  useListPreferences: () => ({ prefs: mocks.prefs, pin: mocks.pin, hide: mocks.hide, markRead: mocks.markRead, reorderLibrary: mocks.reorderLibrary, sortLibrary: mocks.sortLibrary }),
+  useListPreferences: () => ({ ownerId: "owner", prefs: mocks.prefs, pin: mocks.pin, hide: mocks.hide, markRead: mocks.markRead, reorderLibrary: mocks.reorderLibrary, sortLibrary: mocks.sortLibrary }),
 }));
 vi.mock("../../design/SwipeRow", () => ({
   SwipeRow: "SwipeRow",
