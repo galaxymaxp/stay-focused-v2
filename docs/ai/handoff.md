@@ -8524,3 +8524,150 @@ and supabase/.temp/ remain untouched/unstaged. No local code blocker remains.
 
 Ignored progress/status: `tmp/overnight/OF1b.progress` and `OF1b.status`.
 Endpoint OF1b only; rollout/device work and later tasks remain owner work.
+
+
+## OR3b / orb momentum, ring spin, ripple and pearl - PASS locally (2026-10-19)
+
+**Status: PASS for the finite unattended local code scope.** OR3b was read in
+full, including the overriding UNATTENDED rules. STEP 0-5, both apps, tests,
+all prompt gates, forced root build, docs and local commits complete. Baseline
+6cfeabb; branch overnight/2026-10-15_feedback retained. Tracked entry tree was
+clean; the prompt-listed unrelated paths were preserved. Reused OR3.progress,
+be9d5dc and the existing preflight at docs/ai/acceptance/ (the prompt's
+shorter docs/acceptance/ path had drifted). OR1b, TC1b and OR2 handoffs and
+ADR-048 were reviewed. The explicit 0.4-second owner answer resolves the prior
+friction STOP. No further contradiction or ring restructuring was needed.
+No later overnight task or roadmap slice was started.
+
+### What changed
+
+- Shared pure model: roughly 100ms velocity smoothing, +/-10 rad/s cap,
+  exp(-dt / 0.4) decay, 0.01 cutoff, held-pose pause decay and release continuity.
+  Render/input timestamps prevent double decay. The 10ms timing tests stop
+  6 rad/s at 2.56s and 1 rad/s at 1.85s. Cancellation, scene disposal,
+  navigation/background and Reduce Motion clear inertia; existing idle spin
+  remains after the excess velocity settles.
+- Both start/end/block ring handlers push Y-axis spin from physical angle
+  deltas at gain 3. Clockwise moves the front right; snapping never pushes.
+  Ring input stays synchronous and retains priority. Native Today page touch
+  pause excludes ring input, coast and active interaction work. Settled Today
+  returns to its existing 80ms cadence. Deferred web Reduce Motion can load one
+  deliberate ring-driven still pose without enabling ambient animation.
+- Identical shader text replaces bulge uniforms with uRippleDir/uRippleTime.
+  The 900ms great-circle wave packet travels/fades, restarts on a second tap
+  and derives normals from the same height function. Maximum amplitude 0.12
+  is below the old 0.18. Off/zero/endpoints match original undeformed pixels.
+  Reduce Motion has no ripple, with an instant color change.
+- Pearl uses the existing Knowledge Core light body #E6EAF1 and starts the
+  pearl/gold/green/violet/orange cycle. Both stores persist stable keys under
+  sf.orb.colorKey; missing new keys migrate old sf.orb.color indices 0..3 to
+  their original colors. Unknown keys use pearl. Native writes are serialized,
+  new reads wait for queued choices, and revisions reject late hydration.
+  Web keeps guarded preferences and same-tab/cross-tab notifications.
+- **Glow decision: approved removal fallback.** Both Today aura meshes and the
+  mobile SVG halo are removed. Body emission uses world-space uLight while
+  inverse uSpin rotates liquid; shifting an aura alone would not prove
+  tracking. Both auras support per-frame offset, but the installed native
+  Stop.setNativeProps ignores new color and invokes parent.forceUpdate.
+  The actual implementation probe passes 2/2 assertions; using it at render
+  cadence requires React updates or a new native encoding path. Removal
+  preserves parity and avoids a disconnected glow/new animation loop.
+  Generation keeps its centered aura, exactly matching idle body crossfade
+  and restoring authoritative state colors in the same theme. Its centered
+  light remains centered under a forward pose rotation.
+
+No required platform feature skipped. Mobile halo-center animation is NOT
+APPLICABLE after the approved removal; web has no native SVG halo. Both shader
+and sampler parity are tested, including the inverse of the full two-axis
+pose. Existing deferred loading, decorative accessibility and touch priorities
+remain. No new native dependency, APK requirement, API/auth/RLS, schema,
+migration, source-content, design-token or release-version change. React
+best-practices review checked refs, effects/dependencies, cancellation and
+cleanup; no per-frame React state update or second animation loop.
+
+### Commits and gate counts
+
+- `d0a4c65 feat(shared): add orb momentum ring spin and palette keys`
+- `4c3fdbe feat(orb): replace tap bulge with traveling ripple shaders`
+- `1a0b512 feat(mobile): connect orb momentum ripple and ring input`
+- `445fcb2f feat(web): connect orb momentum ripple and ring input`
+- `docs: complete OR3b orb interaction handoff` (final hash in Git and
+  ignored `tmp/overnight/OR3b.status`; no self-hash amendment).
+
+All commits use --author='galaxymaxp <omgraythekid@gmail.com>'. Verification is
+FRESH against implementation tip 445fcb2f; later changes are docs only.
+**10/10 prompt gates PASS**, plus the additional forced root build.
+
+| Exact command | FRESH final result |
+| --- | --- |
+| `npm run typecheck -- --force --env-mode=loose` | PASS, 8/8 tasks, 0 cached; closure repeat |
+| `npm run lint -- --force --env-mode=loose` | PASS, 8/8 tasks, 0 cached; 0 errors / 6 existing warnings; closure repeat |
+| `npm run test --workspace @stay-focused/shared` | PASS, 610/610 tests, 58 files; includes generated copies |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | PASS, 2433 passed / 3 intentional live skips, 212 files; full suite |
+| `npm run test --workspace @stay-focused/mobile` | PASS, 1558/1558 tests, 163 files |
+| `npm run test --workspace @stay-focused/web` | PASS, 411/411 tests, 63 files |
+| `npm run build --workspace @stay-focused/api` | PASS, 36/36 static pages |
+| `npm run build --workspace @stay-focused/web` | PASS, 22/22 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | PASS, 1 local Android export |
+| `git diff --check` / `git diff --cached --check` | PASS, 0 whitespace errors; closure repeated |
+| Additional `npm run build -- --force --env-mode=loose` | PASS, 8/8 tasks, 0 cached; local Android/iOS/web exports |
+
+All four workspaces have test scripts. API uses its complete suite with two
+workers and 3 explicitly disabled live cases. Separate workflow/provider
+contract suites are NOT APPLICABLE: those implementations did not change.
+Turbo loose env mode carries the ignored outbound HTTP(S)/fetch/socket guard;
+telemetry is disabled and Expo is offline. No deployment/provider script ran.
+Generated Next declarations were inspected/restored; generated tests, exports,
+logs, private data and every tmp path remain uncommitted.
+
+Additional local proof: WebGL shader **FRESH PASS 5/5**, 0 page/shader errors;
+off/zero/900ms endpoint vs original shader has 0 differing byte channels,
+active ripple changes 37,260 channels. Installed native Stop probe **FRESH
+PASS 2/2**. These are local code/GPU proofs, not Realme appearance or physical
+feel. Focused native final 28/28 and browser deferred RM 4/4 pass.
+
+Failed first attempts are retained in the
+[OR3b acceptance report](acceptance/or3b-orb-interaction.md): unavailable python
+alias and a stale test-title edit match; early shared build with 2 removed-test
+export errors; focused web 9 pass / 4 fail plus 2 failed collection suites from
+an edit-script copy error and missing rectangle.height, then 18 / 3 before
+repair; new browser fixture 0 / 7 from a missing forceContextLoss mock; first
+shared full gate 598 / 4 from stale generated dist tests. Rebuild refreshed
+those tests, final shared 610/610 includes both copies. All repaired without
+weaker assertions, type suppression or skipped required checks. Earlier lint
+had 7 warnings; removed one introduced unused CLOCK import, leaving the
+6 existing warnings. Final typecheck/lint repeated after final lifecycle,
+storage and deferred RM edits. No remaining nondeterministic flake established.
+Existing Vite, React renderer and Expo color warnings remain non-failing.
+The first docs-finalizer attempt stopped on Windows cp1252 decoding of a
+pre-existing UTF-8 planning file; explicit `py -X utf8` repaired the launch
+without changing unrelated content or any implementation gate result.
+
+Current-state, roadmap and sprint reconcile OR3b and supersede the old OR3
+requirements STOP. ADR-048 includes the requested follow-up. No local blocker
+remains. Original UI/, apps/mobile/.gitignore and supabase/.temp/ are preserved
+unstaged; ignored tmp progress/status/logs are uncommitted. Baseline cached
+upstream ahead 44 / behind 2, without fetch. Only owned paths are staged.
+
+**UNVERIFIED (owner to confirm):** installed/deployed API/web/mobile revisions,
+production DB/applied migrations, Cloud Scheduler state, remote-ref freshness,
+actual Realme/browser appearance, gesture arbitration, feel and power. No live
+state was queried or inferred from tests. No Supabase, Vercel, Google Cloud,
+Canvas or Resend call, deployment, remote SQL/migration application, Scheduler
+operation, email, environment-file edit, branch switch or push occurred.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** review local commits and choose
+  web/mobile publication separately through the existing owner release process.
+- **Device checks - NOT RUN, skipped entirely:** Realme and desktop hard/gentle
+  flicks, ring start/end/block and move-hold-move-release, traveling ripple,
+  approved absence of Today glow, matching generation aura, fresh pearl and
+  preserved legacy gold, Reduce Motion, scrolling, navigation/visibility and
+  power. Local GPU proof does not replace physical acceptance.
+- Confirm all UNVERIFIED state. For later authorized deployment/env/log work,
+  installing the missing Vercel CLI with npm i -g vercel is strongly recommended;
+  no installation or invocation ran here.
+
+Ignored progress/status: tmp/overnight/OR3b.progress and OR3b.status.
+Endpoint OR3b only; rollout/device work and later tasks remain owner work.

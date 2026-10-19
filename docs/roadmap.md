@@ -78,24 +78,34 @@ no later slice or previously stopped task resumed. [Acceptance](ai/acceptance/lp
 <!-- LP1 end -->
 
 
-<!-- OR3 begin -->
-OR3 / orb momentum, ring spin, ripple, glow and pearl (2026-10-19):
-**STOPPED before STEP 1** for a material requirements conflict. The requested
-exponential friction exp(-dt / 1.4) with a 0.01 rad/s cutoff stops 6 rad/s
-after 8.9557 s and 1 rad/s after 6.4472 s, incompatible with the mandatory
-2.5-5 s / under-2 s tests. No product code changed and no alternative physics
-or weakened tests were selected. STEP 0 is partial; both ring paths can reach
-their existing orb interaction handles, so no Today restructuring is needed.
-FRESH local math diagnostic: 6/6 assertions pass, 0/2 timing requirements
-compatible (exit 1). Nine implementation gates and extra root build NOT RUN;
-docs-only preservation/diff checks recorded in the handoff. Full evidence and
-exact owner question: [OR3 preflight](ai/acceptance/or3-orb-momentum-preflight.md).
-Endpoint: requirements checkpoint and scoped local docs commit only. Owner
-must choose the friction formula or authorize revised stopping behavior before
-STEP 1-5 resume. Rollout/Device checks NOT RUN, skipped entirely. Deployed and
-physical state UNVERIFIED (owner to confirm). Branch retained; no remote call,
-environment-file change, deployment, migration application or push.
-<!-- OR3 end -->
+<!-- OR3b begin -->
+OR3b / orb momentum, ring spin, ripple and pearl (2026-10-19): **PASS for the
+finite unattended local code scope**. STEP 0-5, both apps, regression tests,
+all 10 prompt gates, additional forced root build, docs and local commits
+complete. Baseline 6cfeabb; branch overnight/2026-10-15_feedback retained.
+OR3b's explicit owner answer resolves OR3's prior requirements STOP: one
+0.4-second friction constant, 0.01 rad/s cutoff; 6 rad/s stops at 2.56s and
+1 rad/s at 1.85s in the 10ms model tests. Smoothed samples preserve decayed
+velocity through held pauses. Physical ring moves feed Y spin at gain 3;
+release snapping never pushes spin. Ring input and coast bypass native page
+pause. Both shaders use a 900ms great-circle ripple and matching normals;
+Reduce Motion suppresses ripple/momentum and keeps deliberate still poses.
+Pearl is existing #E6EAF1; stable sf.orb.colorKey migration preserves all four
+old choices and handles queued writes/late hydration safely. Approved glow
+fallback: remove the Today aura on both apps and native SVG halo after the
+installed Stop API probe; generation aura matches the body's idle fade and
+restores authoritative state tint. No new native module/dependency/token.
+Commits: d0a4c65, 4c3fdbe, 1a0b512, 445fcb2f; docs hash in Git/OR3b.status.
+FRESH PASS: typecheck/lint/root build each 8/8 tasks, 0 cached; 6 existing lint
+warnings. Shared 610, API 2433 / 3 intentional live skips, mobile 1558, web 411
+tests; API/web 36/36 and 22/22 pages; Android export and diff hygiene pass.
+Local WebGL 5/5 and native Stop probe 2/2 PASS. Failed first attempts recorded.
+Rollout and Device checks NOT RUN, skipped entirely. Live state, deployed
+revisions and physical feel/power UNVERIFIED (owner to confirm). No remote
+call, SQL/migration application, Scheduler, email, deployment, environment-file
+edit, branch switch or push. Original unrelated paths preserved. Endpoint
+OR3b only; no later task started. [Acceptance and exact gates](ai/acceptance/or3b-orb-interaction.md).
+<!-- OR3b end -->
 
 
 <!-- OF1 begin -->
