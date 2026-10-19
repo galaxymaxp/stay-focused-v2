@@ -2,12 +2,12 @@ import { createRequire } from "node:module";
 import { GLView } from "expo-gl";
 import { createElement } from "react";
 import { Image } from "react-native";
-import { Stop } from "react-native-svg";
+import { createOrbInteraction, pushOrbSpin } from "@stay-focused/shared";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { DayOrb, DAY_ORB_FILL } from "./DayOrb";
-import { CLOCK, dayOrbTones } from "./dayClock";
+import { DayOrb, DAY_ORB_FILL, dayOrbTouch } from "./DayOrb";
+import { CLOCK } from "./dayClock";
 
 const mocks = vi.hoisted(() => ({
   fail: false,
@@ -72,78 +72,52 @@ async function startGL() {
   }));
 }
 
-describe("Today orb static outer glow", () => {
-  it("extends beyond the unchanged glass footprint and fades before the handles", async () => {
+describe("Today orb without an external glow", () => {
+  it("keeps the glass footprint and passes touches through its decorative host", async () => {
     const root = await render();
-    const halo = root.findByProps({ testID: "day-orb-halo" });
-    const stops = halo.findAllByType(Stop);
-    const peak = stops.find((stop) => stop.props.stopOpacity === 0.35)!;
-    const edge = stops.at(-2)!;
-    expect(size * DAY_ORB_FILL).toBeCloseTo(CLOCK.glass * 2);
-    expect(halo.props.width).toBe(size);
-    expect(halo.props.height).toBe(size);
-    expect(peak.props.offset * size / 2).toBeGreaterThan(CLOCK.glass);
-    expect(edge.props.offset * size / 2).toBeLessThan(CLOCK.ring - 2);
-    expect(edge.props.stopOpacity).toBe(0);
-    expect(stops[1]!.props.stopOpacity).toBe(0); // No fog behind the readout.
+    expect(root.findAllByProps({ testID: 'day-orb-halo' })).toHaveLength(0);
     const gl = root.findByType(GLView);
+    expect(size * DAY_ORB_FILL).toBeCloseTo(CLOCK.glass * 2);
     expect(gl.props.style.width * gl.props.style.transform[0].scale).toBeCloseTo(size);
-    expect(halo.parent!.children.indexOf(halo)).toBeLessThan(halo.parent!.children.indexOf(gl));
-    expect(halo.props.style).toEqual({ position: "absolute", top: 0, left: 0 });
+    expect(gl.parent!.props.pointerEvents).toBe('none');
+    expect(gl.parent!.props.accessibilityElementsHidden).toBe(true);
+    await startGL(); vi.advanceTimersByTime(80); mocks.frame.mock.lastCall![0](Date.now());
+    const scene = mocks.render.mock.lastCall![0];
+    expect(scene.children).toHaveLength(1); // Root/body only; no aura mesh.
   });
-
-  it("passes touches through both the halo and its host", async () => {
-    const root = await render();
-    const halo = root.findByProps({ testID: "day-orb-halo" });
-    expect(halo.props.pointerEvents).toBe("none");
-    expect(halo.parent!.props.pointerEvents).toBe("none");
-    expect(halo.parent!.props.accessibilityElementsHidden).toBe(true);
-  });
-
-  it("follows the existing day aura tint when the minute changes", async () => {
-    const root = await render({ minutes: 0 });
-    expect(dayOrbTones(0).aura).not.toBe(dayOrbTones(720).aura);
-    for (const minutes of [0, 720]) {
-      await act(async () => rendered!.update(createElement(DayOrb, { ...props, minutes })));
-      expect(root.findAllByType(Stop).every((stop) => stop.props.stopColor === dayOrbTones(minutes).aura)).toBe(true);
-    }
-  });
-
-  it("uses a subtler light-theme peak with a transparent edge", async () => {
-    const root = await render({ mode: "light" });
-    const stops = root.findAllByType(Stop);
-    expect(Math.max(...stops.map((stop) => Number(stop.props.stopOpacity)))).toBe(0.16);
-    expect(stops.at(-1)!.props).toMatchObject({ offset: 1, stopOpacity: 0 });
-  });
-
   it.each([
     { reducedMotion: true, live: true },
     { reducedMotion: false, live: false },
-  ])("keeps a static halo without an extra render loop: %j", async (overrides) => {
-    const root = await render(overrides);
-    const haloBefore = root.findByProps({ testID: "day-orb-halo" }).props;
-    expect(mocks.frame).not.toHaveBeenCalled(); // Mounting the halo schedules nothing.
-    await startGL();
-    expect(mocks.frame).toHaveBeenCalledOnce(); // Existing GL initial still frame.
-    vi.advanceTimersByTime(1000);
-    mocks.frame.mock.calls[0]![0](Date.now());
-    expect(mocks.render).toHaveBeenCalledOnce();
-    expect(mocks.frame).toHaveBeenCalledOnce();
-    expect(mocks.animatedValue).not.toHaveBeenCalled();
-    expect(root.findByProps({ testID: "day-orb-halo" }).props).toBe(haloBefore);
+  ])("renders one still frame without an extra loop: %j", async overrides => {
+    await render(overrides); expect(mocks.frame).not.toHaveBeenCalled();
+    await startGL(); vi.advanceTimersByTime(1000); mocks.frame.mock.calls[0]![0](Date.now());
+    expect(mocks.render).toHaveBeenCalledOnce(); expect(mocks.frame).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   });
-
-  it("retains the unanimated glow behind the PNG when GL fails", async () => {
-    const root = await render({ reducedMotion: true, live: false });
-    mocks.fail = true;
-    await startGL();
-    expect(root.findAllByType(GLView)).toHaveLength(0);
-    expect(root.findByType(Image).props.resizeMode).toBe("contain");
-    expect(root.findByProps({ testID: "day-orb-halo" }).props.pointerEvents).toBe("none");
-    expect(root.findAllByType(Stop)[2]!.props.stopOpacity).toBe(0.35);
+  it.each(['ring', 'momentum'] as const)('does not freeze %s during a Today touch', async kind => {
+    const interaction = { state: { current: createOrbInteraction() }, wake: { current: null as (() => void) | null }, ringDragging: { current: kind === 'ring' } };
+    if (kind === 'momentum') interaction.state.current = pushOrbSpin(interaction.state.current, 0.2, Date.now());
+    await render({ interaction }); await startGL(); dayOrbTouch.active = true;
+    try { vi.advanceTimersByTime(80); mocks.frame.mock.lastCall![0](Date.now()); expect(mocks.render).toHaveBeenCalledOnce(); }
+    finally { dayOrbTouch.active = false; }
+  });
+  it('returns from momentum cadence to the existing idle cadence', async () => {
+    const interaction = { state: { current: pushOrbSpin(createOrbInteraction(), 0.2, Date.now()) }, wake: { current: null as (() => void) | null } };
+    await render({ interaction }); await startGL();
+    for (let i = 0; i < 350; i++) { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); }
+    expect(interaction.state.current.spin.velocityY).toBe(0);
+    const count = mocks.render.mock.calls.length;
+    vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
+    expect(mocks.render.mock.calls.length).toBeLessThanOrEqual(count + 1);
+    const after = mocks.render.mock.calls.length;
+    vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
+    expect(mocks.render.mock.calls.length).toBe(after);
+  });
+  it('keeps the PNG fallback without a misleading halo when GL fails', async () => {
+    await render({ reducedMotion: true, live: false }); mocks.fail = true; await startGL();
+    const root = rendered!.root;
+    expect(root.findAllByType(GLView)).toHaveLength(0); expect(root.findByType(Image).props.resizeMode).toBe('contain');
+    expect(root.findAllByProps({ testID: 'day-orb-halo' })).toHaveLength(0);
     expect(mocks.frame).not.toHaveBeenCalled();
-    expect(mocks.animatedValue).not.toHaveBeenCalled();
-    expect(vi.getTimerCount()).toBe(0);
   });
 });

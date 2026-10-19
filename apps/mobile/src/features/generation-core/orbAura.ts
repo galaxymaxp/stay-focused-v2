@@ -84,7 +84,6 @@ export function createOrbAura() {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(AURA_SIZE, AURA_SIZE), material);
   mesh.renderOrder = 0;
   const shimmer: OrbShimmer = { time: 0, amount: 0, level: 0 };
-  let mode: "light" | "dark" | null = null;
 
   return {
     mesh,
@@ -94,11 +93,7 @@ export function createOrbAura() {
       shimmer.time = (shimmer.time + frame.shimmer * SHIMMER_SPEED * frame.delta) % 10000;
       shimmer.amount = frame.shimmerAmount * (1 - frame.error);
       shimmer.level = orbShimmerLevel(shimmer.time) * shimmer.amount;
-      if (frame.color) uniforms.uColor.value.set(frame.color);
-      else if (mode !== frame.mode) {
-        mode = frame.mode;
-        uniforms.uColor.value.set(AURA_COLOR[mode]);
-      }
+      uniforms.uColor.value.set(frame.color ?? AURA_COLOR[frame.mode]);
       uniforms.uStrength.value = frame.glow * (frame.mode === "dark" ? 0.32 : 0.28) * (1 - frame.error);
       uniforms.uTime.value = shimmer.time;
       uniforms.uShimmer.value = shimmer.amount;

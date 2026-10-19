@@ -1,3 +1,4 @@
+import { pushOrbSpin, ringOrbRadians, cancelOrbSpin } from '@stay-focused/shared';
 import { OrbTouchLayer, useOrbInteraction } from '../generation-core/orbInteraction';
 import { clockTimeLabel, freeTimeDuration, containsMinute, type TodayItem } from "@stay-focused/shared";
 import { useIsFocused } from "expo-router/react-navigation";
@@ -164,6 +165,7 @@ export function DayRingClock({
   }, [active, focused]);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
+  const orbInteraction = useOrbInteraction();
   const [draft, setDraft] = useState<Range | null>(null);
   const [adjusting, setAdjusting] = useState<Mode | null>(null);
   const range = draft ?? { start, end };
@@ -191,7 +193,9 @@ export function DayRingClock({
   useEffect(() => () => {
     clearTimeout(gesture.current.timer);
     gesture.current.stopSnap?.();
-  }, []);
+    if (orbInteraction.ringDragging) orbInteraction.ringDragging.current = false;
+    orbInteraction.state.current = cancelOrbSpin(orbInteraction.state.current);
+  }, [orbInteraction]);
 
   // Props caught up with a committed value: the local draft is no longer needed.
   useEffect(() => {
@@ -220,6 +224,9 @@ export function DayRingClock({
       const state = gesture.current;
       if (state.held || !state.mode) return;
       state.held = true;
+      if (orbInteraction.ringDragging) orbInteraction.ringDragging.current = true;
+      orbInteraction.state.current = { ...orbInteraction.state.current, inputAt: Date.now() };
+      orbInteraction.wake.current?.();
       if (state.mode === "move") haptic.press();
       else haptic.select();
       setAdjusting(state.mode);
@@ -232,6 +239,9 @@ export function DayRingClock({
       const state = gesture.current;
       clearTimeout(state.timer);
       const wasHeld = state.held;
+      if (orbInteraction.ringDragging) orbInteraction.ringDragging.current = false;
+      if (!commit) orbInteraction.state.current = cancelOrbSpin(orbInteraction.state.current);
+      orbInteraction.wake.current?.();
       state.held = false;
       const mode = state.mode;
       if (mode) setAdjusting(null);
@@ -305,6 +315,9 @@ export function DayRingClock({
         const y = state.origin.y + move.dy / k;
         const angle = angleMinutes(x - CLOCK.center, y - CLOCK.center);
         const current = state.value;
+        const spinDelta = angularDelta(state.angle, angle);
+        orbInteraction.state.current = pushOrbSpin(orbInteraction.state.current, ringOrbRadians(spinDelta), Date.now(), latest.current.reducedMotion);
+        orbInteraction.wake.current?.();
         let next: Range;
         if (state.mode === "move") {
           state.moved += angularDelta(state.angle, angle);
@@ -314,6 +327,7 @@ export function DayRingClock({
           const edge = state.mode;
           next = dragEdge(edge, followMinutes(edge === "start" ? current.start : current.end, angle), current.start, current.end);
         }
+        state.angle = angle;
         state.value = next;
         publish(next);
       },
@@ -329,7 +343,7 @@ export function DayRingClock({
         finish(false);
       },
     });
-  }, [lift, publish]);
+  }, [lift, publish, orbInteraction]);
 
   const step = (edge: Mode, direction: 1 | -1) => {
     if (disabled || locked) return;
@@ -348,7 +362,6 @@ export function DayRingClock({
     kind === "study_session" ? colors.blue : kind === "calendar_block" ? colors.orange : colors.violet;
   const marker = ringPoint(nowMinutes);
   const middle = range.start + freeTimeDuration(range.start, range.end) / 2;
-  const orbInteraction = useOrbInteraction();
   const orbCanvas = (CLOCK.glass * 2) / DAY_ORB_FILL;
   const handles: { key: Mode; at: number }[] = [
     { key: "start", at: range.start },

@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ORB_COLOR_KEY } from '@stay-focused/shared';
+import { ORB_COLOR_KEY, ORB_LEGACY_COLOR_KEY } from '@stay-focused/shared';
 import type { GestureResponderEvent, PanResponderInstance } from 'react-native';
 import { OrbTouchLayer, readOrbColor, rememberOrbColor, useOrbInteraction, type OrbInteractionHandle } from './orbInteraction';
 import { CLOCK, hitTest } from '../redesign/dayClock';
@@ -13,7 +13,7 @@ let delegate: Partial<PanResponderInstance['panHandlers']> | undefined;
 function Host() { handle = useOrbInteraction(); return createElement(OrbTouchLayer, { interaction: handle, size: 204, left: 68, top: 68, reducedMotion: false, delegate }); }
 const event = (x: number, y: number) => ({ nativeEvent: { locationX: x, locationY: y } }) as GestureResponderEvent;
 const target = () => tree!.root.findByProps({ testID: 'orb-touch' });
-beforeEach(() => { vi.useFakeTimers(); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); storage.getItem.mockResolvedValue('0'); storage.setItem.mockResolvedValue(undefined); vi.clearAllMocks(); delegate = undefined; });
+beforeEach(() => { vi.useFakeTimers(); vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); storage.getItem.mockResolvedValue('pearl'); storage.setItem.mockResolvedValue(undefined); vi.clearAllMocks(); delegate = undefined; });
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); });
 async function mount() { await act(async () => { tree = create(createElement(Host)); }); }
 it('covers only the ball footprint, stays decorative, and persists a short tap', async () => {
@@ -25,7 +25,7 @@ it('covers only the ball footprint, stays decorative, and persists a short tap',
   await act(async () => { p.onResponderGrant(event(102, 102)); vi.advanceTimersByTime(100); p.onResponderRelease(event(102, 102)); });
   expect(handle.state.current.colorIndex).toBe(1);
   expect(storage.getItem).toHaveBeenCalledWith(ORB_COLOR_KEY);
-  expect(storage.setItem).toHaveBeenCalledWith(ORB_COLOR_KEY, '1');
+  expect(storage.setItem).toHaveBeenCalledWith(ORB_COLOR_KEY, 'gold');
 });
 it('lets early vertical movement terminate for scrolling and rejects termination after rotation starts', async () => {
   await mount(); const p = target().props;
@@ -56,8 +56,37 @@ it('gives the existing ring responder immediate priority in the overlapping band
   expect(storage.setItem).not.toHaveBeenCalled();
 });
 it('restores the device color and tolerates unavailable storage', async () => {
-  storage.getItem.mockResolvedValue('3'); await mount();
+  storage.getItem.mockResolvedValue('violet'); await mount();
   expect(handle.state.current.colorIndex).toBe(3);
   storage.getItem.mockRejectedValue(new Error('blocked')); expect(await readOrbColor()).toBe(3);
   storage.setItem.mockRejectedValue(new Error('blocked')); rememberOrbColor(2); await Promise.resolve();
+});
+
+it.each([['0', 'gold', 1], ['1', 'green', 2], ['2', 'violet', 3], ['3', 'orange', 4], [null, 'pearl', 0]] as const)('migrates legacy %s once to %s', async (legacy, key, index) => {
+  const saved = new Map<string, string>();
+  storage.getItem.mockImplementation(async (name: string) => name === ORB_LEGACY_COLOR_KEY ? legacy : saved.get(name) ?? null);
+  storage.setItem.mockImplementation(async (name: string, value: string) => { saved.set(name, value); });
+  expect(await readOrbColor()).toBe(index);
+  await vi.waitFor(() => expect(saved.get(ORB_COLOR_KEY)).toBe(key));
+  storage.getItem.mockClear();
+  expect(await readOrbColor()).toBe(index);
+  expect(storage.getItem).not.toHaveBeenCalledWith(ORB_LEGACY_COLOR_KEY);
+});
+it('never lets late hydration or legacy migration overwrite an early choice', async () => {
+  let resolve: (value: string | null) => void = () => {};
+  storage.getItem.mockImplementationOnce(() => new Promise<string | null>(done => { resolve = done; }));
+  const reading = readOrbColor();
+  await vi.waitFor(() => expect(storage.getItem).toHaveBeenCalledOnce());
+  rememberOrbColor(4); resolve('gold');
+  expect(await reading).toBe(4);
+  await vi.waitFor(() => expect(storage.setItem).toHaveBeenLastCalledWith(ORB_COLOR_KEY, 'orange'));
+});
+
+it('lets a new surface read only after queued choices have persisted', async () => {
+  const saved = new Map<string, string>([[ORB_COLOR_KEY, 'gold']]);
+  storage.getItem.mockImplementation(async (key: string) => saved.get(key) ?? null);
+  storage.setItem.mockImplementation(async (key: string, value: string) => { saved.set(key, value); });
+  rememberOrbColor(4);
+  expect(await readOrbColor()).toBe(4);
+  expect(saved.get(ORB_COLOR_KEY)).toBe('orange');
 });

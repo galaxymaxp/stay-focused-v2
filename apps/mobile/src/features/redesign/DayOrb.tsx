@@ -1,13 +1,11 @@
-import { createOrbInteraction } from '@stay-focused/shared';
+import { cancelOrbSpin, createOrbInteraction } from '@stay-focused/shared';
 import type { OrbInteractionHandle } from '../generation-core/orbInteraction';
 import { createOrbInteractionSampler } from '../generation-core/orbInteractionFrame';
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Image, View } from "react-native";
-import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import * as THREE from "three";
 
-import { createOrbAura } from "../generation-core/orbAura";
 import { createOrbBody } from "../generation-core/orbBody";
 import { threeContext } from "../generation-core/threeContext";
 import { dayOrbTones, type DayOrbTones } from "./dayClock";
@@ -31,8 +29,8 @@ const FRAME_MS = 80;
 const RENDER_SCALE = 0.6;
 
 /**
- * Set while a finger is on Today. Rendering pauses entirely so touch handling
- * (ring handles, scrolling, pull-to-refresh) always gets the JS thread first.
+ * Set while a finger is on Today. Plain page touches pause idle rendering.
+ * Ring input and active interaction animation keep the existing scene running.
  */
 export const dayOrbTouch = { active: false };
 
@@ -73,7 +71,6 @@ export const DayOrb = memo(function DayOrb({
   const [foreground, setForeground] = useState(AppState.currentState === "active");
   const [renderingFailed, setRenderingFailed] = useState(false);
   const tones = useMemo(() => dayOrbTones(minutes), [minutes]);
-  const haloId = useId();
   const runtime = useRef<Runtime>({ tones, mode, reducedMotion, running: live && foreground });
   runtime.current = { tones, mode, reducedMotion, running: live && foreground };
   const controller = useRef<{ wake: () => void; dispose: () => void } | null>(null);
@@ -82,6 +79,9 @@ export const DayOrb = memo(function DayOrb({
     const subscription = AppState.addEventListener("change", (next) => setForeground(next === "active"));
     return () => subscription.remove();
   }, []);
+  useEffect(() => {
+    if (!live || !foreground) interaction.state.current = cancelOrbSpin(interaction.state.current);
+  }, [live, foreground, interaction]);
   useEffect(() => controller.current?.wake(), [minutes, mode, reducedMotion, live, foreground]);
   useEffect(() => {
     if (context.current && !controller.current) {
@@ -102,21 +102,7 @@ export const DayOrb = memo(function DayOrb({
   const inner = size * RENDER_SCALE;
   return (
     <View pointerEvents="none" style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {/* Static spill also survives transparent GL compositing and PNG fallback.
-          Keep the glass clear and fade out before the schedule ring/handles. */}
-      <Svg testID="day-orb-halo" pointerEvents="none" width={size} height={size} viewBox="0 0 1 1" style={{ position: "absolute", top: 0, left: 0 }}>
-        <Defs>
-          <RadialGradient id={haloId} cx="50%" cy="50%" r="50%">
-            <Stop offset={0} stopColor={tones.aura} stopOpacity={0} />
-            <Stop offset={DAY_ORB_FILL * 0.97} stopColor={tones.aura} stopOpacity={0} />
-            <Stop offset={DAY_ORB_FILL * 1.04} stopColor={tones.aura} stopOpacity={mode === "dark" ? 0.35 : 0.16} />
-            <Stop offset={0.76} stopColor={tones.aura} stopOpacity={mode === "dark" ? 0.1 : 0.04} />
-            <Stop offset={0.84} stopColor={tones.aura} stopOpacity={0} />
-            <Stop offset={1} stopColor={tones.aura} stopOpacity={0} />
-          </RadialGradient>
-        </Defs>
-        <Circle cx={0.5} cy={0.5} r={0.5} fill={`url(#${haloId})`} />
-      </Svg>
+      {/* OR3b: no external halo; native gradient stops require React updates. */}
       {renderingFailed
         ? <Image source={require("../../../assets/branding/orb-adaptive-foreground.png")} style={{ width: size, height: size }} resizeMode="contain" />
         : <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />}
@@ -148,10 +134,6 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   scene.add(root);
   const body = createOrbBody();
   root.add(body.mesh);
-  const aura = createOrbAura();
-  // A little smaller than the Knowledge Core's, so it fades before the canvas edge.
-  aura.mesh.scale.setScalar(0.86);
-  scene.add(aura.mesh);
 
   let disposed = false;
   let requestId: number | null = null;
@@ -170,8 +152,9 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
     const now = Date.now();
     const current = runtime.current;
     const moving = current.running && !current.reducedMotion;
-    // While a finger is down, skip frames entirely (the clock keeps its pose).
-    if (dayOrbTouch.active && moving && !interaction.state.current.gesture?.rotating) {
+    // Plain page touches pause idle work; ring motion and its coast remain visible.
+    if (dayOrbTouch.active && moving && !interaction.ringDragging?.current && !interaction.state.current.gesture?.rotating
+      && interaction.state.current.spin.velocityX === 0 && interaction.state.current.spin.velocityY === 0 && !interacting) {
       lastFrame = now;
       requestId = requestAnimationFrame(draw);
       return;
@@ -191,31 +174,14 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
       camera.lookAt(0, 0, 0);
       camera.updateMatrixWorld();
       const tones = current.tones;
-      aura.update({
-        delta: current.running ? delta : 0,
-        shimmer: current.reducedMotion ? 0 : 0.25,
-        shimmerAmount: current.reducedMotion ? 0 : 0.28,
-        glow: 0.45 + tones.strength * 0.5,
-        error: 0,
-        mode: current.mode,
-        camera,
-        center: root.position,
-        color: tones.aura,
-        // The halo moves with the bright body and a slow independent current.
-        // This lights the surrounding canvas without another blur pass.
-        offset: current.reducedMotion ? { x: tones.position.x * 0.16, y: tones.position.y * 0.16 } : {
-          x: tones.position.x * 0.2 + Math.sin(time * 0.7) * 0.05,
-          y: tones.position.y * 0.2 + Math.cos(time * 0.5) * 0.04,
-        },
-      });
       body.update({
         idleColor: interactionFrame.idleColor,
-        bulgeDir: interactionFrame.bulgeDir, bulgeAmount: interactionFrame.bulgeAmount,
+        rippleDir: interactionFrame.rippleDir, rippleTime: interactionFrame.rippleTime,
         time,
         life: 0.22,
         stir: 0,
         glow: 0.35 + tones.strength * 0.75,
-        level: aura.shimmer.level,
+        level: 0,
         error: 0,
         spin: spinMatrix,
         mode: current.mode,
@@ -241,10 +207,10 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
     wake,
     dispose: () => {
       disposed = true;
+      interaction.state.current = cancelOrbSpin(interaction.state.current);
       if (interaction.wake.current === wake) interaction.wake.current = null;
       if (requestId !== null) cancelAnimationFrame(requestId);
       body.dispose();
-      aura.dispose();
       renderer.dispose();
     },
   };

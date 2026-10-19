@@ -1,30 +1,43 @@
-import { beginOrbGesture, createOrbInteraction, endOrbGesture, moveOrbGesture, orbIdleColor, ORB_COLOR_KEY, parseOrbColor, projectTapToSphere, type OrbInteraction } from '@stay-focused/shared';
+import { beginOrbGesture, createOrbInteraction, endOrbGesture, moveOrbGesture, orbIdleColor, ORB_COLOR_KEY, parseOrbColorKey, legacyOrbIndexToKey, orbColorIndex, ORB_LEGACY_COLOR_KEY, ORB_IDLE_PALETTE, projectTapToSphere, type OrbInteraction } from '@stay-focused/shared';
 import { useEffect, useMemo, useRef, type MutableRefObject } from 'react';
 import { View, type GestureResponderEvent, type PanResponderInstance } from 'react-native';
 import { sessionStore } from '../../auth/sessionStore';
 
 export interface OrbInteractionHandle {
   readonly state: MutableRefObject<OrbInteraction>;
+  readonly ringDragging?: MutableRefObject<boolean>;
   readonly wake: MutableRefObject<(() => void) | null>;
 }
 let colorIndex = 0, revision = 0;
 const listeners = new Set<(index: number) => void>();
+let writes: Promise<void> = Promise.resolve();
+function writeColor(index: number) {
+  const key = ORB_IDLE_PALETTE[index]?.key ?? 'pearl';
+  writes = writes.catch(() => {}).then(() => sessionStore.setItem(ORB_COLOR_KEY, key)).catch(() => {});
+}
 export async function readOrbColor(): Promise<number> {
   const before = revision;
   try {
-    const index = parseOrbColor(await sessionStore.getItem(ORB_COLOR_KEY));
-    if (before === revision) colorIndex = index;
+    // A newly mounted surface must not read ahead of a queued color choice.
+    await writes;
+    const saved = await sessionStore.getItem(ORB_COLOR_KEY);
+    const key = saved === null ? legacyOrbIndexToKey(await sessionStore.getItem(ORB_LEGACY_COLOR_KEY)) : parseOrbColorKey(saved);
+    if (before === revision) {
+      colorIndex = orbColorIndex(key);
+      if (saved === null) writeColor(colorIndex);
+    }
   } catch { /* Keep this visit's color if storage is unavailable. */ }
   return colorIndex;
 }
 export function rememberOrbColor(index: number) {
-  colorIndex = parseOrbColor(String(index)); revision++;
+  colorIndex = orbColorIndex(parseOrbColorKey(ORB_IDLE_PALETTE[index]?.key ?? null)); revision++;
   listeners.forEach(listener => listener(colorIndex));
-  void Promise.resolve().then(() => sessionStore.setItem(ORB_COLOR_KEY, String(colorIndex))).catch(() => {});
+  writeColor(colorIndex);
 }
 export function useOrbInteraction(): OrbInteractionHandle {
   const state = useRef(createOrbInteraction(colorIndex));
   const wake = useRef<(() => void) | null>(null);
+  const ringDragging = useRef(false);
   useEffect(() => {
     let live = true;
     const apply = (index: number) => {
@@ -36,7 +49,7 @@ export function useOrbInteraction(): OrbInteractionHandle {
     void readOrbColor().then(apply);
     return () => { live = false; listeners.delete(apply); };
   }, []);
-  return useMemo(() => ({ state, wake }), []);
+  return useMemo(() => ({ state, wake, ringDragging }), []);
 }
 
 /** Transparent ball-only target. Ring responder delegation wins in overlapping bands. */

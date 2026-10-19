@@ -1,4 +1,4 @@
-import { PerspectiveCamera, ShaderMaterial, Vector3 } from "three";
+import { Color, PerspectiveCamera, ShaderMaterial, Vector3 } from "three";
 import { describe, expect, it, vi } from "vitest";
 
 import { createOrbAura, orbShimmerLevel, SHIMMER_SPEED } from "./orbAura";
@@ -35,4 +35,16 @@ describe("orb aura", () => {
     expect(geometry).toHaveBeenCalledOnce();
     expect(material).toHaveBeenCalledOnce();
   });
+});
+
+it('uses the exact idle tint and restores the generation tint in the same theme', () => {
+  const aura = createOrbAura();
+  aura.update({ ...frame, delta: 0, shimmer: 0 });
+  const uniform = (aura.mesh.material as ShaderMaterial).uniforms.uColor!;
+  const generation = uniform.value.clone();
+  aura.update({ ...frame, delta: 0, shimmer: 0, color: '#e6eaf1' });
+  expect(uniform.value.equals(new Color('#e6eaf1'))).toBe(true);
+  aura.update({ ...frame, delta: 0, shimmer: 0 });
+  expect(uniform.value.equals(generation)).toBe(true);
+  aura.dispose();
 });

@@ -1,3 +1,4 @@
+import { cancelOrbSpin } from '@stay-focused/shared';
 import { OrbTouchLayer, useOrbInteraction, type OrbInteractionHandle } from './orbInteraction';
 import { createOrbInteractionSampler } from './orbInteractionFrame';
 import { useIsFocused } from "expo-router/react-navigation";
@@ -49,6 +50,9 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
     const subscription = AppState.addEventListener("change", (next) => setForeground(next === "active"));
     return () => subscription.remove();
   }, []);
+  useEffect(() => {
+    if (!active || !foreground || !focused) interaction.state.current = cancelOrbSpin(interaction.state.current);
+  }, [active, foreground, focused, interaction]);
   useEffect(() => controller.current?.renderForChange(), [active, colors, focused, foreground, mode, reducedMotion, state]);
   const context = useRef<ExpoWebGLRenderingContext | null>(null);
   // Effects can re-run on a live GL context (Fast Refresh, StrictMode), so rebuild rather than stay disposed.
@@ -165,6 +169,8 @@ function buildScene(
     const glow = 0.55 + activity * 0.5 + completion * 0.15;
     aura.update({
       delta: current.reducedMotion ? 0 : delta, shimmer, glow, error, mode: current.mode, camera, center: root.position,
+      color: current.state === 'idle' ? interactionFrame.idleColor : undefined,
+      // The generation light is centered, so rotation keeps its aura centered.
       // Reduced Motion keeps a steady glow.
       shimmerAmount: current.reducedMotion ? 0 : 0.4 + activity * 0.6,
     });
@@ -173,7 +179,7 @@ function buildScene(
       level: aura.shimmer.level,
       stir: 0,
       idleColor: current.state === 'idle' ? interactionFrame.idleColor : undefined,
-      bulgeDir: interactionFrame.bulgeDir, bulgeAmount: interactionFrame.bulgeAmount,
+      rippleDir: interactionFrame.rippleDir, rippleTime: interactionFrame.rippleTime,
     });
     renderer.render(scene, camera);
     gl.endFrameEXP();
@@ -191,6 +197,7 @@ function buildScene(
   return { renderForChange,
     dispose: () => {
       disposed = true;
+      interaction.state.current = cancelOrbSpin(interaction.state.current);
       if (interaction.wake.current === renderForChange) interaction.wake.current = null;
       if (requestId !== null) cancelAnimationFrame(requestId);
       body.dispose();
