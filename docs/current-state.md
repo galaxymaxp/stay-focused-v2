@@ -1,5 +1,22 @@
 # Current State
 
+<!-- OF1 begin -->
+OF1 / automatic offline saving (2026-10-19): **STOPPED at STEP 0**, under
+the prompt's overriding UNATTENDED rules 3-4. Baseline `09e53dd`, branch
+`overnight/2026-10-15_feedback` retained. Implementation contradicts the
+assumed focus-cancelled job: AppLifecycle already starts owner-scoped catch-up
+on sign-in/foreground; Library blur aborts only its own remote fallback, not
+the shared catch-up controller. Body hydration instead has a 60-second budget
+and 300-attempt cap, with no automatic continuation after a limited run;
+notifications occur after batches of up to 20. This changes the required fix.
+No product code changed; implementation/tests/build gates NOT RUN after STOP.
+Documentation diff hygiene checked separately. Owner must resolve the recorded
+scope question before work resumes. Rollout/Device checks NOT RUN, skipped
+entirely; deployed behavior/state UNVERIFIED (owner to confirm). No remote call,
+deployment, environment-file edit, migration application or push. Full findings
+and exact owner question are in the latest OF1 handoff footer.
+<!-- OF1 end -->
+
 <!-- IV1 begin -->
 IV1 / reviewer image viewer (2026-10-19): **PASS for the finite unattended local
 code scope**. Endpoint: STEP 0, web/mobile implementation, tests, all 10 prompt

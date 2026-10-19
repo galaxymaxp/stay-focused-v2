@@ -7893,3 +7893,117 @@ email, deployment, environment-file edit, branch switch or push ran.
 
 Final progress/status: ignored `tmp/overnight/IV1.*`. Endpoint IV1 only;
 no rollout, device work, later slice or AN1 resumption.
+
+
+## OF1 unattended automatic offline saving - STOPPED (2026-10-19)
+
+**Status: STOPPED at STEP 0.** Read the entire prompt, including overriding
+UNATTENDED rules, newest IV1 handoff, full OI1/SP1 handoff sections, AUTOPILOT
+and relevant implementation. Rule 3 says: "It is a STOP if the code itself
+contradicts what the prompt assumes in a way that changes the fix." Rule 4
+requires recording the owner question and ending rather than continuing.
+No question was sent to an unavailable owner and no implementation proceeded.
+
+Baseline `09e53dd`, branch `overnight/2026-10-15_feedback`; tracked tree clean
+at entry. Cached upstream `github/main`: behind 2 / ahead 32, without fetch.
+Original untracked `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` and ignored
+`tmp/` remain untouched/unstaged. No branch switch or history rewrite.
+
+### STEP 0 findings and changed fix
+
+- `apps/mobile/src/app-shell/AppLifecycle.tsx:49`: app-level effect already
+  invokes catch-up for the owner/token when active, independently of Library
+  focus. Its stop cleanup at :57 is tied to owner changes/unmount, not blur.
+  Existing AppLifecycle.test.ts covers sign-in/foreground, signed-out admission
+  and owner switching. OI1's handoff explicitly records this lifecycle wiring.
+- `apps/mobile/src/features/redesign/useLocalLibrary.ts:68`: focus/active gates
+  the screen effect, but :99 joins `runOfflineCatchUp` without passing the
+  screen's AbortSignal. Cleanup at :120 aborts only the controller passed to
+  the separate fallback remote at :69. It unsubscribes the view without
+  cancelling the shared native catch-up. Moving the job out of this effect
+  would therefore not fix the claimed cancellation cause.
+- `apps/mobile/src/services/localLibrary/offlineCatchUp.ts:50`: concurrent
+  callers already share an owner-scoped promise. :57 creates its own abort
+  controller; :62 makes one reconciliation call. There is no continuation
+  loop/timer for a limited or transiently failed body run. :74 checks whether
+  success may be throttled; leaving it unthrottled only permits a later trigger.
+- `apps/mobile/src/services/localLibrary/librarySync.ts:26`: list pagination
+  walks up to 10 pages of 100, rather than native catch-up using only
+  fetchPage(0,100). That single-page path exists only for a null device store
+  in useLocalLibrary.ts:79. Hydration at :89 has a 300-attempt cap and a
+  60,000ms budget (:29-30, :91, :97). It can return limit while copies remain.
+  Per-item non-connection errors are skipped in the run (:103-105), without
+  persistent permanent-failure accounting or body retry backoff. Progress at
+  :108 publishes after a batch of up to 20, rather than after every item.
+- `apps/mobile/src/services/localLibrary/artifactStore.ts:383`: current count
+  is image-aware offline readiness. Body counts alone cannot establish full
+  completion. OI1 image queue already has separate retry scheduling, caps and
+  cleanup; no image behavior was changed or claimed defective here.
+- Both libraryPresentation.ts twins still contain the old caption wording.
+  Web search found only the function definition and no caption caller.
+  Web has no native offline mode (OI1); no web code was deleted or changed.
+
+The 60-second budget, lack of automatic body continuation/retry and batched
+notifications are code-established potential contributors; **the cause of the
+reported production 40/72 state is UNVERIFIED (owner to confirm)**. No live
+evidence was collected. These findings change the proposed blur/lifecycle fix
+to continuation/retry/progress work on an already app-scoped job, triggering
+the explicit unattended STOP before STEP 1.
+
+**Exact owner question for a later attended run:** May OF1 proceed against the
+existing app-scoped, blur-independent job by implementing resumable body
+continuation after time/attempt limits, transient retry/backoff and permanent
+failure accounting, explicit reconnect admission and per-item progress, while
+preserving OI1 image rules and updating both caption twins, instead of the
+prompt's assumed relocation/focus-abort fix?
+
+### Commits and verification
+
+Local checkpoint commit: `docs: record OF1 step-zero stop findings`, author
+`galaxymaxp <omgraythekid@gmail.com>` via --author. Its final hash is recorded
+in Git and ignored `tmp/overnight/OF1.status`; no implementation commit.
+
+| Exact command | Result / counts |
+| --- | --- |
+| `npm run typecheck -- --force` | NOT RUN, 0 tasks; STEP 0 STOP |
+| `npm run lint -- --force` | NOT RUN, 0 tasks; STEP 0 STOP |
+| `npm run test --workspace @stay-focused/shared` | NOT RUN, 0 tests; STEP 0 STOP |
+| `npm run test --workspace @stay-focused/api` | NOT RUN, 0 tests; STEP 0 STOP |
+| `npm run test --workspace @stay-focused/mobile` | NOT RUN, 0 tests; STEP 0 STOP |
+| `npm run test --workspace @stay-focused/web` | NOT RUN, 0 tests; STEP 0 STOP |
+| `npm run build --workspace @stay-focused/api` | NOT RUN, 0 builds; STEP 0 STOP |
+| `npm run build --workspace @stay-focused/web` | NOT RUN, 0 builds; STEP 0 STOP |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | NOT RUN, 0 exports; STEP 0 STOP |
+| `npm run build -- --force` (AUTOPILOT) | NOT RUN, 0 tasks; STEP 0 STOP |
+| `git diff --check` and `git diff --cached --check` | FRESH PASS, 0 whitespace errors |
+
+Prompt gates: 1/10 checked (diff hygiene); 9/10 NOT RUN. No product test result
+or completion claim. Documentation preservation check: FRESH PASS, 4/4 files
+retain all pre-existing bytes. No test failure, flake or gate repair attempt.
+One exploratory read targeted nonexistent repository.ts; source search located
+librarySync.ts instead. Output-heavy initial reads were repeated in bounded
+sections to inspect relevant evidence. No application file was written.
+Current-state, roadmap and sprint now record this STOP without superseding
+the previous completed IV1 result. No ADR needed for an inspection checkpoint.
+
+**UNVERIFIED (owner to confirm):** deployed API/mobile/website revisions,
+production database/applied-migration/Scheduler state, remote-ref freshness,
+actual reported count, and physical/authenticated reconnect behavior. No
+Supabase, Vercel, Google Cloud, Canvas or Resend call, remote SQL/migration,
+Scheduler action, email, deployment, environment-file edit or push ran.
+
+### Owner steps remaining
+
+- Resolve the exact scope question above; STEP 1-3, regression tests and full
+  implementation gates remain pending. This run ends at STEP 0.
+- **Rollout - NOT RUN, skipped entirely:** after a later completed/reviewed
+  implementation, owner chooses publication separately.
+- **Device checks - NOT RUN, skipped entirely:** after implementation, owner
+  verifies Today-only sign-in saving, a gradually rising Library count and
+  completion wording, then airplane-mode interruption/reconnect on Realme.
+- Confirm all UNVERIFIED state above. For later Vercel deployment/env/log work,
+  installing the missing CLI with `npm i -g vercel` is strongly recommended;
+  no installation or invocation ran here.
+
+Ignored progress/status: `tmp/overnight/OF1.progress` and `OF1.status`.
+No later overnight task or AN1 resumption started.
