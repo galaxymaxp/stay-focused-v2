@@ -9,7 +9,8 @@
     "./clock-glass-renderer": "./src/clock-glass-renderer.ts",
     "./task-planning": "./src/task-planning.ts",
     "./notification-preferences": "./src/notification-preferences.ts",
-    "./study-export": "./src/study-export/index.ts"
+    "./study-export": "./src/study-export/index.ts",
+    "./orb-ambient-renderer": "./src/orb-ambient-renderer.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
