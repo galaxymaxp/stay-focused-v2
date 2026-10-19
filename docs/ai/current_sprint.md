@@ -138,6 +138,36 @@ environment-file edit, branch switch or push. Original unrelated paths
 preserved. Endpoint OR4 only; no later task started. [Acceptance and exact gates](acceptance/or4-orb-color-sync.md).
 <!-- OR4 end -->
 
+<!-- WGP2 begin -->
+WGP2 / generation orb and vertical step bar (2026-10-19): **PASS for the
+finite unattended local code scope**. STEP 0-4, both apps, tests, all 10
+prompt gates, docs and local commits complete. Baseline 2480cf14; branch
+overnight/2026-10-15_feedback retained. STEP 0 Playwright repro (real
+GenerationScreen, 1440/390): the canvas mounts, the ball-only target receives
+the pointer and a tap stores the next color, but generation states hid the
+idle color, so taps looked dead. Web and mobile generation screens (and the
+Queue generation view) now render the Today DayOrb, which gains an optional
+state: the Knowledge Core's coreModel excess over idle while running, the
+existing desaturated tint and stillness on failure, and a brief brighten then
+idle on completion. Today is unchanged without a state; Reduce Motion snaps.
+Web: numbered list replaced by a 3px segmented track (done --success, failed
+--danger, pending --line), a 1.6s sweep on the current segment (steady half
+fill under RM), sr-only state words, real section fill and count under
+Building study material, and stepRevealQueue ticks multi-stage jumps at 180ms
+without ever running ahead of the server or delaying Library. Mobile: a thin
+pill bar under the status line with the shared skeleton shimmer and the
+same count caption. Commits: 0aeb7177, d1231c6a, 392ca412, 3bef7b33,
+4063c883; docs hash in Git/WGP2.status.
+FRESH PASS: typecheck/lint/root build 8/8 tasks each, 0 cached; 6 existing
+lint warnings. Shared 614, API 2452 / 3 intentional live skips, mobile 1580,
+web 435 tests (first web run 430 / 5 fail on a test window stub, repaired);
+API/web builds 37/37 and 22/22 pages; Android export and diff hygiene pass.
+Rollout and Device checks NOT RUN, skipped entirely. Deployed revisions and
+physical appearance UNVERIFIED (owner to confirm). No remote call,
+SQL/migration, Scheduler, email, deployment, environment-file edit, branch
+switch or push. Endpoint WGP2 only; no later task started. [Acceptance and exact gates](acceptance/wgp2-generation-orb-step-bar.md).
+<!-- WGP2 end -->
+
 <!-- OF1 begin -->
 OF1 / automatic offline saving (2026-10-19): **STOPPED at STEP 0**, under
 the prompt's overriding UNATTENDED rules 3-4. Baseline `09e53dd`, branch

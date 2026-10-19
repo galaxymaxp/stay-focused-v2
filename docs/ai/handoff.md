@@ -8777,3 +8777,148 @@ environment-file edit, branch switch or push occurred.
 
 Ignored progress/status: tmp/overnight/OR4.progress and OR4.status.
 Endpoint OR4 only; rollout/device work and later tasks remain owner work.
+
+## WGP2 / generation orb and vertical step bar - PASS locally (2026-10-19)
+
+**Status: PASS for the finite unattended local code scope.** WGP2 was read in
+full, including the overriding UNATTENDED rules. STEP 0-4, both apps, tests,
+all 10 prompt gates, docs and local commits complete. Baseline 2480cf14;
+branch overnight/2026-10-15_feedback retained. First run (no prior
+WGP2.progress). Tracked tree was clean; UI/, apps/mobile/.gitignore,
+supabase/.temp/ and tmp/ were left alone and never staged. Newest handoffs
+(WGP1, OR2, OR3b, OR4, GB1) were read first. No later task was started.
+
+### STEP 0 finding (interactivity root cause)
+
+A local Playwright harness rendered the real web GenerationScreen with
+globals.css and three.js (fictional local job fixture, all non-local requests
+aborted) at 1440x900 and 390x844. The canvas was present;
+`document.elementFromPoint` at the orb center returned the ball-only
+`orb-touch` layer at both widths, and a click changed `sf.orb.colorKey`
+pearl -> gold. So none of the prompt's candidates (dynamic placeholder, pane
+stacking, status overlap, inset math, WebGL fallback) was the cause. The real
+cause is visual: the Knowledge Core passes the remembered idle color only in
+the `idle` state (OR2 rule), and a generation page is never idle. A tap
+changed storage with nothing visible, and the 0.12 ripple was masked by the
+full-speed spin. DayOrb could take a state input through the existing
+coreModel mapping without duplicating shader logic, so no STOP.
+
+### What changed
+
+- **One orb (both apps).** DayOrb gains an optional `state`. coreModel (web
+  and mobile copies) adds `createCoreLevels` / `stepCoreLevels` /
+  `coreLevelsExtra`. These add the Knowledge Core's excess over its own idle
+  profile (life, glow, spin, liquid rate, shimmer level) with the same easing
+  constants. Running states are livelier and render at full frame rate.
+  Failure eases `error` to 1 (the existing desaturated, glow-off tint, which
+  wins over the idle color) and then stops the loop. Completion brightens for
+  about 1 s, then renders exactly as idle Today. Reduce Motion snaps the
+  levels, with no flash and no ambient loop. Without a state, Today's
+  uniforms are unchanged (tested).
+- **Web generation page:** new `GenerationOrb` (DayOrb + the shared
+  OrbPointerLayer and remembered or synced color), still lazy-loaded with
+  three.js at the WGP1 size. The `.day-orb-fallback` static fallback is kept.
+- **Mobile:** GenerationCore renders DayOrb with an OrbTouchLayer. This covers
+  the generation screen and the Generate "Submitting" view. It keeps the
+  pre-GL install fallback (GenerationVisual) and DayOrb's PNG fallback.
+- **Web step bar:** the numbered list and its Done/Pending/In progress lines
+  are replaced by a 3px pill track with one segment per stage. Done segments
+  are --success, failed is --danger (still showing "Stopped here"), pending is
+  --line. The current segment has a 1.6s ease-in-out top-to-bottom sweep,
+  reusing the skeleton highlight's muted color; under Reduce Motion it is a
+  steady half fill. Screen readers get aria-current plus a hidden state word.
+  Building study material fills by `progress.completed/total`, with the
+  `3 of 18 sections` count moved under its label (pages progress attaches to
+  the current step).
+- **Fast tail:** pure `stepRevealQueue(prev, next)` plus a 180ms reveal hook.
+  It never marks a stage done before the server does, and Reduce Motion
+  makes it instant. The Library open is now keyed by the saved id, so these
+  re-renders (or polls) can no longer cancel the existing 1400ms wait. The
+  redirect is never delayed.
+- **Mobile compact progress:** under the status line, a 3px pill bar with the
+  shared SkeletonBlock shimmer while running (hidden when stalled, failed or
+  done). It fills by real section or page progress, with the same caption,
+  and holds still under Reduce Motion. No step list was added.
+
+**Parity and skips:** both apps got the orb change. The step list is web-only
+and the compact bar is mobile-only, as the prompt specifies. Mobile reuses its
+existing opacity skeleton shimmer instead of a sliding gradient: there is no
+gradient primitive, and adding a dependency was out of scope. The web topbar
+Queue icon is a 26px static PNG, not a renderer, so it was left unchanged; the
+Queue generation view is the same GenerationScreen. The Knowledge Core files
+stay: the mobile lab screen uses them, and web `KnowledgeCore.tsx` is no longer
+imported by production code but is kept with its tests.
+
+### Commits and gate counts
+
+- 0aeb7177 feat(web): Today orb with generation state on generation screen
+- d1231c6a feat(mobile): Today orb with generation state on generation screens
+- 392ca412 feat(web): vertical generation step bar
+- 3bef7b33 feat(mobile): compact generation progress
+- 4063c883 test(web): give the recovery screen fixture a matchMedia window
+- docs commit: hash in tmp/overnight/WGP2.status
+
+All use `--author="galaxymaxp <omgraythekid@gmail.com>"`, with no
+attribution trailers. **10/10 prompt gates FRESH PASS**, plus the forced root
+build:
+
+| Command | Result |
+| --- | --- |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached (loose env mode for the network guard; repeated at closure) |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors, 6 existing warnings; repeated at closure |
+| `npm run test --workspace @stay-focused/shared` | 614/614 tests, 59 files |
+| `npm run test --workspace @stay-focused/api` | 2452 passed / 3 intentional live skips, 213 files (`--maxWorkers=2`) |
+| `npm run test --workspace @stay-focused/mobile` | 1580/1580 tests, 166 files |
+| `npm run test --workspace @stay-focused/web` | 435/435 tests, 66 files (after repair) |
+| `npm run build --workspace @stay-focused/api` | 37/37 static pages |
+| `npm run build --workspace @stay-focused/web` | 22/22 static pages |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | 1 local Android bundle |
+| `git diff --check` | PASS, 0 whitespace errors |
+| Additional `npm run build -- --force --env-mode=loose` | 8/8 tasks, 0 cached |
+
+The new local Playwright suite (`generation-screen.browser.test.ts`, part of
+the web gate) passes 3/3. At 1440 and 390 it checks the canvas, the center hit
+target, that a tap changes pearl -> gold, the numberless and wordless list,
+the `animated` current segment with `step-sweep`, and the Reduce Motion
+`none`. Each one launches local Chromium with software WebGL and aborts all
+non-local requests.
+
+**Failed first attempt:** the first full web gate ran 430 passed / 5 failed in
+`generationRecovery.test.ts` (`window.matchMedia is not a function`; its
+EventTarget window stub lacked matchMedia). 4063c883 adds it, with no
+assertion changed; the rerun passed 435/435. Other implementation-time
+failures are recorded in the acceptance report. No assertion was weakened, no
+rule suppressed, no test skipped, and no flake was observed. The builds
+regenerated both next-env.d.ts files; both were restored. Details:
+[WGP2 acceptance](acceptance/wgp2-generation-orb-step-bar.md).
+
+**Risks/debt:** the state mapping's visual weights (life, glow, flash) are
+tuned by reasoning and local renders, not on a device. The running generation
+orb now renders at full frame rate, the same as the Knowledge Core did before.
+
+**UNVERIFIED (owner to confirm):** whether the deployed website even includes
+the OR2/OR3b pointer handling (an older deployment would explain "not
+interactable" on its own). Also: deployed API/web/mobile revisions, applied
+migrations (OR4 file still pending), remote-ref freshness, and the physical
+look and feel on the Realme and desktop. No Supabase, Vercel, Google Cloud,
+Canvas or Resend call, deployment, remote SQL or migration application,
+Scheduler operation, email, environment-file edit, branch switch or push.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** publish the website and the mobile
+  OTA through the existing owner release process. On the website and Realme,
+  start a reviewer generation. Check that the orb looks like Today's, rotates
+  and ripples, and shows state; that the step bar shimmers on the current
+  step; that Building study material fills with sections; and that the last
+  steps tick through in sequence before Library opens.
+- **Device checks - NOT RUN, skipped entirely:** tap color change and
+  hold-rotate on the generation page, failure dimming, completion brighten,
+  Reduce Motion (steady bar, no sweep or brighten), the mobile compact bar
+  and caption, and power while generating.
+- Confirm the UNVERIFIED items. For later authorized deployment or env work,
+  installing the missing Vercel CLI (`npm i -g vercel`) is recommended; no
+  installation or invocation ran here.
+
+Ignored progress/status: tmp/overnight/WGP2.progress and WGP2.status.
+Endpoint WGP2 only; rollout/device work and later tasks remain owner work.
