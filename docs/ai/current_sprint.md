@@ -1,3 +1,29 @@
+<!-- LG1 begin -->
+LG1 / hidden Canvas files linked from visible sources (2026-10-19): **PASS**
+for the finite unattended local code scope, baseline f709843, branch
+overnight/2026-10-15_feedback retained. STEP 0-6, tests/gates/docs/local commits
+complete. Shared effective policy requires current published, visible source
+evidence. Course-batched reads, next-sync stale-status repair and preparation
+through the existing 200-per-sync guard cover source status, previews and
+snapshots. Both clients consume corrected API state; no client UI, migration,
+dependency or ADR change. Finalize health records lack reference context and
+retain the prompt's explicit exception; they do not gate material generation.
+Commits: d318a09, ddcaef1, b345138; documentation hash in Git/LG1.status.
+FRESH PASS: 10/10 requested gates. Forced typecheck/lint each 8/8 tasks, zero
+cached; six existing lint warnings, zero errors. Shared 590/590 (56 files),
+API 2433 passed / 3 intentional live skips (212 files, final committed-tree
+rerun), mobile 1511/1511 (158 files), web 363/363 (55 files). API build 36/36
+static pages, web 20/20, Android local export and diff hygiene pass. Additional
+AUTOPILOT forced root build passes 8/8 tasks, zero cached, including local
+Android/iOS/web exports. Failed first attempts are recorded in acceptance;
+no nondeterministic flake. Generated declarations restored; owner paths untouched.
+Rollout and Device checks NOT RUN, skipped entirely. Production state remains
+UNVERIFIED (owner to confirm). No external service call, deployment, remote SQL,
+Scheduler operation, environment-file edit or push. Next: owner rollout, SOC SCI
+103N Realme/website sync/preparation/generation and read-only 14-row check.
+[LG1 acceptance](acceptance/lg1-page-linked-hidden-files.md).
+<!-- LG1 end -->
+
 <!-- UC3 begin -->
 UC3 / APK release pipeline (2026-10-19): **PASS** for the finite local code
 scope, baseline `0037a3a`, branch `overnight/2026-10-15_feedback` retained.

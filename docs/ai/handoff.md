@@ -7220,3 +7220,125 @@ roadmap and sprint are reconciled; UC3 is the endpoint.
 
 Final UC3 checkpoint/status is in ignored `tmp/overnight/UC3.*`. Stop at UC3;
 no rollout, publication or later work is authorized by this handoff.
+
+
+## LG1 / hidden Canvas Page-linked files (2026-10-19)
+
+**Status: PASS for the finite unattended local code scope.**
+Baseline f709843; current branch overnight/2026-10-15_feedback retained.
+Finite endpoint: STEP 0-6, tests/gates/docs/local commits. The tracked baseline
+was clean; owner UI/, apps/mobile/.gitignore and supabase/.temp/ remain untouched.
+Local upstream tracking was ahead 16 / behind 2 at baseline; no fetch or push.
+
+Shared effective eligibility now requires a current, explicitly published,
+student-visible reference before hidden metadata can be treated as available.
+Locks/dates/deletion and byte/type/security checks still win. Fresh inventory
+uses existing course source/reference context; stored readers batch complete
+references/source rows by course with owner/connection predicates and safe
+failure. Sync repairs stale blocked/unavailable statuses, including retained
+hashes, without claiming old bytes are current. Preparation re-ingests missing
+objects and registers jobs through the existing 200-per-sync guard.
+API source lists, preparation, previews/structured snapshots and saved reviewer
+status consume the same rule. No migration, backfill script, dependency or ADR.
+Mobile and web already consume API preparation/generation state; no raw hidden
+checks were found in either Generate client, so client implementation is
+intentionally unchanged. Both clients receive the corrected behavior.
+
+STEP 0 schema evidence: packages/db/src/types.ts and the existing
+202607060003 file-ingestion foundation migration store references and source
+publication/access metadata. No missing-schema STOP condition applied. The
+prompt's approximate line numbers drifted; the schema lives in packages/db,
+not supabase/migrations. Every requested scan call site is recorded here:
+
+| Call site | Before LG1 | LG1 result / reference availability |
+| --- | --- | --- |
+| `packages/canvas/src/types.ts`, `client.ts` | Define/parse `hiddenForUser` | Unchanged metadata transport; no access decision |
+| `packages/db/src/types.ts` | File row/insert/update hidden fields | Unchanged schema types |
+| `canvas-file-policy.ts` classifier, direct-link classifier, status mapper, hidden predicate | Hidden always unavailable except explicit Page override | Shared effective policy; locks/deletion win; only current, explicitly published and visible references elevate hidden files; size/type/security limits retained |
+| `canvas-file-policy.ts:isNewlySupportedOfficeFile` | Ordinary Office metadata upgrade classifier | Unchanged legacy helper; effective classification now runs on access-aware source reads |
+| `canvas-file-normalize.ts` payload fields / `mapCanvasFile` | Raw hidden flags set blocked eligibility/status | Effective policy from fresh course reference/source batches; standalone mapping denies without evidence |
+| `canvas-sync.ts` inventory write / existing-file mapping | Reclassified inventory could overwrite Page access; existing-file path merely maps flags | Persistence extracted to `canvas-file-inventory.ts`; effective inventory payload plus owner-scoped 200-ID repair batches for stale unavailable/blocked status |
+| `canvas-file-ingestion.ts` hiddenPageLink / eligibility/status mapping / metadata update / content validation | Only explicit Page-worker hint could override hidden metadata | Current references loaded once per requested course, fully paginated; shared mapper used on fresh provider metadata; aggregate limit uses effective eligibility; metadata/signature validation unchanged |
+| `canvas-reviewer-sources.ts` direct-link candidate / metadata availability | Raw hidden flags denied normal file preparation; separate Page candidate override | Course-batched access evidence attached to source rows for list/prepare/preview/structured snapshot reads; candidate bypass removed; shared policy controls availability |
+| `reviewer-source-status.ts:isFileUnavailable` | Hidden flags and stored blocked eligibility denied rebuild | Shared policy plus complete owned reference/source batches for file status; missing rows remain denied |
+| `canvas-stored-file-extraction.ts` hidden fields in validation input | Pass-through to byte/type/signature validation | Unchanged; preview/snapshot readers supply effective source state, workers freshly ingest before extraction |
+| `experience/canvas-page-attachments.ts` hidden-file branch | Separate hidden Page download override | Shared effective policy and visible published Page check; authenticated byte validation retained; stale existing rows repaired without replacing historical objects |
+| `canvas-sync-jobs/finalize.ts:itemStateForRecord` | `locked` or `hiddenForUser` reports health state locked | Explicit prompt exception: unchanged. The staged `record` has provider metadata, no current references/source visibility. This health receipt does not determine material generation eligibility |
+| `canvas-module-material.ts` | Classifies raw provider file/assignment attachment policy; blocks `blocked_*` eligibility | Unchanged dormant diagnostic classifier: repository search finds no production caller, only its tests; it does not control material Generate, previews or snapshots |
+| `canvas-preparation/backfill.fixture.ts` | Synthetic local nonhidden rows | Test fixture only; not a production decision |
+| `canvas-preparation/orchestration.ts` | Enqueues supported/canPrepare sources from complete API inventory | Unchanged: corrected sources enter the same durable registration/200-job guard; no parallel queue or bypass |
+
+Final verification and exact commands:
+
+| Exact command | Result / counts | Log stem |
+| --- | --- | --- |
+| npm run typecheck -- --force | FRESH PASS, 8/8 tasks, 0 cached (final rerun) | LG1.typecheck-final |
+| npm run lint -- --force | FRESH PASS, 8/8 tasks, 0 cached, 6 existing warnings, 0 errors | LG1.lint-final |
+| npm run test --workspace @stay-focused/shared | FRESH PASS, 590/590 tests, 56 files (existing emitted copies included) | LG1.shared |
+| npm run test --workspace @stay-focused/api -- --maxWorkers=2 | FRESH PASS, 2433 passed / 3 intentional live skips, 212 files; final committed-tree rerun also passes | LG1.api / LG1.api-final |
+| npm run test --workspace @stay-focused/mobile | FRESH PASS, 1511/1511 tests, 158 files | LG1.mobile |
+| npm run test --workspace @stay-focused/web | FRESH PASS, 363/363 tests, 55 files | LG1.web |
+| npm run build --workspace @stay-focused/api | FRESH PASS, 36/36 static pages | LG1.api-build |
+| npm run build --workspace @stay-focused/web | FRESH PASS, 20/20 static pages | LG1.web-build |
+| npm run build --workspace @stay-focused/mobile -- --platform android | FRESH PASS, 1 local Android bundle / 35 assets, no publication | LG1.android |
+| git diff --check | FRESH PASS, 0 whitespace errors; staged and baseline-to-HEAD checks also pass | LG1.diff-check |
+| npm run build -- --force (additional AUTOPILOT gate) | FRESH PASS, 8/8 tasks, 0 cached; API/web and Android/iOS/web exports | LG1.root-build |
+
+Every workspace has a test script. NOT APPLICABLE: new schema migration,
+ADR, dependency installation, UI visual changes and workflow/provider-contract
+suites (no workflow/provider implementation change). No device or deployment
+claim is inferred from local gates. The API full suite was repeated against
+committed code after the final aggregate-policy review; the 25/25 focused run
+also covers that review. Vite config-loader and Expo color warnings remain.
+
+Implementation commits (author galaxymaxp <omgraythekid@gmail.com>):
+
+- d318a09 fix(api): centralize access policy for hidden linked Canvas files
+- ddcaef1 fix(api): preserve hidden linked file access through sync and generation
+- b345138 test(api): cover Page-only hidden file repair and preparation
+- The documentation checkpoint's exact hash is recorded in Git and LG1.status
+  after committing; no self-referential amendment.
+
+
+See [LG1 acceptance](acceptance/lg1-page-linked-hidden-files.md) for the matrix,
+local-only fixture boundaries, failed first attempts and log paths. The
+Page-only synthetic course proves two linked hidden PDFs eligible/preparable,
+the third unreferenced PDF unavailable, later Files promotion stable, and
+source list/rebuild readiness after injected worker publication. Complete
+reference paging and missing/foreign/unpublished/locked-source denial pass.
+Full-suite local worker/extraction/guard contracts remain in place.
+
+Failed first attempts are preserved: focused typecheck typing/narrowing and
+fixture hash errors; focused preparation fixtures missing paging/source rows
+(2 failed / 105 passed); new integration fixture metadata (1 failed / 35 passed)
+and enum expectation (1 failed / 58 passed). Focused final 89/89, post-review
+25/25. First forced lint failed after 6/8 tasks with one reserved binding error;
+fixed without suppressions. One trailing EOF blank line found by staged diff
+hygiene was removed in a local test-commit amendment. Python was unavailable;
+Node handled that local edit. One long shell write was automatically rejected;
+apply_patch safely authored the local fixture. No nondeterministic flake.
+Generated Next declarations are inspected/restored; logs/exports remain ignored.
+
+**UNVERIFIED (owner to confirm):** reported production course/file/reference
+rows, deployed API/worker/website revisions, applied production database state,
+Scheduler state, remote-ref freshness and real Realme/browser behavior.
+No Supabase, Vercel, Google Cloud, Canvas or Resend call, remote SQL, migration
+application, Scheduler action, email, deployment, environment-file edit or push
+ran. Live-state limitations did not stop authorized code work.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** deploy API and Google worker.
+  No migration/backfill is needed; the next course sync performs repair.
+- **Device checks - NOT RUN, skipped entirely:** sync SOC SCI 103N on Realme
+  and website; confirm Unit 1-3 lesson PDFs appear under Pages, prepare and
+  generate a reviewer. Owner performs the prompt's read-only check that all 14
+  rows have eligible_document after sync.
+- Confirm the UNVERIFIED states above. Finalize health receipts can still call
+  hiddenForUser items locked because their records lack reference context;
+  this explicit LG1 exception does not gate material generation.
+- For later deployment/env/log tooling, installing the missing Vercel CLI with
+  npm i -g vercel is strongly recommended. No installation/invocation ran.
+
+The finite LG1 endpoint ends here; no later overnight prompt is started.
+Final progress and status are recorded in ignored tmp/overnight/LG1.*.
