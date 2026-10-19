@@ -7746,3 +7746,150 @@ deployment, environment-file edit, branch switch or push ran.
 
 Final progress/status: ignored `tmp/overnight/RV3.*`. RV3 endpoint only;
 no rollout, device work, AN1 resumption or later overnight slice started.
+
+
+## IV1 / reviewer image viewer (2026-10-19)
+
+**Status: PASS for the finite unattended local code scope.** Read the full IV1
+prompt and overriding UNATTENDED rules. STEP 0, code, tests, 10/10 prompt
+gates, additional forced root build, documentation and local commits complete.
+Baseline `c448c21`, branch `overnight/2026-10-15_feedback` retained; cached
+upstream behind 2 / ahead 29 at entry, no fetch. Tracked baseline clean;
+original `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` and ignored `tmp/`
+untouched and unstaged. Scope ends at IV1.
+
+STEP 0 matched source despite drifted line numbers/shared-reviewer path. The
+only broken web message-circle use was SectionVisual AskImageButton; no other
+web use to defer. Mobile ImageViewer already isolated a scrollable native
+Modal with top-only fit dismissal; ZoomablePage supported double-tap 1x/2x,
+pinch 1x-4x and pan. Single tap did nothing beyond recording a timestamp.
+It now immediately toggles 1x/2.5x at the point, retains pinch and clamped pan,
+and prevents post-pinch/pan/cancel toggles. Two taps toggle in and back out.
+All three viewers use the shared zoom surface. Native gesture/physical
+acceptance stays UNVERIFIED, not inferred from render tests.
+
+Web removes the slider/width scaling. Fixed overflow-hidden frame, point
+transform origin plus clamped translation/scale, precise fitted layout
+dimensions excluding entrance transforms, mouse/one-finger pointer capture,
+200ms transform/origin transition and instant Reduce Motion. Stationary taps
+complete on pointerup, with compatibility clicks suppressed. Keyboard toggle,
+native Escape/Close/backdrop and image non-dismissal verified. Optional web
+pinch and ctrl/command-wheel intentionally omitted to retain small tested
+scope; native pinch stays.
+
+CircleHelp is an installed circle-question-mark alias; web copies its lucide
+SVG with stroke width 2 and uses it in viewer/inline/shared sign-in actions.
+Both platforms stack Ask above Save, equal 48px/pt full-width left-aligned
+rows, matching labels/color/icons and 8px/pt gap, offline note below column.
+Mobile ImageActions covers ExternalVisual, SourcePageSnapshot and SourceFigures.
+No required platform skipped. Shared-reader lacks Save/interactive zoom and
+retains its existing sign-in-only action. No API/source/schema/migration,
+dependency or ADR change.
+
+Commits, author galaxymaxp <omgraythekid@gmail.com>:
+
+- `0d09cf3 feat(mobile): align reviewer image zoom and actions`
+- `2a2f1d8 feat(web): tap to zoom reviewer images`
+- `docs: complete IV1 reviewer image viewer handoff`: documentation checkpoint;
+  final hash recorded in Git and ignored IV1.status after committing.
+
+**FRESH PASS: 10/10 prompt gates**, plus AUTOPILOT forced root build:
+
+| Exact command | FRESH result / counts |
+| --- | --- |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached, final rerun |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors / 6 existing warnings, final rerun |
+| `npm run test --workspace @stay-focused/shared` | 590/590 tests, 56 files |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | 2433 passed / 3 intentional live skips, 212 files |
+| `npm run test --workspace @stay-focused/mobile` | 1527/1527 tests, 159 files, final rerun |
+| `npm run test --workspace @stay-focused/web` | 378/378 tests, 57 files, final rerun |
+| `npm run build --workspace @stay-focused/api` | 36/36 static pages |
+| `npm run build --workspace @stay-focused/web` | 20/20 static pages, final rebuild |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | 1 Android bundle / 35 assets, local export |
+| `git diff --check` | 0 whitespace errors; staged/final hygiene also checked |
+| `npm run build -- --force --env-mode=loose` (additional AUTOPILOT gate) | 8/8 tasks, 0 cached; local Android/iOS/web exports |
+
+All workspaces have test scripts. Focused native **80/80**; final web suite
+includes **38/38** focused tests. API uses two workers for local database-test
+memory without filtering. Web Playwright **6/6** at 1440/390/320px in both
+themes; actual native ImageActions via RN Web **6/6** at 390/360/320px in both
+themes; zero unexpected requests/page errors. Synthetic fixtures and service
+stubs only. Screenshots inspected. Final web rebuild and root typecheck/lint
+follow the last measurement refinement; forced root build passed earlier in
+this run with all other workspaces unchanged afterward. Workflow/provider
+contract suites NOT APPLICABLE to these UI-only paths.
+
+Resume checkpoint: the interrupted final lint run had no completion marker.
+Its log is preserved as `IV1.lint-interrupted.log`; the resumed forced lint
+finished FRESH PASS, 8/8 tasks, 0 cached, 0 errors / 6 existing warnings.
+Other passing IV1 results above are retained from the pre-interruption local
+run after inspecting their logs and the unchanged implementation. No committed
+work or passing suite was repeated. No application changes were needed on resume.
+
+Failed attempts retained, without weakening validation:
+
+- Initial forced typecheck: **7/8 tasks passed, 1 failed**, one TS2769 error:
+  native Image does not accept pointerEvents. A wrapping View now owns it;
+  final forced typecheck is green.
+- Initial full mobile suite: **1526 passed / 1 failed**, 158 files passed /
+  1 failed. StudyAssistSheet's lucide mock omitted the new CircleHelp export;
+  extending that existing mock fixes it. Final full suite **1527/1527**.
+- Focused mobile first three runs: **77 passed / 1 failed**, then **79 passed /
+  1 failed** twice. New assertions initially ignored letterboxing, omitted one
+  required release event, and used exact equality for a fractional pan bound.
+  Correct event evidence and geometric/tolerance assertions yield **80/80**.
+- The first optional browser geometry probe measured rows during the existing
+  entrance animation; waiting for it to settle fixes that harness expectation.
+  Two subsequent probes exposed missing compatibility clicks after captured
+  touch pan. Taps now complete on pointerup and suppress duplicate clicks;
+  a committed regression covers both browser behaviors. Web **6/6** then passed.
+- Final tapped-origin review prompted further browser bound failures on
+  intermediate edits. Integer client sizes rounded fractional phone widths;
+  bounding-rect sizes then included the dialog's entrance scale (diagnostic
+  first combination **0/6**). Final computed layout sizes avoid both issues;
+  origin-aware clamp evidence and final browser **6/6** pass.
+- Optional native-web layout bundling failed twice on React Native Flow code;
+  resolving react-native-svg's installed web entry and .web extensions fixes
+  the harness. Final **6/6**, with real CircleHelp/Download vectors.
+- Exploratory drifted paths were resolved with source search. One mock patch
+  missed its context and applied no changes before the corrected patch.
+
+- On resume, a documentation-only preservation check first compared raw
+  checkout bytes to Git-normalized content and failed on Windows CRLF.
+  Comparing canonical line endings passes; Git shows additions only.
+
+No nondeterministic flake, removed assertion, suppressed check or remaining
+gate failure. Existing Vite config-loader, react-test-renderer deprecation and
+Expo NO_COLOR/FORCE_COLOR warnings remain non-failing.
+
+Generated Next declarations inspected/restored. Logs/exports/screenshots,
+progress/status and all tmp files excluded. Outbound HTTP/fetch/socket guards,
+disabled live flags and offline/no-telemetry build settings used. Planning
+files reconciled with historical bytes preserved. No local code blocker.
+[Full acceptance/evidence](acceptance/iv1-reviewer-image-viewer.md).
+
+**UNVERIFIED (owner to confirm):** deployed API/mobile/website revisions,
+production database/applied-migration/Scheduler state, remote-ref freshness,
+the reported deployed symptom, real Realme/authenticated-browser gestures,
+native tap-coordinate behavior, TalkBack and physical appearance. No remote
+state was needed to establish the code fix. No Supabase, Vercel, Google Cloud,
+Canvas or Resend call, remote SQL/migration application, Scheduler action,
+email, deployment, environment-file edit, branch switch or push ran.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** review these local commits and
+  choose website deployment and mobile OTA/APK publication separately.
+- **Device checks - NOT RUN, skipped entirely:** website reviewer image tap
+  at a point, drag with mouse/one finger, tap back to fit; verify Escape,
+  Close/backdrop, keyboard and Reduce Motion. On Realme verify single-tap
+  toggling, retained pinch/pan, dismissal/scroll isolation, Ask/Save matching
+  vectors and stacked full-width rows in external, source-page and figure
+  viewers. Confirm light/dark and offline notes on both apps, and shared
+  reviewer Ask remains a sign-in link.
+- Confirm the UNVERIFIED states above. For later deployment/env/log tooling,
+  installing the missing Vercel CLI with `npm i -g vercel` is strongly
+  recommended; no installation or invocation ran here.
+
+Final progress/status: ignored `tmp/overnight/IV1.*`. Endpoint IV1 only;
+no rollout, device work, later slice or AN1 resumption.

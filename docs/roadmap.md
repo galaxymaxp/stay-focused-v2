@@ -1,5 +1,28 @@
 # Roadmap
 
+<!-- IV1 begin -->
+IV1 / reviewer image viewer (2026-10-19): **PASS for the finite unattended local
+code scope**. Endpoint: STEP 0, web/mobile implementation, tests, all 10 prompt
+gates, additional forced root build, docs and scoped local commits. Baseline
+`c448c21`, branch `overnight/2026-10-15_feedback` retained. Web: slider
+removed; point-origin 1x/2.5x tap zoom, transform pan with fitted-image clamps,
+pointer-release touch handling, keyboard toggle, 200ms motion / instant Reduce
+Motion. Mobile: single-tap 1x/2.5x parity, retained 1x-4x pinch/pan and modal
+isolation. Both: question-circle vectors, Ask above Save, equal full-width
+48px/pt rows, 8px/pt gap and offline note below. Shared Ask retains sign-in.
+FRESH PASS: shared 590, API 2433 / 3 intentional live skips, mobile 1527,
+web 378; final typecheck/lint 8/8 tasks each, 0 cached; 6 existing warnings.
+API/web builds, Android export, root build 8/8 / 0 cached and diff hygiene
+pass. Final web rebuild follows the last measurement refinement. Browser web
+6/6 and native-web layout 6/6 combinations pass, zero unexpected requests/page
+errors; screenshots inspected. Failed attempts recorded. Optional web pinch/
+wheel omitted; no required platform skipped, dependency/API/schema/ADR change.
+Rollout/Device checks NOT RUN, skipped entirely. Live/physical state UNVERIFIED
+(owner to confirm). No remote operation, environment-file edit or push.
+Next: owner rollout and real website/Realme checks. IV1 endpoint only;
+no later slice started or AN1 resumed. [Acceptance](ai/acceptance/iv1-reviewer-image-viewer.md).
+<!-- IV1 end -->
+
 <!-- RV3 begin -->
 RV3 / reference topic level pill (2026-10-19): **PASS for the finite unattended
 local code scope**. Frozen endpoint complete: STEP 0-3, mobile/web/shared-reader
