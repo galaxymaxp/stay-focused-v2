@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { isLatestRelease, type LatestRelease } from '@stay-focused/shared';
 import { DownloadQr } from './DownloadQr';
+import { LegalLinks } from '../../components/legal-links';
 
 const allVersions = 'https://github.com/galaxymaxp/stay-focused-releases/releases';
 
@@ -56,6 +57,7 @@ export function DownloadPage() {
         </section>
       ) : <p role="status" className="muted">{loading ? 'Checking the latest Android release…' : 'The latest download is available from our public releases.'}</p>}
       <p><a href={allVersions}>All versions</a></p>
+      <LegalLinks />
     </main>
   );
 }

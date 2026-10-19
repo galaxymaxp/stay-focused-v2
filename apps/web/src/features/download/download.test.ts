@@ -8,6 +8,7 @@ import type { LatestRelease } from '@stay-focused/shared';
 
 const mocks = vi.hoisted(() => ({ redirect: vi.fn() }));
 vi.mock('next/navigation', () => ({ redirect: mocks.redirect }));
+vi.mock('next/link', () => ({ default: ({ children, href }: { children: import('react').ReactNode; href: string }) => createElement('a', { href }, children) }));
 const release: LatestRelease = {
   versionName: '2.3.0', versionCode: 7, runtimeVersion: '2.3.0',
   apkUrl: 'https://github.com/galaxymaxp/stay-focused-releases/releases/download/v2.3.0+7/app.apk',
@@ -33,6 +34,8 @@ function expectFallback() {
   expect(root.findAllByType('svg')).toHaveLength(0);
   expect(root.findAllByType('a').map(node => [node.children.join(''), node.props.href])).toEqual([
     ['All versions', 'https://github.com/galaxymaxp/stay-focused-releases/releases'],
+    ['Privacy', '/privacy'],
+    ['Terms', '/terms'],
   ]);
 }
 

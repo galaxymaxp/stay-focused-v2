@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { LogoMark } from "../components/brand";
 import { useAuth } from "../components/providers";
 import { Notice } from "../components/ui";
+import { LegalLinks } from '../components/legal-links';
 import { sharedReturnPath } from '@stay-focused/shared';
 import { useAction } from "../lib/hooks";
 export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
@@ -145,6 +146,7 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
                 ? "Create account"
                 : "Sign in"}
           </button>
+          {signUp ? <p className="legal-agreement">By creating an account you agree to the Terms and Privacy Policy.</p> : null}
         </form>
         <p className="meta">
           {signUp ? "Already have an account? " : "New to Stay Focused? "}
@@ -165,6 +167,7 @@ export function AuthScreen({ signUp = false }: { signUp?: boolean }) {
             <option value="dark">Dark</option>
           </select>
         </label>
+        <LegalLinks />
       </div>
     </main>
   );

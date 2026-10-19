@@ -31,7 +31,7 @@ it("sign-out awaits owner cleanup and account switch clears the departing owner'
   expect(auth.session?.user.id).toBe("b");
   expect(mocks.purge).toHaveBeenCalledWith("a");
 });
-it.each([`/s/${'a'.repeat(64)}`, '/download', '/release'])('public route %s never initializes auth or private caches even when auth is configured', async pathname => {
+it.each([`/s/${'a'.repeat(64)}`, '/download', '/release', '/privacy', '/terms'])('public route %s never initializes auth or private caches even when auth is configured', async pathname => {
   mocks.pathname = pathname; mocks.create.mockClear(); mocks.purge.mockClear();
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://unused.invalid'); vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'test');

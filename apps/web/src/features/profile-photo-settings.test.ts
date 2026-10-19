@@ -1,6 +1,7 @@
 import { createElement } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, expect, it, vi } from 'vitest';
+vi.mock('next/link', () => ({ default: ({ children, href }: { children: import('react').ReactNode; href: string }) => createElement('a', { href }, children) }));
 const mocks = vi.hoisted(() => ({ change: vi.fn(), crop: vi.fn(), confirm: vi.fn() }));
 vi.mock('../components/providers', () => ({ useAuth: () => ({ session: { user: { email: 'a@test' } }, signOut: vi.fn(), theme: 'light', setTheme: vi.fn() }) }));
 vi.mock('../components/profile-avatar', () => ({ useProfileAvatar: () => ({ url: 'https://private.test/a', initial: 'A', hasUpload: true, change: mocks.change }) }));

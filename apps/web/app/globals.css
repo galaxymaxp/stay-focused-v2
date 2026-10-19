@@ -1,3 +1,40 @@
+.legal-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 24px;
+  color: var(--secondary);
+  font-size: 12px;
+  text-align: center;
+}
+.legal-links a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  min-width: 48px;
+  padding: 8px;
+  color: inherit;
+}
+.legal-agreement {
+  color: var(--secondary);
+  font-size: 12px;
+  text-align: center;
+}
+.legal-page {
+  max-width: calc(68ch + 48px);
+  margin: 48px auto;
+  padding: 0 24px;
+  overflow-wrap: anywhere;
+  line-height: 1.65;
+}
+.legal-page h1 { margin-top: 24px; }
+.legal-page section { margin-top: 32px; }
+.legal-page h2 { margin-bottom: 12px; }
+.legal-page p + p, .legal-page li + li { margin-top: 12px; }
+.legal-page ul { padding-left: 24px; }
+
 :root {
   color-scheme: light;
   --bg: #f7f6f2;

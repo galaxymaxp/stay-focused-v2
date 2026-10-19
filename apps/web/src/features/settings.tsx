@@ -7,6 +7,7 @@ import { useRef, useState } from 'react';
 import { Avatar } from '../components/avatar';
 import { useProfileAvatar } from '../components/profile-avatar';
 import { cropAvatar } from '../lib/crop-avatar';
+import { LegalLinks } from '../components/legal-links';
 export function SettingsScreen() {
   const photo = useProfileAvatar();
   const input = useRef<HTMLInputElement>(null);
@@ -83,6 +84,7 @@ export function SettingsScreen() {
         </section>
         {action.message && <Notice error>{action.message}</Notice>}
       </div>
+      <LegalLinks />
     </>
   );
 }

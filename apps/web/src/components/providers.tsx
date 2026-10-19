@@ -48,7 +48,7 @@ function browserClient() {
 }
 export function Providers({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  return pathname === '/download' || pathname === '/release' || pathname?.startsWith('/s/') ? <PublicTheme>{children}</PublicTheme> : <AuthenticatedProviders>{children}</AuthenticatedProviders>;
+  return pathname === '/privacy' || pathname === '/terms' || pathname === '/download' || pathname === '/release' || pathname?.startsWith('/s/') ? <PublicTheme>{children}</PublicTheme> : <AuthenticatedProviders>{children}</AuthenticatedProviders>;
 }
 /** Public pages never initialize auth, refresh tokens or hydrate private caches. */
 function PublicTheme({ children }: { children: ReactNode }) {
