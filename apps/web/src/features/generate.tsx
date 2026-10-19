@@ -1,5 +1,6 @@
 "use client";
 import { useSavedMaterialPages } from "../lib/use-saved-material-pages";
+import { useHideOnScroll } from "../lib/use-hide-on-scroll";
 import { CourseBatchControls } from './course-batch';
 import { snapshotUpdatedLabel } from "@stay-focused/shared";
 import type {
@@ -103,6 +104,8 @@ export function GenerateScreen() {
     [runs, setRuns] = useState<Record<string, CourseSyncRun>>({}),
     [showUnsynced, setShowUnsynced] = useState(false);
   const [showPast, setShowPast] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchHeader = useHideOnScroll({ forceVisible: searchFocused || search.length > 0 });
   const action = useAction();
   const canvas = useCanvasRefresh("all", courses.refresh);
   const query = search.trim().toLowerCase();
@@ -172,7 +175,8 @@ export function GenerateScreen() {
       <Heading title="Generate" subtitle="Canvas material or your own notes." />
       <div className="stack">
         <div className="row wrap generate-tools">
-          <label className="grow">
+          <label className="grow generate-course-search" style={searchHeader.style}
+            inert={searchHeader.hidden} aria-hidden={searchHeader.hidden || undefined}>
             <span className="sr-only">Search courses</span>
             <input
               type="search"
@@ -180,6 +184,8 @@ export function GenerateScreen() {
               placeholder="Search courses"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
             />
           </label>
           <Link className="button subtle" href="/canvas">

@@ -4244,6 +4244,21 @@ mark.find-active {
 .generate-tools .button .icon {
   margin-right: 6px;
 }
+@media (max-width: 760px) {
+  .generate-tools {
+    display: contents;
+  }
+  .generate-tools > .generate-course-search {
+    flex: none;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg);
+  }
+  .generate-tools > .button {
+    align-self: flex-start;
+  }
+}
 .course-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));

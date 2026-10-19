@@ -121,3 +121,33 @@ it('State status opt-out preserves default snapshots and initial error recovery'
   await act(async () => tree.root.findByType('button').props.onClick());
   expect(refresh).toHaveBeenCalledOnce();
 });
+
+it('keeps narrow Generate search visible while focused or containing raw text', async () => {
+  const phone = Object.assign(new EventTarget(), { matches: true });
+  const motion = Object.assign(new EventTarget(), { matches: false });
+  const browser = Object.assign(new EventTarget(), { scrollY: 0,
+    matchMedia: (query: string) => query.includes('760px') ? phone : motion });
+  vi.stubGlobal('window', browser);
+  await act(async () => { tree = create(createElement(GenerateScreen)); });
+  const search = () => tree.root.findByProps({ type: 'search' });
+  const header = () => tree.root.findByProps({ className: 'grow generate-course-search' });
+  const scroll = async () => { await act(async () => {
+    browser.scrollY += 100; browser.dispatchEvent(new Event('scroll'));
+  }); };
+  await scroll();
+  expect(header().props).toMatchObject({ inert: true, 'aria-hidden': true });
+  await act(async () => search().props.onFocus()); await scroll();
+  expect(header().props.inert).toBe(false);
+  await act(async () => search().props.onBlur()); await scroll();
+  expect(header().props.inert).toBe(true);
+  for (const value of ['course', ' ']) {
+    await act(async () => search().props.onChange({ target: { value } })); await scroll();
+    expect(header().props.inert).toBe(false);
+    expect(header().props['aria-hidden']).toBeUndefined();
+  }
+  await act(async () => search().props.onFocus());
+  await act(async () => search().props.onChange({ target: { value: '' } })); await scroll();
+  expect(header().props.inert).toBe(false);
+  await act(async () => search().props.onBlur()); await scroll();
+  expect(header().props.inert).toBe(true);
+});
