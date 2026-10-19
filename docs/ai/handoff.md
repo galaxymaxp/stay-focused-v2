@@ -8671,3 +8671,109 @@ operation, email, environment-file edit, branch switch or push occurred.
 
 Ignored progress/status: tmp/overnight/OR3b.progress and OR3b.status.
 Endpoint OR3b only; rollout/device work and later tasks remain owner work.
+
+## OR4 / orb color sync between phone and website - PASS locally (2026-10-19)
+
+**Status: PASS for the finite unattended local code scope.** OR4 was read in
+full, including the overriding UNATTENDED rules. STEP 0-4, both apps, tests,
+all 10 prompt gates, docs and local commits complete. Baseline 34ab2f4d;
+branch overnight/2026-10-15_feedback retained. The run was interrupted after
+STEP 4 and resumed from OR4.progress for gates and docs; no committed work was
+redone. PF1b user_profiles exists in the repo migrations, so there was no
+STOP. Newest migration across both directories was
+packages/db 20261018000300 (supabase/migrations newest 20261016010000), so
+the new file is 20261018000301. No later task was started.
+
+### What changed
+
+- DB (file only, **not applied**):
+  `packages/db/migrations/20261018000301_profile_preferences.sql` adds
+  nullable `user_profiles.orb_color` with a check on the five OR3 palette keys
+  (null = pearl), `orb_color_updated_at` set by a DB trigger with
+  `clock_timestamp()` (last write wins by server time, including conflicting
+  upserts), and extends the column-level authenticated select grant.
+  Existing RLS and service-only writes are unchanged. `packages/db` types updated.
+- API: `GET`/`PATCH /api/profile/preferences` returns `{ orbColor }`. Verified
+  bearer, owner-scoped service-client upsert, 1 KiB bounded strict body,
+  query strings rejected, invalid key 400, private no-store, CORS like the
+  avatar route. A missing column or stale PostgREST schema (42703/PGRST204)
+  maps to a typed 503 `profile_preferences_unavailable`. Provider messages are
+  never exposed.
+- Shared: `parseProfilePreferences`/`isOrbColorKey` reuse OR3 palette keys, and
+  `OrbPreferenceSync` is a serialized per-owner queue: 600ms debounce, durable
+  pending value, stale-response guard, and it never reverts the visible color.
+- Mobile: `OrbPreferencesSync` is mounted in the root layout. The cached
+  `sf.orb.colorKey` still renders instantly. It refreshes on start, sign-in,
+  foreground and every 15s while active. The pending value is stored in
+  sessionStore per owner, and writes are kept safe across sign-out and owner
+  changes.
+- Web: `OrbPreferencesSync` is mounted in the shell. The cached localStorage
+  key renders instantly. It refreshes on load, focus, visibilitychange, online
+  and every 15s while visible. The pending value is stored in localStorage per
+  owner.
+- Server values flow through the existing orb color listeners, so the
+  OR2 600ms cross-fade applies. It is instant under Reduce Motion. No new
+  dependency, token or native module.
+- Parity: both apps got every change. Only the lifecycle triggers differ by
+  platform (AppState vs window/document events). Nothing was skipped.
+
+### Commits and gate counts
+
+- e2124bd6 feat(db): add orb profile preferences migration file
+- bb5352ea feat(api): add owner-scoped profile preferences route
+- d84e058b feat(shared): validate orb preferences and serialize offline sync
+- 4197bb95 fix(profile): preserve pending writes across owner lifecycle changes
+- a0d2d8bc feat(mobile): sync cached orb color with profile preferences
+- 78c8dd0c feat(web): sync orb color on focus and reconnect
+- 7fc55b7d test(profile): align orb sync fixture import order
+- docs commit: hash in tmp/overnight/OR4.status
+
+Focused results (all FRESH): route 17/17, local PGlite DB 8/8, shared sync 4/4,
+native 20/20, web 16/16.
+
+Final gates (all FRESH PASS):
+- typecheck --force: 8/8 tasks, 0 cached.
+- lint --force: 8/8 tasks, 0 errors, plus the same 6 warnings already in
+  untouched files.
+- Tests: shared 614/614 (59 files); API 2452 passed with 3 intentional live
+  skips (213 files); mobile 1567/1567 (165 files); web 417/417 (64 files).
+- Builds: API 37/37 pages, web 22/22 pages, Android export PASS.
+- git diff --check: PASS.
+
+Failed first attempt: the first full API run hit 2 timeouts in files OR4 did
+not touch: canvas-file-ingestion (15s) and page-snapshot-prerender-hook (5s).
+That run was 2450 passed / 2 failed. Both files passed 34/34 when run alone,
+and the full rerun was green. This is recorded as a load-timeout flake.
+Builds regenerated next-env.d.ts in api/web; both files were restored. The docs
+insert first failed on the missing `python` alias and was rerun with
+`py -X utf8`. Details:
+[OR4 acceptance](acceptance/or4-orb-color-sync.md).
+
+**Risks/debt:** the clients refresh every 15s and on focus/foreground, with
+no push channel. A color change on one device shows on the other at its next
+focus, foreground or retry tick. Until the migration is applied, both clients
+silently stay local-only.
+
+**UNVERIFIED (owner to confirm):** applied migrations and production DB
+schema, deployed API/web/mobile revisions, remote-ref freshness, and real
+phone/browser sync. No Supabase, Vercel, Google Cloud, Canvas or Resend call,
+deployment, remote SQL/migration application, Scheduler operation, email,
+environment-file edit, branch switch or push occurred.
+
+### Owner steps remaining
+
+- **Rollout - NOT RUN, skipped entirely:** apply
+  `20261018000301_profile_preferences.sql` after profile_avatars (copy it into
+  supabase/migrations if that is the apply path). Then deploy the API and the
+  website, and publish the OTA through the existing owner release process.
+- **Device checks - NOT RUN, skipped entirely:** on the Realme, tap the orb to
+  violet. Open or focus the website: it should show violet. Change the color on
+  the web, then reopen or foreground the app: it should match. Also check the
+  cross-fade, Reduce Motion (instant), that an offline tap is sent on
+  reconnect, and that nothing breaks before the migration is applied.
+- Confirm all UNVERIFIED state. For later authorized deployment/env work,
+  installing the missing Vercel CLI with npm i -g vercel is recommended; no
+  installation or invocation ran here.
+
+Ignored progress/status: tmp/overnight/OR4.progress and OR4.status.
+Endpoint OR4 only; rollout/device work and later tasks remain owner work.

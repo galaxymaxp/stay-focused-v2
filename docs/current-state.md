@@ -107,6 +107,39 @@ edit, branch switch or push. Original unrelated paths preserved. Endpoint
 OR3b only; no later task started. [Acceptance and exact gates](ai/acceptance/or3b-orb-interaction.md).
 <!-- OR3b end -->
 
+<!-- OR4 begin -->
+OR4 / orb color sync between phone and website (2026-10-19): **PASS for the
+finite unattended local code scope**. STEP 0-4, both apps, tests, all 10 prompt
+gates, docs and local commits complete. Baseline 34ab2f4d; branch
+overnight/2026-10-15_feedback retained. Migration **file only, not applied**:
+packages/db/migrations/20261018000301_profile_preferences.sql adds nullable
+user_profiles.orb_color (check on pearl/gold/green/violet/orange; null = pearl)
+plus a DB-time orb_color_updated_at trigger (last write wins by server time),
+and extends the column-level authenticated select grant. GET/PATCH
+/api/profile/preferences: verified bearer, owner-scoped service upsert,
+1 KiB bounded strict body, private no-store, invalid key 400, missing
+column/stale schema mapped to typed 503 profile_preferences_unavailable. Shared
+parseProfilePreferences reuses OR3 palette keys; OrbPreferenceSync is one
+serialized per-owner queue. Both clients render the cached key at once, PATCH
+600ms after the last tap (one request for fast taps), keep a durable
+per-owner pending value for reconnect, never revert on failure, and silently
+stay local-only while unavailable. Server values use the existing OR2 color
+cross-fade (instant under Reduce Motion). Mobile refreshes on start, sign-in,
+foreground and a 15s active retry; web on load, focus, visibility, online and
+a 15s visible retry. No new dependency, token or native module.
+Commits: e2124bd6, bb5352ea, d84e058b, 4197bb95, a0d2d8bc, 78c8dd0c, 7fc55b7d;
+docs hash in Git/OR4.status.
+FRESH PASS: typecheck/lint each 8/8 tasks, 0 cached; 6 existing lint warnings.
+Shared 614, API 2452 / 3 intentional live skips, mobile 1567, web 417 tests;
+API/web/Android builds and diff hygiene pass. First API run had 2 timeout
+flakes in unrelated files (34/34 isolated, full rerun green).
+Rollout and Device checks NOT RUN, skipped entirely. Applied migration,
+deployed revisions and phone/browser sync UNVERIFIED (owner to confirm). No
+remote call, SQL/migration application, Scheduler, email, deployment,
+environment-file edit, branch switch or push. Original unrelated paths
+preserved. Endpoint OR4 only; no later task started. [Acceptance and exact gates](ai/acceptance/or4-orb-color-sync.md).
+<!-- OR4 end -->
+
 
 <!-- OF1 begin -->
 OF1 / automatic offline saving (2026-10-19): **STOPPED at STEP 0**, under
