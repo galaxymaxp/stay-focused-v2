@@ -1,5 +1,82 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff ? FULLSEND (20261020-2101)
+
+What changed:
+Published OP2/GV1 from pinned source 32206c1656453975b4c989f7d59a0b1726730c8c;
+previous shipped main 913b11877f29206b3deee41c2cb4e453f1c5a64b; final application
+main f0736bfa20ff545264624940db4dfc42b2a33265. OP2 9e17fd4d/1d3c5cfc,
+GV1 8b37b5ae/32206c16. Fresh clone, normal merge 5143e3e preserving earlier
+main fixes and both documentation entries; normal main push. Test/CI-only
+fixes 1f099db (portable fixture/Chromium order) and f0736bf (explicit gesture
+time/one-worker web CI). Original UI/, apps/mobile/.gitignore, supabase/.temp/
+left local, not shipped. Author/committer galaxymaxp, no trailers.
+
+Verification (exact counts):
+FRESH local and final Linux CI gates: forced typecheck/lint/build 8/8 each,
+0 cached; six existing lint warnings. Shared 335/34 source files (historical
+670/68 included compiled duplicates), Canvas 75/1, OCR 27/3, engine 606, API
+2452 pass + 3 intentional live skips/213 files, mobile 1600/169, web 540/72,
+provider contract 20/20 fake clients. API/web pages 37/37 and 23/23; native
+and web exports. Doctor 21/21, npm ci 1593 packages. Repo-local temp; generated
+Next declarations restored. Full CI 39438782653 SUCCESS on final app SHA.
+First mobile timeout and first web timeouts/hook-blocked cases, full passing
+reruns, and failed CI 39435814818 / 39436913399 are retained. Post-fix focused
+native browser 6/6 and web browser 23/23 plus respective typecheck/lint pass.
+No assertions/deadlines weakened or tests removed/newly skipped. Final docs-only
+checks: diff/staged hygiene FRESH; application suites NOT APPLICABLE to docs alone.
+
+Deployments (IDs, SHAs):
+Migrations: none. Worker Cloud Build 7632e00a-2be6-4ed1-ad27-492a0adbdacf SUCCESS;
+asia-northeast1-docker.pkg.dev/stay-focus-492811/generation/worker:f0736bf,
+digest sha256:3545a74e1a4b2acb9fff5071b92d619c93971bc9ead682504ab12cf04ffc11ba;
+generation-worker-00031-kns Ready/100%; dispatch succeeds; startup errors zero.
+Upload 2047 tracked files only, generated/private artifacts excluded.
+API dpl_8Y2xj9EFsVBQb6JvCpdKM4pTBtd4 READY/production at f0736bf;
+https://stay-focused-v2-prototype-6v4t5rn0b-galaxymaxps-projects.vercel.app.
+Website dpl_DopMzVTAgzTdMMo7YgC4236H7yNf READY/production at f0736bf;
+https://stay-focused-ge3gtn2d1-galaxymaxps-projects.vercel.app, aliased to
+stay-focused-ten.vercel.app. Verified metadata SHAs, root/direct/proxied health
+200/ok, API commit matches main. API 20-minute/web five-minute error/fatal and
+5xx scans zero, no pagination/excluded intervals. Existing login, explicit
+verified project, clean source checkout; no settings change or rollback.
+OTA group 44243e11-cb14-4390-b56c-0755e317144b; Android update
+01a159c7-b0d4-7f4c-8ae4-4f513969d26a; preview/runtime 2.2.0-sdk57 from f0736bf.
+Installed manifest proves channel/runtime; Realme About proves 2.2.0 (6),
+update 01a159c7 after relaunches. No native change, APK build/install/public
+release NOT APPLICABLE. Final docs SHA and resulting automatic API/CI are in
+external result/status after commit.
+
+Live checks:
+FRESH 5 PASS / 1 FAIL. PASS: initial Today clock/body/backdrop; Queue safety
+and open/close; confirmation visually fits portrait; full details/Done/return;
+Generate picker scroll. FAIL: blank regions outside the orb in post-tap
+captures 11/12; navigation redraw restores normal Today. Five-tap palette
+cycle returns pearl. Cause native composition versus ADB capture is unverified.
+Initial clipping diagnosis is withdrawn: pixel close-up shows the full details
+control despite UIAutomator's underreported bound; accessibility discrepancy
+remains open. Desktop UI NOT RUN: IAB unavailable. Zero paid generations;
+no start/retry/clear/sync submitted. Original timeout 1800000 ms unchanged,
+settings preserved, phone returned Today and Asleep. Neutral ignored evidence
+under .local/fullsend-20261020-2101. Initial Python helper/asleep captures failed;
+Node capture plus ordinary wake/swipe-only keyguard dismissal resolved access.
+
+Next steps:
+Investigate captured blank regions and actual native display/compositor behavior;
+verify accessibility bounds and remaining desktop, active generation, landscape,
+enlarged-text, Reduced Motion, wave/gesture and performance variants.
+
+Blockers:
+Browser unavailable. No release migration/deployment/mobile operation pending.
+
+Risks:
+SHIPPED with physical acceptance PARTIAL, not full OP2/GV1 acceptance. No
+credential/signing rotation, destructive SQL, email activation, purchase,
+force-push, uninstall or app data clear. Owner Pause and later scopes retained.
+Source checkout fetch/ancestry is recorded externally; no source integration.
+
+[Full acceptance](acceptance/fullsend-20261020-2101.md).
+
 ## Handoff — FULLSEND (20261020-0604)
 
 What changed:

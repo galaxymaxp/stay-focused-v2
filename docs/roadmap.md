@@ -1,5 +1,24 @@
 # Roadmap
 
+FS4 / FULLSEND 20261020-2101: **SHIPPED; STEP 0-6 PASS, physical acceptance PARTIAL.**
+Pinned source `32206c16`, previous main `913b1187`, final application main
+`f0736bfa`. Ships OP2/GV1 plus scoped test portability/timing repairs; the
+original worktree is preserved. FRESH forced typecheck/lint/build 8/8 each,
+0 cached; CI 39438782653 SUCCESS. Shared 335 source tests, Canvas 75, OCR 27,
+engine 606, API 2452 + 3 intentional live skips, mobile 1600, web 540,
+provider 20. Failures and repairs remain in acceptance. No migrations.
+Worker generation-worker-00031-kns serves 100%; API and website READY at the
+application SHA, aliases healthy, bounded error/5xx scans empty. OTA group
+44243e11-cb14-4390-b56c-0755e317144b runs on Realme: 2.2.0/code 6/runtime
+2.2.0-sdk57/update 01a159c7. Six bounded checks: 5 PASS / 1 FAIL (blank UI
+regions in post-tap captures; native composition versus capture cause unverified).
+Desktop UI NOT RUN: browser unavailable. The initial clipping diagnosis was
+withdrawn after pixel close-up; accessibility bounds still need verification.
+Zero paid generations; original pearl appearance/settings restored and device
+returned asleep. No deployment/migration/mobile delivery step is pending.
+Visual/accessibility/performance and remaining state/viewport acceptance remain
+open. Owner Pause and later scopes remain. [Full acceptance](ai/acceptance/fullsend-20261020-2101.md).
+
 <!-- GV1 begin -->
 GV1 / Generation viewport (2026-10-20): **PASS for the finite unattended local code scope**.
 Native detail and pre-admission pages use measured non-scroll flex space, with
