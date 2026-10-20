@@ -252,7 +252,7 @@ describe("web generation layout and actions", () => {
       expect(root.findByType("aside").props.resource.loading).toBe(loading);
       expect(
         root.findAllByProps({ className: "generation generation-layout" }),
-      ).toHaveLength(0);
+      ).toHaveLength(1);
     },
   );
   describe("vertical step bar", () => {
@@ -275,7 +275,7 @@ describe("web generation layout and actions", () => {
       expect(list.props.className).toBe("generation-steps");
       const text = JSON.stringify(list.findAllByType("li").map((node) => node.findAll((child) => child.props.className === "meta").length));
       expect(text).toBe("[0,0,0,0,0,0,0,0,0]");
-      expect(output()).not.toMatch(/"(Done|Pending|In progress)"/);
+      expect(list.findAllByType("span").flatMap(node => node.children.filter(child => typeof child === "string")).join(" ")).not.toMatch(/\b(Done|Pending|In progress)\b/);
       const current = list.findByProps({ "aria-current": "step" });
       expect(current.findByProps({ className: "generation-step-segment animated" }).props["aria-hidden"]).toBe("true");
       expect(current.findByProps({ className: "sr-only" }).props.children).toEqual([", ", "in progress"]);

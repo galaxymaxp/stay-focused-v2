@@ -11,7 +11,7 @@ const SIZE = 280;
  * A lightweight native-driven study field. It intentionally avoids a faux-3D
  * blob: source fragments orbit, align, and resolve into a stable page mark.
  */
-export function GenerationVisual({ running, completed }: { running: boolean; completed: boolean }) {
+export function GenerationVisual({ running, completed, size = 300 }: { running: boolean; completed: boolean; size?: number }) {
   const { active, colors, mode, reducedMotion } = useTheme();
   const focused = useIsFocused();
   const id = useId().replace(/:/g, "");
@@ -61,8 +61,8 @@ export function GenerationVisual({ running, completed }: { running: boolean; com
   const completionScale = reducedMotion ? 1 : resolve.interpolate({ inputRange: [0, 1], outputRange: [1, 1.07] });
 
   return (
-    <View accessibilityLabel={completed ? "Generation complete" : "Generation in progress"} accessibilityState={{ busy: running }} testID="generation-visual" style={styles.frame}>
-      <View pointerEvents="none" style={styles.visual}>
+    <View accessibilityLabel={completed ? "Generation complete" : "Generation in progress"} accessibilityState={{ busy: running }} testID="generation-visual" style={[styles.frame, { width: size, height: size }]}>
+      <View pointerEvents="none" style={[styles.visual, { transform: [{ scale: size / 300 }] }]}>
         <Svg width={SIZE} height={SIZE} viewBox="0 0 280 280" style={styles.fill}>
           <Defs>
             <RadialGradient id={`${id}-halo`}>

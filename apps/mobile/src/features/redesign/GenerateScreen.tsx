@@ -29,7 +29,7 @@ import { ExperienceApiError, experienceRequest } from "../../services/experience
 import { acceptGeneration, createGenerationIntent } from "../../services/generationRecovery";
 import { useQueueItems } from "../queue/useQueueItems";
 import { useGraceNavigation } from "./useGraceNavigation";
-import { GenerationCore } from "./GenerationCore";
+import { GenerationLayout } from "./GenerationLayout";
 import { SyncStatus } from "../sync/SyncStatus";
 import { useCanvasSync } from "../sync/CanvasSyncProvider";
 import { available, capabilityNote, generateCourseDestination, generateCourseGroups, generateCourseStatus, matchesCourseQuery, materialTypes, moduleGroups } from "./presentation";
@@ -468,14 +468,11 @@ export function GenerateMaterialScreen() {
   }
 
   if (activeAction) return (
-    <Page back title={material?.title ?? "Material"} subtitle={identity.title}>
-      <View accessibilityLiveRegion="polite" style={{ alignItems: "center", paddingTop: spacing[8], gap: spacing[3] }}>
-        <Copy size="h2" style={{ textAlign: "center" }}>Submitting generation…</Copy>
-        <GenerationCore state="reading" />
-        <Copy muted size="bodySmall" style={{ textAlign: "center" }}>
-          Saving your request. The server will take over once it accepts the job.
-        </Copy>
-      </View>
+    <Page back title="" scroll={false}>
+      <GenerationLayout title={material?.title ?? "Material"} state="reading"
+        compactStatus={<Copy size="h2" style={{ textAlign: "center" }}>Submitting…</Copy>}
+        status={<Copy size="h2" style={{ textAlign: "center" }}>Submitting generation…</Copy>}
+        note="Saving your request. The server will take over once it accepts the job." />
     </Page>
   );
 

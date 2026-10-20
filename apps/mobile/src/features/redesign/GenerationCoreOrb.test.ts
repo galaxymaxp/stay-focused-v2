@@ -33,13 +33,13 @@ afterEach(async () => {
   else delete require.extensions[".tsx"];
 });
 
-it("renders the Today orb with the job state and one shared ball-only touch target", async () => {
+it.each([80, 170, 300, 340])("renders the Today orb and its ball-only touch target at size %i", async size => {
   const { GenerationCore } = await import("./GenerationCore");
-  await act(async () => { tree = create(createElement(GenerationCore, { state: "generating", size: 300 })); });
+  await act(async () => { tree = create(createElement(GenerationCore, { state: "generating", size })); });
   const orb = tree!.root.findByType("DayOrb" as never), touch = tree!.root.findByType("OrbTouchLayer" as never);
-  expect(orb.props).toMatchObject({ state: "generating", size: 300, live: true, mode: "dark", reducedMotion: false });
+  expect(orb.props).toMatchObject({ state: "generating", size, live: true, mode: "dark", reducedMotion: false });
   expect(orb.props.interaction).toBe(mocks.handle);
-  expect(touch.props).toMatchObject({ interaction: mocks.handle, size: 150, left: 75, top: 75 });
+  expect(touch.props).toMatchObject({ interaction: mocks.handle, size: size / 2, left: size / 4, top: size / 4 });
 });
 
 it("stops rendering when the generation screen is not focused", async () => {

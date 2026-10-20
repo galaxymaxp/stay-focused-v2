@@ -49,11 +49,12 @@ vi.mock("./useExperience", () => ({
 }));
 vi.mock("../../design/theme", () => ({ useTheme: () => ({ reducedMotion: true, colors: { success: "success", separator: "separator" } }) }));
 vi.mock("../../design/primitives", () => ({
-  Action: "Action", Copy: "Copy", Notice: "Notice", Page: "Page", Surface: "Surface", RowLink: "RowLink", ContentIcon: "ContentIcon", SkeletonBlock: "SkeletonBlock",
+  Sheet: "Sheet", Action: "Action", Copy: "Copy", Notice: "Notice", Page: "Page", Surface: "Surface", RowLink: "RowLink", ContentIcon: "ContentIcon", SkeletonBlock: "SkeletonBlock",
 }));
 vi.mock("lucide-react-native", () => ({ CheckCircle2: "CheckCircle2", CircleDashed: "CircleDashed", Clock3: "Clock3", AlertCircle: "AlertCircle" }));
 vi.mock("react-native", () => ({
   View: "View",
+  useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
   Easing: { out: (value: unknown) => value, ease: "ease" },
   Animated: {
     View: "AnimatedView",
@@ -86,7 +87,12 @@ afterEach(async () => {
 });
 async function render(element: ReactElement) {
   await act(async () => { rendered = create(element); });
-  return rendered!.root;
+  const root = rendered!.root;
+  await act(async () => {
+    root.findByProps({ testID: "generation-viewport" }).props.onLayout({ nativeEvent: { layout: { width: 350, height: 734 } } });
+    root.findByProps({ testID: "generation-orb-space" }).props.onLayout({ nativeEvent: { layout: { width: 350, height: 350 } } });
+  });
+  return root;
 }
 
 describe("generation action spacing", () => {
@@ -109,11 +115,11 @@ describe("generation action spacing", () => {
     if (name === "reconnect") mocks.jobError = "Could not reconnect.";
     const root = await render(createElement(GenerationScreen));
     const column = root.findByProps({ testID: "generation-actions" });
-    expect(column.props.style).toMatchObject({ width: 240, gap: spacing[3], marginTop: spacing[4] });
+    expect(column.props.style).toMatchObject({ width: "100%", gap: spacing[2] });
     expect(column.props.style.gap).toBeGreaterThan(0);
     const actions = root.findAll(node => String(node.type) === "Action");
-    expect(actions.map(node => node.props.children)).toEqual(labels);
-    expect(actions.every(node => node.parent === column && node.props.pill)).toBe(true);
+    expect(actions.filter(node => node.parent === column).map(node => node.props.children)).toEqual(labels);
+    expect(actions.every(node => node.props.pill)).toBe(true);
     expect(actions.filter(node => !node.props.secondary).length).toBeLessThanOrEqual(1);
     if (artifactId) expect(actions[0]!.props.secondary).not.toBe(true);
   });
@@ -126,7 +132,7 @@ describe("generation action spacing", () => {
     expect(reconnect.props).toMatchObject({ secondary: true, pill: true });
     mocks.read.mockResolvedValue([pending]);
     await act(async () => reconnect.props.onPress());
-    expect(root.findAll(node => String(node.type) === "Action").map(node => node.props.children)).toEqual(["Start generation", "View Queue"]);
+    expect(root.findByProps({ testID: "generation-actions" }).findAll(node => String(node.type) === "Action").map(node => node.props.children)).toEqual(["Start generation", "View Queue"]);
   });
 });
 
@@ -170,6 +176,18 @@ describe("compact generation progress", () => {
 });
 
 describe("Queue generation confirmation safety", () => {
+  it("only promises background work after an automatic request is accepted", async () => {
+    mocks.params = { intent: "pending-key", start: "1" };
+    let accept!: (value: GenerationIntent) => void;
+    mocks.accept.mockReturnValueOnce(new Promise<GenerationIntent>(resolve => { accept = resolve; }));
+    const root = await render(createElement(GenerationScreen));
+    const text = () => root.findAll(node => String(node.type) === "Copy").map(node => String(node.props.children)).join(" ");
+    expect(text()).toContain("The server will take over once it accepts the job.");
+    expect(text()).not.toContain("You can leave this screen.");
+    await act(async () => accept({ ...pending, generationId: "accepted-job" }));
+    expect(text()).toContain("You can leave this screen.");
+    expect(mocks.accept).toHaveBeenCalledOnce();
+  });
   it("observes an admission that finishes after the first intent read without accepting again", async () => {
     let finish!: (value: GenerationIntent) => void;
     mocks.accept.mockImplementationOnce(() => new Promise<GenerationIntent>(resolve => { finish = resolve; }));
@@ -269,6 +287,7 @@ describe("Draft generation result", () => {
     mocks.request.mockReturnValueOnce(new Promise(resolve => { accept = resolve; }));
     const root = await render(createElement(GenerationScreen));
     const retry = () => root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Try again')[0]!;
+    await act(async () => root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Details and error')[0]!.props.onPress());
     expect(JSON.stringify(rendered!.toJSON())).toContain('Stopped while building topics');
     expect(JSON.stringify(rendered!.toJSON())).toContain('Your material is safe.');
     await act(async () => { retry().props.onPress(); retry().props.onPress(); });
@@ -288,6 +307,7 @@ describe("Draft generation result", () => {
     const root = await render(createElement(GenerationScreen));
     await act(async () => root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Try again')[0]!.props.onPress());
     expect(root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Try again')).toHaveLength(0);
+    await act(async () => root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Details and error')[0]!.props.onPress());
     expect(JSON.stringify(rendered!.toJSON())).toContain('This job cannot be retried.');
   });
   it('never offers Try again for a non-retryable job', async () => {
@@ -327,6 +347,7 @@ describe("Draft generation result", () => {
     mocks.generation = { id: 'job-id', state: 'failed', artifactId: null, updatedAt: '2026-09-29', progress: null,
       error: { code: 'insufficient_source', title: 'Not enough lesson content', message: 'Check the Canvas attachment.', retryable: false, action: 'choose_material' } };
     const root = await render(createElement(GenerationScreen));
+    await act(async () => root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Details and error')[0]!.props.onPress());
     expect(root.findAll(node => String(node.type) === 'Notice').map(node => String(node.props.children)).join(' ')).toContain('Check the Canvas attachment.');
     expect(root.findAll(node => String(node.type) === 'Action' && node.props.children === 'View Queue')).toHaveLength(1);
   });

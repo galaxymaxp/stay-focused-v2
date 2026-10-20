@@ -2,11 +2,19 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useIsFocused } from "expo-router/react-navigation";
 import { useEffect, useRef, useState } from "react";
 import { Animated, Easing, View } from "react-native";
-import { isProcessingJobRetryDenied, processingJobStoppedMessage } from "@stay-focused/shared";
-
+import {
+  isProcessingJobRetryDenied,
+  processingJobStoppedMessage,
+} from "@stay-focused/shared";
 
 import { useAuth } from "../../auth";
-import { Action, Copy, Notice, Page, SkeletonBlock } from "../../design/primitives";
+import {
+  Action,
+  Copy,
+  Notice,
+  Page,
+  SkeletonBlock,
+} from "../../design/primitives";
 import { useAppActivity } from "../../design/appActivity";
 import { useTheme } from "../../design/theme";
 import { radius, spacing } from "../../design/tokens";
@@ -18,16 +26,23 @@ import {
 } from "../../services/generationRecovery";
 import { storeCompletedGeneration } from "../../services/localLibrary/deviceLibrary";
 import { persistedArtifactId } from "../../services/localLibrary/librarySync";
-import { GenerationCore } from "./GenerationCore";
-import { generationCoreState, generationMessages, stalledInQueue } from "./presentation";
+import { GenerationLayout } from "./GenerationLayout";
+import {
+  generationCoreState,
+  generationMessages,
+  stalledInQueue,
+} from "./presentation";
 import { useExperienceClient } from "./useExperience";
 import { useJobRead, useQueueItems } from "../queue/useQueueItems";
 
-
-
 export function GenerationScreen() {
   const focused = useIsFocused();
-  const params = useLocalSearchParams<{ id?: string; intent?: string; start?: string; quiz?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    intent?: string;
+    start?: string;
+    quiz?: string;
+  }>();
   // Requests made from a Generate action start at once; only an old saved
   // request reopened from Queue still asks before it starts.
   const autoStart = params.start === "1";
@@ -84,7 +99,11 @@ export function GenerationScreen() {
       // The header orb should appear now, not on the next idle check.
       activity.refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not confirm this request.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not confirm this request.",
+      );
     } finally {
       confirmationInFlight.current = false;
       setConfirming(false);
@@ -97,7 +116,9 @@ export function GenerationScreen() {
   });
   const generation = useJobRead(focused ? id : null);
   const data = generation.data;
-  const isDraft = intent?.type === "activity_output" || data?.artifactId?.startsWith("activity:") === true;
+  const isDraft =
+    intent?.type === "activity_output" ||
+    data?.artifactId?.startsWith("activity:") === true;
   // Completed and cloud-persisted: keep a device copy for Library and offline reading.
   const persistedId = persistedArtifactId(data);
   const ownerUserId = session?.user.id;
@@ -115,35 +136,60 @@ export function GenerationScreen() {
       .finally(() => {
         if (openedCompletedArtifact.current === persistedId) return;
         openedCompletedArtifact.current = persistedId;
-        router.replace({ pathname: "/artifact", params: { id: persistedId, ...(params.quiz === "1" ? { quiz: "1" } : {}) } });
+        router.replace({
+          pathname: "/artifact",
+          params: {
+            id: persistedId,
+            ...(params.quiz === "1" ? { quiz: "1" } : {}),
+          },
+        });
       });
   }, [persistedId, ownerUserId, client, params.quiz]);
   const running =
     !data ||
     ["queued", "preparing", "generating", "finalizing"].includes(data.state);
-  const stalled = !!data && stalledInQueue({ status: data.state, since: data.updatedAt });
+  const stalled =
+    !!data && stalledInQueue({ status: data.state, since: data.updatedAt });
   const [cancelling, setCancelling] = useState(false);
   // Reuse ambiguous submissions; every accepted attempt gets a fresh identity.
   const retryRequest = useRef<{ id: string; key: string } | null>(null);
   const retryLock = useRef(false);
   const [retryDeniedId, setRetryDeniedId] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
-  const canRetry = data?.state === "failed" && data.error?.retryable === true && retryDeniedId !== id;
+  const canRetry =
+    data?.state === "failed" &&
+    data.error?.retryable === true &&
+    retryDeniedId !== id;
   async function retryFailed() {
     if (!id || !canRetry || retryLock.current) return;
     retryLock.current = true;
-    if (retryRequest.current?.id !== id) retryRequest.current = { id, key: newRequestKey() };
+    if (retryRequest.current?.id !== id)
+      retryRequest.current = { id, key: newRequestKey() };
     setRetrying(true);
     setError(null);
     try {
-      const result = await experienceRequest<{ id: string }>(client, `/api/jobs/${encodeURIComponent(id)}/retry`, { method: "POST", key: retryRequest.current.key });
+      const result = await experienceRequest<{ id: string }>(
+        client,
+        `/api/jobs/${encodeURIComponent(id)}/retry`,
+        { method: "POST", key: retryRequest.current.key },
+      );
       retryRequest.current = null;
       setId(result.id);
       activity.refresh();
-      router.replace({ pathname: "/generation", params: { id: result.id, ...(params.quiz === "1" ? { quiz: "1" } : {}) } });
+      router.replace({
+        pathname: "/generation",
+        params: {
+          id: result.id,
+          ...(params.quiz === "1" ? { quiz: "1" } : {}),
+        },
+      });
     } catch (cause) {
       if (isProcessingJobRetryDenied(cause)) setRetryDeniedId(id);
-      setError(cause instanceof Error ? cause.message : "Could not retry this generation.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not retry this generation.",
+      );
     } finally {
       retryLock.current = false;
       setRetrying(false);
@@ -154,60 +200,121 @@ export function GenerationScreen() {
     setCancelling(true);
     setError(null);
     try {
-      await experienceRequest(client, `/api/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" });
+      await experienceRequest(
+        client,
+        `/api/jobs/${encodeURIComponent(id)}/cancel`,
+        { method: "POST" },
+      );
       generation.refresh();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not cancel this generation.");
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "Could not cancel this generation.",
+      );
     } finally {
       setCancelling(false);
     }
   }
   return (
-    <Page
-      title=""
-      back
-    >
-      <View
-        style={{
-          paddingTop: 40,
-          paddingBottom: 32,
-          alignItems: "center",
-          gap: 24,
-        }}
-      >
-        {intent && (
-          <Copy muted size="caption">
-            {intent.title}
-          </Copy>
-        )}
-        <View
-          accessibilityLiveRegion="polite"
-          style={{ alignItems: "center", gap: 0, width: "100%" }}
-        >
-          <GenerationStatus message={stalled ? "Still waiting to start" : data ? isDraft && data.state === "completed" ? "Draft ready" : generationMessages[data.state] : id ? "Connecting to your generation…" : intent && !autoStart ? "Ready to start" : "Starting your request…"} />
-          {data && running && !stalled ? (
+    <Page title="" back scroll={false}>
+      <GenerationLayout
+        title={intent?.title}
+        attention={!!(error || generation.error || data?.error || stalled)}
+        state={generationCoreState(data?.state ?? null, !!id)}
+        compactStatus={
+          <GenerationStatus
+            message={
+              stalled
+                ? "Still waiting"
+                : data
+                  ? {
+                      queued: "Queued",
+                      preparing: "Reading material…",
+                      generating: "Generating…",
+                      finalizing: "Saving…",
+                      completed: isDraft ? "Draft ready" : "Ready",
+                      failed: "Couldn’t finish",
+                      cancelling: "Stopping…",
+                      cancelled: "Cancelled",
+                    }[data.state]
+                  : id
+                    ? "Connecting…"
+                    : intent && !autoStart
+                      ? "Ready to start"
+                      : "Starting…"
+            }
+          />
+        }
+        status={
+          <GenerationStatus
+            message={
+              stalled
+                ? "Still waiting to start"
+                : data
+                  ? isDraft && data.state === "completed"
+                    ? "Draft ready"
+                    : generationMessages[data.state]
+                  : id
+                    ? "Connecting to your generation…"
+                    : intent && !autoStart
+                      ? "Ready to start"
+                      : "Starting your request…"
+            }
+          />
+        }
+        progress={
+          data && running && !stalled ? (
             <GenerationProgress
-              progress={data.progress && (data.progress.unit === "pages" || generation.job?.stage === "generating_sections") ? data.progress : null}
+              progress={
+                data.progress &&
+                (data.progress.unit === "pages" ||
+                  generation.job?.stage === "generating_sections")
+                  ? data.progress
+                  : null
+              }
             />
-          ) : null}
-          <GenerationCore state={generationCoreState(data?.state ?? null, !!id)} />
-          <Copy muted size="bodySmall" style={{ textAlign: "center", textAlignVertical: "center", width: 270, minHeight: 56, lineHeight: 20 }}>
-            {id
-              ? stalled
-                ? "The generation service hasn’t picked this up. It may be busy or at its usage limit. Cancel and try again later."
-                : running
+          ) : null
+        }
+        note={
+          id
+            ? stalled
+              ? "The generation service hasn’t picked this up. It may be busy or at its usage limit. Cancel and try again later."
+              : running
                 ? "You can leave this screen. We’ll keep working."
                 : "View your saved work or return to Queue."
-              : autoStart
-                ? "You can leave this screen. We’ll keep working."
-                : "This saved request hasn’t started yet."}
-          </Copy>
-          {data?.state === "failed" ? (
-            <Copy muted size="bodySmall">{processingJobStoppedMessage(generation.job?.stage)}</Copy>
-          ) : null}
+            : autoStart
+              ? "Saving your request. The server will take over once it accepts the job."
+              : "This saved request hasn’t started yet."
+        }
+        notices={
+          <>
+            {data?.state === "failed" ? (
+              <Copy muted size="bodySmall">
+                {processingJobStoppedMessage(generation.job?.stage)}
+              </Copy>
+            ) : null}
+            {(error || generation.error) && (
+              <Notice>{error ?? generation.error}</Notice>
+            )}
+            {data?.error && (
+              <Notice>
+                {canRetry ? `${data.error.message} ` : ""}
+                {canRetry
+                  ? "Your material is safe."
+                  : data.error.code === "activity_source_unavailable"
+                    ? data.error.message
+                    : data.error.code === "quiz_generation_failed"
+                      ? "The quiz could not be completed. Try another material."
+                      : data.error.message}
+              </Notice>
+            )}
+          </>
+        }
+        actions={(close) => (
           <View
             testID="generation-actions"
-            style={{ width: 240, gap: spacing[3], marginTop: spacing[4] }}
+            style={{ width: "100%", gap: spacing[2] }}
           >
             {data?.artifactId && (
               <Action
@@ -215,7 +322,10 @@ export function GenerationScreen() {
                 onPress={() =>
                   router.replace({
                     pathname: "/artifact",
-                    params: { id: data.artifactId!, ...(params.quiz === "1" ? { quiz: "1" } : {}) },
+                    params: {
+                      id: data.artifactId!,
+                      ...(params.quiz === "1" ? { quiz: "1" } : {}),
+                    },
                   })
                 }
               >
@@ -223,17 +333,55 @@ export function GenerationScreen() {
               </Action>
             )}
             {intent && !id && (!autoStart || error) ? (
-              <Action secondary={!!data?.artifactId} disabled={confirming} pill onPress={() => void confirmGeneration()}>{confirming ? "Starting…" : autoStart ? "Try again" : "Start generation"}</Action>
+              <Action
+                secondary={!!data?.artifactId}
+                disabled={confirming}
+                pill
+                onPress={() => void confirmGeneration()}
+              >
+                {confirming
+                  ? "Starting…"
+                  : autoStart
+                    ? "Try again"
+                    : "Start generation"}
+              </Action>
             ) : null}
             {stalled ? (
-              <Action secondary={!!data?.artifactId} disabled={cancelling} pill onPress={() => void cancelStalled()}>{cancelling ? "Cancelling…" : "Cancel generation"}</Action>
+              <Action
+                secondary={!!data?.artifactId}
+                disabled={cancelling}
+                pill
+                onPress={() => void cancelStalled()}
+              >
+                {cancelling ? "Cancelling…" : "Cancel generation"}
+              </Action>
             ) : null}
             {canRetry ? (
-              <Action secondary={!!data?.artifactId} disabled={retrying} pill onPress={() => void retryFailed()}>{retrying ? "Retrying…" : "Try again"}</Action>
+              <Action
+                secondary={!!data?.artifactId}
+                disabled={retrying}
+                pill
+                onPress={() => void retryFailed()}
+              >
+                {retrying ? "Retrying…" : "Try again"}
+              </Action>
             ) : null}
-            <Action secondary pill onPress={() => queue.show()}>View Queue</Action>
+            <Action
+              secondary
+              pill
+              onPress={() => {
+                close();
+                queue.show();
+              }}
+            >
+              View Queue
+            </Action>
             {error && !id && !intent && (
-              <Action secondary pill onPress={() => setAttempt((value) => value + 1)}>
+              <Action
+                secondary
+                pill
+                onPress={() => setAttempt((value) => value + 1)}
+              >
                 Reconnect request
               </Action>
             )}
@@ -243,22 +391,8 @@ export function GenerationScreen() {
               </Action>
             )}
           </View>
-        </View>
-        {(error || generation.error) && (
-          <Notice>{error ?? generation.error}</Notice>
         )}
-        {data?.error && (
-          <Notice>
-            {canRetry
-              ? "Your material is safe."
-              : data.error.code === "activity_source_unavailable"
-                ? data.error.message
-                : data.error.code === "quiz_generation_failed"
-                  ? "The quiz could not be completed. Try another material."
-                  : data.error.message}
-          </Notice>
-        )}
-      </View>
+      />
     </Page>
   );
 }
@@ -268,21 +402,60 @@ export function GenerationScreen() {
  * skeleton shimmer while running, filled by the server's real section (or
  * page) count when it reports one. Holds still under Reduce Motion.
  */
-function GenerationProgress({ progress }: { progress: { completed: number; total: number; unit: string } | null }) {
+function GenerationProgress({
+  progress,
+}: {
+  progress: { completed: number; total: number; unit: string } | null;
+}) {
   const { colors } = useTheme();
-  const filled = progress ? Math.min(1, progress.completed / progress.total) : 0;
+  const filled = progress
+    ? Math.min(1, progress.completed / progress.total)
+    : 0;
   return (
-    <View testID="generation-progress" style={{ width: 240, alignItems: "center", gap: spacing[2], marginBottom: spacing[2] }}>
+    <View
+      testID="generation-progress"
+      style={{
+        width: "100%",
+        maxWidth: 320,
+        alignItems: "center",
+        gap: spacing[2],
+        marginBottom: spacing[2],
+      }}
+    >
       <View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
-        style={{ width: "100%", height: 3, flexDirection: "row", overflow: "hidden", borderRadius: radius.pill, backgroundColor: colors.separator }}
+        style={{
+          width: "100%",
+          height: 3,
+          flexDirection: "row",
+          overflow: "hidden",
+          borderRadius: radius.pill,
+          backgroundColor: colors.separator,
+        }}
       >
-        {filled > 0 ? <View testID="generation-progress-fill" style={{ width: `${filled * 100}%`, backgroundColor: colors.success }} /> : null}
-        {filled < 1 ? <SkeletonBlock width={`${(1 - filled) * 100}%`} height={3} radius={0} /> : null}
+        {filled > 0 ? (
+          <View
+            testID="generation-progress-fill"
+            style={{
+              width: `${filled * 100}%`,
+              backgroundColor: colors.success,
+            }}
+          />
+        ) : null}
+        {filled < 1 ? (
+          <SkeletonBlock
+            width={`${(1 - filled) * 100}%`}
+            height={3}
+            radius={0}
+          />
+        ) : null}
       </View>
       {progress ? (
-        <Copy muted size="caption">{`${progress.completed} of ${progress.total} ${progress.unit}`}</Copy>
+        <Copy
+          muted
+          size="caption"
+        >{`${progress.completed} of ${progress.total} ${progress.unit}`}</Copy>
       ) : null}
     </View>
   );
@@ -301,23 +474,57 @@ function GenerationStatus({ message }: { message: string }) {
       return;
     }
     const out = Animated.parallel([
-      Animated.timing(opacity, { toValue: 0, duration: 100, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: -4, duration: 100, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 100,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: -4,
+        duration: 100,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
     ]);
     out.start(({ finished }) => {
       if (!finished) return;
       setVisible(message);
       translateY.setValue(5);
       Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 180, easing: Easing.out(Easing.ease), useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 180, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 180,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 180,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }),
       ]).start();
     });
     return () => out.stop();
   }, [message, opacity, reducedMotion, translateY]);
   return (
-    <Animated.View style={{ height: 78, width: 290, alignItems: "center", justifyContent: "center", opacity, transform: [{ translateY }] }}>
-      <Copy size="h2" style={{ textAlign: "center", fontSize: 24, lineHeight: 30 }}>{visible}</Copy>
+    <Animated.View
+      style={{
+        width: "100%",
+        minHeight: 60,
+        alignItems: "center",
+        justifyContent: "center",
+        opacity,
+        transform: [{ translateY }],
+      }}
+    >
+      <Copy
+        size="h2"
+        style={{ textAlign: "center", fontSize: 24, lineHeight: 30 }}
+      >
+        {visible}
+      </Copy>
     </Animated.View>
   );
 }

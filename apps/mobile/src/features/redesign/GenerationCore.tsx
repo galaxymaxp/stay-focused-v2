@@ -46,6 +46,7 @@ export function GenerationCore({ state, size = 300 }: { state: CoreState; size?:
   if (!orb) {
     return (
       <GenerationVisual
+        size={size}
         running={state === "reading" || state === "generating" || state === "finalizing"}
         completed={state === "complete"}
       />

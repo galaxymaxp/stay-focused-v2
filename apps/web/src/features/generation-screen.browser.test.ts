@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
@@ -28,7 +28,7 @@ const stubs: Record<string, string> = {
   entry: `import { createRoot } from "react-dom/client";
     import { createElement } from "react";
     import { GenerationScreen } from "${resolve("src/features/queue.tsx").replace(/\\/g, "/")}";
-    createRoot(document.getElementById("root")).render(createElement("main", { className: "main" }, createElement(GenerationScreen, { id: "job-1" })));`,
+    createRoot(document.getElementById("root")).render(createElement("div", { className: "app-shell detail-page" }, createElement("div", { className: "workspace" }, createElement("header", { className: "topbar" }, "Navigation"), createElement("main", { className: "main" }, createElement(GenerationScreen, { id: "job-1" })))));`,
 };
 const stubFor = (source: string) =>
   source === "generation-browser-entry" ? "entry"
@@ -45,6 +45,10 @@ const localStubs: Plugin = {
   },
   load(id) {
     return id.startsWith("\0stub:") ? stubs[id.slice(6)] : null;
+  },
+  transform(code, id) {
+    return id.replaceAll("\\", "/").endsWith("/day-clock/GenerationOrb.tsx")
+      ? code.replace("const interaction = useOrbInteraction();", "const interaction = useOrbInteraction(); window.__interaction = interaction;") : null;
   },
 };
 const fixture = {
@@ -72,9 +76,20 @@ beforeAll(async () => {
   });
   const css = readFileSync(resolve("app/globals.css"), "utf8");
   server = createServer((request, response) => {
-    if (request.url === "/") {
+    if (request.url?.split("?")[0] === "/") {
+      const scenario = new URL(request.url, "http://localhost").searchParams.get("state") ?? "generating";
+      const current = structuredClone(fixture);
+      current.data.state = scenario;
+      current.job.status = ["queued", "stalled"].includes(scenario) ? "queued" : scenario === "failed" ? "failed" : scenario === "completed" ? "succeeded" : scenario === "cancelled" ? "cancelled" : "running";
+      if (scenario === "stalled") { current.data.state = "queued"; current.data.updatedAt = current.job.updatedAt = "2020-01-01T00:00:00Z"; }
+      if (scenario === "preparing") { current.job.jobType = "document_extraction"; current.job.stage = "extracting_text"; }
+      if (scenario === "finalizing") current.job.stage = "storing_reviewer";
+      if (scenario === "failed") { current.job.retryable = true; Object.assign(current.data, { error: { code: "insufficient_source", retryable: false, message: "A safe, complete explanation. ".repeat(80) + "END OF ERROR" } }); }
+      if (scenario === "reconnect") Object.assign(current, { error: "Connection interrupted. ".repeat(80) + "END OF CONNECTION ERROR" });
+      current.job.source.displayName = "A long synthetic material name ".repeat(20) + "END OF TITLE";
+      const rendered = scenario === "connecting" ? { ...current, job: null, data: null, loading: true } : current;
       response.writeHead(200, { "Content-Type": "text/html" });
-      response.end(`<!doctype html><html data-theme="light"><style>${css}</style><body><div id="root"></div><script>window.__fixture=${JSON.stringify(fixture)}</script><script type="module" src="/entry.js"></script></body></html>`);
+      response.end(`<!doctype html><html data-theme="light"><style>${css}</style><body><div id="root"></div><script>window.__fixture=${JSON.stringify(rendered)}</script><script type="module" src="/entry.js"></script></body></html>`);
       return;
     }
     try {
@@ -98,13 +113,13 @@ afterAll(async () => {
   if (out) rmSync(out, { recursive: true, force: true });
 });
 
-async function open(width: number, height: number, reducedMotion: "reduce" | "no-preference" = "no-preference") {
+async function open(width: number, height: number, reducedMotion: "reduce" | "no-preference" = "no-preference", state = "generating") {
   const page = await browser.newPage({ viewport: { width, height }, reducedMotion });
   await page.route("**/*", (route) => (route.request().url().startsWith(origin) ? route.continue() : route.abort()));
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(String(error)));
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
-  await page.goto(origin);
+  await page.goto(origin + "?state=" + state);
   await page.waitForSelector(".generation-orb canvas", { timeout: 15_000 }).catch((cause: unknown) => {
     throw new Error([String(cause), ...errors].join(" | "));
   });
@@ -128,6 +143,7 @@ describe("generation page in a real browser (local only)", () => {
       expect(orb).toMatchObject({ canvas: true, hit: "orb-touch", color: "pearl" });
       await page.mouse.click(orb.x, orb.y);
       expect(await page.evaluate(() => localStorage.getItem("sf.orb.colorKey"))).toBe("gold");
+      if (width <= 760) await page.locator(".generation-details-trigger").click();
       // Progress eases toward the server value. Wait for that exact value,
       // rather than sampling a transitional integer on a busy software GPU.
       await page.waitForFunction(() => document.querySelector('ol.generation-steps')?.textContent?.includes('3 of 18 sections'));
@@ -150,5 +166,110 @@ describe("generation page in a real browser (local only)", () => {
     } finally {
       await page.close();
     }
+  }, 60_000);
+});
+
+const captures = resolve("../../tmp/overnight/GV1-web");
+const measurements: unknown[] = [];
+async function bounds(page: Page) {
+  await page.waitForFunction(() => { const box = document.querySelector(".generation-orb")?.getBoundingClientRect(); return box && box.width > 0 && box.height > 0; });
+  const result = await page.evaluate(() => {
+    const main = document.querySelector("main")!;
+    const box = (selector: string) => { const b = document.querySelector(selector)!.getBoundingClientRect(); return { x: b.x, y: b.y, width: b.width, height: b.height, bottom: b.bottom, right: b.right }; };
+    return { viewport: { width: innerWidth, height: innerHeight }, pageHeight: document.documentElement.scrollHeight, pageWidth: document.documentElement.scrollWidth, mainHeight: main.clientHeight, contentHeight: main.scrollHeight, orb: box(".generation-orb"), status: box(".generation-status"), details: box(".generation-details-trigger"), canvas: box(".generation-orb canvas") };
+  });
+  expect(result.pageHeight).toBeLessThanOrEqual(result.viewport.height + 1);
+  expect(result.pageWidth).toBeLessThanOrEqual(result.viewport.width + 1);
+  expect(result.contentHeight).toBeLessThanOrEqual(result.mainHeight + 1);
+  for (const b of [result.orb, result.status, result.details, result.canvas]) {
+    expect(b.x).toBeGreaterThanOrEqual(0); expect(b.y).toBeGreaterThanOrEqual(0);
+    expect(b.right).toBeLessThanOrEqual(result.viewport.width + 1); expect(b.bottom).toBeLessThanOrEqual(result.viewport.height + 1);
+  }
+  expect(result.orb.width).toBeCloseTo(result.orb.height, 0);
+  expect(result.orb.width).toBeGreaterThan(48);
+  await page.mouse.wheel(0, 500);
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+  return result;
+}
+
+describe("GV1 measured generation viewport", () => {
+  it.each([[360, 640], [390, 844], [412, 915], [640, 360]])("fits every state at %ix%i with intact canvas and reachable details", async (width, height) => {
+    mkdirSync(captures, { recursive: true });
+    for (const state of ["connecting", "queued", "preparing", "generating", "finalizing", "stalled", "failed", "completed", "cancelled", "reconnect"]) {
+      const page = await open(width, height, "reduce", state);
+      try {
+        const measured = await bounds(page);
+        measurements.push({ state, ...measured });
+        writeFileSync(join(captures, "bounds.json"), JSON.stringify(measurements, null, 2));
+        await page.screenshot({ path: join(captures, width + "x" + height + "-" + state + ".png") });
+        await page.locator(".generation-details-trigger").click();
+        await page.waitForSelector("dialog[open]");
+        const dialog = page.locator(".generation-dialog-content");
+        if (state !== "connecting") expect(await dialog.textContent()).toContain("END OF TITLE");
+        if (state === "failed") expect(await dialog.textContent()).toContain("END OF ERROR");
+        if (state === "reconnect") expect(await dialog.textContent()).toContain("END OF CONNECTION ERROR");
+        // The last action remains reachable even when the complete explanation is long.
+        const last = dialog.locator("a,button").last();
+        await last.scrollIntoViewIfNeeded();
+        const actionBounds = await last.boundingBox();
+        expect(actionBounds!.y + actionBounds!.height).toBeLessThanOrEqual(height);
+        expect(measured.details.height).toBeGreaterThanOrEqual(44);
+        await page.getByRole("button", { name: "Done", exact: true }).click();
+        expect(await page.locator("dialog[open]").count()).toBe(0);
+        expect(await page.locator(".generation-details-trigger").evaluate(node => document.activeElement === node)).toBe(true);
+        await bounds(page);
+      } finally { await page.close(); }
+    }
+  }, 120_000);
+  it.each([[360, 640], [640, 360]])("keeps doubled text and safe inset controls reachable at %ix%i", async (width, height) => {
+    const page = await open(width, height, "reduce", "failed");
+    try {
+      await page.evaluate(() => {
+        const nodes = [...document.querySelectorAll<HTMLElement>("h1,h2,p,span,button,a,strong")];
+        const styles = nodes.map(node => ({ node, font: parseFloat(getComputedStyle(node).fontSize), line: parseFloat(getComputedStyle(node).lineHeight) }));
+        styles.forEach(({ node, font, line }) => { node.style.fontSize = font * 2 + "px"; if (Number.isFinite(line)) node.style.lineHeight = line * 2 + "px"; });
+        const main = document.querySelector<HTMLElement>("main")!;
+        main.style.paddingTop = "32px"; main.style.paddingBottom = "24px";
+      });
+      await bounds(page);
+      await page.locator(".generation-details-trigger").click();
+      await page.getByRole("button", { name: "Try again", exact: true }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: join(captures, width + "x" + height + "-text200-dialog.png") });
+      await page.keyboard.press("Escape");
+      expect(await page.locator("dialog[open]").count()).toBe(0);
+    } finally { await page.close(); }
+  }, 60_000);
+  it("keeps tap waves, hold rotation and momentum working in the fitted viewport", async () => {
+    const page = await open(390, 844);
+    try {
+      const box = await page.locator('[data-testid="orb-touch"]').boundingBox();
+      const x = box!.x + box!.width / 2, y = box!.y + box!.height / 2;
+      for (let i = 0; i < 5; i++) { await page.mouse.click(x, y); await page.waitForTimeout(150); }
+      const waves = await page.evaluate(() => (window as unknown as { __interaction: { state: { current: { impulses: unknown[] } } } }).__interaction.state.current.impulses.length);
+      expect(waves).toBe(5);
+      const palette = await page.evaluate(() => localStorage.getItem("sf.orb.colorKey"));
+      await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(450);
+      await page.mouse.move(x + 26, y - 18, { steps: 4 }); await page.mouse.up();
+      const spin = await page.evaluate(() => (window as unknown as { __interaction: { state: { current: { spin: { velocityX: number; velocityY: number } } } } }).__interaction.state.current.spin);
+      expect(Math.abs(spin.velocityX) + Math.abs(spin.velocityY)).toBeGreaterThan(0);
+      expect(await page.evaluate(() => localStorage.getItem("sf.orb.colorKey"))).toBe(palette);
+      await bounds(page);
+    } finally { await page.close(); }
+  }, 60_000);
+  it("remeasures orientation and dynamic viewport changes while preserving the desktop panes", async () => {
+    const page = await open(390, 844, "reduce");
+    try {
+      for (const viewport of [{ width: 640, height: 360 }, { width: 390, height: 680 }, { width: 412, height: 915 }]) {
+        await page.setViewportSize(viewport); await bounds(page);
+      }
+      await page.setViewportSize({ width: 1440, height: 900 });
+      const desktop = await page.evaluate(() => ({
+        columns: getComputedStyle(document.querySelector(".generation-layout")!).gridTemplateColumns.split(" ").length,
+        details: getComputedStyle(document.querySelector(".generation-detail-pane")!).display,
+        trigger: getComputedStyle(document.querySelector(".generation-details-trigger")!).display,
+      }));
+      expect(desktop).toEqual({ columns: 2, details: "flex", trigger: "none" });
+      await page.getByRole("button", { name: "Cancel generation", exact: true }).waitFor();
+    } finally { await page.close(); }
   }, 60_000);
 });
