@@ -1,5 +1,30 @@
 # Current State
 
+<!-- OP2 begin -->
+OP2 / Larger glass clock, cumulative waves and source-faithful backdrop
+(2026-10-20): **PASS for the finite unattended local code scope**. Time is 40
+pixels/points across idle/drag/fallback, with refracted source shading and
+proportional AM/PM. Eight bounded overlapping waves build strength smoothly;
+a 64x64 RGBA GPU capture drives the backdrop from resolved color AND opacity.
+Today, Generation preparation/detail, retained KnowledgeCore and existing
+static/Queue sources are covered. Jobs, gestures, synced palettes and render
+cadence remain; no extra animation loop or production pixel readback.
+Implementation: `9e17fd4d`; documentation hash is in Git/OP2.status.
+FRESH PASS: forced typecheck/lint/build 8/8 workspaces each, 0 cached; six
+existing lint warnings. Shared 670/68 files (includes compiled duplicates;
+335 source cases), mobile 1581/166, web 532/72. API/web builds 37/37 and 23/23
+pages and Android HBC export are supplied by the equivalent fresh root build.
+Diff/staged checks pass. Real GPU pixels, screenshots, before/after motion
+frames and CPU submission/resource observations were inspected; failed attempts
+and repairs are retained. Rollout and Device checks NOT RUN, skipped entirely.
+Deployed/live state and physical Android appearance/performance remain
+UNVERIFIED (owner to confirm). No service call, environment-file edit, remote
+SQL/migration, Scheduler, deployment or push. Unrelated paths and Owner Pause
+are preserved. OP2 ends here; GV1 is separate and has not started.
+[Acceptance and exact gates](ai/acceptance/op2-orb-polish.md).
+<!-- OP2 end -->
+
+
 <!-- OA1 begin -->
 OA1 / Orb ambient light (2026-10-20): **PASS for the finite unattended local
 code scope**. Shared procedural spill follows final body palette, liquid motion,

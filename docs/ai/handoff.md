@@ -9207,3 +9207,70 @@ were inspected/restored. No validation output or generated artifact is staged.
   confirm)**. Original UI/, apps/mobile/.gitignore and supabase/.temp/ are
   preserved. Owner Pause and unrelated scopes remain unchanged. No Supabase,
   Vercel, Google Cloud, Canvas or Resend call was made.
+
+## OP2 � larger glass time, cumulative waves and source-faithful backdrop (2026-10-20)
+
+**Status: PASS for the finite unattended local code scope.** STEP 0�4, local
+visual/regression checks and scoped commits are complete. Rollout/device checks
+are skipped. The full OP2 unattended header governed this run; no questions or
+production access were required. Baseline 202f8c3f on the expected branch matched.
+
+Commits:
+- `9e17fd4d feat(orb): refine glass time, cumulative waves and ambient backdrop`
+- `docs(orb): close OP2 local acceptance and gates` (this documentation checkpoint;
+  final hash is recorded in Git and tmp/overnight/OP2.status, per AUTOPILOT).
+
+Both platforms use 40px/point refractive time with proportional AM/PM and real
+fallback text. Eight independently timed 1.8s waves preserve earlier fronts and
+add smooth bounded energy; reduced motion keeps only the palette acknowledgment.
+One 64x64 RGBA target samples the resolved body into a diffuse backdrop, retaining
+source opacity and hue/luminance. No full-resolution second orb, readback or
+extra animation loop. Today, preparation/detail/Queue Generation, retained
+KnowledgeCore and exact existing static/miniature sources are covered.
+
+FRESH final gates: typecheck/lint/forced root build 8/8 tasks each, 0 cached;
+six existing lint warnings, 0 errors. Shared 670/670 in 68 files (335 source
+cases plus compiled copies), mobile 1581/1581 in 166, web 532/532 in 72.
+Equivalent final root API/web builds 37/37 and 23/23 pages; Android HBC emitted
+and inspected for final shader strings. Separate duplicate builds NOT RUN,
+satisfied by the prompt-permitted final forced equivalents. Relevant API tests
+NOT APPLICABLE: no API consumer, server behavior, auth or schema changed.
+Unstaged and staged diff checks FRESH PASS, 0 whitespace errors.
+
+Actual local GPU pixels, 390/1440 light/dark/Reduce Motion/state/palette captures,
+320/390/1440 long time and fallback, eight dawn/dusk captures and before/after
+WebM decoded motion frames were reviewed. Real page-composited luminance
+correlation .9725�.9997 with moving dim sectors; interior RGBA diff and border
+alpha 0. One-to-five 150ms taps grow peak .00989?.03020 and RMS .00339?.01614;
+GPU retains five distinct ages and later reaches count 0. Idle cadence ~83ms;
+3/5 draws, 2/1 and 4/3 geometry/texture counts, one 16KiB logical target.
+CPU submission observations are not Android/GPU timing or battery evidence.
+
+Failures are retained in [acceptance](acceptance/op2-orb-polish.md): launcher
+preload path quoting, initial float/negative-zero assertions, new QA typing,
+clock contrast/material iterations, a packet interference bug caught by a
+stronger buildup audit, old uniform/text-child tests, and an initial ambient
+metric that incorrectly normalized away opacity. Source coverage and emitted/
+visible metrics were corrected. No test threshold was lowered. Earlier forced
+builds were superseded; only the final source gates support this PASS.
+
+Artifacts are ignored under tmp/overnight/OP2-*: logs, gates JSON, before/after
+screens/videos, day-state captures, pixel/resource data, decoded motion, progress
+and status. Generated Next declarations were inspected/restored. No validation
+artifact, private fixture or credential was staged.
+
+**Owner steps remaining**
+
+- Rollout: NOT RUN, skipped entirely. Review the scoped commits/evidence and
+  separately initiate any release. Nothing was pushed, deployed or published.
+- Device checks: NOT RUN, skipped entirely; Realme is disconnected. Confirm
+  actual Android glass/plain typography, dynamic source lighting, preparation/
+  Generation/Queue detail, fallback/miniatures, gestures/scrolling, reduced motion,
+  focus/background/context recovery and actual GPU/frame/power behavior.
+- Deployed revisions, live preference/database/migration/Scheduler state and all
+  physical appearance/performance are **UNVERIFIED (owner to confirm)**. Static
+  native pearl stills do not establish live procedural palette parity.
+- GV1 is the separately queued next scope and has not started. Owner Pause and
+  unrelated UI/, apps/mobile/.gitignore and supabase/.temp/ are preserved.
+  No Supabase, Vercel, Google Cloud, Canvas or Resend call, environment-file edit,
+  remote SQL/migration, Scheduler change or push occurred.
