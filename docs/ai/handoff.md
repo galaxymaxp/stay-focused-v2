@@ -9274,3 +9274,54 @@ artifact, private fixture or credential was staged.
   unrelated UI/, apps/mobile/.gitignore and supabase/.temp/ are preserved.
   No Supabase, Vercel, Google Cloud, Canvas or Resend call, environment-file edit,
   remote SQL/migration, Scheduler change or push occurred.
+
+
+## GV1 generation viewport - unattended local closure (2026-10-20)
+
+Status: **PASS for the finite unattended local code scope**. Implementation
+`8b37b5ae fix(generation): fit active pages to measured viewports`. Documentation:
+`docs(generation): close GV1 local acceptance and gates` (this follow-up commit;
+exact hash and both commits are recorded in tmp/overnight/GV1.status and Git).
+Branch: overnight/2026-10-15_feedback. Owner Pause remains preserved.
+
+Native detail/pre-admission pages now use Page's existing non-scroll flex path
+and the measured post-chrome viewport. Full canvas/fallback sizing, width-aware
+controls, concise enlarged-text landscape status, full details/errors and actions
+fit without clipping. Automatic-start copy waits for accepted server identity
+before promising background work. Phone web fits the dynamic safe viewport,
+with a bounded details/actions dialog; desktop keeps two panes. Existing job
+handlers, picker/Queue behavior and OP2 remain.
+
+FRESH final serial gates: typecheck/lint/build **8/8 each, 0 cached**, six existing
+lint warnings; shared **670/68 files**, mobile **1600/169**, web **540/72**. Root
+build supplies equivalent FRESH API **37/37 pages**, web **23/23 pages** and Android
+HBC export; separate duplicate invocations NOT RUN. Relevant API tests are NOT
+APPLICABLE (client layout/copy only, no server/request/auth/schema change).
+Unstaged and explicitly staged diff checks PASS exit 0. The final forced build
+took 235.824s wall. Failed focused attempts, the native audit and
+interrupted intermediate validation are retained; only the final frozen-source
+run is closure evidence.
+
+Bounds/screenshots: synthetic RN Web native components cover **66** state/viewport
+combinations at 360x640, 390x844, 412x915, 640x360, 24/24 safe insets and 200%
+text; all complete canvases exceed 48 points. Actual web covers **40** state/
+viewports plus enlarged text, dynamic resize, desktop and tap/hold/momentum.
+Full text/error/action reachability and zero page offset are asserted. Local
+Today/Generation OP2 clock/waves/backdrop tests and fresh captures were jointly
+reviewed. Evidence: ignored GV1-web/, GV1-native/, GV1-gate-*.log and final
+Android bundle hash report under tmp/overnight/. Native fixtures replace GL;
+component/unit PASS is not physical or native rendering approval.
+
+### Owner steps remaining
+
+Native rendering/appearance, physical Android interactions/performance and OS
+text scaling: **UNVERIFIED (owner to confirm)**. No emulator was running; Realme
+is disconnected. Device checks: **NOT RUN**, skipped entirely; no device install
+or reconnection was attempted. Rollout: **NOT RUN**, skipped entirely. Live/
+deployed state: **UNVERIFIED (owner to confirm)**. Review commits/evidence and
+separately initiate any publication. No service call, environment-file edit,
+remote SQL/migration, Scheduler operation, deployment or push. Original untracked
+UI/, apps/mobile/.gitignore and supabase/.temp/ remain. Finite GV1 endpoint
+reached; no later task or FULLSEND was started.
+
+See [GV1 acceptance](acceptance/gv1-generation-viewport.md).

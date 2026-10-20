@@ -1,3 +1,26 @@
+<!-- GV1 begin -->
+GV1 / Generation viewport (2026-10-20): **PASS for the finite unattended local code scope**.
+Native detail and pre-admission pages use measured non-scroll flex space, with
+an intact responsive orb/fallback and bounded full details/errors/actions.
+Enlarged short layouts keep concise state labels and full status in details;
+background-work copy waits for acceptance. Phone web uses the dynamic viewport
+and a bounded dialog; desktop retains both panes. Jobs, OP2 and picker scrolling
+are preserved. Implementation: `8b37b5ae`; documentation hash is in Git/GV1.status.
+FRESH PASS: forced typecheck/lint/build 8/8 tasks each, 0 cached; six existing
+lint warnings. Shared 670/68 files (335 source + compiled duplicates), mobile
+1600/169, web 540/72. Equivalent final root API/web builds generate 37/37 and
+23/23 pages; Android HBC export and diff/staged checks pass. Native component
+bounds cover 66 state/viewport combinations via RN Web, including safe insets,
+landscape and 200% text. Actual web bounds, gestures, screenshots and OP2
+clock/wave/backdrop browser checks pass. Failed attempts and the stronger final
+native audit are retained. Native rendering/physical acceptance and live state
+remain UNVERIFIED (owner to confirm). Rollout and Device checks NOT RUN,
+skipped entirely; Realme disconnected. No service call, environment-file edit,
+remote SQL/migration, Scheduler operation, deployment or push. Original unrelated
+paths and Owner Pause are preserved. Finite GV1 endpoint reached; no later work.
+[Acceptance and exact gates](acceptance/gv1-generation-viewport.md).
+<!-- GV1 end -->
+
 <!-- OP2 begin -->
 OP2 / Larger glass clock, cumulative waves and source-faithful backdrop
 (2026-10-20): **PASS for the finite unattended local code scope**. Time is 40
