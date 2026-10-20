@@ -42,7 +42,7 @@ const stubs: Record<string, string> = {
     export const GenerationCore = ({ size }) => React.createElement(View, { testID: "sized-core", style: { width: size, height: size, borderRadius: size / 2, backgroundColor: "#c4b6d9" } });`,
   entry: `import React, { useState } from "react"; import { createRoot } from "react-dom/client";
     import { View } from "react-native";
-    import { generationMessages } from "C:/Users/Fely Max Dilinila/Documents/Projects/b25-3-3-work/apps/mobile/src/features/redesign/presentation.ts";
+    import { generationMessages } from "${root}/features/redesign/presentation.ts";
     import { Page, Copy, Action, Notice, Sheet } from "${root}/design/primitives.tsx";
     import { GenerationLayout } from "${root}/features/redesign/GenerationLayout.tsx";
     const state = new URLSearchParams(location.search).get("state") || "generating";
