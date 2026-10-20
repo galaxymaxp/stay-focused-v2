@@ -1,14 +1,10 @@
-import { Color, Matrix3, ShaderMaterial, Vector3 } from 'three';
+import { Camera, Scene, ShaderMaterial, WebGLRenderTarget, type WebGLRenderer } from 'three';
 import { expect, it, vi } from 'vitest';
 import { orbAmbientEase } from './orb-ambient';
 import { createOrbAmbient, type OrbAmbientSource } from './orb-ambient-renderer';
 
 const source = (): OrbAmbientSource => ({
-  uTime: { value: 8.4 }, uLife: { value: 0.4 }, uStir: { value: 0 },
   uGlow: { value: 1 }, uError: { value: 0 },
-  uSpin: { value: new Matrix3() }, uLight: { value: new Vector3(0.4, 0.2, 0.1) },
-  uBase: { value: new Color('#e6eaf1') }, uDeep: { value: new Color('#161b26') },
-  uGlowColor: { value: new Color('#cfddff') },
 });
 it('eases by elapsed time, with identical 12.5/30/60Hz responses', () => {
   const response = (hz: number) => {
@@ -23,27 +19,32 @@ it('eases by elapsed time, with identical 12.5/30/60Hz responses', () => {
   expect(orbAmbientEase(-1, false)).toBe(0);
   expect(orbAmbientEase(0, true)).toBe(1);
 });
-it('uses resolved body colors, spatial light, inverse spin and liquid clock; never mutates the source', () => {
+it('captures the same resolved body scene without feedback and restores target/visibility even on failure', () => {
   const a = createOrbAmbient(), s = source();
   a.update(s, 0, 'dark', false);
   const u = (a.mesh.material as ShaderMaterial).uniforms;
-  expect(u.uBase!.value.equals(s.uBase.value)).toBe(true);
-  expect(u.uDeep!.value.equals(s.uDeep.value)).toBe(true);
-  expect(u.uGlowColor!.value.equals(s.uGlowColor.value)).toBe(true);
-  expect(u.uTime!.value).toBe(8.4);
-  expect(u.uLight!.value.equals(s.uLight.value)).toBe(true);
-  s.uBase.value.set('#f4c542'); s.uSpin.value.set(0, 1, 0, -1, 0, 0, 0, 0, 1); s.uTime.value = 10;
-  a.update(s, 0.08, 'dark', false);
-  expect(u.uBase!.value.equals(s.uBase.value)).toBe(false);
-  expect(s.uBase.value.getHexString()).toBe('f4c542');
-  expect(u.uSpin!.value.equals(s.uSpin.value)).toBe(true);
-  expect(u.uTime!.value).toBe(10);
+  const previous = new WebGLRenderTarget(3, 3), scene = new Scene(), camera = new Camera();
+  scene.add(a.mesh);
+  const setRenderTarget = vi.fn();
+  const render = vi.fn((actualScene: Scene, actualCamera: Camera) => {
+    expect(actualScene).toBe(scene); expect(actualCamera).toBe(camera);
+    expect(a.mesh.visible).toBe(false);
+  });
+  const renderer = { getRenderTarget: () => previous, setRenderTarget, render } as unknown as WebGLRenderer;
+  a.capture(renderer, scene, camera);
+  const target = setRenderTarget.mock.calls[0]![0] as WebGLRenderTarget;
+  expect(target.width).toBe(64); expect(target.height).toBe(64);
+  expect(u.uSource!.value).toBe(target.texture);
+  expect(setRenderTarget).toHaveBeenLastCalledWith(previous); expect(a.mesh.visible).toBe(true);
+  render.mockImplementationOnce(() => { throw Error('draw_failed'); });
+  expect(() => a.capture(renderer, scene, camera)).toThrow('draw_failed');
+  expect(setRenderTarget).toHaveBeenLastCalledWith(previous); expect(a.mesh.visible).toBe(true);
   a.update(s, 0, 'light', true);
-  expect(u.uBase!.value.equals(s.uBase.value)).toBe(true);
-  expect(u.uStrength!.value).toBe(0.18);
+  expect(u.uStrength!.value).toBe(0.5);
   s.uError.value = 1; a.update(s, 0.08, 'dark', false);
   expect(u.uStrength!.value).toBe(0);
-  a.dispose();
+  const dispose = vi.spyOn(target, 'dispose');
+  a.dispose(); a.dispose(); expect(dispose).toHaveBeenCalledOnce(); previous.dispose();
 });
 it('is stable in reduced motion and owns no scheduling or readback; disposal is idempotent', () => {
   const a = createOrbAmbient(), s = source();
@@ -55,7 +56,7 @@ it('is stable in reduced motion and owns no scheduling or readback; disposal is 
   const geometry = vi.spyOn(a.mesh.geometry, 'dispose');
   const material = vi.spyOn(a.mesh.material as ShaderMaterial, 'dispose');
   a.dispose(); a.dispose();
-  s.uTime.value = 100; a.update(s, 1, 'dark', false);
-  expect(u.uTime!.value).toBe(8.4);
+  s.uGlow.value = 100; a.update(s, 1, 'dark', false);
+  expect(JSON.stringify(u)).toBe(snapshot);
   expect(geometry).toHaveBeenCalledOnce(); expect(material).toHaveBeenCalledOnce();
 });

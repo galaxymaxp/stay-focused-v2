@@ -21,7 +21,7 @@ const stubs: Record<string, string> = {
       if (location.search.includes('generation')) return createElement(GenerationOrb, { state });
       if (location.search.includes('core')) return createElement(KnowledgeCore, { state });
       if (location.search.includes('orb')) return createElement(DayOrb, { minutes: 720, size: 315, state: 'generating',
-        clock: location.search.includes('glass') ? { text: '12:00 PM', fontSize: 30 } : undefined });
+        clock: location.search.includes('glass') ? { text: '12:00 PM', fontSize: 40 } : undefined });
       return createElement('main', { style: { width: 'min(400px, 100%)', margin: '40px auto' } },
         createElement(DayRingClock, { date: '2026-10-19', timeline: [], ...range,
           onCommit: (start, end) => setRange({ start, end }) }));
@@ -36,12 +36,23 @@ const stubs: Record<string, string> = {
         window.__renders = [];
         this.render = (scene, camera) => {
           for (const child of scene.children) {
-            if (child.material?.uniforms?.uStrength) {
+            if (child.material?.uniforms?.uStrength && this.getRenderTarget()?.texture.name !== 'orb-ambient-source') {
               child.visible = window.__showSpill !== false;
               window.__redraw = () => this.render(scene, camera);
               window.__ambient = child.material.uniforms;
             }
           }
+          if (this.getRenderTarget()?.texture.name === 'orb-ambient-source') {
+            window.__refreshSource = () => {
+              const previous = this.getRenderTarget(), ambient = scene.children.find(c => c.material?.uniforms?.uStrength);
+              const visible = ambient.visible; ambient.visible = false;
+              this.setRenderTarget(window.__sourceTarget); original(scene, camera);
+              ambient.visible = visible; this.setRenderTarget(previous);
+            };
+            window.__sourceTarget = this.getRenderTarget();
+          }
+          const body = scene.children[0]?.children?.[0]?.material?.uniforms;
+          if (body?.uSpin) window.__body = body;
           const start = performance.now(); original(scene, camera);
           const composite = !!scene.children[1]?.material?.uniforms?.uAtlas;
           window.__renders.push({ ms: performance.now() - start, at: performance.now(), calls: this.info.render.calls,
@@ -58,7 +69,7 @@ const plugin: Plugin = {
   load(id) { return id.startsWith('\0clock:') ? stubs[id.slice(7)] : null; },
 };
 let server: Server, browser: Browser, origin: string, out: string;
-const evidence = resolve('../../tmp/overnight/OA1-after');
+const evidence = resolve('../../tmp/overnight/OP2-after');
 beforeAll(async () => {
   mkdirSync(evidence, { recursive: true });
   out = mkdtempSync(resolve('../../tmp/overnight/OA1-browser-'));
@@ -214,3 +225,100 @@ it.each([1440, 390])('captures both orb paths at %i', async width => {
     }
   }
 }, 120_000);
+
+// Actual body and low-resolution capture, sampled only by QA. No production readback.
+it.each(['dark', 'light'])('tracks resolved dark/light sectors while the source rotates in %s', async theme => {
+  const { page, errors } = await open(390, theme, 'reduce', undefined, '?core');
+  try {
+    await page.waitForFunction(() => Boolean((window as unknown as { __refreshSource?: unknown }).__refreshSource));
+    await page.evaluate(theme => { document.body.style.background = theme === 'light' ? '#ffffff' : '#000000'; },theme);
+    const results = [];
+    for (const angle of [0, 1.6, 3.2]) {
+      const result = await page.evaluate(({angle,theme}) => {
+        const runtime = window as unknown as {
+          __body: Record<string, { value: number | { set(...args: number[]): void } }>;
+          __refreshSource(): void; __redraw(): void;
+        };
+        const u = runtime.__body;
+        u.uTime!.value = 8.4; u.uLife!.value = 0.6; u.uGlow!.value = 1;
+        (u.uBase!.value as { set(...args: unknown[]): void }).set('#f4c542');
+        (u.uGlowColor!.value as { set(...args: unknown[]): void }).set('#f4c542');
+        // A known dark studio source on either page background. Ordinary light
+        // mode source/state captures above retain the platform's normal studio.
+        (u.uEnvFloor!.value as { set(...args: unknown[]): void }).set('#010102');
+        (u.uEnvSky!.value as { set(...args: unknown[]): void }).set('#1c2028');
+        const c = Math.cos(angle), s = Math.sin(angle);
+        (u.uSpin!.value as { set(...args: number[]): void }).set(c,-s,0,s,c,0,0,0,1);
+        runtime.__refreshSource(); runtime.__redraw();
+        const canvas = document.querySelector('canvas')!, gl = canvas.getContext('webgl2')!;
+        const pixels = new Uint8Array(canvas.width * canvas.height * 4);
+        gl.readPixels(0,0,canvas.width,canvas.height,gl.RGBA,gl.UNSIGNED_BYTE,pixels);
+        const sample = (r: number, theta: number) => {
+          const x = Math.round(canvas.width * (0.5 + Math.cos(theta) * r));
+          const y = Math.round(canvas.height * (0.5 + Math.sin(theta) * r));
+          const i = (y * canvas.width + x) * 4, alpha = pixels[i + 3]! / 255;
+          const emitted = pixels[i]! * 0.2126 + pixels[i+1]! * 0.7152 + pixels[i+2]! * 0.0722;
+          return { emitted, visible: emitted + (theme === 'light' ? 255 : 0) * (1-alpha) };
+        };
+        const body: number[] = [], spill: number[] = [], visibleBody: number[] = [], visibleSpill: number[] = [];
+        // Orthographic-to-screen scale at this camera: body sample matches the
+        // shader's radial expansion; multi-point averages allow diffuse blur.
+        for(let i=0; i<16; i++) {
+          const theta = i * Math.PI / 8;
+          body.push([-0.06,0,0.06].reduce((v,d) => v + sample(0.207,theta+d).emitted,0)/3);
+          spill.push([-0.06,0,0.06].reduce((v,d) => v + sample(0.389,theta+d).emitted,0)/3);
+          visibleBody.push([-0.06,0,0.06].reduce((v,d) => v + sample(0.207,theta+d).visible,0)/3);
+          visibleSpill.push([-0.06,0,0.06].reduce((v,d) => v + sample(0.389,theta+d).visible,0)/3);
+        }
+        const mean = (a: number[]) => a.reduce((x,y)=>x+y,0)/a.length;
+        const correlate = (a: number[], b: number[]) => {
+          const ma=mean(a), mb=mean(b);
+          return a.reduce((v,x,i)=>v+(x-ma)*(b[i]!-mb),0)/Math.sqrt(a.reduce((v,x)=>v+(x-ma)**2,0)*b.reduce((v,x)=>v+(x-mb)**2,0));
+        };
+        return { angle, body, spill, visibleBody, visibleSpill, correlation: correlate(body,spill),
+          visibleCorrelation: correlate(visibleBody,visibleSpill), dimSector: visibleSpill.indexOf(Math.min(...visibleSpill)) };
+      }, {angle,theme});
+      results.push(result);
+      writeFileSync(join(evidence, 'structure-'+theme+'.json'), JSON.stringify(results,null,2));
+      await page.screenshot({ path: join(evidence, 'structure-'+theme+'-'+angle+'.png') });
+      expect(result.correlation).toBeGreaterThan(0.6);
+      expect(result.visibleCorrelation).toBeGreaterThan(0.6);
+      expect(Math.max(...result.visibleSpill)-Math.min(...result.visibleSpill)).toBeGreaterThan(2);
+      expect(Math.min(...result.spill)).toBeLessThan(Math.max(...result.spill) * 0.7);
+    }
+    writeFileSync(join(evidence, 'structure-'+theme+'.json'), JSON.stringify(results,null,2));
+    expect(new Set(results.map(r=>r.dimSector)).size).toBeGreaterThan(1);
+    expect(errors).toEqual([]);
+  } finally { await page.close(); }
+}, 30_000);
+
+it.each(['', '?generation'])('records one tap, five overlapping taps at 150ms, directional taps and decay: %s', async query => {
+  const { page, errors } = await open(390, 'dark', 'no-preference', undefined, query);
+  try {
+    await page.waitForSelector('canvas'); if(!query) await glass(page);
+    const box = await page.locator('[data-testid="orb-touch"]').boundingBox(); if(!box) throw Error('orb_bounds');
+    const name = query ? 'generation' : 'today';
+    const at = (x: number) => page.mouse.click(box.x+box.width*x,box.y+box.height*0.5);
+    await at(0.5); await page.waitForTimeout(350);
+    await page.screenshot({path: join(evidence, name+'-single-tap.png')});
+    await page.waitForTimeout(1900);
+    for(let i=0;i<5;i++) { await at(0.5); await page.waitForTimeout(150); }
+    const activeSequence = await page.evaluate(() => {
+      const u = (window as unknown as { __body: { uWaveCount:{value:number}; uWaves:{value:{w:number}[]} } }).__body;
+      return u.uWaves.value.slice(0,u.uWaveCount.value).map(w=>w.w);
+    });
+    expect(activeSequence.length).toBe(5); expect(activeSequence[0]!).toBeGreaterThan(activeSequence[4]!);
+    writeFileSync(join(evidence, name+'-impulse-ages.json'), JSON.stringify(activeSequence));
+    await page.screenshot({path: join(evidence, name+'-five-taps.png')});
+    await at(0.28); await page.waitForTimeout(150); await at(0.72);
+    await page.waitForTimeout(200);
+    await page.screenshot({path: join(evidence, name+'-distinct-directions.png')});
+    await page.waitForTimeout(2000);
+    await page.screenshot({path: join(evidence, name+'-settled.png')});
+    const active = await page.evaluate(() => {
+      const body = (window as unknown as { __body: {uWaveCount:{value:number}} }).__body;
+      return body.uWaveCount.value;
+    });
+    expect(active).toBe(0); expect(errors).toEqual([]);
+  } finally { const video = page.video(); await page.close(); await video?.saveAs(join(evidence, 'video', (query ? 'generation' : 'today')+'-wave-sequence.webm')); }
+}, 30_000);

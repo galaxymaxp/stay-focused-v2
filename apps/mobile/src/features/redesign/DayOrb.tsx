@@ -224,7 +224,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
       const tones = current.tones;
       body.update({
         idleColor: interactionFrame.idleColor,
-        rippleDir: interactionFrame.rippleDir, rippleTime: interactionFrame.rippleTime,
+        waves: interactionFrame.waves,
         time,
         life: 0.22 + (extra?.life ?? 0),
         stir: 0,
@@ -239,6 +239,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
       aura.update({ delta, shimmer: 0, shimmerAmount: 0, glow: body.uniforms.uGlow.value,
         error: extra?.error ?? 0, mode: current.mode, camera, center: root.position,
         source: body.uniforms, reducedMotion: current.reducedMotion });
+      aura.capture(renderer, scene, camera);
       if (glass && current.clock) {
         try {
           glass.render(scene, camera, current.clock, current.canvasSize, [tones.position.x, tones.position.y], current.mode === 'dark');

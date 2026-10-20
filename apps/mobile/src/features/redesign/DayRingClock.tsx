@@ -174,7 +174,7 @@ export function DayRingClock({
   const fontsLoaded = useClockFonts();
   // The atlas deliberately contains only these canonical clock glyphs.
   const clockText = clockLabel(adjusting === 'end' ? range.end : adjusting ? range.start : nowMinutes);
-  const clockFontSize = adjusting ? 30 : 32;
+  const clockFontSize = 40;
   const glassClock = useMemo(() => ({ text: clockText, fontSize: clockFontSize }), [clockText, clockFontSize]);
   const lift = useRef(new Animated.Value(0)).current;
 
@@ -512,9 +512,9 @@ export function CenterReadout({ mode, range, text, glassReady, fontsLoaded }: {
       </Copy>}
       <Text testID="clock-time" accessible accessibilityRole="text" accessibilityLabel={text}
         style={{ ...shadow, color: '#FFFFFF', fontFamily: fontsLoaded ? 'InterClock700' : undefined,
-          fontWeight: fontsLoaded ? 'normal' : '700', fontSize: mode ? 30 : 32, lineHeight: mode ? 37 : 39,
-          letterSpacing: mode ? -0.6 : -0.64, fontVariant: ['tabular-nums'], opacity: glassReady ? 0 : 1 }}>
-        {text}
+          fontWeight: fontsLoaded ? 'normal' : '700', fontSize: 40, lineHeight: 48,
+          letterSpacing: -0.8, fontVariant: ['tabular-nums'], opacity: glassReady ? 0 : 1 }}>
+        {text.split(' ')[0]} <Text style={{ fontSize: 18, letterSpacing: -0.36 }}>{text.split(' ')[1]}</Text>
       </Text>
       {mode && <Copy color="rgba(255,255,255,0.86)" size="caption" style={{ ...shadow,
         fontFamily: fontsLoaded ? 'InterClock500' : undefined, fontWeight: fontsLoaded ? 'normal' : '500', fontVariant: ['tabular-nums'] }}>

@@ -17,7 +17,7 @@ uniform float uScrim;
 varying vec2 vUv;
 void main() {
   vec4 orb = texture2D(uOrb, vUv);
-  float shade = (1.0 - smoothstep(0.12, 0.31, length((vUv - 0.5) * vec2(0.85, 1.0)))) * uScrim;
+  float shade = (1.0 - smoothstep(0.20, 0.40, length((vUv - 0.5) * vec2(0.85, 1.0)))) * uScrim;
   gl_FragColor = vec4(orb.rgb / max(orb.a, 0.001), orb.a);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -37,6 +37,11 @@ float field(vec2 uv) {
   vec3 s = texture2D(uAtlas, uv).rgb;
   return max(min(s.r, s.g), min(max(s.r, s.g), s.b)) - 0.5;
 }
+vec3 orbColor(vec2 uv) {
+  vec4 source = texture2D(uOrb, uv);
+  // Keep low-coverage dark shading instead of amplifying it into an opaque fill.
+  return source.rgb / max(source.a, 0.35);
+}
 void main() {
   float d = field(vUv);
   float aa = max(fwidth(d) * 0.5, 0.001);
@@ -46,15 +51,15 @@ void main() {
     field(vUv - vec2(0.0, uAtlasTexel.y)) - field(vUv + vec2(0.0, uAtlasTexel.y)));
   vec2 normal = grad / max(length(grad), 0.00001);
   float edge = 1.0 - smoothstep(0.01, 0.14, d);
-  vec2 refracted = clamp(vScreen + normal * mix(0.015, 0.028, edge), 0.0, 1.0);
-  vec3 glass = texture2D(uOrb, refracted).rgb * 0.4;
-  glass += texture2D(uOrb, refracted + uPixel * vec2(1.5, 0.0)).rgb * 0.15;
-  glass += texture2D(uOrb, refracted - uPixel * vec2(1.5, 0.0)).rgb * 0.15;
-  glass += texture2D(uOrb, refracted + uPixel * vec2(0.0, 1.5)).rgb * 0.15;
-  glass += texture2D(uOrb, refracted - uPixel * vec2(0.0, 1.5)).rgb * 0.15;
-  // White tint, dark inner rim and directional fresnel preserve bright-sky legibility.
-  glass = mix(glass, vec3(1.0), 0.65);
+  vec2 refracted = clamp(0.5 + (vScreen - 0.5) * 1.12 + normal * mix(0.045, 0.065, edge), 0.0, 1.0);
+  vec3 glass = orbColor(refracted) * 0.4;
+  glass += orbColor(refracted + uPixel * vec2(1.5, 0.0)) * 0.15;
+  glass += orbColor(refracted - uPixel * vec2(1.5, 0.0)) * 0.15;
+  glass += orbColor(refracted + uPixel * vec2(0.0, 1.5)) * 0.15;
+  glass += orbColor(refracted - uPixel * vec2(0.0, 1.5)) * 0.15;
+  // Transmission fills the glyph; a directional reflection gives the curved glass depth.
   float facing = max(dot(-normal, normalize(uLight + vec2(0.0001))), 0.0);
+  glass = glass * 1.1 + vec3(0.18 + 0.30 * pow(facing, 2.0));
   gl_FragColor = vec4(glass, coverage);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>

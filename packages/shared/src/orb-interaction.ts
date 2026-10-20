@@ -4,7 +4,38 @@ export const ORB_COLOR_KEY = 'sf.orb.colorKey';
 export const ORB_LEGACY_COLOR_KEY = 'sf.orb.color';
 export const ORB_SPIN_FRICTION_SECONDS = 0.4;
 export const RING_SPIN_GAIN = 3;
-export const ORB_RIPPLE_MS = 900;
+export const ORB_RIPPLE_MS = 1800;
+export const ORB_MAX_IMPULSES = 8;
+export const ORB_WAVE_AMPLITUDE = 0.045;
+export const ORB_WAVE_CAP = 0.10;
+export interface OrbImpulse { readonly at: number; readonly direction: OrbVector }
+export interface OrbWave { readonly time: number; readonly direction: OrbVector }
+/** Shared energy strengthens retained fronts smoothly; it is zero at both endpoints. */
+export function orbWaveGain(waves: readonly OrbWave[]): number {
+  return 1 + 0.15 * waves.slice(0, ORB_MAX_IMPULSES).reduce((energy, wave) => {
+    const t = wave.time;
+    if (orbRippleTime(t * 1000, false) < 0) return energy;
+    return energy + (1 - Math.exp(-t / 0.12)) * Math.exp(-t / 1.2)
+      * Math.sin(Math.PI * t / (ORB_RIPPLE_MS / 1000)) ** 2;
+  }, 0);
+}
+/** Positive crests add energy even at half-period tap intervals; GPU uses the same packet. */
+export function orbWaveHeight(distance: number, time: number): number {
+  if (!Number.isFinite(distance) || time === 0 || orbRippleTime(time * 1000, false) < 0) return 0;
+  const t = time / (ORB_RIPPLE_MS / 1000);
+  const gap = Math.abs(distance - Math.PI * t);
+  const k = Math.max(0, Math.min(1, (gap - 0.15) / 0.65));
+  const packet = 1 - k * k * (3 - 2 * k);
+  return ORB_WAVE_AMPLITUDE * Math.sin(Math.PI * t) ** 2 * Math.exp(-1.5 * time)
+    * Math.sin(6 * distance - 6 * Math.PI * t) ** 2 * packet;
+}
+export function orbWaveDisplacement(normal: OrbVector, waves: readonly OrbWave[]): number {
+  const height = waves.slice(0, ORB_MAX_IMPULSES).reduce((sum, wave) => {
+    const dot = normal.x * wave.direction.x + normal.y * wave.direction.y + normal.z * wave.direction.z;
+    return sum + orbWaveHeight(Math.acos(Math.max(-1, Math.min(1, dot))), wave.time);
+  }, 0);
+  return ORB_WAVE_CAP * Math.tanh(height * orbWaveGain(waves) / ORB_WAVE_CAP);
+}
 // Pearl is the existing Knowledge Core light body, not a new theme color.
 export const ORB_IDLE_PALETTE = [
   { key: 'pearl', token: 'knowledgeCore.light.base', hex: '#E6EAF1' },
@@ -71,14 +102,14 @@ interface OrbGesture {
 export interface OrbInteraction {
   readonly spin: OrbSpin; readonly gesture: OrbGesture | null;
   readonly colorIndex: number; readonly colorFrom: string; readonly colorAt: number;
-  readonly tapAt: number; readonly rippleDir: OrbVector;
+  readonly impulses: readonly OrbImpulse[];
   readonly spinAt: number; readonly inputAt: number;
 }
 export function createOrbInteraction(index = 0): OrbInteraction {
   const colorIndex = validIndex(index);
   return { spin: { x: 0, y: 0, velocityX: 0, velocityY: 0 }, gesture: null,
     colorIndex, colorFrom: ORB_IDLE_PALETTE[colorIndex]!.hex, colorAt: -Infinity,
-    spinAt: -Infinity, inputAt: -Infinity, tapAt: -Infinity, rippleDir: { x: 0, y: 0, z: 1 } };
+    spinAt: -Infinity, inputAt: -Infinity, impulses: [] };
 }
 export function orbIdleColor(state: OrbInteraction, now: number, reducedMotion: boolean): string {
   return mixOrbColor(state.colorFrom, ORB_IDLE_PALETTE[state.colorIndex]!.hex, orbCrossFade(now - state.colorAt, reducedMotion));
@@ -125,12 +156,15 @@ export function endOrbGesture(state: OrbInteraction, x: number, y: number, size:
   const direction = projectTapToSphere(x, y, size);
   const tap = !cancelled && !g.scroll && !g.rotating && direction && classifyOrbGesture({ heldMs: now - g.started, dx: x - g.x, dy: y - g.y }) === 'tap';
   const current = advanceSpin(state, now, 0, reducedMotion);
-  return { ...(cancelled || reducedMotion || g.scroll ? cancelOrbSpin(current) : current), gesture: null,
-    ...(tap ? { colorFrom: orbIdleColor(state, now, reducedMotion), colorIndex: nextOrbColor(state.colorIndex), colorAt: now, tapAt: now, rippleDir: direction } : {}) };
+  const impulses = reducedMotion ? [] : state.impulses.filter(impulse => orbRippleTime(now - impulse.at, false) >= 0);
+  return { ...(cancelled || reducedMotion || g.scroll ? cancelOrbSpin(current) : current), gesture: null, impulses,
+    ...(tap ? { colorFrom: orbIdleColor(state, now, reducedMotion), colorIndex: nextOrbColor(state.colorIndex), colorAt: now,
+      impulses: reducedMotion ? [] : [...impulses, { at: now, direction }].slice(-ORB_MAX_IMPULSES) } : {}) };
 }
 export function sampleOrbInteraction(state: OrbInteraction, now: number, dtMs: number, reducedMotion: boolean) {
-  const next = advanceSpin(state, now, dtMs, reducedMotion);
-  const rippleTime = orbRippleTime(now - state.tapAt, reducedMotion);
-  const animating = !reducedMotion && (rippleTime >= 0 || now - state.colorAt < 600 || next.spin.velocityX !== 0 || next.spin.velocityY !== 0);
-  return { state: next, rippleTime, idleColor: orbIdleColor(state, now, reducedMotion), animating };
+  const impulses = reducedMotion ? [] : state.impulses.filter(impulse => orbRippleTime(now - impulse.at, false) >= 0);
+  const next: OrbInteraction = { ...advanceSpin(state, now, dtMs, reducedMotion), impulses };
+  const waves: readonly OrbWave[] = impulses.map(impulse => ({ direction: impulse.direction, time: (now - impulse.at) / 1000 }));
+  const animating = !reducedMotion && (waves.length > 0 || now - state.colorAt < 600 || next.spin.velocityX !== 0 || next.spin.velocityY !== 0);
+  return { state: next, waves, idleColor: orbIdleColor(state, now, reducedMotion), animating };
 }

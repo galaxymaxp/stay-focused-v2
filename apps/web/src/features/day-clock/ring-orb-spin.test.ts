@@ -1,11 +1,12 @@
 import { createElement } from 'react';
-import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createOrbInteraction, pushOrbSpin, ringOrbRadians } from '@stay-focused/shared';
 import type { OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 import { DayRingClock } from './DayRingClock';
 import { CLOCK, ringPoint } from './dayClock';
 let handle: OrbInteractionHandle, tree: ReactTestRenderer | undefined;
+const readText = (node: ReactTestInstance): string => node.children.map(child => typeof child === 'string' ? child : readText(child)).join('');
 vi.mock('@stay-focused/shared', async original => {
   const shared = await original<typeof import('@stay-focused/shared')>();
   return { ...shared, pushOrbSpin: vi.fn(shared.pushOrbSpin) };
@@ -26,11 +27,12 @@ afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree =
 it('keeps an accessible idle Inter time with no weekday through glass success and failure', async () => {
   vi.setSystemTime(new Date(2026, 9, 19, 15, 30));
   await act(async () => { tree = create(createElement(DayRingClock, { date: '2026-10-19', timeline: [], start: 0, end: 720, onCommit: vi.fn() })); });
-  expect(tree!.root.findByProps({ className: 'readout-time' }).children).toEqual(['3:30 PM']);
+  expect(readText(tree!.root.findByProps({ className: 'readout-time' }))).toBe('3:30 PM');
+  expect(tree!.root.findByProps({ className: 'readout-period' }).children).toEqual(['PM']);
   expect(tree!.root.findAllByProps({ className: 'readout-sub' })).toHaveLength(0);
   expect(JSON.stringify(tree!.toJSON())).not.toContain('Monday');
   const orb = tree!.root.find(node => typeof node.props.onGlassReady === 'function');
-  expect(orb.props.clock).toEqual({ text: '3:30 PM', fontSize: 30 });
+  expect(orb.props.clock).toEqual({ text: '3:30 PM', fontSize: 40 });
   await act(async () => orb.props.onGlassReady(true));
   expect(tree!.root.findByProps({ className: 'day-readout glass-ready' })).toBeTruthy();
   expect(tree!.root.findByProps({ className: 'readout-time' }).props['aria-hidden']).toBeUndefined();
@@ -44,7 +46,7 @@ it.each([[0, 'Free from'], [720, 'Free until'], [360, 'Free time']] as const)('s
   const target = tree!.root.findByProps({ className: 'day-clock-touch' }).props, point = ringPoint(minute);
   await act(async () => target.onPointerDown({ button: 0, pointerType: 'mouse', pointerId: 1, clientX: point.x, clientY: point.y, currentTarget: { setPointerCapture() {} } }));
   expect(tree!.root.findByProps({ className: 'readout-label' }).children).toEqual([label]);
-  expect(tree!.root.findByProps({ className: 'readout-time' }).children).toEqual([minute === 720 ? '12:00 PM' : '12:00 AM']);
+  expect(readText(tree!.root.findByProps({ className: 'readout-time' }))).toBe(minute === 720 ? '12:00 PM' : '12:00 AM');
   expect(tree!.root.findByProps({ className: 'readout-sub' }).children.join('')).toContain('12 h');
 });
 it.each([0, 720, 360])('feeds only physical ring movement at %s, never the release snap', async minute => {

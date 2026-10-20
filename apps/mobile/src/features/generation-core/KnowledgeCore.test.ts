@@ -20,7 +20,7 @@ vi.mock('./orbBody', async original => {
 vi.mock('./orbAura', async original => { const actual = await original<typeof import('./orbAura')>(); return { ...actual, createOrbAura: () => {
   const aura = actual.createOrbAura(); return { ...aura, update: (frame: Parameters<typeof aura.update>[0]) => { mocks.aura(frame); aura.update(frame); } };
 } }; });
-vi.mock('three', async original => ({ ...await original<typeof import('three')>(), WebGLRenderer: class { setSize() {} setPixelRatio() {} setClearColor() {} render = mocks.render; dispose() {} } }));
+vi.mock('three', async original => ({ ...await original<typeof import('three')>(), WebGLRenderer: class { setSize() {} setPixelRatio() {} setClearColor() {} getRenderTarget() { return null; } setRenderTarget() {} render = mocks.render; dispose() {} } }));
 let tree: ReactTestRenderer | undefined, frames: Map<number, FrameRequestCallback>, serial: number;
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks(); frames = new Map(); serial = 0;
@@ -42,7 +42,7 @@ it.each<CoreState>(['reading', 'generating', 'finalizing', 'complete', 'error'])
   vi.advanceTimersByTime(100); draw();
   expect(mocks.update.mock.lastCall![0].idleColor).toBeUndefined();
   expect(mocks.aura.mock.lastCall![0].source.uBase.value.getHexString()).toBe('dde3ee');
-  expect(mocks.update.mock.lastCall![0].rippleTime).toBeCloseTo(0.1);
+  expect(mocks.update.mock.lastCall![0].waves[0].time).toBeCloseTo(0.1);
   expect(tree!.root.findByProps({ testID: 'knowledge-core' }).props.accessibilityElementsHidden).toBe(true);
 });
 it('renders reduced-motion taps once, with an instant idle color and no ripple/inertia', async () => {
@@ -50,7 +50,7 @@ it('renders reduced-motion taps once, with an instant idle color and no ripple/i
   const p = tree!.root.findByProps({ testID: 'orb-touch' }).props;
   p.onResponderGrant(event); vi.advanceTimersByTime(50); p.onResponderRelease(event); draw();
   expect(mocks.update.mock.lastCall![0].idleColor).toBe('#f4c542');
-  expect(mocks.update.mock.lastCall![0].rippleTime).toBe(-1); expect(frames.size).toBe(0);
+  expect(mocks.update.mock.lastCall![0].waves).toEqual([]); expect(frames.size).toBe(0);
 });
 
 it('crossfades idle body and aura together then restores generation colors', async () => {

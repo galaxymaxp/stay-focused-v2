@@ -423,7 +423,7 @@ export function DayRingClock({
       : new Date(new Date(`${date}T00:00:00`).getTime() + Math.min(1439, Math.max(0, fromMidnight(nowMinutes))) * 60000);
   const clockText = adjusting ? clockLabel(adjusting === 'end' ? range.end : range.start)
     : clockTimeLabel(readoutTime.getHours() * 60 + readoutTime.getMinutes());
-  const glassClock = useMemo(() => ({ text: clockText, fontSize: 30 }), [clockText]);
+  const glassClock = useMemo(() => ({ text: clockText, fontSize: 40 }), [clockText]);
 
   return (
     <div
@@ -458,7 +458,7 @@ export function DayRingClock({
               {adjusting === "start" ? "Free from" : adjusting === "end" ? "Free until" : "Free time"}
             </span>
             <span className="readout-time">
-              {clockText}
+              {clockText.split(' ')[0]} <span className="readout-period">{clockText.split(' ')[1]}</span>
             </span>
             <span className="readout-sub">
               {adjusting === "move" ? `until ${clockLabel(range.end)} · ` : ""}
@@ -468,7 +468,7 @@ export function DayRingClock({
         ) : (
           <>
             <span className="readout-time">
-              {clockText}
+              {clockText.split(' ')[0]} <span className="readout-period">{clockText.split(' ')[1]}</span>
             </span>
           </>
         )}

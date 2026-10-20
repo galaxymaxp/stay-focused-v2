@@ -36,9 +36,8 @@ vi.mock("three", async (importOriginal) => ({
     constructor() { if (mocks.fail) throw new Error("Unavailable GL"); }
     setSize() {}
     setPixelRatio() {}
-    setClearColor() {}
-    setRenderTarget() {}
-    render = mocks.render;
+    setClearColor() {} getRenderTarget() { return null; }
+    setRenderTarget() {} render = mocks.render;
     dispose() {}
   },
 }));
@@ -101,7 +100,7 @@ it('keeps the original orb and plain-text readiness when the atlas cannot load',
   await startGL(); await act(async () => { await vi.dynamicImportSettled(); });
   await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
   expect(mocks.glass).not.toHaveBeenCalled(); expect(ready).not.toHaveBeenCalledWith(true);
-  expect(mocks.render).toHaveBeenCalledOnce();
+  expect(mocks.render).toHaveBeenCalledTimes(2);
 });
 it('withdraws glass readiness and disposes the composite on a draw failure', async () => {
   const ready = vi.fn();
@@ -113,7 +112,7 @@ it('withdraws glass readiness and disposes the composite on a draw failure', asy
   await act(async () => rendered!.update(createElement(DayOrb, { ...props, reducedMotion: true, clock: { text: '3:31 PM', fontSize: 32 }, onGlassReady: ready })));
   await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
   expect(ready).toHaveBeenLastCalledWith(false);
-  expect(mocks.glassDispose).toHaveBeenCalledOnce(); expect(mocks.render).toHaveBeenCalledOnce();
+  expect(mocks.glassDispose).toHaveBeenCalledOnce(); expect(mocks.render).toHaveBeenCalledTimes(3);
 });
 
 describe("Today orb with one in-scene ambient spill", () => {
@@ -130,8 +129,9 @@ describe("Today orb with one in-scene ambient spill", () => {
     expect(scene.children).toHaveLength(2); // Root/body and exactly one ambient plane.
     const body = scene.children[0].children[0].material.uniforms;
     const spill = scene.children[1].material.uniforms;
-    expect(spill.uBase.value.equals(body.uBase.value)).toBe(true);
-    expect(spill.uTime.value).toBe(body.uTime.value);
+    expect(spill.uSource.value.image).toMatchObject({ width: 64, height: 64 });
+    expect(body.uTime.value).toBeGreaterThanOrEqual(0);
+    expect(mocks.render.mock.calls[0]).toEqual([scene, mocks.render.mock.lastCall![1]]);
   });
   it.each([
     { reducedMotion: true, live: true },
@@ -139,14 +139,14 @@ describe("Today orb with one in-scene ambient spill", () => {
   ])("renders one still frame without an extra loop: %j", async overrides => {
     await render(overrides); expect(mocks.frame).not.toHaveBeenCalled();
     await startGL(); vi.advanceTimersByTime(1000); mocks.frame.mock.calls[0]![0](Date.now());
-    expect(mocks.render).toHaveBeenCalledOnce(); expect(mocks.frame).toHaveBeenCalledOnce();
+    expect(mocks.render).toHaveBeenCalledTimes(2); expect(mocks.frame).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   });
   it.each(['ring', 'momentum'] as const)('does not freeze %s during a Today touch', async kind => {
     const interaction = { state: { current: createOrbInteraction() }, wake: { current: null as (() => void) | null }, ringDragging: { current: kind === 'ring' } };
     if (kind === 'momentum') interaction.state.current = pushOrbSpin(interaction.state.current, 0.2, Date.now());
     await render({ interaction }); await startGL(); dayOrbTouch.active = true;
-    try { vi.advanceTimersByTime(80); mocks.frame.mock.lastCall![0](Date.now()); expect(mocks.render).toHaveBeenCalledOnce(); }
+    try { vi.advanceTimersByTime(80); mocks.frame.mock.lastCall![0](Date.now()); expect(mocks.render).toHaveBeenCalledTimes(2); }
     finally { dayOrbTouch.active = false; }
   });
   it('returns from momentum cadence to the existing idle cadence', async () => {
@@ -156,7 +156,7 @@ describe("Today orb with one in-scene ambient spill", () => {
     expect(interaction.state.current.spin.velocityY).toBe(0);
     const count = mocks.render.mock.calls.length;
     vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
-    expect(mocks.render.mock.calls.length).toBeLessThanOrEqual(count + 1);
+    expect(mocks.render.mock.calls.length).toBeLessThanOrEqual(count + 2);
     const after = mocks.render.mock.calls.length;
     vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
     expect(mocks.render.mock.calls.length).toBe(after);
@@ -220,7 +220,7 @@ it('does not draw while unfocused or backgrounded and disposes the ambient mesh'
   expect(mocks.render).toHaveBeenCalledTimes(count);
   await act(async () => mocks.appState?.('active'));
   vi.advanceTimersByTime(80); mocks.frame.mock.lastCall![0](Date.now());
-  expect(mocks.render.mock.calls.length).toBe(count + 1);
+  expect(mocks.render.mock.calls.length).toBe(count + 2);
   await act(async () => rendered!.unmount()); rendered = undefined;
   expect(dispose).toHaveBeenCalledOnce();
 });

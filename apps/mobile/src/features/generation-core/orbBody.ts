@@ -1,33 +1,42 @@
 import * as THREE from "three";
 
+import { ORB_MAX_IMPULSES, ORB_RIPPLE_MS, ORB_WAVE_AMPLITUDE, ORB_WAVE_CAP, orbWaveGain, type OrbWave } from '@stay-focused/shared';
+
 export const ORB_RADIUS = 0.95;
 
 const VERTEX = `
-uniform vec3 uRippleDir;
-uniform float uRippleTime;
+uniform int uWaveCount;
+uniform float uWaveGain;
+uniform vec4 uWaves[${ORB_MAX_IMPULSES}];
 varying vec3 vNormal;
 varying vec3 vWorldPosition;
-// Great-circle wave packet: about two crests, travelling pole to antipode.
-float rippleHeight(float d, float t) {
-  float front = 3.4906585 * t;
-  float packet = 1.0 - smoothstep(0.15, 0.8, abs(d - front));
-  float envelope = pow(sin(3.14159265 * t / 0.9), 2.0) * exp(-2.0 * t);
-  return 0.12 * envelope * sin(16.0 * d - 55.850536 * t) * packet;
+float rippleHeight(vec3 n) {
+  float height = 0.0;
+  for (int i = 0; i < ${ORB_MAX_IMPULSES}; i++) {
+    if (i >= uWaveCount) break;
+    float t = uWaves[i].w;
+    if (t > 0.0 && t < ${ORB_RIPPLE_MS / 1000}) {
+      float phase = t / ${ORB_RIPPLE_MS / 1000};
+      float d = acos(clamp(dot(n, uWaves[i].xyz), -1.0, 1.0));
+      float packet = 1.0 - smoothstep(0.15, 0.8, abs(d - 3.14159265 * phase));
+      float envelope = pow(sin(3.14159265 * phase), 2.0) * exp(-1.5 * t);
+      height += ${ORB_WAVE_AMPLITUDE} * envelope * pow(sin(6.0 * d - 6.0 * 3.14159265 * phase), 2.0) * packet;
+    }
+  }
+  // Smooth signed saturation, including the differentiated normal.
+  float e = exp(2.0 * height * uWaveGain / ${ORB_WAVE_CAP});
+  return ${ORB_WAVE_CAP} * (e - 1.0) / (e + 1.0);
 }
 void main() {
-  vec3 displaced = position;
+  float height = rippleHeight(normal);
+  vec3 displaced = position + normal * height;
   vec3 surfaceNormal = normal;
-  // Off and exact endpoints preserve the original position and normal.
-  if (uRippleTime > 0.0 && uRippleTime < 0.9) {
-    float alignment = clamp(dot(normal, uRippleDir), -1.0, 1.0);
-    float d = acos(alignment);
-    float height = rippleHeight(d, uRippleTime);
-    displaced = position + normal * height;
-    // Differentiate the very same displacement; avoid singularities at the poles.
-    float slope = (rippleHeight(min(3.14159265, d + 0.002), uRippleTime)
-      - rippleHeight(max(0.0, d - 0.002), uRippleTime)) / 0.004;
-    vec3 tangent = (normal * alignment - uRippleDir) / max(sin(d), 0.002);
-    surfaceNormal = normal - tangent * slope / (length(position) + height);
+  if (uWaveCount > 0) {
+    vec3 tangent = normalize(cross(normal, abs(normal.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+    vec3 bitangent = cross(normal, tangent);
+    float dx = (rippleHeight(normalize(normal + tangent * 0.002)) - rippleHeight(normalize(normal - tangent * 0.002))) / 0.004;
+    float dy = (rippleHeight(normalize(normal + bitangent * 0.002)) - rippleHeight(normalize(normal - bitangent * 0.002))) / 0.004;
+    surfaceNormal -= (tangent * dx + bitangent * dy) / (length(position) + height);
   }
   vec4 world = modelMatrix * vec4(displaced, 1.0);
   vWorldPosition = world.xyz;
@@ -123,8 +132,7 @@ const TONES = {
 } as const;
 
 export interface OrbBodyFrame {
-  readonly rippleDir?: { readonly x: number; readonly y: number; readonly z: number };
-  readonly rippleTime?: number;
+  readonly waves?: readonly OrbWave[];
   /** Pass only for idle: generation states retain their authoritative appearance. */
   readonly idleColor?: string;
   readonly time: number;
@@ -150,7 +158,8 @@ export function createOrbBody() {
     uBase: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uGlowColor: { value: new THREE.Color() },
     uEnvFloor: { value: new THREE.Color() }, uEnvSky: { value: new THREE.Color() },
     uLight: { value: new THREE.Vector3() },
-    uRippleDir: { value: new THREE.Vector3(0, 0, 1) }, uRippleTime: { value: -1 },
+    uWaveCount: { value: 0 }, uWaveGain: { value: 1 },
+    uWaves: { value: Array.from({ length: ORB_MAX_IMPULSES }, () => new THREE.Vector4(0, 0, 1, -1)) },
   };
   const geometry = new THREE.SphereGeometry(ORB_RADIUS, 96, 64);
   const material = new THREE.ShaderMaterial({
@@ -170,9 +179,12 @@ export function createOrbBody() {
       uniforms.uGlowColor.value.set(frame.idleColor ?? tones.glow);
       uniforms.uEnvFloor.value.set(TONES[frame.mode].envFloor);
       uniforms.uEnvSky.value.set(TONES[frame.mode].envSky);
-      const dir = frame.rippleDir;
-      uniforms.uRippleDir.value.set(dir?.x ?? 0, dir?.y ?? 0, dir?.z ?? 1);
-      uniforms.uRippleTime.value = frame.rippleTime ?? -1;
+      uniforms.uWaveGain.value = orbWaveGain(frame.waves ?? []);
+      uniforms.uWaveCount.value = Math.min(ORB_MAX_IMPULSES, frame.waves?.length ?? 0);
+      for (let i = 0; i < ORB_MAX_IMPULSES; i++) {
+        const wave = frame.waves?.[i];
+        uniforms.uWaves.value[i]!.set(wave?.direction.x ?? 0, wave?.direction.y ?? 0, wave?.direction.z ?? 1, wave?.time ?? -1);
+      }
       uniforms.uLight.value.set(frame.light?.x ?? 0, frame.light?.y ?? 0, frame.light?.z ?? 0);
       uniforms.uTime.value = frame.time;
       uniforms.uLife.value = frame.life;

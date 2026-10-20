@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ORB_IDLE_PALETTE, beginOrbGesture, classifyOrbGesture, createOrbInteraction, endOrbGesture, moveOrbGesture, nextOrbColor, orbRippleTime, orbCrossFade, parseOrbColorKey, legacyOrbIndexToKey, pushOrbSpin, ringOrbRadians, ORB_SPIN_FRICTION_SECONDS, projectTapToSphere, sampleOrbInteraction, stepOrbSpin } from './orb-interaction';
+import { ORB_MAX_IMPULSES, ORB_RIPPLE_MS, ORB_WAVE_CAP, orbWaveDisplacement, orbWaveHeight, ORB_IDLE_PALETTE, beginOrbGesture, classifyOrbGesture, createOrbInteraction, endOrbGesture, moveOrbGesture, nextOrbColor, orbRippleTime, orbCrossFade, parseOrbColorKey, legacyOrbIndexToKey, pushOrbSpin, ringOrbRadians, ORB_SPIN_FRICTION_SECONDS, projectTapToSphere, sampleOrbInteraction, stepOrbSpin } from './orb-interaction';
 describe('orb interaction', () => {
   it('classifies tap, exact hold boundary, and early scroll', () => {
     expect(classifyOrbGesture({ heldMs: 100, dx: 2, dy: 2 })).toBe('tap');
@@ -15,11 +15,11 @@ describe('orb interaction', () => {
     const a = stepOrbSpin(stepOrbSpin(start, 100, false), 100, false), b = stepOrbSpin(start, 200, false);
     expect(a.x).toBeCloseTo(b.x); expect(a.velocityX).toBeCloseTo(b.velocityX);
   });
-  it('bounds ripple time to 900ms and disables it under Reduce Motion', () => {
+  it('bounds ripple time to the slower 1800ms packet and disables it under Reduce Motion', () => {
     expect(orbRippleTime(-1, false)).toBe(-1);
     expect(orbRippleTime(0, false)).toBe(0);
     expect(orbRippleTime(450, false)).toBe(0.45);
-    expect(orbRippleTime(900, false)).toBe(-1);
+    expect(orbRippleTime(1800, false)).toBe(-1);
     expect(orbRippleTime(Infinity, false)).toBe(-1);
     expect(orbRippleTime(200, true)).toBe(-1);
   });
@@ -67,7 +67,7 @@ describe('orb interaction', () => {
     const mid = sampleOrbInteraction(s, 300, 0, false).idleColor;
     s = endOrbGesture(beginOrbGesture(s, 50, 50, 290), 50, 50, 100, 300, false);
     expect(s.colorFrom).toBe(mid);
-    expect(sampleOrbInteraction(s, 1200, 0, false).animating).toBe(false);
+    expect(sampleOrbInteraction(s, 2200, 0, false).animating).toBe(false);
     expect(sampleOrbInteraction(s, 300, 0, true).animating).toBe(false);
   });
 });
@@ -117,14 +117,80 @@ it('pushes ring Y impulses with clockwise sign and gain, coasts, and honors Redu
   const reduced = sampleOrbInteraction(pushOrbSpin(createOrbInteraction(), delta, 100, true), 100, 0, true);
   expect(reduced.state.spin.velocityY).toBe(0); expect(reduced.animating).toBe(false);
 });
-it('restarts one ripple at the new tap point', () => {
-  const tap = (s: ReturnType<typeof createOrbInteraction>, x: number, at: number) => endOrbGesture(beginOrbGesture(s, x, 50, at), x, 50, 100, at + 50, false);
-  let state = tap(createOrbInteraction(), 50, 0);
-  expect(sampleOrbInteraction(state, 450, 0, false).rippleTime).toBe(0.4);
-  state = tap(state, 75, 450);
-  expect(state.rippleDir.x).toBe(0.5);
-  expect(sampleOrbInteraction(state, 500, 0, false).rippleTime).toBe(0);
-  expect(sampleOrbInteraction(state, 1400, 0, false).rippleTime).toBe(-1);
+const tap = (s: ReturnType<typeof createOrbInteraction>, x: number, at: number, reduced = false) =>
+  endOrbGesture(beginOrbGesture(s, x, 50, at), x, 50, 100, at + 20, reduced);
+it('retains earlier traveling waves and each new direction instead of restarting', () => {
+  let state = tap(createOrbInteraction(), 35, 0);
+  state = tap(state, 75, 150);
+  const frame = sampleOrbInteraction(state, 500, 0, false);
+  expect(frame.waves.map(w => w.time)).toEqual([0.48, 0.33]);
+  expect(frame.waves[0]!.direction.x).toBeCloseTo(-0.3); expect(frame.waves[1]!.direction.x).toBeCloseTo(0.5);
+  expect(frame.state.impulses).toHaveLength(2);
+});
+it('sums coincident waves, grows on five taps and smoothly caps displacement', () => {
+  const normal = { x: Math.sin(0.95), y: 0, z: Math.cos(0.95) };
+  const wave = { direction: { x: 0, y: 0, z: 1 }, time: 0.4 };
+  const one = Math.abs(orbWaveDisplacement(normal, [wave]));
+  const five = Math.abs(orbWaveDisplacement(normal, Array(5).fill(wave)));
+  expect(one).toBeGreaterThan(0); expect(five).toBeGreaterThan(one * 4);
+  let state = createOrbInteraction();
+  for (let i = 0; i < 100; i++) state = tap(state, 50, i * 2);
+  expect(state.impulses).toHaveLength(ORB_MAX_IMPULSES);
+  for (let ms = 0; ms <= ORB_RIPPLE_MS; ms += 17) {
+    const frame = sampleOrbInteraction(state, 220 + ms, 17, false);
+    expect(Math.abs(orbWaveDisplacement(normal, frame.waves))).toBeLessThanOrEqual(ORB_WAVE_CAP);
+  }
+  const peak = (s: typeof state, now: number) => Math.max(...Array.from({length: 100}, (_, i) =>
+    Math.abs(orbWaveDisplacement({ x: Math.sin(i * Math.PI / 100), y: 0, z: Math.cos(i * Math.PI / 100) }, sampleOrbInteraction(s, now, 0, false).waves))));
+  let fiveTaps = createOrbInteraction(); for (let i = 0; i < 5; i++) fiveTaps = tap(fiveTaps, 50, i * 150);
+  expect(peak(fiveTaps, 850)).toBeGreaterThan(peak(tap(createOrbInteraction(), 50, 600), 850));
+});
+it('prunes expired waves on input and samples; a late isolated tap starts gently', () => {
+  const first = tap(createOrbInteraction(), 50, 0);
+  const before = sampleOrbInteraction(first, 1819, 0, false);
+  expect(before.state.impulses).toHaveLength(1);
+  expect(Math.abs(orbWaveHeight(3, 1.799))).toBeLessThan(0.000001);
+  expect(sampleOrbInteraction(first, 1820, 0, false).state.impulses).toEqual([]);
+  expect(sampleOrbInteraction(first, 1e12, 0, false).animating).toBe(false);
+  const late = tap(first, 50, 1e12);
+  expect(late.impulses).toHaveLength(1);
+  expect(sampleOrbInteraction(late, 1e12 + 420, 0, false).waves).toEqual(sampleOrbInteraction(first, 420, 0, false).waves);
+});
+it('builds peak and spatial energy from one through five taps at 150ms without destructive cancellation', () => {
+  let previousPeak = 0, previousEnergy = 0;
+  for (let count = 1; count <= 5; count++) {
+    let state = createOrbInteraction();
+    for (let i = 0; i < count; i++) state = tap(state, 50, i * 150);
+    const frame = sampleOrbInteraction(state, (count - 1) * 150 + 420, 0, false);
+    const heights = Array.from({ length: 180 }, (_, i) => {
+      const angle = i * Math.PI / 180;
+      return orbWaveDisplacement({ x: Math.sin(angle), y: 0, z: Math.cos(angle) }, frame.waves);
+    });
+    const peak = Math.max(...heights), energy = heights.reduce((sum, height) => sum + height ** 2, 0);
+    expect(peak, `peak after ${count} taps`).toBeGreaterThan(previousPeak);
+    expect(energy, `energy after ${count} taps`).toBeGreaterThan(previousEnergy);
+    previousPeak = peak; previousEnergy = energy;
+  }
+});
+it('uses absolute impulse time independent of frame count, gaps or invalid samples', () => {
+  const initial = tap(tap(createOrbInteraction(), 40, 0), 65, 150);
+  const step = (dt: number) => {
+    let s = initial;
+    for (let now = 200; now < 1200; now += dt) s = sampleOrbInteraction(s, now, dt, false).state;
+    return sampleOrbInteraction(s, 1200, dt, false).waves;
+  };
+  expect(step(16)).toEqual(step(80));
+  expect(step(80)).toEqual(sampleOrbInteraction(initial, 1200, 1000, false).waves);
+  expect(sampleOrbInteraction(initial, NaN, 16, false).waves).toEqual([]);
+  for (const time of [NaN, Infinity, -1, 0, 1.8, 10000]) expect(orbWaveHeight(1, time)).toBe(0);
+});
+it('clears waves under Reduce Motion and acknowledges taps only by stable palette changes', () => {
+  const active = tap(createOrbInteraction(), 50, 0);
+  const frame = sampleOrbInteraction(active, 150, 16, true);
+  expect(frame.waves).toEqual([]); expect(frame.state.impulses).toEqual([]); expect(frame.animating).toBe(false);
+  let state = frame.state; for(let i = 0; i < 5; i++) state = tap(state, 50, 200 + i * 150, true);
+  expect(state.impulses).toEqual([]); expect(state.colorIndex).toBe(1);
+  expect(sampleOrbInteraction(state, 1000, 16, false).waves).toEqual([]);
 });
 
 it('ring move, hold, move and release preserves a continuously decaying speed', () => {

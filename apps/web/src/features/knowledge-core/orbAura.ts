@@ -26,6 +26,7 @@ export function createOrbAura() {
   const shimmer: OrbShimmer = { time: 0, amount: 0, level: 0 };
   return {
     mesh: ambient.mesh,
+    capture: ambient.capture,
     shimmer,
     stepShimmer(delta: number, speed: number, amount: number, error: number) {
       shimmer.time = (shimmer.time + speed * SHIMMER_SPEED * delta) % 10000;

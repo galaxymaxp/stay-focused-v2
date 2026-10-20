@@ -13,7 +13,7 @@ vi.mock('../knowledge-core/orbBody', async original => {
 vi.mock('../knowledge-core/orbAura', async original => { const actual = await original<typeof import('../knowledge-core/orbAura')>(); return { ...actual, createOrbAura: () => {
   const aura = actual.createOrbAura(); return { ...aura, update: (frame: Parameters<typeof aura.update>[0]) => { mocks.aura(frame); aura.update(frame); } };
 } }; });
-vi.mock('three', async original => ({ ...await original<typeof import('three')>(), WebGLRenderer: class { setSize() {} setPixelRatio() {} setClearColor() {} render = mocks.render; dispose() {} forceContextLoss() {} } }));
+vi.mock('three', async original => ({ ...await original<typeof import('three')>(), WebGLRenderer: class { setSize() {} setPixelRatio() {} setClearColor() {} getRenderTarget() { return null; } setRenderTarget() {} render = mocks.render; dispose() {} forceContextLoss() {} } }));
 let visibility: (() => void) | undefined, blur: (() => void) | undefined, focus: (() => void) | undefined;
 let tree: ReactTestRenderer | undefined, frames: Map<number, FrameRequestCallback>, serial: number, reduced: boolean;
 beforeEach(() => {
@@ -106,7 +106,7 @@ it('cancels hidden frames, resumes on visibility and disposes the one ambient re
   expect(mocks.render).toHaveBeenCalledTimes(count);
   Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true }); visibility?.();
   expect(frames.size).toBe(1); vi.advanceTimersByTime(80); draw();
-  expect(mocks.render.mock.calls.length).toBe(count + 1);
+  expect(mocks.render.mock.calls.length).toBe(count + 2);
   await act(async () => tree!.unmount()); tree = undefined;
   expect(frames.size).toBe(0); expect(dispose).toHaveBeenCalledOnce();
 });

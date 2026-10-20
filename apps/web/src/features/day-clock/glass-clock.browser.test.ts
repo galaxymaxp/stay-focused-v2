@@ -17,7 +17,7 @@ const stubs: Record<string, string> = {
     function App() {
       const [range, setRange] = useState({ start: 720, end: 1080 });
       if (location.search.includes('orb')) return createElement(DayOrb, { minutes: 720, size: 315,
-        clock: location.search.includes('glass') ? { text: '12:00 PM', fontSize: 30 } : undefined });
+        clock: location.search.includes('glass') ? { text: '11:59 PM', fontSize: 40 } : undefined });
       return createElement('main', { style: { width: 'min(400px, 100%)', margin: '40px auto' } },
         createElement(DayRingClock, { date: '2026-10-19', timeline: [], ...range,
           onCommit: (start, end) => setRange({ start, end }) }));
@@ -31,10 +31,21 @@ const stubs: Record<string, string> = {
         super(options); const original = this.render.bind(this);
         window.__renders = [];
         this.render = (scene, camera) => {
+          const body = scene.children[0]?.children?.[0]?.material?.uniforms;
+          if (body?.uSpin && this.getRenderTarget()?.texture.name !== 'orb-ambient-source') {
+            const target = this.getRenderTarget();
+            window.__probeClock = color => {
+              body.uTime.value = 8.4; body.uLife.value = 0.6; body.uGlow.value = 1;
+              body.uBase.value.set(color); body.uGlowColor.value.set(color); body.uLight.value.set(0,0,0);
+              this.setRenderTarget(target); original(scene,camera); this.setRenderTarget(null);
+            };
+          }
           const start = performance.now(); original(scene, camera);
           const composite = !!scene.children[1]?.material?.uniforms?.uAtlas;
-          window.__renders.push({ ms: performance.now() - start, at: performance.now(), calls: this.info.render.calls, composite });
-          if (composite) window.__hideClock = () => { scene.children[1].visible = false; original(scene, camera); };
+          window.__renders.push({ ms: performance.now() - start, at: performance.now(), calls: this.info.render.calls, composite, final: this.getRenderTarget() === null,
+            geometries: this.info.memory.geometries, textures: this.info.memory.textures });
+          if (composite) { window.__hideClock = () => { scene.children[1].visible = false; original(scene, camera); };
+            window.__showClock = () => { scene.children[1].visible = true; original(scene,camera); }; }
         };
         this.debug.onShaderError = () => { throw new Error('clock_shader_compile_failed'); };
       }
@@ -46,7 +57,7 @@ const plugin: Plugin = {
   load(id) { return id.startsWith('\0clock:') ? stubs[id.slice(7)] : null; },
 };
 let server: Server, browser: Browser, origin: string, out: string;
-const evidence = resolve('../../tmp/overnight/GL1-screens');
+const evidence = resolve('../../tmp/overnight/OP2-clock');
 beforeAll(async () => {
   mkdirSync(evidence, { recursive: true });
   out = mkdtempSync(resolve('../../tmp/overnight/GL1-browser-'));
@@ -90,7 +101,7 @@ async function open(width = 1440, theme = 'light', reducedMotion: 'reduce' | 'no
     localStorage.setItem('sf.orb.colorKey', 'pearl');
     // Fix noon without freezing performance.now/rAF.
     const Original = Date;
-    Object.defineProperty(window, 'Date', { value: new Proxy(Original, { construct(target, args) { return args.length ? Reflect.construct(target, args) : new Original(2026, 9, 19, 12, 0); } }) });
+    Object.defineProperty(window, 'Date', { value: new Proxy(Original, { construct(target, args) { return args.length ? Reflect.construct(target, args) : new Original(2026, 9, 19, location.search.includes('late') ? 23 : 12, location.search.includes('late') ? 59 : 0); } }) });
     if (fail === 'webgl') HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext;
   }, { theme, fail });
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
@@ -160,21 +171,22 @@ it('records renderer.info and submission time before/after without changing cade
     const { page, errors } = await open(1440, 'light', 'no-preference', undefined, `?${mode}`);
     try {
       await page.waitForFunction(count => ((window as unknown as { __renders?: unknown[] }).__renders?.length ?? 0) >= count, mode.includes('glass') ? 64 : 32, { timeout: 20_000 });
-      result[mode] = await page.evaluate(isGlass => {
-        const samples = (window as unknown as { __renders: { at: number; ms: number; calls: number; composite: boolean }[] }).__renders;
+      result[mode] = await page.evaluate(() => {
+        const samples = (window as unknown as { __renders: { at: number; ms: number; calls: number; composite: boolean; final: boolean; geometries: number; textures: number }[] }).__renders;
         const frames: { at: number; ms: number; calls: number }[] = [];
-        for (let i = 0; i < samples.length; i++) {
-          const sample = samples[i]!;
-          if (isGlass && !sample.composite) continue;
-          frames.push({ at: sample.at, ms: sample.ms + (isGlass ? samples[i - 1]?.ms ?? 0 : 0),
-            calls: sample.calls + (isGlass ? samples[i - 1]?.calls ?? 0 : 0) });
+        let ms = 0, calls = 0;
+        for (const sample of samples) {
+          ms += sample.ms; calls += sample.calls;
+          if (!sample.final) continue;
+          frames.push({ at: sample.at, ms, calls }); ms = 0; calls = 0;
         }
         const warmed = frames.slice(8), times = warmed.map(s => s.ms).sort((a, b) => a - b);
         const intervals = warmed.slice(1).map((s, i) => s.at - warmed[i]!.at).sort((a, b) => a - b);
         return { drawCallsPerFrame: [...new Set(warmed.map(s => s.calls))], frames: warmed.length,
           medianIntervalMs: intervals[Math.floor(intervals.length / 2)],
-          medianSubmissionMs: times[Math.floor(times.length / 2)], p95SubmissionMs: times[Math.floor(times.length * 0.95)] };
-      }, mode.includes('glass'));
+          medianSubmissionMs: times[Math.floor(times.length / 2)], p95SubmissionMs: times[Math.floor(times.length * 0.95)],
+          resources: samples.at(-1) ? { geometries: samples.at(-1)!.geometries, textures: samples.at(-1)!.textures } : null };
+      });
       expect(errors).toEqual([]);
     } finally { await page.close(); }
   }
@@ -203,12 +215,12 @@ it.each(['light', 'dark'])('checks stroke contrast against the actual brightest-
         return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722;
       };
       return layout.quads.map(q => {
-        const x0 = box.x + box.width / 2 + (q.x - layout.width / 2) * 30;
-        const y0 = box.y + box.height / 2 + (q.y - (layout.minY + layout.maxY) / 2) * 30;
+        const x0 = box.x + box.width / 2 + (q.x - layout.width / 2) * 40;
+        const y0 = box.y + box.height / 2 + (q.y - (layout.minY + layout.maxY) / 2) * 40;
         const values: number[] = [];
-        for (let y = Math.ceil(y0); y < y0 + q.height * 30; y++) for (let x = Math.ceil(x0); x < x0 + q.width * 30; x++) {
-          const u = q.uv[0]! + (x + 0.5 - x0) / (q.width * 30) * (q.uv[2]! - q.uv[0]!);
-          const v = q.uv[1]! + (y + 0.5 - y0) / (q.height * 30) * (q.uv[3]! - q.uv[1]!);
+        for (let y = Math.ceil(y0); y < y0 + q.height * 40; y++) for (let x = Math.ceil(x0); x < x0 + q.width * 40; x++) {
+          const u = q.uv[0]! + (x + 0.5 - x0) / (q.width * 40) * (q.uv[2]! - q.uv[0]!);
+          const v = q.uv[1]! + (y + 0.5 - y0) / (q.height * 40) * (q.uv[3]! - q.uv[1]!);
           const ai = (Math.floor(v * atlas.height) * atlas.width + Math.floor(u * atlas.width)) * 4;
           const median = [atlas.data[ai]!, atlas.data[ai + 1]!, atlas.data[ai + 2]!].sort((a, b) => a - b)[1]! / 255;
           if (median < 0.6) continue; // Exclude antialias fringe and empty quad padding.
@@ -223,3 +235,65 @@ it.each(['light', 'dark'])('checks stroke contrast against the actual brightest-
     for (const glyph of contrast) expect(glyph.solidStrokeContrast, glyph.char).toBeGreaterThanOrEqual(/[AMP]/.test(glyph.char) ? 4.5 : 3);
   } finally { await page.close(); }
 }, 30_000);
+
+it.each([320,390,1440])('fits the larger long time and AM/PM within the ring at %i, including fallback', async width => {
+  for (const fail of [undefined, 'webgl']) {
+    const { page, errors } = await open(width,'light','reduce',fail,'?late');
+    try {
+      if(!fail) await glass(page);
+      await page.waitForFunction(()=>document.querySelector('.readout-time')?.textContent === '11:59 PM');
+      const time=await page.locator('.readout-time').boundingBox(), area=await page.locator('.day-readout').boundingBox();
+      expect(time!.x).toBeGreaterThan(area!.x); expect(time!.x+time!.width).toBeLessThan(area!.x+area!.width);
+      expect(await page.locator('.readout-time').evaluate(e=>getComputedStyle(e).fontSize)).toBe('40px');
+      expect(await page.locator('.readout-period').evaluate(e=>getComputedStyle(e).fontSize)).toBe('18px');
+      await page.screenshot({path:join(evidence,width+'-long-'+(fail??'glass')+'.png')});
+      expect(errors).toEqual([]);
+    } finally { await page.close(); }
+  }
+},30000);
+
+it('refracts resolved source color and shading through filled glyph interiors on the real GPU', async () => {
+  const {page,errors} = await open(390,'dark','reduce');
+  try {
+    await glass(page);
+    const crop = await page.locator('.readout-time').boundingBox(); if(!crop) throw Error('clock_bounds');
+    const results = [];
+    const box = await page.locator('[data-testid="day-ring"]').boundingBox(); if(!box) throw Error('clock_box');
+    const layout = layoutClockGlyphs('12:00 PM',metrics);
+    for (const color of ['#F4C542','#2466B8']) {
+      await page.evaluate(color=>{
+        const r=window as unknown as {__probeClock(c:string):void;__showClock():void};
+        r.__probeClock(color); r.__showClock();
+      },color);
+      const normal = await page.screenshot();
+      await page.screenshot({path:join(evidence,'refraction-'+color.slice(1)+'.png'),clip:{x:crop.x-8,y:crop.y-8,width:crop.width+16,height:crop.height+16}});
+      results.push(await page.evaluate(async ({normal,box,layout})=>{
+        const img=new Image();img.src=normal;await img.decode();
+        const canvas=document.createElement('canvas');canvas.width=img.width;canvas.height=img.height;
+        const ctx=canvas.getContext('2d')!;ctx.drawImage(img,0,0);const p=ctx.getImageData(0,0,img.width,img.height).data;
+        const points: number[][]=[];
+        // Use MSDF coverage to select filled interiors, excluding counters and background.
+        const atlas=new Image();atlas.src='/clock/clock-atlas.png';await atlas.decode();
+        const ac=document.createElement('canvas');ac.width=atlas.width;ac.height=atlas.height;
+        const ax=ac.getContext('2d')!;ax.drawImage(atlas,0,0);const ap=ax.getImageData(0,0,atlas.width,atlas.height).data;
+        for(const q of layout.quads.filter(q=>q.char === '0')) {
+          const x0=box.x+box.width/2+(q.x-layout.width/2)*40;
+          const y0=box.y+box.height/2+(q.y-(layout.minY+layout.maxY)/2)*40;
+          for(let y=Math.ceil(y0);y<y0+q.height*40;y++) for(let x=Math.ceil(x0);x<x0+q.width*40;x++) {
+            const u=q.uv[0]!+(x+0.5-x0)/(q.width*40)*(q.uv[2]!-q.uv[0]!);
+            const v=q.uv[1]!+(y+0.5-y0)/(q.height*40)*(q.uv[3]!-q.uv[1]!);
+            const ai=(Math.floor(v*atlas.height)*atlas.width+Math.floor(u*atlas.width))*4;
+            const median=[ap[ai]!,ap[ai+1]!,ap[ai+2]!].sort((a,b)=>a-b)[1]!/255;
+            if(median<0.60)continue;
+            const i=(y*img.width+x)*4;points.push([p[i]!,p[i+1]!,p[i+2]!]);
+          }
+        }
+        return [0,1,2].map(c=>points.reduce((v,p)=>v+p[c]!,0)/points.length);
+      },{normal:'data:image/png;base64,'+normal.toString('base64'),box,layout}));
+    }
+    writeFileSync(join(evidence,'refraction-colors.json'),JSON.stringify(results));
+    expect(results[0]![0]! - results[0]![2]!).toBeGreaterThan(8);
+    expect(results[1]![2]! - results[1]![0]!).toBeGreaterThan(3);
+    expect(errors).toEqual([]);
+  } finally {await page.close();}
+},30000);

@@ -234,10 +234,11 @@ function buildScene(
       level: aura.shimmer.level,
       stir: 0,
       idleColor: current.state === 'idle' ? interactionFrame.idleColor : undefined,
-      rippleDir: interactionFrame.rippleDir, rippleTime: interactionFrame.rippleTime,
+      waves: interactionFrame.waves,
     });
     aura.update({ delta, shimmer, glow, error, mode: current.mode, camera, center: root.position,
       shimmerAmount: aura.shimmer.amount, source: body.uniforms, reducedMotion: current.reducedMotion });
+      aura.capture(renderer, scene, camera);
     renderer.render(scene, camera);
     const settling =
       now < settleUntil ||

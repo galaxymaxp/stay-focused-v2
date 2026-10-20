@@ -29,11 +29,11 @@ it('copies the body source and camera pose, snaps reduced-motion colors and disp
   body.uniforms.uBase.value.set('#f4c542'); body.uniforms.uGlow.value = 1;
   aura.update(frame);
   const u = (aura.mesh.material as ShaderMaterial).uniforms;
-  expect(u.uBase!.value.equals(body.uniforms.uBase.value)).toBe(true);
+  expect(u.uSource!.value.image).toMatchObject({ width: 64, height: 64 });
   expect(aura.mesh.position.equals(frame.center)).toBe(true);
   expect(aura.mesh.quaternion.equals(frame.camera.quaternion)).toBe(true);
   body.uniforms.uBase.value.set('#e6eaf1'); aura.update(frame);
-  expect(u.uBase!.value.equals(body.uniforms.uBase.value)).toBe(true);
+  expect(u.uSource!.value.image).toMatchObject({ width: 64, height: 64 });
   body.uniforms.uError.value = 1; aura.update(frame);
   expect(u.uStrength!.value).toBe(0);
   const geo = vi.spyOn(aura.mesh.geometry, 'dispose');
