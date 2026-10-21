@@ -7,9 +7,12 @@ import { CourseBatchQueue } from '../features/course-batch-queue';
 import { useQueueItems } from "../features/queue-items";
 import { useListPreferences } from "../lib/list-preferences";
 import { Icon } from './ui';
+import { OrbStill } from '../features/knowledge-core/OrbStill';
+import { useOrbInteraction } from '../features/knowledge-core/orbInteraction';
 export { countActiveJobs } from "../features/queue-items";
 
 export function QueueButton() {
+  const orbInteraction = useOrbInteraction();
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -107,8 +110,7 @@ export function QueueButton() {
           />
         ) : null}
         <span className="queue-orb" aria-hidden="true">
-          <span className="queue-glow" />
-          <span className="queue-orb-frame" />
+          <OrbStill interaction={orbInteraction} className="queue-orb-frame" />
         </span>
         <span className="queue-label">Queue</span>
       </button>

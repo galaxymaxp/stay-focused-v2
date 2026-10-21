@@ -15,6 +15,8 @@ const state = vi.hoisted(() => ({
 vi.mock("../features/queue/useQueueItems", () => ({
   useQueueItems: () => state.queue,
 }));
+vi.mock('../auth/sessionStore', () => ({ sessionStore: { getItem: async () => 'pearl', setItem: vi.fn() } }));
+vi.mock('react-native-svg', () => ({ default: 'Svg', Defs: 'Defs', Circle: 'Circle', RadialGradient: 'RadialGradient', Stop: 'Stop' }));
 vi.mock("expo-router", () => ({ router: { push: vi.fn() } }));
 vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => true }));
 vi.mock("../../assets/queue/orb-dark.png", () => ({ default: "orb-dark" }));
@@ -82,13 +84,8 @@ describe("QueueButton", () => {
       refresh: () => {},
     };
     const root = await render();
-    expect(
-      root.findAll((node) => String(node.type) === "AnimatedImage"),
-    ).toHaveLength(2);
-    const images = root.findAll(node => String(node.type) === 'AnimatedImage');
-    expect(images[0]!.props.source).toBe(images[1]!.props.source);
-    expect(images[0]!.props.blurRadius).toBe(7);
-    expect(images[0]!.props.style.transform).toEqual(images[1]!.props.style.transform);
+    expect(root.findAllByProps({ testID: 'orb-poster' })).toHaveLength(1);
+    expect(root.findAllByType('Stop' as never).map(node => node.props.stopColor)).toContain('#161B26');
     expect(
       root.findAll((node) => node.props.testID === "queue-count"),
     ).toHaveLength(0);

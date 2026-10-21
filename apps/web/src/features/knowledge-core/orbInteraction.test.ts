@@ -41,7 +41,7 @@ it('uses pan-y on a decorative ball, captures only rotation, and cancels without
 it('keeps the mobile and web body shaders and frame sampler in step', () => {
   const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   for (const file of ['orbBody.ts', 'orbInteractionFrame.ts']) {
-    const shader = (source: string) => file === 'orbBody.ts' ? source.slice(source.indexOf('const VERTEX ='), source.indexOf('const TONES =')) : source;
+    const shader = (source: string) => file === 'orbBody.ts' ? source.slice(source.indexOf('const VERTEX ='), source.indexOf('export interface OrbBodyFrame')) : source;
     expect(shader(read('./' + file))).toBe(shader(read('../../../../mobile/src/features/generation-core/' + file)));
   }
 });

@@ -1,4 +1,5 @@
-import { Matrix3, ShaderMaterial } from "three";
+import { Color, Matrix3, ShaderMaterial } from "three";
+import { ORB_IDLE_PALETTE, orbPaletteAppearance } from '@stay-focused/shared';
 import { describe, expect, it, vi } from "vitest";
 
 import { createOrbBody } from "./orbBody";
@@ -6,6 +7,18 @@ import { createOrbBody } from "./orbBody";
 const frame = { time: 3, life: 0.8, stir: 0.6, glow: 1, level: 0.2, error: 0, spin: new Matrix3(), mode: "dark" as const };
 
 describe("orb body", () => {
+  it.each(ORB_IDLE_PALETTE)('uses the shared $key appearance in both themes on the existing body', color => {
+    const body = createOrbBody();
+    for (const mode of ['light', 'dark'] as const) {
+      body.update({ ...frame, idleColor: color.hex, mode });
+      const appearance = orbPaletteAppearance(color.key, mode);
+      for (const [uniform, tone] of [[body.uniforms.uBase, appearance.base], [body.uniforms.uDeep, appearance.deep],
+        [body.uniforms.uGlowColor, appearance.glow], [body.uniforms.uEnvFloor, appearance.envFloor], [body.uniforms.uEnvSky, appearance.envSky]] as const) {
+        expect(uniform.value.equals(new Color(tone))).toBe(true);
+      }
+    }
+    body.dispose();
+  });
   it("renders as premultiplied glass that does not hide what is behind it", () => {
     const material = createOrbBody().mesh.material as ShaderMaterial;
     expect(material.transparent).toBe(true);

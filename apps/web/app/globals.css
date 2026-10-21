@@ -2073,15 +2073,8 @@ details[open] > :not(summary) {
   background: radial-gradient(closest-side, rgba(0, 0, 0, var(--readout-scrim, 0.2)), transparent);
   z-index: -1;
 }
-:root:not([data-theme="dark"]) .day-readout::before {
-  inset: 16%;
-  background: radial-gradient(
-    closest-side,
-    rgba(10, 14, 28, calc(var(--readout-scrim, 0.2) + 0.32)),
-    rgba(10, 14, 28, 0.08) 70%,
-    transparent
-  );
-}
+:root:not([data-theme="dark"]) .day-readout { color: var(--text); text-shadow: none; }
+:root:not([data-theme="dark"]) .day-readout::before { display: none; }
 .readout-time {
   font-size: 40px;
   line-height: 1.2;
@@ -2801,19 +2794,15 @@ details[open] > :not(summary) {
   height: 26px;
 }
 .queue-orb-frame {
+  border-radius: 50%;
   position: relative;
   width: 26px;
   height: 26px;
-  background: url("/queue/orb-light.png") center / contain no-repeat;
-}
-:root[data-theme="dark"] .queue-orb-frame {
-  background-image: url("/queue/orb-dark.png");
 }
 .queue-glow {
   position: absolute;
   inset: -7px;
   border-radius: 50%;
-  background: url("/queue/orb-light.png") center / contain no-repeat;
   filter: blur(7px);
   opacity: 0.1;
   transition:
@@ -5499,5 +5488,5 @@ mark.find-active {
   pointer-events: none;
 }
 :root[data-theme="dark"] .orb-static-source::before { opacity: 0.38; }
-:root[data-theme="dark"] .queue-glow { background-image: url("/queue/orb-dark.png"); opacity: 0.2; }
+
 .queue-button[data-hidden="true"] .queue-orb { animation-play-state: paused; }

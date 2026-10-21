@@ -13,6 +13,8 @@ beforeEach(() => {
   frames = new Map(); serial = 0; reduced = false;
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('document', { documentElement: { dataset: { theme: 'light' } } });
+  vi.stubGlobal('MutationObserver', class { observe() {} disconnect() {} });
   vi.stubGlobal('window', { addEventListener: vi.fn(), removeEventListener: vi.fn(), matchMedia: () => ({ matches: reduced, addEventListener: vi.fn(), removeEventListener: vi.fn() }) });
   vi.stubGlobal('requestAnimationFrame', (fn: FrameRequestCallback) => { frames.set(++serial, fn); return serial; });
   vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));

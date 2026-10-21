@@ -62,6 +62,8 @@ beforeEach(() => {
     mocks.search = new URLSearchParams(path.split("?")[1]?.split("#")[0]);
   });
   doc = new EventTarget();
+  Object.assign(doc, { documentElement: { dataset: { theme: 'light' } } });
+  vi.stubGlobal('MutationObserver', class { observe() {} disconnect() {} });
   win = Object.assign(new EventTarget(), { location: { hash: "" } });
   Object.assign(globalThis, {
     IS_REACT_ACT_ENVIRONMENT: true,

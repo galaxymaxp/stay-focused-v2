@@ -1,6 +1,7 @@
 // Import only from the lazy orb renderer, never the shared barrel.
 // Both platforms execute this exact shader; native only adapts PNG loading.
 import * as THREE from 'three';
+import { ORB_THEME_TONES } from './orb-appearance';
 import { layoutClockGlyphs, type ClockGlassReadout, type ClockGlyphMetrics } from './clock-glyphs';
 
 const vertex = `
@@ -31,6 +32,8 @@ uniform sampler2D uAtlas;
 uniform vec2 uAtlasTexel;
 uniform vec2 uPixel;
 uniform vec2 uLight;
+uniform float uLightMode;
+uniform vec3 uInk;
 varying vec2 vUv;
 varying vec2 vScreen;
 float field(vec2 uv) {
@@ -60,11 +63,12 @@ void main() {
   // Transmission fills the glyph; a directional reflection gives the curved glass depth.
   float facing = max(dot(-normal, normalize(uLight + vec2(0.0001))), 0.0);
   glass = glass * 1.1 + vec3(0.18 + 0.30 * pow(facing, 2.0));
+  glass = mix(glass, uInk + glass * 0.04, uLightMode);
   gl_FragColor = vec4(glass, coverage);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
   gl_FragColor.rgb *= 1.0 - edge * 0.82;
-  gl_FragColor.rgb += vec3(1.0) * pow(edge, 3.0) * (0.06 + 0.6 * facing);
+  gl_FragColor.rgb += vec3(1.0) * pow(edge, 3.0) * (0.06 + 0.6 * facing) * (1.0 - uLightMode);
 }`;
 
 /** Orb target then base + glyph quads in one composite render pass.
@@ -83,7 +87,8 @@ export function createClockGlass(renderer: THREE.WebGLRenderer, atlas: THREE.Tex
   scene.add(background);
   const uniforms = { uOrb: { value: target.texture }, uAtlas: { value: atlas },
     uAtlasTexel: { value: new THREE.Vector2(1 / metrics.width, 1 / metrics.height) },
-    uPixel: { value: new THREE.Vector2() }, uLight: { value: new THREE.Vector2() } };
+    uPixel: { value: new THREE.Vector2() }, uLight: { value: new THREE.Vector2() },
+    uLightMode: { value: 0 }, uInk: { value: new THREE.Color(ORB_THEME_TONES.light.envFloor) } };
   const material = new THREE.ShaderMaterial({ vertexShader: vertex, fragmentShader: CLOCK_GLASS_FRAGMENT,
     transparent: true, depthTest: false, depthWrite: false, uniforms });
   const geometry = new THREE.BufferGeometry();
@@ -103,7 +108,8 @@ export function createClockGlass(renderer: THREE.WebGLRenderer, atlas: THREE.Tex
       if (target.width !== bufferSize.x || target.height !== bufferSize.y) target.setSize(bufferSize.x, bufferSize.y);
       uniforms.uPixel.value.set(1 / bufferSize.x, 1 / bufferSize.y);
       uniforms.uLight.value.set(light[0] ?? 0, light[1] ?? 1);
-      base.uniforms.uScrim!.value = dark ? 0.35 : 0.78;
+      base.uniforms.uScrim!.value = dark ? 0.35 : 0;
+      uniforms.uLightMode.value = dark ? 0 : 1;
       const key = `${readout.text}/${readout.fontSize}/${size}`;
       if (key !== previous) {
         previous = key;

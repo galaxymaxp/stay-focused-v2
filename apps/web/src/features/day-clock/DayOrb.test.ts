@@ -15,6 +15,7 @@ vi.mock('../knowledge-core/orbAura', async original => { const actual = await or
 } }; });
 vi.mock('three', async original => ({ ...await original<typeof import('three')>(), WebGLRenderer: class { setSize() {} setPixelRatio() {} setClearColor() {} getRenderTarget() { return null; } setRenderTarget() {} render = mocks.render; dispose() {} forceContextLoss() {} } }));
 let visibility: (() => void) | undefined, blur: (() => void) | undefined, focus: (() => void) | undefined;
+let themeChange: () => void;
 let tree: ReactTestRenderer | undefined, frames: Map<number, FrameRequestCallback>, serial: number, reduced: boolean;
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks(); frames = new Map(); serial = 0; reduced = false;
@@ -25,7 +26,7 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', { getItem: () => 'pearl', setItem() {} });
   vi.stubGlobal('document', { documentElement: { dataset: { theme: 'dark' } }, visibilityState: 'visible', addEventListener(name: string, fn: () => void) { if (name === 'visibilitychange') visibility = fn; }, removeEventListener() {},
     createElement: () => ({ clientWidth: 320, setAttribute() {}, remove() {} }) });
-  vi.stubGlobal('MutationObserver', class { observe() {} disconnect() {} });
+  vi.stubGlobal('MutationObserver', class { constructor(callback: () => void) { themeChange = callback; } observe() {} disconnect() {} });
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 });
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -36,6 +37,19 @@ async function mount(reducedMotion = false) {
   return interaction;
 }
 function draw() { const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn(Date.now())); }
+it('updates the existing scene on theme changes without resetting momentum or palette', async () => {
+  const interaction = await mount();
+  interaction.state.current = pushOrbSpin(interaction.state.current, 0.2, Date.now());
+  interaction.wake.current?.(); vi.advanceTimersByTime(16); draw();
+  const scene = mocks.render.mock.lastCall![0];
+  document.documentElement.dataset.theme = 'light'; themeChange();
+  expect(interaction.state.current.spin.velocityY).not.toBe(0);
+  vi.advanceTimersByTime(16); draw();
+  expect(mocks.update.mock.lastCall![0]).toMatchObject({ mode: 'light', idleColor: '#e6eaf1' });
+  expect(mocks.render.mock.lastCall![0]).toBe(scene);
+  expect(interaction.state.current.spin.velocityY).not.toBe(0);
+  expect(interaction.state.current.colorIndex).toBe(0);
+});
 it('adds exactly one source-coupled spill and renders a single Reduce Motion frame', async () => {
   await mount(true); draw();
   expect(mocks.aura).toHaveBeenCalledOnce(); expect(mocks.render.mock.lastCall![0].children).toHaveLength(2);

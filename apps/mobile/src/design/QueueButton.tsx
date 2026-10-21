@@ -10,15 +10,13 @@ import {
   useWindowDimensions,
 } from "react-native";
 
-import orbDark from "../../assets/queue/orb-dark.png";
-import orbLight from "../../assets/queue/orb-light.png";
+import { OrbPoster } from '../features/generation-core/OrbPoster';
+import { useOrbInteraction } from '../features/generation-core/orbInteraction';
 import { useAppActivity } from "./appActivity";
 import { haptic } from "./haptics";
 import { motion, shouldAnimate, useTheme } from "./theme";
 import { hitTarget } from "./tokens";
 
-/** Still frames of the Knowledge Core, captured from the device render. */
-const ORB = { dark: orbDark, light: orbLight } as const;
 const ORB_SIZE = 26;
 
 /**
@@ -29,6 +27,7 @@ const ORB_SIZE = 26;
  */
 export const QueueButton = memo(function QueueButton() {
   const { colors, mode, reducedMotion, active: appActive } = useTheme();
+  const interaction = useOrbInteraction();
   const { active, generating, queued, syncing } = useAppActivity();
   const focused = useIsFocused();
   const queue = useQueueItems();
@@ -170,32 +169,9 @@ export const QueueButton = memo(function QueueButton() {
           justifyContent: "center",
         }}
       >
-        <Animated.Image
-          testID="queue-orb-spill"
-          accessible={false}
-          source={ORB[mode]}
-          blurRadius={7}
-          style={{ position: 'absolute', width: ORB_SIZE + 14, height: ORB_SIZE + 14,
-            opacity: working.interpolate({ inputRange: [0, 1], outputRange: [mode === 'dark' ? 0.2 : 0.1, mode === 'dark' ? 0.4 : 0.22] }),
-            transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
-          }}
-        />
-        <Animated.Image
-          source={ORB[mode]}
-          accessibilityIgnoresInvertColors
-          style={{
-            width: ORB_SIZE,
-            height: ORB_SIZE,
-            transform: [
-              {
-                rotate: turn.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ["0deg", "360deg"],
-                }),
-              },
-            ],
-          }}
-        />
+        <Animated.View style={{ transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
+          <OrbPoster size={ORB_SIZE} mode={mode} interaction={interaction} />
+        </Animated.View>
       </View>
     </Pressable>
   );

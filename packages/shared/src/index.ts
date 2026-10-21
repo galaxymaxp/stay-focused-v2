@@ -264,3 +264,5 @@ export * from './legal';
 export * from './profile-preferences';
 export * from './orb-preference-sync';
 export * from './clock-glyphs';
+
+export * from './orb-appearance';

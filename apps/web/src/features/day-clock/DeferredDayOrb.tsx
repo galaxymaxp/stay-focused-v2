@@ -1,9 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
-import { dayOrbTones } from './dayClock';
 import { DAY_ORB_FILL } from './orb-footprint';
 
-import { orbIdleColor } from '@stay-focused/shared';
+import { orbIdleColor, orbPosterGradient } from '@stay-focused/shared';
 import type { ClockGlassReadout } from '@stay-focused/shared';
 import { useOrbInteraction, type OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 
@@ -40,16 +39,17 @@ export function DeferredDayOrb({ minutes, size, ready, clock, onGlassReady, inte
     const update = () => {
       if (interaction.state.current.gesture?.rotating || interaction.ringDragging?.current) setInteractiveStill(true);
       const color = orbIdleColor(interaction.state.current, Date.now(), true);
-      if (still.current) still.current.style.background = `radial-gradient(circle at 40% 32%, ${dayOrbTones(minutes).light} 0%, ${color} 45%, ${dayOrbTones(minutes).deep} 100%)`;
+      if (still.current) still.current.style.background = orbPosterGradient(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light', color);
     };
     interaction.wake.current = update; update();
-    return () => { if (interaction.wake.current === update) interaction.wake.current = null; };
+    const theme = new MutationObserver(update);
+    theme.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => { theme.disconnect(); if (interaction.wake.current === update) interaction.wake.current = null; };
   }, [Orb, reduced, interactiveStill, interaction, minutes, hasClock]);
   if (Orb && (!reduced || interactiveStill || hasClock)) return <Orb minutes={minutes} size={size} interaction={interaction} clock={clock} onGlassReady={onGlassReady} />;
-  const tones = dayOrbTones(minutes);
   const diameter = size * DAY_ORB_FILL;
   return <div className="day-orb" data-testid="day-orb-still" aria-hidden="true" style={{ width: size, height: size, display: 'grid', placeItems: 'center' }}>
     <div ref={still} className="orb-static-source" style={{ width: diameter, height: diameter, borderRadius: '50%',
-      background: `radial-gradient(circle at 40% 32%, ${tones.light} 0%, ${orbIdleColor(interaction.state.current, Date.now(), true)} 45%, ${tones.deep} 100%)` }} />
+      background: orbPosterGradient('light', orbIdleColor(interaction.state.current, Date.now(), true)) }} />
   </div>;
 }

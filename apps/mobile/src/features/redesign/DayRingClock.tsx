@@ -503,20 +503,22 @@ function HeldHalo({ range, mode, scale, lift, color }: { range: Range; mode: Mod
 export function CenterReadout({ mode, range, text, glassReady, fontsLoaded }: {
   mode: Mode | null; range: Range; text: string; glassReady: boolean; fontsLoaded: boolean;
 }) {
-  const shadow = { textShadowColor: "rgba(0,0,0,0.35)", textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } };
+  const { mode: theme, colors } = useTheme();
+  const ink = colors.textPrimary;
+  const shadow = { textShadowColor: "rgba(0,0,0,0.35)", textShadowRadius: theme === "dark" ? 6 : 0, textShadowOffset: { width: 0, height: 1 } };
   return (
     <>
-      {mode && <Copy color="rgba(255,255,255,0.86)" size="caption" style={{ ...shadow,
+      {mode && <Copy color={ink} size="caption" style={{ ...shadow,
         fontFamily: fontsLoaded ? 'InterClock600' : undefined, letterSpacing: 0.6, textTransform: 'uppercase', fontWeight: fontsLoaded ? 'normal' : '600' }}>
         {mode === 'start' ? 'Free from' : mode === 'end' ? 'Free until' : 'Free time'}
       </Copy>}
       <Text testID="clock-time" accessible accessibilityRole="text" accessibilityLabel={text}
-        style={{ ...shadow, color: '#FFFFFF', fontFamily: fontsLoaded ? 'InterClock700' : undefined,
+        style={{ ...shadow, color: ink, fontFamily: fontsLoaded ? 'InterClock700' : undefined,
           fontWeight: fontsLoaded ? 'normal' : '700', fontSize: 40, lineHeight: 48,
           letterSpacing: -0.8, fontVariant: ['tabular-nums'], opacity: glassReady ? 0 : 1 }}>
         {text.split(' ')[0]} <Text style={{ fontSize: 18, letterSpacing: -0.36 }}>{text.split(' ')[1]}</Text>
       </Text>
-      {mode && <Copy color="rgba(255,255,255,0.86)" size="caption" style={{ ...shadow,
+      {mode && <Copy color={ink} size="caption" style={{ ...shadow,
         fontFamily: fontsLoaded ? 'InterClock500' : undefined, fontWeight: fontsLoaded ? 'normal' : '500', fontVariant: ['tabular-nums'] }}>
         {mode === 'move' ? `until ${clockLabel(range.end)} · ` : ''}{formatFreeTime(freeTimeDuration(range.start, range.end))}
       </Copy>}

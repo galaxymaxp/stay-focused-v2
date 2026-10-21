@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import { ORB_MAX_IMPULSES, ORB_RIPPLE_MS, ORB_WAVE_AMPLITUDE, ORB_WAVE_CAP, orbWaveGain, type OrbWave } from '@stay-focused/shared';
+import { orbAppearance, ORB_MAX_IMPULSES, ORB_RIPPLE_MS, ORB_WAVE_AMPLITUDE, ORB_WAVE_CAP, orbWaveGain, type OrbWave } from '@stay-focused/shared';
 
 export const ORB_RADIUS = 0.95;
 
@@ -126,11 +126,6 @@ void main() {
   gl_FragColor.rgb *= gl_FragColor.a;
 }`;
 
-const TONES = {
-  dark: { base: "#DDE3EE", deep: "#161B26", glow: "#CFDDFF", envFloor: "#010102", envSky: "#1C2028" },
-  light: { base: "#E6EAF1", deep: "#4F5868", glow: "#9FB8F0", envFloor: "#2E333C", envSky: "#9AA2AF" },
-} as const;
-
 export interface OrbBodyFrame {
   readonly waves?: readonly OrbWave[];
   /** Pass only for idle: generation states retain their authoritative appearance. */
@@ -143,8 +138,6 @@ export interface OrbBodyFrame {
   readonly error: number;
   readonly spin: THREE.Matrix3;
   readonly mode: "light" | "dark";
-  /** Optional per-frame liquid and light colors (the Today day orb); defaults follow the theme. */
-  readonly tones?: { readonly base: string; readonly deep: string; readonly glow: string };
   /** Optional inner light position in ball radii; defaults to the centre. */
   readonly light?: { readonly x: number; readonly y: number; readonly z: number };
 }
@@ -173,12 +166,12 @@ export function createOrbBody() {
     mesh,
     uniforms,
     update(frame: OrbBodyFrame) {
-      const tones = frame.tones ?? TONES[frame.mode];
-      uniforms.uBase.value.set(frame.idleColor ?? tones.base);
+      const tones = orbAppearance(frame.mode, frame.idleColor);
+      uniforms.uBase.value.set(tones.base);
       uniforms.uDeep.value.set(tones.deep);
-      uniforms.uGlowColor.value.set(frame.idleColor ?? tones.glow);
-      uniforms.uEnvFloor.value.set(TONES[frame.mode].envFloor);
-      uniforms.uEnvSky.value.set(TONES[frame.mode].envSky);
+      uniforms.uGlowColor.value.set(tones.glow);
+      uniforms.uEnvFloor.value.set(tones.envFloor);
+      uniforms.uEnvSky.value.set(tones.envSky);
       uniforms.uWaveGain.value = orbWaveGain(frame.waves ?? []);
       uniforms.uWaveCount.value = Math.min(ORB_MAX_IMPULSES, frame.waves?.length ?? 0);
       for (let i = 0; i < ORB_MAX_IMPULSES; i++) {

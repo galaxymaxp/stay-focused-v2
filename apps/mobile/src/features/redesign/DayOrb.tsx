@@ -3,8 +3,8 @@ import type { OrbInteractionHandle } from '../generation-core/orbInteraction';
 import { createOrbInteractionSampler } from '../generation-core/orbInteractionFrame';
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Image, View } from "react-native";
-import { OrbImageSpill } from '../generation-core/OrbImageSpill';
+import { AppState, View } from "react-native";
+import { OrbPoster } from '../generation-core/OrbPoster';
 import * as THREE from "three";
 import { createClockGlass } from '@stay-focused/shared/clock-glass-renderer';
 import type { ClockGlassReadout } from '@stay-focused/shared';
@@ -122,7 +122,7 @@ export const DayOrb = memo(function DayOrb({
     <View pointerEvents="none" style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {/* Ambient spill renders inside the same transparent GL view. */}
       {renderingFailed
-        ? <><OrbImageSpill source={require("../../../assets/branding/orb-adaptive-foreground.png")} size={size} mode={mode} /><Image source={require("../../../assets/branding/orb-adaptive-foreground.png")} style={{ width: size, height: size }} resizeMode="contain" /></>
+        ? <OrbPoster size={size * DAY_ORB_FILL} mode={mode} interaction={interaction} />
         : <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />}
     </View>
   );
@@ -233,7 +233,6 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
         error: extra?.error ?? 0,
         spin: spinMatrix,
         mode: current.mode,
-        tones: { base: tones.base, deep: tones.deep, glow: tones.light },
         light: tones.position,
       });
       aura.update({ delta, shimmer: 0, shimmerAmount: 0, glow: body.uniforms.uGlow.value,

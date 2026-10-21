@@ -1,8 +1,7 @@
 import { createRequire } from "node:module";
 import { GLView } from "expo-gl";
 import { createElement } from "react";
-import { Image } from "react-native";
-import { createOrbInteraction, pushOrbSpin } from "@stay-focused/shared";
+import { createOrbInteraction, pushOrbSpin, ORB_IDLE_PALETTE, orbPaletteAppearance } from "@stay-focused/shared";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -78,6 +77,38 @@ async function startGL() {
     drawingBufferWidth: 192, drawingBufferHeight: 192, endFrameEXP: vi.fn(),
   }));
 }
+
+it.each(ORB_IDLE_PALETTE)('keeps Today and idle Generation appearance identical for $key across live theme changes', async color => {
+  const interaction = { state: { current: createOrbInteraction(ORB_IDLE_PALETTE.indexOf(color)) }, wake: { current: null as (() => void) | null } };
+  await render({ interaction, reducedMotion: true }); await startGL();
+  vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
+  const scene = mocks.render.mock.lastCall![0];
+  const body = scene.children[0].children[0].material.uniforms;
+  for (const mode of ['light', 'dark'] as const) {
+    await act(async () => rendered!.update(createElement(DayOrb, { ...props, interaction, mode, reducedMotion: true })));
+    vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
+    const appearance = [body.uBase, body.uDeep, body.uGlowColor, body.uEnvFloor, body.uEnvSky].map(u => u.value.getHexString());
+    expect('#' + body.uDeep.value.getHexString()).toBe(orbPaletteAppearance(color.key, mode).deep.toLowerCase());
+    await act(async () => rendered!.update(createElement(DayOrb, { ...props, interaction, mode, reducedMotion: true, state: 'idle' })));
+    vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
+    expect([body.uBase, body.uDeep, body.uGlowColor, body.uEnvFloor, body.uEnvSky].map(u => u.value.getHexString())).toEqual(appearance);
+    expect(mocks.render.mock.lastCall![0]).toBe(scene);
+    expect(interaction.state.current.colorIndex).toBe(ORB_IDLE_PALETTE.indexOf(color));
+  }
+});
+
+it('keeps momentum and the GL view when the resolved theme changes', async () => {
+  const interaction = { state: { current: pushOrbSpin(createOrbInteraction(), 0.2, Date.now()) }, wake: { current: null as (() => void) | null } };
+  await render({ interaction }); await startGL();
+  vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
+  const view = rendered!.root.findByType(GLView), scene = mocks.render.mock.lastCall![0];
+  await act(async () => rendered!.update(createElement(DayOrb, { ...props, interaction, mode: 'light' })));
+  expect(rendered!.root.findByType(GLView)).toBe(view);
+  expect(interaction.state.current.spin.velocityY).not.toBe(0);
+  vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
+  expect(mocks.render.mock.lastCall![0]).toBe(scene);
+  expect(interaction.state.current.spin.velocityY).not.toBe(0);
+});
 
 it('composites in the existing reduced-resolution GL view and redraws changed time on the next frame under Reduce Motion', async () => {
   const ready = vi.fn();
@@ -161,11 +192,11 @@ describe("Today orb with one in-scene ambient spill", () => {
     vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
     expect(mocks.render.mock.calls.length).toBe(after);
   });
-  it('keeps the PNG fallback with a static image-derived spill when GL fails', async () => {
+  it('keeps a theme-aware static palette poster without a loop when GL fails', async () => {
     await render({ reducedMotion: true, live: false }); mocks.fail = true; await startGL();
     const root = rendered!.root;
-    expect(root.findAllByType(GLView)).toHaveLength(0); expect(root.findAllByType(Image).find(image => !image.props.blurRadius)!.props.resizeMode).toBe('contain');
-    expect(root.findAllByProps({ testID: 'orb-image-spill' })).toHaveLength(1);
+    expect(root.findAllByType(GLView)).toHaveLength(0);
+    expect(root.findAllByProps({ testID: 'orb-poster' })).toHaveLength(1);
     expect(mocks.frame).not.toHaveBeenCalled();
   });
 });

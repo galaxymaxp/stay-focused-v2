@@ -8,6 +8,7 @@ import type { CoreState } from './coreModel';
 const mocks = vi.hoisted(() => ({ update: vi.fn(), aura: vi.fn(), render: vi.fn() }));
 vi.mock('expo-router/react-navigation', () => ({ useIsFocused: () => true }));
 vi.mock('expo-gl', () => ({ GLView: 'GLView' }));
+vi.mock('react-native-svg', () => ({ default: 'Svg', Defs: 'Defs', Circle: 'Circle', RadialGradient: 'RadialGradient', Stop: 'Stop' }));
 vi.mock('react-native', () => ({ View: 'View', Image: 'Image', StyleSheet: { create: (s: unknown) => s, absoluteFill: {} }, AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } }));
 vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: async () => 'pearl', setItem: vi.fn() } }));
 vi.mock('./threeContext', () => ({ threeContext: (gl: unknown) => gl }));

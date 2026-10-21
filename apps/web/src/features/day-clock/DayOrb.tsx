@@ -153,7 +153,7 @@ export const DayOrb = memo(function DayOrb({
       aria-hidden="true"
       data-state={state}
     >
-      {unsupported && <OrbStill interaction={interaction} tones={runtime.current.tones} className="day-orb-fallback" />}
+      {unsupported && <OrbStill interaction={interaction} className="day-orb-fallback" />}
     </div>
   );
 });
@@ -274,7 +274,6 @@ function buildScene(
         error: extra?.error ?? 0,
         spin: spinMatrix,
         mode: current.mode,
-        tones: { base: tones.base, deep: tones.deep, glow: tones.light },
         light: tones.position,
       });
       aura.update({ delta, shimmer: 0, shimmerAmount: 0, glow: body.uniforms.uGlow.value,
