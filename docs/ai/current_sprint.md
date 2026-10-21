@@ -1,3 +1,24 @@
+<!-- OT1 begin -->
+OT1 / Today orb theme sync (2026-10-21): **PASS for the finite unattended local code scope**.
+Confirmed cause: the shared clock compositor applied a .78 black scrim in light
+mode; theme propagation already worked. Shared palette/theme appearance now
+drives both bodies, static fallbacks and Queue. Light clock ink replaces the
+black scrim; live theme changes retain the scene and momentum. OR4 storage,
+gestures, Reduce Motion and accessible real time text remain.
+Implementation: `45526e95`; documentation hash is in Git/OT1.status.
+FRESH PASS: forced typecheck/lint/build 8/8 tasks each, 0 cached; six existing
+lint warnings. Shared 682/70 files (source + compiled duplicates), mobile
+1611/169, web 546/72. Separate web build 23/23 pages and Android HBC
+export pass; root API build 37/37 pages. Both diff checks pass. Eight actual web
+Today/Generation light/dark pearl/gold captures were inspected; GPU contrast and
+live canvas identity pass. First typecheck failure and repairs are retained.
+Native/physical appearance and live state remain UNVERIFIED (owner to confirm).
+Rollout and Device checks NOT RUN, skipped entirely. No service call, environment
+file edit, remote SQL/migration, Scheduler change, deployment or push. Original
+unrelated paths and Owner Pause preserved. OT1 endpoint reached; no later item.
+[Acceptance and exact gates](acceptance/ot1-today-orb-theme-sync.md).
+<!-- OT1 end -->
+
 <!-- GV1 begin -->
 GV1 / Generation viewport (2026-10-20): **PASS for the finite unattended local code scope**.
 Native detail and pre-admission pages use measured non-scroll flex space, with

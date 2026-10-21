@@ -9325,3 +9325,61 @@ UI/, apps/mobile/.gitignore and supabase/.temp/ remain. Finite GV1 endpoint
 reached; no later task or FULLSEND was started.
 
 See [GV1 acceptance](acceptance/gv1-generation-viewport.md).
+
+## OT1 Today orb theme sync - unattended local closure (2026-10-21)
+
+Status: **PASS for the finite unattended local code scope**. Implementation
+`45526e95 fix(orb): unify palette appearance and light clock tint`.
+Documentation: `docs(orb): close OT1 local acceptance and gates` (this follow-up
+commit; exact hash and both commits are in Git and tmp/overnight/OT1.status).
+Branch: overnight/2026-10-15_feedback. Original baseline was 32206c16. Resume
+inspected STEP 0 and unfinished edits; no committed work was repeated.
+
+Cause confirmed at baseline clock-glass-renderer.ts:106: light mode applied .78
+black scrim. Today and Generation already shared the resolved theme. A shared
+appearance helper now drives body uniforms and all static/Queue surfaces. The
+clock uses light-theme ink instead of darkening the orb; existing accessible
+time, OR4 storage, gestures, scene identity and momentum remain.
+
+FRESH final serial gates: typecheck/lint/build **8/8 each, 0 cached**; six
+existing lint warnings. Shared **682/70 files** (includes compiled duplicates;
+341 source cases), mobile **1611/169**, web **546/72**. Separate web build
+**23/23 pages**, Android HBC export and both diff checks PASS exit 0. Root API
+build **37/37 pages**; API tests NOT APPLICABLE because only client decorative
+rendering changed. The first typecheck failed at 6/8 successful tasks with two
+native type errors; both were repaired without weakening types/assertions.
+The first mobile suite also stopped on an unmocked native SVG import in the
+retained KnowledgeCore fixture: 168 files/1604 tests passed, 1 suite failed to
+load. Its native boundary mock was added, preserving every assertion; forced
+typecheck/lint and the complete mobile suite were rerun. The passing root build
+and shared suite preceded this test-only repair; production sources were unchanged.
+Logs, failed attempts, source hashes and evidence remain under ignored
+tmp/overnight/OT1-*; no validation artifact or generated output was staged.
+
+Final documentation resume found implementation already committed. All 25 saved
+source hashes still match; the nine saved gate results and their logs were
+rechecked. Implementation gates were NOT RUN again for documentation-only
+closure; their original FRESH evidence remains valid. Final documentation diff
+checks are FRESH. The capture contact sheet and metadata were reinspected.
+
+Visual evidence: eight actual Today/Generation x light/dark x pearl/gold web
+captures inspected together and against the original black light-mode center.
+Eight browser theme toggles retain the canvas. Existing GPU stroke checks pass
+(light 10.44-12.96:1, dark 5.51-11.84:1 statistics); native/web component tests
+retain scene and momentum. Chromium software WebGL and native unit PASS do not
+establish physical-device acceptance. Manual visual preload-path failure and
+unavailable Python/contact-sheet fallback are recorded in acceptance.
+
+### Owner steps remaining
+
+Rollout: **NOT RUN**, skipped entirely. Review commits/evidence and separately
+initiate any release. Device checks: **NOT RUN**, skipped entirely; confirm
+Realme Today light mode matches Generation, themes, synced palette, Queue and
+fallbacks, glass/plain text and gestures/momentum. Native rendering/performance,
+deployed revisions and live preference/database/Scheduler state remain
+**UNVERIFIED (owner to confirm)**. No service call, environment-file edit,
+remote SQL/migration, Scheduler change, deployment or push occurred. Original
+UI/, apps/mobile/.gitignore and supabase/.temp/ and Owner Pause remain. OT1 ends
+here; no OG1 or later backlog item was started.
+
+See [OT1 acceptance](acceptance/ot1-today-orb-theme-sync.md).
