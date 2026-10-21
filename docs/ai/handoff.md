@@ -9448,3 +9448,79 @@ pass. Local software WebGL is not native performance or physical acceptance.
 - Original UI/, apps/mobile/.gitignore, supabase/.temp/ and Owner Pause preserved.
   No service call, environment-file edit, remote SQL/migration, Scheduler change,
   deployment or push. Finite OG1 endpoint reached; no later item started.
+
+## OL1 whole-orb loading - unattended local closure (2026-10-21)
+
+OL1 / whole-orb loading (2026-10-21): **PASS for the finite unattended local code scope**.
+Confirmed: the deferred still was replaced before the first GL frame, and
+body/aura drew before the asynchronous clock atlas. Web/native now retain one
+OT1 palette/theme poster until a complete frame (native: after endFrameEXP),
+then crossfade the whole surface over 250ms; Reduce Motion is instant.
+Early chunk/atlas loading retains the Three.js split. Failure/timeout keeps the
+poster, logs one safe warning and disposes work; late callbacks cannot reveal it.
+Generation's change-only reduced-motion pose, gestures, cadence and OG1 remain.
+Implementation: e54f11d0; documentation hash is in Git/OL1.status.
+FRESH final forced typecheck/lint/build: 8/8 tasks each, 0 cached; six existing
+warnings. Shared 696/72 files (source plus compiled duplicates), mobile
+1617/169, web 561/73; separate web 23/23 pages and Android HBC
+export pass. Root API build 37/37 pages; API tests NOT APPLICABLE (decorative
+client/loading helper only). Diff/staged checks pass. Failed focused attempts
+and the interrupted first build/reduced-motion repair are recorded.
+Twelve before/after browser sequences, 164/137 images and 3343/4086 samples:
+731 visible partial samples before, zero after; seven loading browser regressions
+cover fades, Slow 4G, failure/timeout and Reduce Motion. Production bundle
+inspection confirms Three stays outside Today/Generation initial route chunks.
+Physical/native appearance/performance, real Next Router/auth/production and
+deployed/live state remain UNVERIFIED (owner to confirm). Rollout and Device
+checks NOT RUN, skipped entirely. No service call, environment-file edit,
+remote SQL/migration, Scheduler, deployment or push. Original unrelated paths
+and Owner Pause preserved. OL1 endpoint reached; no later backlog item.
+[Acceptance and exact gates](acceptance/ol1-web-orb-loads-whole.md).
+
+
+Commits:
+- e54f11d0 fix(orb): reveal only complete orb frames
+- docs(orb): close OL1 local acceptance and gates (this documentation checkpoint;
+  exact hash in Git and tmp/overnight/OL1.status).
+
+Confirmed baseline cause: DeferredDayOrb.tsx:49 replaces the poster at module
+arrival; DayOrb.tsx:204 loads the atlas asynchronously while :299 draws the
+body/aura. Mobile DayOrb.tsx:169,245-255 presents the same incomplete clock
+scene. Atlas and aura are not independently visible GL canvases. The shared
+12-second active deadline, complete-frame event and guarded fallback now bound
+both platforms. Native plain text remains through the reveal; web text fades
+with the complete canvas. No new frame loop or per-frame React update.
+
+The first focused web component run had 9 failures/8 passes from a missing
+style.setProperty DOM mock; expanded focused suites passed. First browser hook
+failed before 7 cases (minifier quote syntax); corrected split assertion and all
+7 passed. Three native test callback TS errors and two hook warnings were
+repaired. First root typecheck/lint passed; root build was deliberately
+interrupted for the Generation reduced-motion preservation fix. Final serial
+gates restarted on frozen source and all pass. Final Expo GL source review
+added a native replacement-context fallback and regression; affected forced
+root gates, full native suite and Android export were rerun serially. Unchanged
+shared/web suites and the explicit web build retain their original FRESH proof;
+they were NOT RUN again for this native-only repair. No hidden flake or relaxed
+rendering assertion. Resume found the separate Android export had stopped at
+Metro startup while its result entry was stale; the incomplete log is retained,
+and only that unfinished export was rerun: FRESH PASS, exit 0, 60.127s.
+Full details and commands are in acceptance. Logs, hashes,
+frames/contact sheets and manifest proof stay ignored under tmp/overnight/OL1-*.
+
+**Owner steps remaining**
+
+- Rollout: NOT RUN, skipped entirely. Review local commits/evidence and separately
+  initiate any publication. No push, deploy, OTA/EAS, remote SQL/migration,
+  Scheduler operation or environment-file edit occurred.
+- Device checks: NOT RUN, skipped entirely. Website real slow connection,
+  cold/reload/real navigation, light/dark palettes, fallback/Reduce Motion;
+  Realme Today/Generation first frame, text/fade, themes/palettes, gestures,
+  AppState/focus and actual GPU/frame/power. Mobile changed; no install attempted.
+- Native/physical appearance/performance, real Next Router/auth/production,
+  deployed revisions and live preference/database/Scheduler state are
+  UNVERIFIED (owner to confirm). Software Chromium/RN tests do not establish them.
+- Vercel CLI is absent. For separately authorized future rollout, strongly
+  recommend npm i -g vercel for env pull/deploy/logs; NOT RUN in OL1.
+- Original UI/, apps/mobile/.gitignore, supabase/.temp/, ignored tmp/ and Owner
+  Pause preserved. OL1 endpoint reached; RS1 and all later items not started.

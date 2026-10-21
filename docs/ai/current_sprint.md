@@ -1,3 +1,31 @@
+<!-- OL1 begin -->
+OL1 / whole-orb loading (2026-10-21): **PASS for the finite unattended local code scope**.
+Confirmed: the deferred still was replaced before the first GL frame, and
+body/aura drew before the asynchronous clock atlas. Web/native now retain one
+OT1 palette/theme poster until a complete frame (native: after endFrameEXP),
+then crossfade the whole surface over 250ms; Reduce Motion is instant.
+Early chunk/atlas loading retains the Three.js split. Failure/timeout keeps the
+poster, logs one safe warning and disposes work; late callbacks cannot reveal it.
+Generation's change-only reduced-motion pose, gestures, cadence and OG1 remain.
+Implementation: e54f11d0; documentation hash is in Git/OL1.status.
+FRESH final forced typecheck/lint/build: 8/8 tasks each, 0 cached; six existing
+warnings. Shared 696/72 files (source plus compiled duplicates), mobile
+1617/169, web 561/73; separate web 23/23 pages and Android HBC
+export pass. Root API build 37/37 pages; API tests NOT APPLICABLE (decorative
+client/loading helper only). Diff/staged checks pass. Failed focused attempts
+and the interrupted first build/reduced-motion repair are recorded.
+Twelve before/after browser sequences, 164/137 images and 3343/4086 samples:
+731 visible partial samples before, zero after; seven loading browser regressions
+cover fades, Slow 4G, failure/timeout and Reduce Motion. Production bundle
+inspection confirms Three stays outside Today/Generation initial route chunks.
+Physical/native appearance/performance, real Next Router/auth/production and
+deployed/live state remain UNVERIFIED (owner to confirm). Rollout and Device
+checks NOT RUN, skipped entirely. No service call, environment-file edit,
+remote SQL/migration, Scheduler, deployment or push. Original unrelated paths
+and Owner Pause preserved. OL1 endpoint reached; no later backlog item.
+[Acceptance and exact gates](acceptance/ol1-web-orb-loads-whole.md).
+<!-- OL1 end -->
+
 <!-- OG1 begin -->
 OG1 / standalone Generation glow (2026-10-21): **PASS for the finite unattended local code scope**.
 Shared annular mask was confirmed; a clock-radius input or existing canvas
