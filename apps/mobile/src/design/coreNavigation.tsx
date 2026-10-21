@@ -1,6 +1,7 @@
 import type { BottomTabNavigationOptions } from "expo-router/js-tabs";
 import { BookOpen, CheckSquare, Clock, Sparkles } from "lucide-react-native";
 import type { ThemeColors } from "./themeTokens";
+import { TabPressButton } from "./TabPressButton";
 import { density, hitTarget } from "./tokens";
 
 export const coreTabIcons = { today: Clock, courses: Sparkles, work: CheckSquare, library: BookOpen };
@@ -9,6 +10,7 @@ export const coreTabIcons = { today: Clock, courses: Sparkles, work: CheckSquare
 export function coreTabOptions(colors: ThemeColors, bottomInset: number): BottomTabNavigationOptions {
   return {
     headerShown: false,
+    tabBarButton: props => <TabPressButton {...props} />,
     tabBarActiveTintColor: colors.accent,
     tabBarInactiveTintColor: colors.textSecondary,
     tabBarStyle: {
