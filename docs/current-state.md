@@ -155,6 +155,24 @@ file edit, remote SQL/migration, Scheduler change, deployment or push. Original
 unrelated paths and Owner Pause preserved. OT1 endpoint reached; no later item.
 [Acceptance and exact gates](ai/acceptance/ot1-today-orb-theme-sync.md).
 <!-- OT1 end -->
+FS4 / FULLSEND 20261020-2101: **SHIPPED; STEP 0-6 PASS, physical acceptance PARTIAL.**
+Pinned source `32206c16`, previous main `913b1187`, final application main
+`f0736bfa`. Ships OP2/GV1 plus scoped test portability/timing repairs; the
+original worktree is preserved. FRESH forced typecheck/lint/build 8/8 each,
+0 cached; CI 39438782653 SUCCESS. Shared 335 source tests, Canvas 75, OCR 27,
+engine 606, API 2452 + 3 intentional live skips, mobile 1600, web 540,
+provider 20. Failures and repairs remain in acceptance. No migrations.
+Worker generation-worker-00031-kns serves 100%; API and website READY at the
+application SHA, aliases healthy, bounded error/5xx scans empty. OTA group
+44243e11-cb14-4390-b56c-0755e317144b runs on Realme: 2.2.0/code 6/runtime
+2.2.0-sdk57/update 01a159c7. Six bounded checks: 5 PASS / 1 FAIL (blank UI
+regions in post-tap captures; native composition versus capture cause unverified).
+Desktop UI NOT RUN: browser unavailable. The initial clipping diagnosis was
+withdrawn after pixel close-up; accessibility bounds still need verification.
+Zero paid generations; original pearl appearance/settings restored and device
+returned asleep. No deployment/migration/mobile delivery step is pending.
+Visual/accessibility/performance and remaining state/viewport acceptance remain
+open. Owner Pause and later scopes remain. [Full acceptance](ai/acceptance/fullsend-20261020-2101.md).
 
 <!-- GV1 begin -->
 GV1 / Generation viewport (2026-10-20): **PASS for the finite unattended local code scope**.
@@ -204,6 +222,7 @@ are preserved. OP2 ends here; GV1 is separate and has not started.
 [Acceptance and exact gates](ai/acceptance/op2-orb-polish.md).
 <!-- OP2 end -->
 
+FS3 / FULLSEND (2026-10-20): **SHIPPED - STEP 0-6 PASS.** Pinned source `202f8c3f`, previous main `384173c0`, tested application main `b6645ed4`; fresh-clone release only. Ships UC1/UC2/UC3, LG1, GB1, GS1, RV3, IV1, AN1b, OF1b, OR3b, OR4, WGP2, LP1, GL1, WA1, WX1 and OA1. All fresh forced gates and GitHub CI 39339336556 pass: typecheck/lint/build 8/8 each, 0 cached; shared 330 source tests, Canvas 75, OCR 27, engine 606, API 2452/3 intentional live skips, mobile 1581, web 524, provider 20, publisher 27. First mobile/web load timeouts are retained; full two-worker reruns and CI pass without weakened assertions. One additive orb-preferences migration applied before main, 99 matching remote versions, RLS/grants/trigger verified. Worker generation-worker-00030-c2q serves 100%; API dpl_FTJbc451LXaRmGadBioS7bQ6qqno and website dpl_9R9BSaNwPUP3hmT856fFjpEpVTQS READY at application main, production aliases healthy; bounded error/fatal/5xx scans zero. OTA 8274c431-7189-42cb-bb36-7fe546e06ea7 is running on Realme, version 2.2.0/code 6/runtime 2.2.0-sdk57/update 01a1567c. Six bounded physical checks PASS; desktop browser NOT RUN. Zero paid generations; no settings changed; device returned asleep. Broader visual/performance/feature acceptance and UC2's separate local showcase push/PR remain outside FS3. Source untracked paths preserved; no later scope resumed. [Acceptance](ai/acceptance/fullsend-20261020-0604.md).
 
 <!-- OA1 begin -->
 OA1 / Orb ambient light (2026-10-20): **PASS for the finite unattended local
@@ -695,6 +714,7 @@ operation, deployment, SQL, Scheduler change, environment-file edit or push.
 Owner rollout/device acceptance remains separate; UC2 status is recorded above.
 UC3 release automation completion is recorded above. [Acceptance](ai/acceptance/uc1-update-checker.md); ADR-050 in `docs/adr/`.
 <!-- UC1 end -->
+FS2 / FULLSEND (2026-10-19): **SHIPPED — STEP 0–6 PASS.** Pinned source `7506d51`, tested application main `e11779a`; fresh-clone release only. One test setup repair creates its repository-local temp parent. All local forced gates and GitHub CI 39150200346 pass: typecheck/lint/build 8/8 each, 0 cached; shared 282 source tests, Canvas 75, OCR 27, engine 606, API 2397/3 intentional skips, mobile 1481, web 353, provider 20. Three reviewed migrations applied before main; 98 matching remote versions. Worker `generation-worker-00029-br6` serves 100%; API live at e11779a; website production `dpl_6dq21qJz4UPLx4pxCMXdyCKgYGEk` READY and assigned to stay-focused-ten.vercel.app. Android preview OTA `946136b5-2716-4e87-b1ba-b254f101fa4f` runs on the Realme, version 2.2.0/code 6/runtime 2.2.0-sdk57. FRESH live PASS: typed midnight clock, halo, image save, loaded external viewer, quiz jump and provider photo. Original free time restored; zero paid generations. NOT RUN: eligible after-midnight sessions, prior-date plan baseline, description display (0 ready entries), desktop browser UI. API runtime logs BLOCKED by existing access; website log scan has zero error/fatal groups. CLI login failure was bypassed using the existing website connector, without new credentials or settings changes. FS2 endpoint only; follow-up product work and description backfill remain separate. [Acceptance](ai/acceptance/fullsend-20261019.md).
 
 PAR1b / web-mobile parity audit (2026-10-19): **PASS for the finite docs-only source audit**, baseline `796e312` on `overnight/2026-10-15_feedback`, endpoint PAR1b only. Completed 54 source-backed feature rows and 16 gaps ranked by student impact; both platforms have file:line evidence, with partial behavior and roadmap mismatches explicit. Expected untracked owner paths remain untouched. FRESH PASS: `git diff --check` (1/1 prompt gate, 0 errors), docs-only scope (1/1, five docs paths), source-link/line validation; build/typecheck/lint/application tests NOT APPLICABLE. One local commit `docs: complete web vs mobile parity audit`; exact hash in Git and `tmp/overnight/PAR1b.status`. Rollout/Device checks NOT RUN, skipped entirely; live/deployed/migration/provider/Scheduler/device state UNVERIFIED (owner to confirm). Supersedes the prior PAR1 preflight-only record; owner exception is resolved. Next: Claude and Fely use Gaps for the next roadmap; no later slice started. [Audit](ai/parity-web-mobile-20261018.md).
 

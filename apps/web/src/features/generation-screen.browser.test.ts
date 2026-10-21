@@ -247,11 +247,18 @@ describe("GV1 measured generation viewport", () => {
     try {
       const box = await page.locator('[data-testid="orb-touch"]').boundingBox();
       const x = box!.x + box!.width / 2, y = box!.y + box!.height / 2;
-      for (let i = 0; i < 5; i++) { await page.mouse.click(x, y); await page.waitForTimeout(150); }
+      // Software GL contention must not turn five 150ms inputs into expired
+      // waves. Drive gesture time while retaining real pointer events/timers.
+      const now = await page.evaluate(() => Date.now());
+      for (let i = 0; i < 5; i++) {
+        await page.clock.setFixedTime(now + i * 150);
+        await page.mouse.click(x, y);
+      }
       const waves = await page.evaluate(() => (window as unknown as { __interaction: { state: { current: { impulses: unknown[] } } } }).__interaction.state.current.impulses.length);
       expect(waves).toBe(5);
       const palette = await page.evaluate(() => localStorage.getItem("sf.orb.colorKey"));
-      await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(450);
+      await page.mouse.move(x, y); await page.mouse.down();
+      await page.clock.setFixedTime(now + 600 + 450);
       await page.mouse.move(x + 26, y - 18, { steps: 4 }); await page.mouse.up();
       const spin = await page.evaluate(() => (window as unknown as { __interaction: { state: { current: { spin: { velocityX: number; velocityY: number } } } } }).__interaction.state.current.spin);
       expect(Math.abs(spin.velocityX) + Math.abs(spin.velocityY)).toBeGreaterThan(0);
