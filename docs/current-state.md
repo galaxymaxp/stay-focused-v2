@@ -1,5 +1,32 @@
 # Current State
 
+<!-- RS1 begin -->
+RS1 / hide-on-scroll search (2026-10-21): **PASS for the finite unattended local code scope**.
+Confirmed: mobile's shared secondary header animated layout height on JS,
+changing the scroll viewport during visibility decisions. Every opted-in Page
+(Reviewer, Generate, Library, Today, Tasks and course Tasks) now uses a measured
+constant inset and an absolute transform-only header with a header-only mask.
+Reanimated owns clamped finger-following motion, drag/momentum snap, top/short
+list restoration, focus/query pinning and instant Reduce Motion endpoints.
+Native animated accessibility/hit props avoid per-scroll header React updates.
+Reviewer jumps/section anchors/answer reveal account for the measured inset.
+Phone web Generate/Reviewer use measured overlay slots and 12px hysteresis;
+desktop layout remains. Implementation: 7a5043e2; docs hash is in Git/RS1.status.
+FRESH forced typecheck/lint/build: 8/8 tasks each, 0 cached; six existing
+warnings. Shared 696/72 files, mobile 1615/169, web 566/74; separate web
+23/23 pages and Android HBC export PASS. Root API build 37/37 pages; API tests
+NOT APPLICABLE (client scroll/layout only). Unstaged/staged diff checks PASS.
+Four local browser regressions, six direct emulated touch drags, before/after
+captures and fixed content coordinates verify local phone scroll behavior.
+Failed focused attempts and two deliberately interrupted builds are retained.
+Native/emulator/physical behavior, authenticated routes and deployed/live state
+remain UNVERIFIED (owner to confirm). Rollout and Device checks NOT RUN,
+skipped entirely. No service call, environment-file edit, SQL/migration apply,
+Scheduler operation, deployment or push. Original owner paths and Owner Pause
+preserved. RS1 endpoint reached; no TB1, LP2, release or FULLSEND started.
+[Acceptance and exact gates](ai/acceptance/rs1-hide-on-scroll-no-shake.md).
+<!-- RS1 end -->
+
 <!-- OL1 begin -->
 OL1 / whole-orb loading (2026-10-21): **PASS for the finite unattended local code scope**.
 Confirmed: the deferred still was replaced before the first GL frame, and

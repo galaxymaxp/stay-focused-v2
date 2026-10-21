@@ -275,3 +275,7 @@ Additional final declaration gate: `npm run typecheck -- --force` FRESH PASS,
 files. All 15 owned source hashes match. No implementation suite was repeated
 for documentation-only closure; final unstaged and explicitly staged checks
 are FRESH before both local commits.
+
+Implementation commit: `7a5043e2 fix(scroll): stabilize shared search headers`.
+Documentation checkpoint: `docs(scroll): close RS1 local acceptance and gates`;
+exact hash in Git and tmp/overnight/RS1.status.

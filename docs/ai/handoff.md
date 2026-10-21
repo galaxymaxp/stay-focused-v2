@@ -9524,3 +9524,97 @@ frames/contact sheets and manifest proof stay ignored under tmp/overnight/OL1-*.
   recommend npm i -g vercel for env pull/deploy/logs; NOT RUN in OL1.
 - Original UI/, apps/mobile/.gitignore, supabase/.temp/, ignored tmp/ and Owner
   Pause preserved. OL1 endpoint reached; RS1 and all later items not started.
+
+
+## RS1 hide-on-scroll search - unattended local closure (2026-10-21)
+
+RS1 / hide-on-scroll search (2026-10-21): **PASS for the finite unattended local code scope**.
+Confirmed: mobile's shared secondary header animated layout height on JS,
+changing the scroll viewport during visibility decisions. Every opted-in Page
+(Reviewer, Generate, Library, Today, Tasks and course Tasks) now uses a measured
+constant inset and an absolute transform-only header with a header-only mask.
+Reanimated owns clamped finger-following motion, drag/momentum snap, top/short
+list restoration, focus/query pinning and instant Reduce Motion endpoints.
+Native animated accessibility/hit props avoid per-scroll header React updates.
+Reviewer jumps/section anchors/answer reveal account for the measured inset.
+Phone web Generate/Reviewer use measured overlay slots and 12px hysteresis;
+desktop layout remains. Implementation: 7a5043e2; docs hash is in Git/RS1.status.
+FRESH forced typecheck/lint/build: 8/8 tasks each, 0 cached; six existing
+warnings. Shared 696/72 files, mobile 1615/169, web 566/74; separate web
+23/23 pages and Android HBC export PASS. Root API build 37/37 pages; API tests
+NOT APPLICABLE (client scroll/layout only). Unstaged/staged diff checks PASS.
+Four local browser regressions, six direct emulated touch drags, before/after
+captures and fixed content coordinates verify local phone scroll behavior.
+Failed focused attempts and two deliberately interrupted builds are retained.
+Native/emulator/physical behavior, authenticated routes and deployed/live state
+remain UNVERIFIED (owner to confirm). Rollout and Device checks NOT RUN,
+skipped entirely. No service call, environment-file edit, SQL/migration apply,
+Scheduler operation, deployment or push. Original owner paths and Owner Pause
+preserved. RS1 endpoint reached; no TB1, LP2, release or FULLSEND started.
+
+Commits:
+- 7a5043e2 fix(scroll): stabilize shared search headers
+- docs(scroll): close RS1 local acceptance and gates (this documentation
+  checkpoint; exact hash in Git and tmp/overnight/RS1.status).
+
+Branch overnight/2026-10-15_feedback; baseline 2764ce02. Confirmed cause at
+baseline useHideOnScroll.ts:64-71,102-105 and primitives.tsx:315-340. Web
+Generate already used transform/hysteresis; phone Reviewer search was static.
+The same shared mobile fix covers all six consumers. Constant padding is
+measured independently; only the search overlay is clipped, preserving the
+existing scrubber viewport/touch region. Search/section/answer jumps compensate
+for the inset so pinned search cannot cover targets. No React header state
+update on scroll; existing reader/organizer observers still receive native metrics.
+
+Evidence: ignored RS1-before/ (4 captures), RS1-after/ (7 captures and two
+36-sample traces), RS1-touch/ (6 captures, two surfaces/six direct touch drags).
+Real production hook/CSS with synthetic content at phone width: unchanged row
+document Y and slot height; slow 1px direction accumulation, fast flings, 12px
+reversal, top, focus/query, ResizeObserver, desktop and Reduce Motion pass.
+Direct emulated touch down/up 40px/s and fast down 1200px/s pass. Expo Babel
+emits nine worklet transforms. These are local browser/compiler/component
+proof, not physical/native rendering or authenticated route acceptance.
+
+Retained failures: invalid Windows guard escaping prevented first test start;
+first actual focused mobile run 28 PASS/1 FAIL from a proxy property-descriptor
+stub; four mobile and two web test-only TypeScript errors; baseline screenshot
+builder virtual-TS parse error; section-anchor test 11 PASS/1 FAIL because the
+mock Page stores but does not render overlay; first CDP high-level touch gesture
+returned without scrolling. All were repaired without weakening assertions;
+direct touch events provide actual scroll evidence. Two earlier builds were
+deliberately interrupted for the isolated header mask and Reviewer jump fixes.
+A final native-only audit retained raw nonfinite metric validation before
+clamping; focused native tests pass 42/42. Affected forced root gates, full
+mobile suite and Android export were rerun serially; unchanged shared/web
+suites and the explicit web build retain their FRESH evidence. Only final
+frozen-production-source gate results count. Exact commands/timings,
+failed logs, hash evidence and limitations are in the acceptance document.
+The final resize regression preserves a fully hidden header's endpoint and
+accessibility state when its measured height grows from 50pt to 90pt. Affected
+native gates were repeated again for this last adjustment. Standalone before /
+touch captures were refreshed with explicit repository TEMP/TMP; the first
+helpers' missing override is recorded in acceptance. No owner file outside the
+repository was targeted.
+Generated Next declarations restored; final forced typecheck and final diff
+checks pass. No generated/private validation artifact was staged.
+
+**Owner steps remaining**
+
+- Rollout: **NOT RUN**, skipped entirely. Review local commits/evidence and
+  separately initiate any publication. Nothing was pushed/deployed/installed.
+- Device checks: **NOT RUN**, skipped entirely. Realme very slow down/up and
+  fast Reviewer/Generate drags, snap, focus/query and match jumps, top/short
+  content, font/width changes, Reduce Motion, scrubber, pull refresh and
+  accessibility. Also smoke-check Today, Library, Tasks and course Tasks.
+- Native/emulator/physical rendering, performance and accessibility, actual
+  authenticated web route behavior, deployed revisions and live database /
+  Scheduler state remain **UNVERIFIED (owner to confirm)**. No emulator was
+  running; no physical device command or install was attempted.
+- Vercel CLI absent: strongly recommend npm i -g vercel for separately authorized
+  future env/deploy/log tooling. Installation and every Vercel command NOT RUN.
+- No Supabase, Vercel, Google Cloud, Canvas or Resend call; no environment-file
+  edit, remote SQL/migration, Scheduler operation, deployment or push.
+- Original UI/, apps/mobile/.gitignore, supabase/.temp/, ignored tmp/ and Owner
+  Pause preserved. RS1 ends here; no later backlog item, release or FULLSEND.
+
+See [RS1 acceptance](acceptance/rs1-hide-on-scroll-no-shake.md).
