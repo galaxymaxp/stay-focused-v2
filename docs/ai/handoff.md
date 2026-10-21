@@ -9383,3 +9383,68 @@ UI/, apps/mobile/.gitignore and supabase/.temp/ and Owner Pause remain. OT1 ends
 here; no OG1 or later backlog item was started.
 
 See [OT1 acceptance](acceptance/ot1-today-orb-theme-sync.md).
+
+## OG1 standalone Generation glow - unattended local closure (2026-10-21)
+
+OG1 / standalone Generation glow (2026-10-21): **PASS for the finite unattended local code scope**.
+Shared annular mask was confirmed; a clock-radius input or existing canvas
+clipping was not found. Explicit standalone lighting begins at .9x body radius,
+fades to zero by 1.7x, and has .4998 of clock peak coverage. Padded decorative
+layers preserve body/hit sizes and phone no-scroll fit. All Generation,
+preparation/Queue, retained KnowledgeCore and static consumers are covered;
+Today keeps its prior clock geometry, strength and appearance.
+Implementation: `0e06266f`; documentation hash is in Git/OG1.status.
+FRESH final typecheck/lint/root build: 8/8 each, 0 cached; six existing lint
+warnings. Shared 688/70 files (344 source cases plus compiled duplicates),
+mobile 1612/169, web 550/72. Separate web build 23/23 pages and Android HBC
+export pass; root API build 37/37 pages. Both diff checks pass. First focused
+measurement failures and two repaired duplicate-import warnings are recorded.
+16 baseline/after web captures per run and eight full Generation page captures
+cover light/dark pearl/gold at phone/desktop sizes. GPU core differences and
+border alpha are zero; standalone source-sector correlations and overlap pass.
+Native component and full viewport/gesture regressions pass. Native/emulator/
+physical appearance and performance remain UNVERIFIED (owner to confirm).
+Rollout and Device checks NOT RUN, skipped entirely. No service call, environment
+file edit, remote SQL/migration, Scheduler operation, deployment or push.
+Original unrelated paths and Owner Pause preserved. OG1 endpoint reached;
+OL1 and all later backlog items were not started.
+
+Commits:
+- 0e06266f fix(orb): soften standalone generation glow
+- docs(orb): close OG1 local acceptance and gates (this documentation checkpoint;
+  exact hash in Git and tmp/overnight/OG1.status).
+
+Cause at baseline orb-ambient-renderer.ts:9,19: a fixed annular mask outside
+.95 body radius, shared without context. The literal clock-radius input and
+existing hard canvas clip hypothesis were refuted; the same accepted symptom
+has one safe explicit-profile fix. See [acceptance](acceptance/og1-standalone-generation-glow.md)
+for file:line inventory, baseline, exact commands, failed focused attempts and
+all local evidence. Root build wall time 410.294s. Full suites have no skips.
+
+The first lint passed with eight warnings; two new duplicate type-import warnings
+were fixed and final forced typecheck/lint rerun. Only six existing warnings
+remain. Focused failures caught new under-edge geometry in old pixel probes,
+transparent decorative overflow, and inappropriate old absolute-luminance
+sampling for the softer profile. Old clock thresholds remain; standalone has
+separate geometry/intensity/sector proof. No final gate failed. All 24 final
+source hashes match. Generated Next declarations were inspected/restored.
+
+Actual captures: tmp/overnight/OG1-before/, OG1-after/, OG1-page/ and their
+inspected contact sheets. GPU metrics copied to OG1-gpu/: core RGBA diff and
+border alpha 0; source opacity and rotating dim sectors preserved. Native GL
+geometry, measured viewport/200% text, gestures and existing lifecycle tests
+pass. Local software WebGL is not native performance or physical acceptance.
+
+**Owner steps remaining**
+
+- Rollout: **NOT RUN**, skipped entirely. Review local commits/evidence and
+  separately initiate publication; nothing was pushed or deployed.
+- Device checks: **NOT RUN**, skipped entirely. Realme Generation light/dark,
+  no band/cutoff, weaker glow, Today, Queue/fallbacks, gestures/Reduce Motion,
+  background/focus and actual GPU/frame/power remain owner checks.
+- Native/emulator/physical appearance and performance, deployed revisions and
+  live preference/database/Scheduler state are **UNVERIFIED (owner to confirm)**.
+  No local emulator is running; no install/reconnection was attempted.
+- Original UI/, apps/mobile/.gitignore, supabase/.temp/ and Owner Pause preserved.
+  No service call, environment-file edit, remote SQL/migration, Scheduler change,
+  deployment or push. Finite OG1 endpoint reached; no later item started.

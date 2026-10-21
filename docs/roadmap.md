@@ -1,5 +1,31 @@
 # Roadmap
 
+<!-- OG1 begin -->
+OG1 / standalone Generation glow (2026-10-21): **PASS for the finite unattended local code scope**.
+Shared annular mask was confirmed; a clock-radius input or existing canvas
+clipping was not found. Explicit standalone lighting begins at .9x body radius,
+fades to zero by 1.7x, and has .4998 of clock peak coverage. Padded decorative
+layers preserve body/hit sizes and phone no-scroll fit. All Generation,
+preparation/Queue, retained KnowledgeCore and static consumers are covered;
+Today keeps its prior clock geometry, strength and appearance.
+Implementation: `0e06266f`; documentation hash is in Git/OG1.status.
+FRESH final typecheck/lint/root build: 8/8 each, 0 cached; six existing lint
+warnings. Shared 688/70 files (344 source cases plus compiled duplicates),
+mobile 1612/169, web 550/72. Separate web build 23/23 pages and Android HBC
+export pass; root API build 37/37 pages. Both diff checks pass. First focused
+measurement failures and two repaired duplicate-import warnings are recorded.
+16 baseline/after web captures per run and eight full Generation page captures
+cover light/dark pearl/gold at phone/desktop sizes. GPU core differences and
+border alpha are zero; standalone source-sector correlations and overlap pass.
+Native component and full viewport/gesture regressions pass. Native/emulator/
+physical appearance and performance remain UNVERIFIED (owner to confirm).
+Rollout and Device checks NOT RUN, skipped entirely. No service call, environment
+file edit, remote SQL/migration, Scheduler operation, deployment or push.
+Original unrelated paths and Owner Pause preserved. OG1 endpoint reached;
+OL1 and all later backlog items were not started.
+[Acceptance and exact gates](ai/acceptance/og1-standalone-generation-glow.md).
+<!-- OG1 end -->
+
 <!-- OT1 begin -->
 OT1 / Today orb theme sync (2026-10-21): **PASS for the finite unattended local code scope**.
 Confirmed cause: the shared clock compositor applied a .78 black scrim in light
