@@ -9618,3 +9618,71 @@ checks pass. No generated/private validation artifact was staged.
   Pause preserved. RS1 ends here; no later backlog item, release or FULLSEND.
 
 See [RS1 acceptance](acceptance/rs1-hide-on-scroll-no-shake.md).
+
+
+## TB1 bottom tab press - unattended local closure (2026-10-21)
+
+TB1 / bottom tab press (2026-10-21): **PASS for the finite unattended local code scope**.
+Confirmed installed Expo Router's borderless Android ripple. Shared tab options
+now supply a plain Pressable, discard ripple props and scale the exact icon/label
+children to 1.08 with native-driver timing. Return uses the existing 180ms token
+and bounded ease, with no overshoot. Release/cancel/blur reset; live Reduce Motion,
+background/disabled changes and unmount stop/reset motion. The 48pt fixed targets,
+accessibility/ref/selected styles, navigation and existing tab haptic remain.
+Website sidebar has no equivalent ripple at phone width; web code change skipped.
+Implementation: 5f875a4e; docs checkpoint hash is in Git and TB1.status.
+FRESH forced root typecheck/lint/build: 8/8 tasks each, 0 cached; six existing
+warnings. Shared 696/72 files, mobile 1630/170, web 566/74; explicit web build
+23/23 pages and Android HBC export PASS. Root API build 37/37 pages; API tests
+NOT APPLICABLE (client feedback only). Post-restoration forced typecheck 8/8,
+0 cached, PASS. Unstaged/staged hygiene checks PASS. First typecheck/fixture
+failures and repairs are retained in acceptance; no assertions were weakened.
+Focused component tests 15/15; local RN Web fixture 8/8 cases, 24 captures,
+135 release samples: scale [1,1.08], return about 179-183ms, reduced scale 1.
+Baseline child/target geometry is preserved in light/dark and column/row layouts.
+Native/emulator/physical rendering/performance and deployed/live state remain
+UNVERIFIED (owner to confirm). Rollout and Device checks NOT RUN, skipped entirely.
+No service call, environment-file edit, SQL/migration apply, Scheduler operation,
+deployment or push. Original owner paths and Owner Pause preserved. Finite TB1
+endpoint reached; no LP2, release or FULLSEND started.
+
+Commits:
+- 5f875a4e fix(navigation): replace tab ripple with press scale
+- docs(navigation): close TB1 local acceptance and gates (this documentation
+  checkpoint; exact hash in Git and tmp/overnight/TB1.status).
+
+Branch overnight/2026-10-15_feedback; baseline 390d3b80. STEP 0 confirmed
+BottomTabItem.js:11,110 and PlatformPressable.js:95-103 in installed Expo Router.
+No custom Liquid Glass tab bar is active. The native timing implementation uses
+existing motion.press=140/motion.small=180; zero new dependencies/colors/glass.
+Website shell.tsx:14-19,68-84 and globals.css:424-451,1314-1323 confirm no phone
+ripple. Existing tabPress haptic listener remains untouched. Expo Web href,
+modified clicks/default prevention and native event/ref/accessibility props
+remain; actual authenticated/native navigation acceptance is still owner work.
+
+[Acceptance](acceptance/tb1-tab-press-scale.md) records exact commands, counts,
+timings, source inventory, baseline, first failures and repair details. Final
+forced typecheck after generated declaration restoration: FRESH PASS 8/8,
+0 cached, exit 0, 44.089s. The three frozen source/test hashes match after gates.
+Six existing lint warnings, zero new; no suite skips. All requested gates ran
+serially. Ignored TB1-gate-*.log/TB1-gates.json and TB1-visual/ retain local proof.
+Both contact sheets of all 24 captures were inspected. Fixture uses production
+button/RN Web with synthetic icons/theme, not Android ripple or native-thread
+runtime/performance evidence. No emulator is running; recording NOT RUN.
+
+**Owner steps remaining**
+
+- Rollout: **NOT RUN**, skipped entirely. Review local commits/evidence and
+  separately initiate publication. No push, deploy, OTA/EAS, production SQL,
+  migration apply, service call, email or Scheduler operation occurred.
+- Device checks: **NOT RUN**, skipped entirely. Realme: tap Today/Generate/
+  Tasks/Library, no circle, quick enlarge and smooth return; long press, cancelled
+  press, rapid tabs, Reduce Motion and accessibility. Physical/native appearance,
+  navigation/haptics and performance are **UNVERIFIED (owner to confirm)**.
+- Deployed revisions and live production/database/Scheduler state are
+  **UNVERIFIED (owner to confirm)**. Source confirmation did not require them.
+- Vercel CLI absent: strongly recommend npm i -g vercel for separately
+  authorized future rollout tooling. Installation and Vercel commands NOT RUN.
+- UI/, apps/mobile/.gitignore, supabase/.temp/ and ignored tmp/ preserved and
+  excluded from staging. Existing Owner Pause remains. TB1 endpoint reached;
+  do not start LP2, release or FULLSEND in this run.

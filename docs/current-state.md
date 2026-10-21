@@ -1,5 +1,32 @@
 # Current State
 
+<!-- TB1 begin -->
+TB1 / bottom tab press (2026-10-21): **PASS for the finite unattended local code scope**.
+Confirmed installed Expo Router's borderless Android ripple. Shared tab options
+now supply a plain Pressable, discard ripple props and scale the exact icon/label
+children to 1.08 with native-driver timing. Return uses the existing 180ms token
+and bounded ease, with no overshoot. Release/cancel/blur reset; live Reduce Motion,
+background/disabled changes and unmount stop/reset motion. The 48pt fixed targets,
+accessibility/ref/selected styles, navigation and existing tab haptic remain.
+Website sidebar has no equivalent ripple at phone width; web code change skipped.
+Implementation: 5f875a4e; docs checkpoint hash is in Git and TB1.status.
+FRESH forced root typecheck/lint/build: 8/8 tasks each, 0 cached; six existing
+warnings. Shared 696/72 files, mobile 1630/170, web 566/74; explicit web build
+23/23 pages and Android HBC export PASS. Root API build 37/37 pages; API tests
+NOT APPLICABLE (client feedback only). Post-restoration forced typecheck 8/8,
+0 cached, PASS. Unstaged/staged hygiene checks PASS. First typecheck/fixture
+failures and repairs are retained in acceptance; no assertions were weakened.
+Focused component tests 15/15; local RN Web fixture 8/8 cases, 24 captures,
+135 release samples: scale [1,1.08], return about 179-183ms, reduced scale 1.
+Baseline child/target geometry is preserved in light/dark and column/row layouts.
+Native/emulator/physical rendering/performance and deployed/live state remain
+UNVERIFIED (owner to confirm). Rollout and Device checks NOT RUN, skipped entirely.
+No service call, environment-file edit, SQL/migration apply, Scheduler operation,
+deployment or push. Original owner paths and Owner Pause preserved. Finite TB1
+endpoint reached; no LP2, release or FULLSEND started.
+[Acceptance and exact gates](ai/acceptance/tb1-tab-press-scale.md).
+<!-- TB1 end -->
+
 <!-- RS1 begin -->
 RS1 / hide-on-scroll search (2026-10-21): **PASS for the finite unattended local code scope**.
 Confirmed: mobile's shared secondary header animated layout height on JS,
