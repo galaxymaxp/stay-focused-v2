@@ -19,10 +19,12 @@ const entry = `import {createRoot} from 'react-dom/client';import {createElement
   createRoot(document.getElementById('root')).render(createElement(App));`;
 const threePath = file('../../node_modules/three/build/three.module.js');
 const three = `export * from '${threePath}';import {WebGLRenderer as Base} from '${threePath}';
+  window.__rendererEvaluatedAt=performance.now();
   export class WebGLRenderer extends Base {constructor(options){super(options);const render=this.render.bind(this);
     this.render=(scene,camera)=>{render(scene,camera);if(this.getRenderTarget()===null){window.__finals=(window.__finals??0)+1;window.__complete=!!scene.children[1]?.material?.uniforms?.uAtlas;}};}}`;
 type Sample = { at: number; status?: string; live: number; poster: number; complete: boolean; clock: boolean; duration: string };
-type ProbeWindow = Window & { __switch: () => void; __samples: Sample[]; __complete: boolean; __finals: number };
+type ProbeWindow = Window & { __switch: () => void; __samples: Sample[]; __complete: boolean; __finals: number;
+  __atlasStartedAt?: number; __rendererEvaluatedAt?: number };
 
 beforeAll(async () => {
   mkdirSync(evidence, { recursive: true });
@@ -72,6 +74,15 @@ async function open(surface: string, theme = 'light', reducedMotion: 'reduce' | 
     return route.continue();
   });
   await page.addInitScript(({ theme, failure }) => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src');
+    const setImageSrc = descriptor?.set;
+    if (!descriptor || !setImageSrc) throw new Error('image_src_probe_unavailable');
+    Object.defineProperty(HTMLImageElement.prototype, 'src', { ...descriptor, set(this: HTMLImageElement, value: string) {
+      if (new URL(value, location.href).pathname === '/clock/clock-atlas.png') {
+        (window as unknown as ProbeWindow).__atlasStartedAt ??= performance.now();
+      }
+      setImageSrc.call(this, value);
+    } });
     localStorage.setItem('sf.orb.colorKey', 'gold');
     document.addEventListener('DOMContentLoaded', () => { document.documentElement.dataset.theme = theme; }, { once: true });
     if (failure === 'webgl') HTMLCanvasElement.prototype.getContext = (() => null) as typeof HTMLCanvasElement.prototype.getContext;
@@ -107,7 +118,12 @@ it.each(['light', 'dark'])('gates cold/reload/route frames in %s on Slow 4G with
     const start = requests.length; await page.goto(`${origin}/?surface=today`, { waitUntil: 'domcontentloaded' }); await settle(page, `${theme}-today-cold`);
     const loaded = requests.slice(start), atlas = loaded.findIndex(r => r.path === '/clock/clock-atlas.png'), chunk = loaded.findIndex(r => /\/DayOrb-/.test(r.path));
     expect(atlas).toBeGreaterThanOrEqual(0); expect(chunk).toBeGreaterThanOrEqual(0);
-    expect(atlas).toBeLessThan(chunk); // Atlas begins before the split renderer evaluates.
+    // Browser scheduling can reverse server arrival order. Check initiation
+    // against actual split-renderer evaluation, while retaining both requests.
+    const order = await page.evaluate(() => { const probe = window as unknown as ProbeWindow;
+      return { atlas: probe.__atlasStartedAt, renderer: probe.__rendererEvaluatedAt }; });
+    if (order.atlas === undefined || order.renderer === undefined) throw new Error('orb_load_order_probe_missing');
+    expect(order.atlas).toBeLessThan(order.renderer);
     await page.reload({ waitUntil: 'domcontentloaded' }); await settle(page, `${theme}-today-reload`);
     await page.evaluate(() => { const p = window as unknown as ProbeWindow; p.__samples = []; p.__switch(); });
     await settle(page, `${theme}-generation-route`);
