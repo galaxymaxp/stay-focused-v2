@@ -115,13 +115,7 @@ function ShellContent({ children }: { children: ReactNode }) {
           <Breadcrumbs trail={trailFor(pathname, page)} />
           <div className="row topbar-actions">
             <Suspense fallback={null}><QueueButton /></Suspense>
-            <Link
-              href="/settings"
-              className="icon-button mobile-only"
-              aria-label="Settings"
-            >
-              <Icon name="settings" />
-            </Link>
+            <div className="mobile-only"><AccountMenu email={email} compact /></div>
           </div>
         </header>
         <CrumbProvider onChange={setPage}>
@@ -186,8 +180,8 @@ function useSidebar() {
   return { collapsed, toggleSidebar };
 }
 
-/** The signed-in account: a menu for settings, appearance and signing out. */
-function AccountMenu({ email }: { email: string }) {
+/** The signed-in account: settings, legal information, appearance and sign out. */
+function AccountMenu({ email, compact = false }: { email: string; compact?: boolean }) {
   const photo = useProfileAvatar();
   const { session, signOut, theme, setTheme } = useAuth();
   const [open, setOpen] = useState(false);
@@ -209,7 +203,7 @@ function AccountMenu({ email }: { email: string }) {
   }, [open]);
   const name = (session?.user.user_metadata?.full_name as string | undefined) ?? null;
   return (
-    <div className="account-menu" ref={root}>
+    <div className={`account-menu${compact ? ' account-menu-compact' : ''}`} ref={root}>
       {open && (
         <div className="account-popover" role="menu" aria-label="Account">
           <div className="account-popover-head">
@@ -227,6 +221,10 @@ function AccountMenu({ email }: { email: string }) {
           <Link role="menuitem" href="/canvas">
             <Icon name="globe" />
             Canvas connection
+          </Link>
+          <Link role="menuitem" href="/privacy" prefetch={false}>
+            <Icon name="file-text" />
+            Privacy &amp; Terms
           </Link>
           <div className="segments" role="group" aria-label="Appearance">
             {(["system", "light", "dark"] as const).map((value) => (
@@ -252,12 +250,13 @@ function AccountMenu({ email }: { email: string }) {
         className="account-button"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label="Profile and settings"
         title={email}
         onClick={() => setOpen((v) => !v)}
       >
         <Avatar url={photo.url} initial={photo.initial} />
-        <span className="account-email">{email}</span>
-        <Icon name="chevron-down" />
+        {!compact && <span className="account-email">{email}</span>}
+        {!compact && <Icon name="chevron-down" />}
       </button>
     </div>
   );

@@ -1,12 +1,13 @@
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Action, Page, RowLink, SearchField, Sheet } from "./primitives";
+import { Action, Page, ProfileButton, RowLink, SearchField, Sheet } from "./primitives";
 import { hitTarget, spacing } from "./tokens";
 
-vi.mock("expo-router", () => ({ router: { canGoBack: () => true, back: vi.fn() } }));
+const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("expo-router", () => ({ router: { ...navigation, canGoBack: () => true, back: vi.fn() } }));
 vi.mock("expo-router/js-tabs", async () => ({ BottomTabBarHeightContext: (await import("react")).createContext(undefined) }));
-vi.mock("../auth", () => ({ useAuth: () => ({ session: null }) }));
+vi.mock("../auth", () => ({ useAuth: () => ({ session: { user: { email: 'student@example.test' } } }) }));
 vi.mock("./QueueButton", () => ({ QueueButton: "QueueButton" }));
 vi.mock("./sheetDrag", () => ({ useSheetDrag: () => ({ drag: { interpolate: () => 1 }, touchHandlers: { onTouchMove: vi.fn() }, onScroll: vi.fn() }) }));
 vi.mock("./haptics", () => ({ haptic: { tap: vi.fn() } }));
@@ -49,6 +50,23 @@ async function mount(props: Partial<React.ComponentProps<typeof Page>> = {}) {
   return rendered!.root;
 }
 const event = (y: number) => ({ nativeEvent: { contentOffset: { y }, contentSize: { height: 2000 }, layoutMeasurement: { height: 700 } } });
+
+it('opens bundled Privacy from the signed-in profile in two taps and dismisses the sheet', async () => {
+  await act(async () => { rendered = create(createElement(ProfileButton)); });
+  const root = rendered!.root;
+  expect(root.findAllByType('Modal' as never)).toHaveLength(0);
+  await act(async () => root.findByProps({ testID: 'profile-button' }).props.onPress());
+  expect(root.findAllByType('Modal' as never)).toHaveLength(1);
+  expect(JSON.stringify(rendered!.toJSON())).toContain('student@example.test');
+  const rows = root.findAllByType(RowLink);
+  expect(rows.map(row => row.props.label)).toEqual(['Sync', 'Settings', 'Privacy & Terms']);
+  const legal = root.findAllByType('Pressable' as never).find(node => node.props.accessibilityLabel === 'Privacy & Terms')!;
+  expect(legal.props.style({ pressed: false }).minHeight).toBeGreaterThanOrEqual(44);
+  expect(legal.findAllByType('ChevronRight' as never)).toHaveLength(1);
+  await act(async () => legal.props.onPress());
+  expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/privacy');
+  expect(root.findAllByType('Modal' as never)).toHaveLength(0);
+});
 
 it.each([false, true])("pill actions retain comfortable padding and touch height (secondary=%s)", async secondary => {
   const props = { pill: true, secondary, onPress: vi.fn(), children: "View Queue" };

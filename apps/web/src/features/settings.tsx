@@ -7,7 +7,7 @@ import { useRef, useState } from 'react';
 import { Avatar } from '../components/avatar';
 import { useProfileAvatar } from '../components/profile-avatar';
 import { cropAvatar } from '../lib/crop-avatar';
-import { LegalLinks } from '../components/legal-links';
+import appPackage from '../../package.json';
 export function SettingsScreen() {
   const photo = useProfileAvatar();
   const input = useRef<HTMLInputElement>(null);
@@ -82,9 +82,14 @@ export function SettingsScreen() {
             icon="layers"
           />
         </section>
+        <section className="stack settings-links" aria-labelledby="settings-about">
+          <h2 id="settings-about">About</h2>
+          <RowLink href="/privacy" title="Privacy Policy" icon="file-text" />
+          <RowLink href="/terms" title="Terms of Use" icon="file-text" />
+          <p className="meta">Version {appPackage.version}</p>
+        </section>
         {action.message && <Notice error>{action.message}</Notice>}
       </div>
-      <LegalLinks />
     </>
   );
 }

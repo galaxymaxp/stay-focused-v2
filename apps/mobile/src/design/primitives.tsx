@@ -769,8 +769,8 @@ export function SearchField({
 
 /**
  * The account entry point on primary screens. It replaces the old overflow
- * menu: the only things that belong here are the account itself, Canvas sync
- * and Settings. Refreshing is pull-to-refresh on each screen.
+ * menu for the account, Canvas sync, Settings and legal information.
+ * Refreshing is pull-to-refresh on each screen.
  */
 export function ProfileButton() {
   const photo = useProfileAvatar();
@@ -778,7 +778,7 @@ export function ProfileButton() {
   const { session } = useAuth();
   const [open, setOpen] = useState(false);
   const email = session?.user.email ?? null;
-  const go = (path: "/canvas-settings" | "/appearance") => {
+  const go = (path: "/canvas-settings" | "/appearance" | "/privacy") => {
     setOpen(false);
     router.push(path);
   };
@@ -813,6 +813,9 @@ export function ProfileButton() {
           <RowLink label="Settings" icon={<RowIcon><Settings size={17} color={colors.accent} strokeWidth={1.8} /></RowIcon>} onPress={() => go("/appearance")}>
             <Copy>Settings</Copy>
             <Copy muted size="caption">Account, sign-in methods and appearance</Copy>
+          </RowLink>
+          <RowLink label="Privacy & Terms" icon={<RowIcon><FileText size={17} color={colors.accent} strokeWidth={1.8} /></RowIcon>} onPress={() => go("/privacy")}>
+            <Copy>Privacy &amp; Terms</Copy>
           </RowLink>
         </Sheet>
       ) : null}

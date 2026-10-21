@@ -1,4 +1,5 @@
-import { Check, LogOut, Vibrate, Volume2 } from "lucide-react-native";
+import { router } from "expo-router";
+import { Check, FileText, LogOut, Vibrate, Volume2 } from "lucide-react-native";
 import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, Switch, View } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
@@ -8,7 +9,7 @@ import type { OAuthProvider } from "../../auth/authTypes";
 import { openProviderAuth } from "../../auth/providerAuth";
 import { getFeedbackPreferences, loadFeedbackPreferences, saveFeedbackPreferences, type FeedbackPreferences } from "../../design/feedback";
 import { haptic } from "../../design/haptics";
-import { Copy, Notice, Page, SegmentedControl, Surface } from "../../design/primitives";
+import { Copy, Notice, Page, RowLink, SegmentedControl, Surface } from "../../design/primitives";
 import { useTheme, type PaletteFamily, type ThemePreference } from "../../design/theme";
 import { hitTarget, radius, spacing } from "../../design/tokens";
 import { NotificationSettings } from "./NotificationSettings";
@@ -19,7 +20,6 @@ import { Avatar } from '../../design/Avatar';
 import { useProfileAvatar } from '../../design/ProfileAvatarProvider';
 import { ProfilePhotoSettings } from './ProfilePhotoSettings';
 import { AppUpdateAbout } from './AppUpdateAbout';
-import { LegalLinks } from '../legal/LegalLinks';
 
 const modes: readonly { value: ThemePreference; label: string }[] = [
   { value: "system", label: "Automatic" },
@@ -177,9 +177,18 @@ export function SettingsScreen() {
           />
         </Surface>
       </Section>
-      <Section title="About"><AppUpdateAbout /></Section>
+      <Section title="About">
+        <Surface style={{ gap: 0, paddingVertical: spacing[1] }}>
+          <RowLink label="Privacy Policy" icon={<Chip background={colors.blueSoft}><FileText size={16} color={colors.accent} /></Chip>} onPress={() => router.push('/privacy')}>
+            <Copy>Privacy Policy</Copy>
+          </RowLink>
+          <RowLink label="Terms of Use" icon={<Chip background={colors.blueSoft}><FileText size={16} color={colors.accent} /></Chip>} onPress={() => router.push('/terms')}>
+            <Copy>Terms of Use</Copy>
+          </RowLink>
+        </Surface>
+        <AppUpdateAbout />
+      </Section>
       {error ? <Notice>{error}</Notice> : null}
-      <LegalLinks />
     </Page>
   );
 }
