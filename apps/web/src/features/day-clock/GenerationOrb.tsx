@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import type { CoreState } from "../knowledge-core/coreModel";
 import { OrbPointerLayer, useOrbInteraction } from "../knowledge-core/orbInteraction";
-import { DAY_ORB_FILL, DayOrb } from "./DayOrb";
+import { DAY_ORB_FILL } from "./orb-footprint";
+import { DeferredDayOrb } from './DeferredDayOrb';
 
 /**
  * The Today orb on generation screens: the same body, remembered color and
@@ -29,7 +30,7 @@ export function GenerationOrb({ state }: { state: CoreState }) {
   }, []);
   return (
     <div className="generation-orb" data-testid="generation-orb" data-state={state} aria-hidden="true">
-      <DayOrb variant="standalone" minutes={now.getHours() * 60 + now.getMinutes()} state={state} interaction={interaction} />
+      <DeferredDayOrb ready variant="standalone" minutes={now.getHours() * 60 + now.getMinutes()} state={state} interaction={interaction} />
       <OrbPointerLayer interaction={interaction} fill={DAY_ORB_FILL} />
     </div>
   );

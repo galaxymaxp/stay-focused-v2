@@ -12,18 +12,23 @@ const mocks = vi.hoisted(() => ({
   appState: null as ((state: string) => void) | null,
   fail: false,
   render: vi.fn(),
-  animatedValue: vi.fn(),
+  timing: vi.fn(), atlasWait: false, atlasResolve: null as (() => void) | null,
   frame: vi.fn<(callback: FrameRequestCallback) => number>(),
   glass: vi.fn(), glassDispose: vi.fn(), atlasFail: false,
 }));
 vi.mock("expo-gl", () => ({ GLView: "GLView" }));
 vi.mock('expo-asset', () => ({ Asset: { fromModule: () => ({ localUri: 'file:///clock-atlas.png',
-  downloadAsync: async () => { if (mocks.atlasFail) throw new Error('missing_atlas'); } }) } }));
+  downloadAsync: async () => { if (mocks.atlasFail) throw new Error('missing_atlas');
+    if (mocks.atlasWait) await new Promise<void>(resolve => { mocks.atlasResolve = resolve; }); } }) } }));
 vi.mock('@stay-focused/shared/clock-glass-renderer', () => ({ createClockGlass: () => ({ render: mocks.glass, dispose: mocks.glassDispose }) }));
 vi.mock("react-native", () => ({
   View: "View", Image: "Image", Platform: { OS: 'android' },
   AppState: { currentState: "active", addEventListener: (_event: string, listener: (state: string) => void) => { mocks.appState = listener; return { remove: vi.fn() }; } },
-  Animated: { Value: mocks.animatedValue },
+  Animated: { View: 'AnimatedView', Value: class {
+    value: number; constructor(value: number) { this.value = value; }
+    setValue(value: number) { this.value = value; } stopAnimation() {}
+    interpolate() { return { inverseOf: this }; }
+  }, timing: (...args: unknown[]) => { mocks.timing(...args); return { start() {}, stop() {} }; } },
 }));
 vi.mock("react-native-svg", () => ({
   default: "Svg", Circle: "Circle", Defs: "Defs", RadialGradient: "RadialGradient", Stop: "Stop",
@@ -54,6 +59,7 @@ const props = { minutes: 720, size, mode: "dark" as const, reducedMotion: false,
 beforeEach(() => {
   mocks.fail = false;
   mocks.atlasFail = false;
+  mocks.atlasWait = false; mocks.atlasResolve = null;
   mocks.glass.mockReset();
   vi.clearAllMocks();
   vi.useFakeTimers();
@@ -77,6 +83,53 @@ async function startGL() {
     drawingBufferWidth: 192, drawingBufferHeight: 192, endFrameEXP: vi.fn(),
   }));
 }
+
+it('hides every live layer until the atlas composite has been presented by endFrameEXP', async () => {
+  mocks.atlasWait = true; const ready = vi.fn(), end = vi.fn(() => {
+    expect(ready).not.toHaveBeenCalledWith(true);
+    expect(rendered!.root.findByProps({ testID: 'orb-live-layer' }).props.style.opacity.value).toBe(0);
+  });
+  await render({ clock: { text: '12:00 PM', fontSize: 40 }, reducedMotion: true, onGlassReady: ready });
+  await act(async () => rendered!.root.findByType(GLView).props.onContextCreate({ drawingBufferWidth: 192, drawingBufferHeight: 192, endFrameEXP: end }));
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(end).not.toHaveBeenCalled(); expect(mocks.render).not.toHaveBeenCalled();
+  await act(async () => { mocks.atlasResolve?.(); await vi.dynamicImportSettled(); });
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(end).toHaveBeenCalledOnce(); expect(ready).toHaveBeenLastCalledWith(true);
+  expect(rendered!.root.findByProps({ testID: 'orb-live-layer' }).props.style.opacity.value).toBe(1);
+  expect(mocks.timing).not.toHaveBeenCalled();
+});
+it('animates the whole live surface once for 250ms using the native driver', async () => {
+  await render(); await startGL();
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(mocks.timing).toHaveBeenCalledOnce();
+  expect(mocks.timing.mock.lastCall![1]).toEqual({ toValue: 1, duration: 250, useNativeDriver: true });
+});
+it('times out without a context, logs once and keeps a palette-aware poster with no GLView', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  await render(); await act(async () => { vi.advanceTimersByTime(12_000); });
+  expect(rendered!.root.findAllByType(GLView)).toHaveLength(0);
+  expect(rendered!.root.findAllByProps({ testID: 'orb-poster' })).toHaveLength(1);
+  await act(async () => { vi.advanceTimersByTime(12_000); }); expect(warn).toHaveBeenCalledOnce();
+});
+it('keeps a hidden scene pending and lets it render when focus returns', async () => {
+  await render({ live: false }); await act(async () => { vi.advanceTimersByTime(24_000); });
+  expect(rendered!.root.findAllByType(GLView)).toHaveLength(1);
+  await act(async () => rendered!.update(createElement(DayOrb, props))); await startGL();
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(mocks.render).toHaveBeenCalledTimes(2);
+});
+it('withdraws a ready surface if Expo replaces its context without a component remount', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  await render({ reducedMotion: true }); await startGL();
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(rendered!.root.findByProps({ testID: 'orb-live-layer' }).props.style.opacity.value).toBe(1);
+  const count = mocks.render.mock.calls.length;
+  await startGL();
+  expect(rendered!.root.findAllByType(GLView)).toHaveLength(0);
+  expect(rendered!.root.findByProps({ testID: 'orb-poster-layer' }).props.style.opacity.inverseOf.value).toBe(0);
+  expect(mocks.render).toHaveBeenCalledTimes(count); expect(warn).toHaveBeenCalledOnce();
+});
 
 it.each(ORB_IDLE_PALETTE)('keeps Today and idle Generation appearance identical for $key across live theme changes', async color => {
   const interaction = { state: { current: createOrbInteraction(ORB_IDLE_PALETTE.indexOf(color)) }, wake: { current: null as (() => void) | null } };
@@ -125,13 +178,13 @@ it('composites in the existing reduced-resolution GL view and redraws changed ti
   expect(mocks.frame.mock.calls.length).toBe(count + 1);
   expect(rendered!.root.findAllByType(GLView)).toHaveLength(1);
 });
-it('keeps the original orb and plain-text readiness when the atlas cannot load', async () => {
+it('keeps only the poster and plain-text readiness when the atlas cannot load', async () => {
   mocks.atlasFail = true; const ready = vi.fn();
   await render({ clock: { text: '3:30 PM', fontSize: 32 }, reducedMotion: true, onGlassReady: ready });
   await startGL(); await act(async () => { await vi.dynamicImportSettled(); });
-  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
   expect(mocks.glass).not.toHaveBeenCalled(); expect(ready).not.toHaveBeenCalledWith(true);
-  expect(mocks.render).toHaveBeenCalledTimes(2);
+  expect(mocks.render).not.toHaveBeenCalled();
+  expect(rendered!.root.findAllByType(GLView)).toHaveLength(0);
 });
 it('withdraws glass readiness and disposes the composite on a draw failure', async () => {
   const ready = vi.fn();
@@ -143,7 +196,8 @@ it('withdraws glass readiness and disposes the composite on a draw failure', asy
   await act(async () => rendered!.update(createElement(DayOrb, { ...props, reducedMotion: true, clock: { text: '3:31 PM', fontSize: 32 }, onGlassReady: ready })));
   await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
   expect(ready).toHaveBeenLastCalledWith(false);
-  expect(mocks.glassDispose).toHaveBeenCalledOnce(); expect(mocks.render).toHaveBeenCalledTimes(3);
+  expect(mocks.glassDispose).toHaveBeenCalledOnce(); expect(mocks.render).toHaveBeenCalledTimes(2);
+  expect(rendered!.root.findAllByType(GLView)).toHaveLength(0);
 });
 
 describe("Today orb with one in-scene ambient spill", () => {

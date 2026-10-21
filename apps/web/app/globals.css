@@ -2023,6 +2023,21 @@ details[open] > :not(summary) {
   width: 100%;
   height: 100%;
 }
+.day-orb { position: relative; }
+.orb-poster-layer { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.day-orb .orb-live { opacity: 0; }
+.day-orb[data-orb-load="ready"] .orb-live { opacity: 1; transition: opacity 250ms ease; }
+.day-orb[data-orb-load="ready"] .orb-poster-layer { opacity: 0; transition: opacity 250ms ease; }
+.day-orb[data-orb-load="failed"] .orb-live { display: none; }
+.day-orb .orb-poster-layer .orb-static-source {
+  --orb-poster-deep: var(--orb-poster-light);
+  background: radial-gradient(circle at 40% 32%, var(--orb-poster-color) 0%, var(--orb-poster-color) 45%, var(--orb-poster-deep) 100%);
+}
+:root[data-theme="dark"] .day-orb .orb-poster-layer .orb-static-source { --orb-poster-deep: var(--orb-poster-dark); }
+@media (prefers-reduced-motion: reduce) {
+  .day-orb[data-orb-load="ready"] .orb-live,
+  .day-orb[data-orb-load="ready"] .orb-poster-layer { transition: none; }
+}
 .day-orb-fallback {
   width: 60%;
   height: 60%;
@@ -2084,7 +2099,9 @@ details[open] > :not(summary) {
 .readout-period { font-size: 0.45em; letter-spacing: -0.02em; }
 .glass-ready .readout-time {
   opacity: 0; /* Real text remains in the accessibility tree and reserves the row. */
+  transition: opacity 250ms ease;
 }
+@media (prefers-reduced-motion: reduce) { .glass-ready .readout-time { transition: none; } }
 .day-readout.glass-ready::before {
   opacity: 0; /* The same scrim moves into the orb composite, below its glass digits. */
 }

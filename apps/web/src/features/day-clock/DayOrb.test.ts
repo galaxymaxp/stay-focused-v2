@@ -3,7 +3,10 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { DayOrb } from './DayOrb';
 import { createOrbInteraction, pushOrbSpin } from '@stay-focused/shared';
-const mocks = vi.hoisted(() => ({ update: vi.fn(), aura: vi.fn(), render: vi.fn() }));
+import * as THREE from 'three';
+const mocks = vi.hoisted(() => ({ update: vi.fn(), aura: vi.fn(), render: vi.fn(), glass: vi.fn(),
+  atlas: null as ((texture: import('three').Texture) => void) | null, fail: false }));
+vi.mock('@stay-focused/shared/clock-glass-renderer', () => ({ createClockGlass: () => ({ render: mocks.glass, dispose() {} }) }));
 vi.mock('../knowledge-core/orbBody', async original => {
   const actual = await original<typeof import('../knowledge-core/orbBody')>();
   return { ...actual, createOrbBody: () => { const body = actual.createOrbBody();
@@ -13,12 +16,15 @@ vi.mock('../knowledge-core/orbBody', async original => {
 vi.mock('../knowledge-core/orbAura', async original => { const actual = await original<typeof import('../knowledge-core/orbAura')>(); return { ...actual, createOrbAura: () => {
   const aura = actual.createOrbAura(); return { ...aura, update: (frame: Parameters<typeof aura.update>[0]) => { mocks.aura(frame); aura.update(frame); } };
 } }; });
-vi.mock('three', async original => ({ ...await original<typeof import('three')>(), WebGLRenderer: class { setSize() {} setPixelRatio() {} setClearColor() {} getRenderTarget() { return null; } setRenderTarget() {} render = mocks.render; dispose() {} forceContextLoss() {} } }));
+vi.mock('three', async original => ({ ...await original<typeof import('three')>(),
+  TextureLoader: class { load(_url: string, ready: (texture: import('three').Texture) => void) { mocks.atlas = ready; } },
+  WebGLRenderer: class { constructor() { if (mocks.fail) throw new Error('private renderer error'); } setSize() {} setPixelRatio() {} setClearColor() {} getRenderTarget() { return null; } setRenderTarget() {} render = mocks.render; dispose() {} forceContextLoss() {} } }));
 let visibility: (() => void) | undefined, blur: (() => void) | undefined, focus: (() => void) | undefined;
 let themeChange: () => void;
 let tree: ReactTestRenderer | undefined, frames: Map<number, FrameRequestCallback>, serial: number, reduced: boolean;
 beforeEach(() => {
   vi.useFakeTimers(); vi.clearAllMocks(); frames = new Map(); serial = 0; reduced = false;
+  mocks.atlas = null; mocks.fail = false;
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal('requestAnimationFrame', (fn: FrameRequestCallback) => { frames.set(++serial, fn); return serial; });
   vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
@@ -30,13 +36,39 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 });
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); });
-async function mount(reducedMotion = false) {
+async function mount(reducedMotion = false, extra: Partial<Parameters<typeof DayOrb>[0]> = {}) {
   reduced = reducedMotion;
   const interaction = { state: { current: createOrbInteraction() }, wake: { current: null as (() => void) | null }, ringDragging: { current: false } };
-  await act(async () => { tree = create(createElement(DayOrb, { minutes: 720, size: 320, interaction }), { createNodeMock: () => ({ prepend() {} }) }); });
+  await act(async () => { tree = create(createElement(DayOrb, { minutes: 720, size: 320, interaction, ...extra }), { createNodeMock: () => ({ prepend() {}, dataset: {}, style: { setProperty() {} } }) }); });
   return interaction;
 }
 function draw() { const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn(Date.now())); }
+it('keeps the poster until a complete atlas/body/aura draw, including Reduce Motion', async () => {
+  const ready = vi.fn(); await mount(true, { clock: { text: '12:00 PM', fontSize: 40 }, onGlassReady: ready });
+  await act(async () => draw());
+  expect(mocks.render).not.toHaveBeenCalled(); expect(ready).not.toHaveBeenCalledWith(true);
+  expect(tree!.root.findByProps({ 'data-orb-load': 'loading' })).toBeTruthy();
+  mocks.atlas!(new THREE.Texture());
+  await act(async () => draw());
+  expect(mocks.aura).toHaveBeenCalled(); expect(mocks.glass).toHaveBeenCalledOnce();
+  expect(tree!.root.findByProps({ 'data-orb-load': 'ready' })).toBeTruthy();
+  expect(ready).toHaveBeenLastCalledWith(true); expect(frames.size).toBe(0);
+});
+it('keeps the final poster on missing atlas timeout and ignores a late texture', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  await mount(true, { clock: { text: '12:00 PM', fontSize: 40 } });
+  await act(async () => { draw(); vi.advanceTimersByTime(12_000); });
+  expect(tree!.root.findByProps({ 'data-orb-load': 'failed' })).toBeTruthy();
+  const texture = new THREE.Texture(), dispose = vi.spyOn(texture, 'dispose'); mocks.atlas!(texture);
+  await act(async () => { vi.advanceTimersByTime(12_000); draw(); });
+  expect(dispose).toHaveBeenCalledOnce(); expect(mocks.render).not.toHaveBeenCalled(); expect(warn).toHaveBeenCalledOnce();
+});
+it('keeps the poster on WebGL initialization failure without logging the raw error', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {}); mocks.fail = true;
+  await mount(); expect(tree!.root.findByProps({ 'data-orb-load': 'failed' })).toBeTruthy();
+  vi.advanceTimersByTime(24_000); expect(warn.mock.calls).toEqual([['Orb unavailable; keeping static poster.']]);
+  expect(mocks.render).not.toHaveBeenCalled();
+});
 it('updates the existing scene on theme changes without resetting momentum or palette', async () => {
   const interaction = await mount();
   interaction.state.current = pushOrbSpin(interaction.state.current, 0.2, Date.now());
@@ -69,7 +101,7 @@ it('returns to the original 80ms cadence after ring momentum ends', async () => 
 async function mountState(state: 'generating' | 'error' | 'complete' | 'idle', reducedMotion = false) {
   reduced = reducedMotion;
   const interaction = { state: { current: createOrbInteraction() }, wake: { current: null as (() => void) | null }, ringDragging: { current: false } };
-  await act(async () => { tree = create(createElement(DayOrb, { minutes: 720, size: 320, state, interaction }), { createNodeMock: () => ({ prepend() {} }) }); });
+  await act(async () => { tree = create(createElement(DayOrb, { minutes: 720, size: 320, state, interaction }), { createNodeMock: () => ({ prepend() {}, style: { setProperty() {} } }) }); });
   return interaction;
 }
 const frame = () => mocks.update.mock.lastCall![0] as { life: number; glow: number; error: number; idleColor?: string };

@@ -2,8 +2,10 @@
 import { ORB_AMBIENT_PROFILES, type OrbVariant, cancelOrbSpin } from '@stay-focused/shared';
 import { useOrbInteraction, type OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 import { createOrbInteractionSampler } from '../knowledge-core/orbInteractionFrame';
-import { memo, useEffect, useRef, useState } from "react";
-import { OrbStill } from '../knowledge-core/OrbStill';
+import { memo, useCallback, useEffect, useRef } from "react";
+import { useOrbLoad } from './useOrbLoad';
+import { OrbLoadPoster, usePosterInteraction } from './OrbLoadPoster';
+import { DAY_ORB_FILL } from './orb-footprint';
 import * as THREE from "three";
 import { createClockGlass } from '@stay-focused/shared/clock-glass-renderer';
 import type { ClockGlassReadout } from '@stay-focused/shared';
@@ -41,6 +43,8 @@ interface Runtime {
   state?: CoreState;
   clock?: ClockGlassReadout;
   onGlassReady?: (ready: boolean) => void;
+  onFrameReady: () => void;
+  onFailure: () => void;
 }
 
 /**
@@ -70,7 +74,14 @@ export const DayOrb = memo(function DayOrb({
   interaction?: OrbInteractionHandle;
 }) {
   const interaction = useOrbInteraction(suppliedInteraction);
+  const { poster, scene: sceneInteraction } = usePosterInteraction(interaction);
+  const { status: loadStatus, ready: frameReady, fail: loadFailed } = useOrbLoad();
   const frameRef = useRef<HTMLDivElement>(null);
+  const fail = useCallback(() => {
+    // Withdraw pixels in the failing draw itself, before React's next commit.
+    if (frameRef.current) frameRef.current.dataset.orbLoad = 'failed';
+    loadFailed();
+  }, [loadFailed]);
   const runtime = useRef<Runtime>({
     variant,
     tones: dayOrbTones(minutes),
@@ -80,23 +91,28 @@ export const DayOrb = memo(function DayOrb({
     state,
     clock,
     onGlassReady,
+    onFrameReady: frameReady,
+    onFailure: fail,
   });
   const controller = useRef<{ wake: () => void; dispose: () => void } | null>(
     null,
   );
-  const [unsupported, setUnsupported] = useState(false);
   runtime.current.variant = variant;
   runtime.current.tones = dayOrbTones(minutes);
   runtime.current.state = state;
   runtime.current.clock = clock;
   runtime.current.onGlassReady = onGlassReady;
   useEffect(() => controller.current?.wake(), [minutes, state, clock?.text, clock?.fontSize]);
+  useEffect(() => {
+    if (loadStatus === 'failed') { controller.current?.dispose(); controller.current = null; }
+  }, [loadStatus]);
 
   useEffect(() => {
     const currentRuntime = runtime.current;
     const frame = frameRef.current;
     if (!frame) return;
     const canvas = document.createElement("canvas");
+    canvas.className = 'orb-live';
     canvas.setAttribute("aria-hidden", "true");
     frame.prepend(canvas);
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -117,16 +133,16 @@ export const DayOrb = memo(function DayOrb({
       controller.current?.dispose(); controller.current = null;
       canvas.remove();
       currentRuntime.onGlassReady?.(false);
-      setUnsupported(true);
+      fail();
     };
     canvas.addEventListener?.('webglcontextlost', lost);
     try {
-      controller.current = buildScene(canvas, runtime, interaction);
+      controller.current = buildScene(canvas, runtime, sceneInteraction);
     } catch {
       canvas.remove();
       currentRuntime.onGlassReady?.(false);
       canvas.removeEventListener?.('webglcontextlost', lost);
-      setUnsupported(true);
+      fail();
       return;
     }
     const theme = new MutationObserver(sync);
@@ -148,18 +164,19 @@ export const DayOrb = memo(function DayOrb({
       canvas.removeEventListener?.('webglcontextlost', lost);
       currentRuntime.onGlassReady?.(false);
     };
-  }, [interaction, variant]);
+  }, [interaction, sceneInteraction, variant, fail]);
 
   return (
     <div
       ref={frameRef}
       className="day-orb"
       data-orb-variant={variant}
+      data-orb-load={loadStatus}
       style={{ width: size ?? "100%", height: size ?? "100%" }}
       aria-hidden="true"
       data-state={state}
     >
-      {unsupported && <OrbStill variant={variant} interaction={interaction} className="day-orb-fallback" />}
+      <OrbLoadPoster poster={poster} interaction={interaction} variant={variant} diameter={size ? size * DAY_ORB_FILL : `${DAY_ORB_FILL * 100}%`} />
     </div>
   );
 });
@@ -181,6 +198,7 @@ function buildScene(
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.02;
+  if (renderer.debug) renderer.debug.onShaderError = () => { throw new Error('orb_shader_unavailable'); };
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
   camera.zoom = 1 / ORB_AMBIENT_PROFILES[runtime.current.variant].canvasScale;
@@ -207,9 +225,9 @@ function buildScene(
       atlas.minFilter = THREE.LinearFilter; atlas.magFilter = THREE.LinearFilter;
       atlas.colorSpace = THREE.NoColorSpace; atlas.needsUpdate = true;
       try { glass = createClockGlass(renderer, atlas, clockMetrics); }
-      catch { report(false); }
+      catch { runtime.current.onFailure(); return; }
       wake();
-    }, undefined, () => report(false));
+    }, undefined, () => { if (!disposed) runtime.current.onFailure(); });
   }
 
   const resize = () => {
@@ -287,16 +305,16 @@ function buildScene(
       aura.update({ delta, shimmer: 0, shimmerAmount: 0, glow: body.uniforms.uGlow.value,
         error: extra?.error ?? 0, mode: current.mode, camera, center: root.position,
         source: body.uniforms, reducedMotion: current.reducedMotion });
-      aura.capture(renderer, scene, camera);
-      if (glass && current.clock) {
-        try {
+      // Never submit an incomplete clock scene to the visible framebuffer.
+      if (current.clock && !glass) return;
+      try {
+        aura.capture(renderer, scene, camera);
+        if (glass && current.clock) {
           glass.render(scene, camera, current.clock, canvas.clientWidth, [tones.position.x, tones.position.y], current.mode === 'dark');
           report(true);
-        } catch {
-          glass.dispose(); glass = null; renderer.setRenderTarget(null);
-          report(false); renderer.render(scene, camera);
-        }
-      } else renderer.render(scene, camera);
+        } else renderer.render(scene, camera);
+        if (canvas.clientWidth > 0) current.onFrameReady();
+      } catch { report(false); current.onFailure(); return; }
     }
     if (!disposed && current.running && !current.reducedMotion && (moving || interacting || now < settleUntil))
       requestId = requestAnimationFrame(draw);

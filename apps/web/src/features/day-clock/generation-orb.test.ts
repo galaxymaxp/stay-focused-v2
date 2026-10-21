@@ -1,7 +1,8 @@
 import { createElement } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-vi.mock('./DayOrb', () => ({ DayOrb: 'DayOrb', DAY_ORB_FILL: 0.64 }));
+vi.mock('./DeferredDayOrb', () => ({ DeferredDayOrb: 'DayOrb' }));
+vi.mock('./orb-footprint', () => ({ DAY_ORB_FILL: 0.64 }));
 vi.mock('../knowledge-core/orbInteraction', async original => ({ ...await original<typeof import('../knowledge-core/orbInteraction')>(), OrbPointerLayer: 'OrbPointerLayer' }));
 const { GenerationOrb } = await import('./GenerationOrb');
 let tree: ReactTestRenderer | undefined;

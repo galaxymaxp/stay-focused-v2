@@ -1,9 +1,10 @@
-import { ORB_AMBIENT_PROFILES, type OrbVariant, type ClockGlassReadout, cancelOrbSpin, createOrbInteraction } from '@stay-focused/shared';
+import { ORB_AMBIENT_PROFILES, type OrbVariant, type ClockGlassReadout, cancelOrbSpin, createOrbInteraction,
+  createOrbLoadGate, ORB_REVEAL_MS, type OrbLoadStatus } from '@stay-focused/shared';
 import type { OrbInteractionHandle } from '../generation-core/orbInteraction';
 import { createOrbInteractionSampler } from '../generation-core/orbInteractionFrame';
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, View } from "react-native";
+import { Animated, AppState, View } from "react-native";
 import { OrbPoster } from '../generation-core/OrbPoster';
 import * as THREE from "three";
 import { createClockGlass } from '@stay-focused/shared/clock-glass-renderer';
@@ -49,6 +50,8 @@ interface Runtime {
   clock?: ClockGlassReadout;
   canvasSize: number;
   onGlassReady?: (ready: boolean) => void;
+  onFrameReady: () => void;
+  onFailure: () => void;
 }
 
 
@@ -89,12 +92,50 @@ export const DayOrb = memo(function DayOrb({
   const localWake = useRef<(() => void) | null>(null);
   const interaction = useMemo(() => suppliedInteraction ?? { state: localState, wake: localWake }, [suppliedInteraction]);
   const [foreground, setForeground] = useState(AppState.currentState === "active");
-  const [renderingFailed, setRenderingFailed] = useState(false);
+  const [loadStatus, setLoadStatus] = useState<OrbLoadStatus>('loading');
+  const gate = useRef<ReturnType<typeof createOrbLoadGate> | null>(null);
+  const opacity = useRef<Animated.Value | null>(null);
+  if (!opacity.current) opacity.current = new Animated.Value(0);
+  const sceneWake = useRef<(() => void) | null>(null);
+  const posterWake = useRef<(() => void) | null>(null);
+  const sceneInteraction = useMemo(() => ({ ...interaction, wake: sceneWake }), [interaction]);
+  const posterInteraction = useMemo(() => ({ ...interaction, wake: posterWake }), [interaction]);
+  const frameReady = useCallback(() => gate.current?.ready(), []);
+  const failure = useCallback(() => { opacity.current?.setValue(0); gate.current?.fail(); }, []);
   const tones = useMemo(() => dayOrbTones(minutes), [minutes]);
-  const runtime = useRef<Runtime>({ variant, tones, mode, reducedMotion, running: live && foreground, state, clock, canvasSize: size, onGlassReady });
-  runtime.current = { variant, tones, mode, reducedMotion, running: live && foreground, state, clock, canvasSize: size, onGlassReady };
+  const runtime = useRef<Runtime>({ variant, tones, mode, reducedMotion, running: live && foreground, state, clock, canvasSize: size, onGlassReady, onFrameReady: frameReady, onFailure: failure });
+  runtime.current = { variant, tones, mode, reducedMotion, running: live && foreground, state, clock, canvasSize: size, onGlassReady, onFrameReady: frameReady, onFailure: failure };
   const controller = useRef<{ wake: () => void; dispose: () => void } | null>(null);
   const context = useRef<ExpoWebGLRenderingContext | null>(null);
+  useEffect(() => {
+    const current = createOrbLoadGate(setLoadStatus, () => console.warn('Orb unavailable; keeping static poster.'));
+    gate.current = current;
+    return () => { current.dispose(); gate.current = null; };
+  }, []);
+  useEffect(() => {
+    gate.current?.setActive(live && foreground);
+  }, [live, foreground]);
+  useEffect(() => {
+    const wake = () => { posterWake.current?.(); sceneWake.current?.(); };
+    interaction.wake.current = wake;
+    return () => { if (interaction.wake.current === wake) interaction.wake.current = null; };
+  }, [interaction]);
+  useEffect(() => {
+    const value = opacity.current!;
+    value.stopAnimation();
+    const shown = () => { if (runtime.current.clock) runtime.current.onGlassReady?.(true); };
+    if (loadStatus !== 'ready' || reducedMotion) {
+      value.setValue(loadStatus === 'ready' ? 1 : 0);
+      if (loadStatus === 'ready') shown();
+    }
+    else {
+      const animation = Animated.timing(value, { toValue: 1, duration: ORB_REVEAL_MS, useNativeDriver: true });
+      animation.start(({ finished }) => { if (finished) shown(); }); return () => animation.stop();
+    }
+  }, [loadStatus, reducedMotion]);
+  useEffect(() => {
+    if (loadStatus === 'failed') { controller.current?.dispose(); controller.current = null; context.current = null; }
+  }, [loadStatus]);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (next) => setForeground(next === "active"));
     return () => subscription.remove();
@@ -105,27 +146,33 @@ export const DayOrb = memo(function DayOrb({
   useEffect(() => controller.current?.wake(), [minutes, mode, reducedMotion, live, foreground, state, size, clock?.text, clock?.fontSize]);
   useEffect(() => {
     if (context.current && !controller.current) {
-      try { controller.current = buildScene(context.current, runtime, interaction); }
-      catch { context.current = null; setRenderingFailed(true); }
+      try { controller.current = buildScene(context.current, runtime, sceneInteraction); }
+      catch { context.current = null; failure(); }
     }
     return () => {
       controller.current?.dispose();
       controller.current = null;
     };
-  }, [interaction, variant]);
+  }, [sceneInteraction, variant, failure]);
   const create = useCallback((gl: ExpoWebGLRenderingContext) => {
+    // Expo can recreate a destroyed surface without remounting this component.
+    // Treat that context loss as a final fallback, never as an already-ready canvas.
+    if (context.current) { if (context.current !== gl) failure(); return; }
     context.current = gl;
     controller.current?.dispose();
-    try { controller.current = buildScene(gl, runtime, interaction); }
-    catch { context.current = null; setRenderingFailed(true); }
-  }, [interaction]);
+    try { controller.current = buildScene(gl, runtime, sceneInteraction); }
+    catch { context.current = null; failure(); }
+  }, [sceneInteraction, failure]);
   const inner = size * RENDER_SCALE * ORB_AMBIENT_PROFILES[variant].canvasScale;
   return (
     <View pointerEvents="none" style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {/* Ambient spill renders inside the same transparent GL view. */}
-      {renderingFailed
-        ? <OrbPoster variant={variant} size={size * DAY_ORB_FILL} mode={mode} interaction={interaction} />
-        : <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />}
+      <Animated.View pointerEvents="none" accessibilityElementsHidden testID="orb-poster-layer" style={{ position: 'absolute', opacity: opacity.current.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }}>
+        <OrbPoster variant={variant} size={size * DAY_ORB_FILL} mode={mode} interaction={posterInteraction} />
+      </Animated.View>
+      {loadStatus !== 'failed' && <Animated.View pointerEvents="none" accessibilityElementsHidden testID="orb-live-layer" style={{ position: 'absolute', opacity: opacity.current }}>
+        <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />
+      </Animated.View>}
     </View>
   );
 });
@@ -147,6 +194,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.02;
+  if (renderer.debug) renderer.debug.onShaderError = () => { throw new Error('orb_shader_unavailable'); };
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
   camera.zoom = 1 / ORB_AMBIENT_PROFILES[runtime.current.variant].canvasScale;
@@ -163,16 +211,20 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   let atlas: THREE.Texture | null = null;
   let glassReady = false;
   const report = (ready: boolean) => {
-    if (glassReady !== ready) { glassReady = ready; runtime.current.onGlassReady?.(ready); }
+    if (glassReady !== ready) {
+      glassReady = ready;
+      // Plain accessible text stays visible until the complete canvas finishes fading.
+      if (!ready) runtime.current.onGlassReady?.(false);
+    }
   };
   if (runtime.current.clock) {
     void loadClockAtlas().then(texture => {
       if (disposed) { texture.dispose(); return; }
       atlas = texture;
       try { glass = createClockGlass(renderer, atlas, clockMetrics); }
-      catch { report(false); }
+      catch { runtime.current.onFailure(); return; }
       wake();
-    }).catch(() => report(false));
+    }).catch(() => { if (!disposed) runtime.current.onFailure(); });
   }
 
   let disposed = false;
@@ -242,17 +294,17 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
       aura.update({ delta, shimmer: 0, shimmerAmount: 0, glow: body.uniforms.uGlow.value,
         error: extra?.error ?? 0, mode: current.mode, camera, center: root.position,
         source: body.uniforms, reducedMotion: current.reducedMotion });
-      aura.capture(renderer, scene, camera);
-      if (glass && current.clock) {
-        try {
+      if (current.clock && !glass) return;
+      try {
+        if (gl.isContextLost?.()) throw new Error('orb_context_unavailable');
+        aura.capture(renderer, scene, camera);
+        if (glass && current.clock) {
           glass.render(scene, camera, current.clock, current.canvasSize, [tones.position.x, tones.position.y], current.mode === 'dark');
-          report(true);
-        } catch {
-          glass.dispose(); glass = null; renderer.setRenderTarget(null);
-          report(false); renderer.render(scene, camera);
-        }
-      } else renderer.render(scene, camera);
-      gl.endFrameEXP();
+        } else renderer.render(scene, camera);
+        gl.endFrameEXP();
+        if (glass && current.clock) report(true);
+        current.onFrameReady();
+      } catch { report(false); current.onFailure(); return; }
     }
     if (!disposed && current.running && !current.reducedMotion && (moving || interacting || now < settleUntil)) requestId = requestAnimationFrame(draw);
   };
