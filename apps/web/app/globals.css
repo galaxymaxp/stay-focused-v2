@@ -5490,3 +5490,18 @@ mark.find-active {
 :root[data-theme="dark"] .orb-static-source::before { opacity: 0.38; }
 
 .queue-button[data-hidden="true"] .queue-orb { animation-play-state: paused; }
+
+/* OG1: decorative padding preserves body size, pointer targets and viewport fit. */
+.day-orb[data-orb-variant="standalone"] { position: relative; overflow: visible; }
+.day-orb[data-orb-variant="standalone"] canvas,
+.knowledge-core[data-orb-variant="standalone"] canvas {
+  position: absolute; width: 120%; height: 120%; left: -10%; top: -10%;
+  pointer-events: none;
+}
+.orb-static-source[data-orb-variant="standalone"]::before {
+  inset: -35%; opacity: 0.09;
+}
+:root[data-theme="dark"] .orb-static-source[data-orb-variant="standalone"]::before { opacity: 0.19; }
+
+/* Decorative pixels may overlap content, but cannot create a scroll viewport. */
+.generation-page { overflow: clip; }

@@ -17,6 +17,7 @@ it('renders the Today orb with the job state and one shared ball-only pointer ta
   await act(async () => { tree = create(createElement(GenerationOrb, { state: 'generating' })); });
   const orb = tree!.root.findByType('DayOrb' as never), pointer = tree!.root.findByType('OrbPointerLayer' as never);
   expect(orb.props.state).toBe('generating');
+  expect(orb.props.variant).toBe('standalone');
   expect(orb.props.size).toBeUndefined();
   expect(pointer.props.fill).toBe(0.64);
   expect(pointer.props.interaction).toBe(orb.props.interaction);

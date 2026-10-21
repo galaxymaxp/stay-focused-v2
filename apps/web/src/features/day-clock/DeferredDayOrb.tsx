@@ -46,10 +46,10 @@ export function DeferredDayOrb({ minutes, size, ready, clock, onGlassReady, inte
     theme.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => { theme.disconnect(); if (interaction.wake.current === update) interaction.wake.current = null; };
   }, [Orb, reduced, interactiveStill, interaction, minutes, hasClock]);
-  if (Orb && (!reduced || interactiveStill || hasClock)) return <Orb minutes={minutes} size={size} interaction={interaction} clock={clock} onGlassReady={onGlassReady} />;
+  if (Orb && (!reduced || interactiveStill || hasClock)) return <Orb variant="clock" minutes={minutes} size={size} interaction={interaction} clock={clock} onGlassReady={onGlassReady} />;
   const diameter = size * DAY_ORB_FILL;
   return <div className="day-orb" data-testid="day-orb-still" aria-hidden="true" style={{ width: size, height: size, display: 'grid', placeItems: 'center' }}>
-    <div ref={still} className="orb-static-source" style={{ width: diameter, height: diameter, borderRadius: '50%',
+    <div ref={still} className="orb-static-source" data-orb-variant="clock" style={{ width: diameter, height: diameter, borderRadius: '50%',
       background: orbPosterGradient('light', orbIdleColor(interaction.state.current, Date.now(), true)) }} />
   </div>;
 }

@@ -1,5 +1,5 @@
 "use client";
-import { cancelOrbSpin } from '@stay-focused/shared';
+import { ORB_AMBIENT_PROFILES, type OrbVariant, cancelOrbSpin } from '@stay-focused/shared';
 import { useOrbInteraction, type OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 import { createOrbInteractionSampler } from '../knowledge-core/orbInteractionFrame';
 import { memo, useEffect, useRef, useState } from "react";
@@ -33,6 +33,7 @@ const FRAME_MS = 80;
 
 type Mode = "light" | "dark";
 interface Runtime {
+  variant: OrbVariant;
   tones: DayOrbTones;
   mode: Mode;
   reducedMotion: boolean;
@@ -51,6 +52,7 @@ interface Runtime {
  * failure, a brief brighten on completion.
  */
 export const DayOrb = memo(function DayOrb({
+  variant = 'clock',
   minutes,
   size,
   state,
@@ -58,6 +60,7 @@ export const DayOrb = memo(function DayOrb({
   onGlassReady,
   interaction: suppliedInteraction,
 }: {
+  variant?: OrbVariant;
   minutes: number;
   /** Canvas size in CSS pixels; the ball fills DAY_ORB_FILL of it. Omit to fill the parent. */
   size?: number;
@@ -69,6 +72,7 @@ export const DayOrb = memo(function DayOrb({
   const interaction = useOrbInteraction(suppliedInteraction);
   const frameRef = useRef<HTMLDivElement>(null);
   const runtime = useRef<Runtime>({
+    variant,
     tones: dayOrbTones(minutes),
     mode: "light",
     reducedMotion: false,
@@ -81,6 +85,7 @@ export const DayOrb = memo(function DayOrb({
     null,
   );
   const [unsupported, setUnsupported] = useState(false);
+  runtime.current.variant = variant;
   runtime.current.tones = dayOrbTones(minutes);
   runtime.current.state = state;
   runtime.current.clock = clock;
@@ -143,17 +148,18 @@ export const DayOrb = memo(function DayOrb({
       canvas.removeEventListener?.('webglcontextlost', lost);
       currentRuntime.onGlassReady?.(false);
     };
-  }, [interaction]);
+  }, [interaction, variant]);
 
   return (
     <div
       ref={frameRef}
       className="day-orb"
+      data-orb-variant={variant}
       style={{ width: size ?? "100%", height: size ?? "100%" }}
       aria-hidden="true"
       data-state={state}
     >
-      {unsupported && <OrbStill interaction={interaction} className="day-orb-fallback" />}
+      {unsupported && <OrbStill variant={variant} interaction={interaction} className="day-orb-fallback" />}
     </div>
   );
 });
@@ -177,12 +183,14 @@ function buildScene(
   renderer.toneMappingExposure = 1.02;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
+  camera.zoom = 1 / ORB_AMBIENT_PROFILES[runtime.current.variant].canvasScale;
+  camera.updateProjectionMatrix();
   camera.position.set(0, 0.02, CAMERA_DISTANCE);
   const root = new THREE.Group();
   scene.add(root);
   const body = createOrbBody();
   root.add(body.mesh);
-  const aura = createOrbAura();
+  const aura = createOrbAura(runtime.current.variant);
   scene.add(aura.mesh);
 
   let glass: ReturnType<typeof createClockGlass> | null = null;

@@ -379,7 +379,7 @@ export function DayRingClock({
     <View style={{ alignItems: "center", gap: 4 }}>
       <View style={{ width: size, height: size }} testID="day-ring">
         <View pointerEvents="none" style={{ position: "absolute", left: (CLOCK.center - orbCanvas / 2) * scale, top: (CLOCK.center - orbCanvas / 2) * scale }}>
-          <DayOrb interaction={orbInteraction} minutes={nowMinutes} size={orbCanvas * scale} mode={theme} reducedMotion={reducedMotion} live={focused && active} clock={glassClock} onGlassReady={setGlassReady} />
+          <DayOrb variant="clock" interaction={orbInteraction} minutes={nowMinutes} size={orbCanvas * scale} mode={theme} reducedMotion={reducedMotion} live={focused && active} clock={glassClock} onGlassReady={setGlassReady} />
         </View>
         <View
           pointerEvents="none"

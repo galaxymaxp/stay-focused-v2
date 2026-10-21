@@ -266,3 +266,5 @@ export * from './orb-preference-sync';
 export * from './clock-glyphs';
 
 export * from './orb-appearance';
+
+export { ORB_AMBIENT_PROFILES, type OrbVariant } from './orb-ambient';

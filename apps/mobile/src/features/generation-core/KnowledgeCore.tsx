@@ -1,4 +1,4 @@
-import { cancelOrbSpin } from '@stay-focused/shared';
+import { ORB_AMBIENT_PROFILES, cancelOrbSpin } from '@stay-focused/shared';
 import { OrbTouchLayer, useOrbInteraction, type OrbInteractionHandle } from './orbInteraction';
 import { createOrbInteractionSampler } from './orbInteractionFrame';
 import { useIsFocused } from "expo-router/react-navigation";
@@ -80,8 +80,8 @@ export function KnowledgeCore({ state, colors, mode, reducedMotion = false, acti
   return (
     <View style={[styles.frame, { width: size, height: size }]} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" testID="knowledge-core">
       {renderingFailed
-        ? <OrbPoster size={size * ORB_FILL} mode={mode} interaction={interaction} idle={state === 'idle'} />
-        : <GLView onContextCreate={createScene} style={styles.canvas} />}
+        ? <OrbPoster variant="standalone" size={size * ORB_FILL} mode={mode} interaction={interaction} idle={state === 'idle'} />
+        : <GLView onContextCreate={createScene} style={[styles.canvas, { width: size * 1.2, height: size * 1.2, left: -size * 0.1, top: -size * 0.1 }]} />}
       <OrbTouchLayer interaction={interaction} size={size * ORB_FILL} left={size * (1 - ORB_FILL) / 2} top={size * (1 - ORB_FILL) / 2} reducedMotion={reducedMotion} />
     </View>
   );
@@ -115,13 +115,15 @@ function buildScene(
   renderer.toneMappingExposure = 1.02;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
+  camera.zoom = 1 / ORB_AMBIENT_PROFILES.standalone.canvasScale;
+  camera.updateProjectionMatrix();
   camera.position.set(0, 0.02, CAMERA_DISTANCE);
   const root = new THREE.Group();
   scene.add(root);
 
   const body = createOrbBody();
   root.add(body.mesh);
-  const aura = createOrbAura();
+  const aura = createOrbAura('standalone');
   scene.add(aura.mesh);
 
   let requestId: number | null = null;

@@ -29,7 +29,7 @@ export function GenerationOrb({ state }: { state: CoreState }) {
   }, []);
   return (
     <div className="generation-orb" data-testid="generation-orb" data-state={state} aria-hidden="true">
-      <DayOrb minutes={now.getHours() * 60 + now.getMinutes()} state={state} interaction={interaction} />
+      <DayOrb variant="standalone" minutes={now.getHours() * 60 + now.getMinutes()} state={state} interaction={interaction} />
       <OrbPointerLayer interaction={interaction} fill={DAY_ORB_FILL} />
     </div>
   );

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { OrbVariant } from '@stay-focused/shared';
 import { createOrbAmbient, type OrbAmbientSource } from '@stay-focused/shared/orb-ambient-renderer';
 
 /** Existing body shimmer stays unchanged; ambient uses body motion, never a pulse. */
@@ -21,8 +22,8 @@ export interface OrbAuraFrame {
 }
 
 /** Thin platform adapter; both scenes use the same shared shader and easing. */
-export function createOrbAura() {
-  const ambient = createOrbAmbient();
+export function createOrbAura(variant: OrbVariant = 'clock') {
+  const ambient = createOrbAmbient(variant);
   const shimmer: OrbShimmer = { time: 0, amount: 0, level: 0 };
   return {
     mesh: ambient.mesh,

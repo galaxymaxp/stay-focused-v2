@@ -55,7 +55,7 @@ export function GenerationCore({ state, size = 300 }: { state: CoreState; size?:
   const ball = size * orb.DAY_ORB_FILL, inset = (size - ball) / 2;
   return (
     <View testID="generation-orb" style={{ width: size, height: size }}>
-      <orb.DayOrb minutes={now.getHours() * 60 + now.getMinutes()} size={size} mode={mode} reducedMotion={reducedMotion}
+      <orb.DayOrb variant="standalone" minutes={now.getHours() * 60 + now.getMinutes()} size={size} mode={mode} reducedMotion={reducedMotion}
         live={focused && active} state={state} interaction={interaction} />
       <OrbTouchLayer interaction={interaction} size={ball} left={inset} top={inset} reducedMotion={reducedMotion} />
     </View>

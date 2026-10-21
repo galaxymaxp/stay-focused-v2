@@ -1,5 +1,5 @@
 "use client";
-import { cancelOrbSpin } from '@stay-focused/shared';
+import { ORB_AMBIENT_PROFILES, cancelOrbSpin } from '@stay-focused/shared';
 import { OrbPointerLayer, useOrbInteraction, type OrbInteractionHandle } from './orbInteraction';
 import { createOrbInteractionSampler } from './orbInteractionFrame';
 import { useEffect, useRef, useState } from "react";
@@ -115,13 +115,14 @@ export function KnowledgeCore({ state }: { state: CoreState }) {
     <div
       ref={frameRef}
       className="knowledge-core"
+      data-orb-variant="standalone"
       aria-hidden="true"
       style={{ position: "relative", touchAction: "pan-y" }}
       data-testid="knowledge-core"
       data-state={state}
 
     >
-      {unsupported && <OrbStill interaction={interaction} idle={state === 'idle'} />}
+      {unsupported && <OrbStill variant="standalone" interaction={interaction} idle={state === 'idle'} />}
       <OrbPointerLayer interaction={interaction} fill={ORB_FILL} />
     </div>
   );
@@ -145,13 +146,15 @@ function buildScene(
   renderer.toneMappingExposure = 1.02;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
+  camera.zoom = 1 / ORB_AMBIENT_PROFILES.standalone.canvasScale;
+  camera.updateProjectionMatrix();
   camera.position.set(0, 0.02, CAMERA_DISTANCE);
   const root = new THREE.Group();
   scene.add(root);
 
   const body = createOrbBody();
   root.add(body.mesh);
-  const aura = createOrbAura();
+  const aura = createOrbAura('standalone');
   scene.add(aura.mesh);
 
   const resize = () => {

@@ -1,25 +1,28 @@
 import * as THREE from 'three';
-import { orbAmbientEase } from './orb-ambient';
+import { orbAmbientEase, ORB_AMBIENT_PROFILES, type OrbVariant } from './orb-ambient';
 
 /** The final body uniforms, after palette, day tones and state are resolved. */
 export interface OrbAmbientSource {
   uGlow: { value: number }; uError: { value: number };
 }
 
-const SIZE = 2.92; // Inside the existing camera bounds; no layout or backing-size change.
 const VERTEX = `varying vec2 vUv;
 void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
 const FRAGMENT = `
 uniform sampler2D uSource;
 uniform float uStrength;
+uniform float uSize;
+uniform vec4 uProfile;
+uniform float uMaskGain;
+uniform float uSampleScale;
 varying vec2 vUv;
 void main() {
-  vec2 p = (vUv - 0.5) * 2.92;
+  vec2 p = (vUv - 0.5) * uSize;
   float r = length(p);
-  float mask = smoothstep(0.975, 1.20, r) * (1.0 - smoothstep(1.06, 1.44, r));
+  float mask = smoothstep(uProfile.x, uProfile.y, r) * (1.0 - smoothstep(uProfile.z, uProfile.w, r)) * uMaskGain;
   // Expand the visible inner body into the margin, with a small spatial blur.
   // Averaging samples (rather than adding lights) retains dim source sectors.
-  vec2 uv = 0.5 + p * 0.18;
+  vec2 uv = 0.5 + p * uSampleScale;
   vec4 source = texture2D(uSource, uv) * 0.20;
   for (int i = 0; i < 8; i++) {
     float angle = float(i) * 0.785398163;
@@ -32,17 +35,22 @@ void main() {
 }`;
 
 /** Bounded 64px capture of the existing body; no CPU readback or separate loop. */
-export function createOrbAmbient() {
+export function createOrbAmbient(variant: OrbVariant = 'clock') {
+  const profile = ORB_AMBIENT_PROFILES[variant];
   const target = new THREE.WebGLRenderTarget(64, 64, { depthBuffer: false, stencilBuffer: false });
   target.texture.name = 'orb-ambient-source';
   const uniforms = {
     uSource: { value: target.texture },
     uStrength: { value: 0 },
+    uSize: { value: profile.size },
+    uProfile: { value: new THREE.Vector4(profile.inner, profile.rise, profile.fade, profile.outer) },
+    uMaskGain: { value: profile.maskGain },
+    uSampleScale: { value: 0.18 / profile.canvasScale },
   };
   const material = new THREE.ShaderMaterial({ uniforms, vertexShader: VERTEX,
     fragmentShader: FRAGMENT, transparent: true, depthWrite: false,
     premultipliedAlpha: true });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(SIZE, SIZE), material);
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(profile.size, profile.size), material);
   mesh.renderOrder = 0;
   let initialized = false, disposed = false;
   return {
@@ -60,7 +68,7 @@ export function createOrbAmbient() {
       if (disposed) return;
       const ease = initialized ? orbAmbientEase(delta, reducedMotion) : 1;
       initialized = true;
-      const strength = Math.min(1.4, source.uGlow.value) * (mode === 'dark' ? 0.9 : 0.5) * (1 - source.uError.value);
+      const strength = Math.min(1.4, source.uGlow.value) * (mode === 'dark' ? 0.9 : 0.5) * (1 - source.uError.value) * profile.intensity;
       uniforms.uStrength.value += (strength - uniforms.uStrength.value) * ease;
       // Failure is allowed to settle without leaving an autonomous ambient tail.
       if (source.uError.value === 1) uniforms.uStrength.value = 0;

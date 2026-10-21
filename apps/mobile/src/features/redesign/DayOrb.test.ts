@@ -255,3 +255,15 @@ it('does not draw while unfocused or backgrounded and disposes the ambient mesh'
   await act(async () => rendered!.unmount()); rendered = undefined;
   expect(dispose).toHaveBeenCalledOnce();
 });
+
+it('pads only the standalone GL layer while keeping the body, layout and reduced-motion scheduling stable', async () => {
+  const root = await render({ variant: 'standalone', reducedMotion: true });
+  expect(root.findByType('View' as never).props.style).toMatchObject({ width: size, height: size });
+  expect(root.findByType(GLView).props.style.width).toBeCloseTo(size * .6 * 1.2);
+  await startGL(); vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now());
+  const scene = mocks.render.mock.lastCall![0], camera = mocks.render.mock.lastCall![1];
+  expect(camera.zoom).toBeCloseTo(1 / 1.2);
+  expect(scene.children[1].material.uniforms.uProfile.value.x).toBeCloseTo(.95 * .9);
+  const count = mocks.frame.mock.calls.length;
+  vi.advanceTimersByTime(500); expect(mocks.frame.mock.calls.length).toBe(count);
+});

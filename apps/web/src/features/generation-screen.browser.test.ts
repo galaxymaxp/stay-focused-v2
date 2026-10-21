@@ -181,7 +181,10 @@ async function bounds(page: Page) {
   expect(result.pageHeight).toBeLessThanOrEqual(result.viewport.height + 1);
   expect(result.pageWidth).toBeLessThanOrEqual(result.viewport.width + 1);
   expect(result.contentHeight).toBeLessThanOrEqual(result.mainHeight + 1);
-  for (const b of [result.orb, result.status, result.details, result.canvas]) {
+  // OG1 explicitly allows transparent decorative padding outside the layout box.
+  // Keep every interactive/layout bound and the no-scroll assertions intact.
+  expect(result.canvas.width / result.orb.width).toBeCloseTo(1.2, 2);
+  for (const b of [result.orb, result.status, result.details]) {
     expect(b.x).toBeGreaterThanOrEqual(0); expect(b.y).toBeGreaterThanOrEqual(0);
     expect(b.right).toBeLessThanOrEqual(result.viewport.width + 1); expect(b.bottom).toBeLessThanOrEqual(result.viewport.height + 1);
   }
@@ -273,3 +276,30 @@ describe("GV1 measured generation viewport", () => {
     } finally { await page.close(); }
   }, 60_000);
 });
+
+// OG1: actual Generation layout A, decorative overflow must not alter viewport fit.
+it.each([[390, 844], [1440, 900]])('captures standalone lighting across themes and palettes at %i', async (width, height) => {
+  const evidence = resolve('../../tmp/overnight/OG1-page'); mkdirSync(evidence, { recursive: true });
+  for (const theme of ['light', 'dark']) for (const palette of ['pearl', 'gold']) {
+    const page = await open(width, height, 'reduce', 'queued');
+    try {
+      await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
+      if (palette === 'gold') await page.locator('[data-testid="orb-touch"]').click();
+      await page.waitForTimeout(150);
+      const geometry = await page.evaluate(() => {
+        const frame = document.querySelector('.generation-orb')!.getBoundingClientRect();
+        const canvas = document.querySelector('.generation-orb canvas')!.getBoundingClientRect();
+        return { frame: frame.width, canvas: canvas.width, pageWidth: document.documentElement.scrollWidth,
+          pageHeight: document.documentElement.scrollHeight, viewportWidth: innerWidth, viewportHeight: innerHeight,
+          variant: document.querySelector('.day-orb')!.getAttribute('data-orb-variant') };
+      });
+      expect(geometry.variant).toBe('standalone'); expect(geometry.canvas / geometry.frame).toBeCloseTo(1.2, 2);
+      if (width <= 760) {
+        expect(geometry.pageWidth).toBeLessThanOrEqual(geometry.viewportWidth + 1);
+        expect(geometry.pageHeight).toBeLessThanOrEqual(geometry.viewportHeight + 1);
+      }
+      await page.screenshot({ path: join(evidence, width + '-' + theme + '-' + palette + '.png') });
+      writeFileSync(join(evidence, width + '-' + theme + '-' + palette + '.json'), JSON.stringify(geometry));
+    } finally { await page.close(); }
+  }
+}, 60_000);

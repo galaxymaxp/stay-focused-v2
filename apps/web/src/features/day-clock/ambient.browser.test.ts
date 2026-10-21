@@ -67,6 +67,14 @@ const plugin: Plugin = {
   name: 'local-clock-harness', enforce: 'pre',
   resolveId(source) { return source === 'clock-browser-entry' ? '\0clock:entry' : source === 'three' ? '\0clock:three' : null; },
   load(id) { return id.startsWith('\0clock:') ? stubs[id.slice(7)] : null; },
+  // Preserve OP2's exact source/lighting fixture for its absolute-luminance
+  // regression. Actual standalone paths above/below use the production profile.
+  transform(code, id) {
+    if (!id.replaceAll('\\', '/').endsWith('/knowledge-core/KnowledgeCore.tsx')) return null;
+    return code.replace("createOrbAura('standalone')", "createOrbAura(location.search.includes('clock-profile') ? 'clock' : 'standalone')")
+      .replace('camera.zoom = 1 / ORB_AMBIENT_PROFILES.standalone.canvasScale', "camera.zoom = location.search.includes('clock-profile') ? 1 : 1 / ORB_AMBIENT_PROFILES.standalone.canvasScale")
+      .replace('data-orb-variant="standalone"', 'data-orb-variant={location.search.includes("clock-profile") ? "clock" : "standalone"}');
+  },
 };
 let server: Server, browser: Browser, origin: string, out: string;
 const evidence = resolve('../../tmp/overnight/OP2-after');
@@ -114,20 +122,24 @@ it.each(['generation', 'core'])('renders real spatial spill without changing the
         gl.readPixels(0, 0, canvas.width, canvas.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels); return pixels; };
       runtime.__showSpill = false; runtime.__redraw(); const before = read();
       runtime.__showSpill = true; runtime.__redraw(); const after = read();
-      let bodyDiff = 0, spillDiff = 0, edgeAlpha = 0;
+      let bodyDiff = 0, overlapDiff = 0, spillDiff = 0, edgeAlpha = 0;
       const sectors = [0, 0, 0, 0];
       for (let y = 0; y < canvas.height; y++) for (let x = 0; x < canvas.width; x++) {
         const p = (y * canvas.width + x) * 4;
         const r = Math.hypot(x / canvas.width - 0.5, y / canvas.height - 0.5);
         const diff = Math.abs(after[p + 3]! - before[p + 3]!);
-        if (r < 0.30) for (let channel = 0; channel < 4; channel++) bodyDiff += Math.abs(after[p + channel]! - before[p + channel]!);
-        if (r > 0.35 && r < 0.48) { spillDiff += diff; sectors[(x > canvas.width / 2 ? 1 : 0) + (y > canvas.height / 2 ? 2 : 0)]! += after[p]! + after[p + 1]! + after[p + 2]!; }
+        // Standalone intentionally lights beneath the transparent body edge.
+        // The padded camera puts its inner mask at r=.241; the core stays exact.
+        if (r < 0.23) for (let channel = 0; channel < 4; channel++) bodyDiff += Math.abs(after[p + channel]! - before[p + channel]!);
+        if (r > 0.24 && r < 0.28) overlapDiff += diff;
+        if (r > 0.30 && r < 0.45) { spillDiff += diff; sectors[(x > canvas.width / 2 ? 1 : 0) + (y > canvas.height / 2 ? 2 : 0)]! += after[p]! + after[p + 1]! + after[p + 2]!; }
         if (x < 2 || y < 2 || x >= canvas.width - 2 || y >= canvas.height - 2) edgeAlpha += after[p + 3]!;
       }
-      return { bodyDiff, spillDiff, edgeAlpha, sectors };
+      return { bodyDiff, overlapDiff, spillDiff, edgeAlpha, sectors };
     });
     writeFileSync(join(evidence, `${surface}-pixels.json`), JSON.stringify(result, null, 2));
     expect(result.bodyDiff).toBe(0);
+    expect(result.overlapDiff).toBeGreaterThan(0);
     expect(result.spillDiff).toBeGreaterThan(1000);
     expect(result.edgeAlpha).toBe(0);
     expect(new Set(result.sectors.map(v => Math.round(v / 1000))).size).toBeGreaterThan(1);
@@ -227,14 +239,14 @@ it.each([1440, 390])('captures both orb paths at %i', async width => {
 }, 120_000);
 
 // Actual body and low-resolution capture, sampled only by QA. No production readback.
-it.each(['dark', 'light'])('tracks resolved dark/light sectors while the source rotates in %s', async theme => {
-  const { page, errors } = await open(390, theme, 'reduce', undefined, '?core');
+it.each(['dark', 'light'].flatMap(theme => ['clock', 'standalone'].map(variant => ({ theme, variant }))))('tracks resolved source sectors in $theme with $variant lighting', async ({ theme, variant }) => {
+  const { page, errors } = await open(390, theme, 'reduce', undefined, variant === 'clock' ? '?core&clock-profile' : '?core');
   try {
     await page.waitForFunction(() => Boolean((window as unknown as { __refreshSource?: unknown }).__refreshSource));
     await page.evaluate(theme => { document.body.style.background = theme === 'light' ? '#ffffff' : '#000000'; },theme);
     const results = [];
     for (const angle of [0, 1.6, 3.2]) {
-      const result = await page.evaluate(({angle,theme}) => {
+      const result = await page.evaluate(({angle,theme,variant}) => {
         const runtime = window as unknown as {
           __body: Record<string, { value: number | { set(...args: number[]): void } }>;
           __refreshSource(): void; __redraw(): void;
@@ -265,10 +277,10 @@ it.each(['dark', 'light'])('tracks resolved dark/light sectors while the source 
         // shader's radial expansion; multi-point averages allow diffuse blur.
         for(let i=0; i<16; i++) {
           const theta = i * Math.PI / 8;
-          body.push([-0.06,0,0.06].reduce((v,d) => v + sample(0.207,theta+d).emitted,0)/3);
-          spill.push([-0.06,0,0.06].reduce((v,d) => v + sample(0.389,theta+d).emitted,0)/3);
-          visibleBody.push([-0.06,0,0.06].reduce((v,d) => v + sample(0.207,theta+d).visible,0)/3);
-          visibleSpill.push([-0.06,0,0.06].reduce((v,d) => v + sample(0.389,theta+d).visible,0)/3);
+          body.push([-0.06,0,0.06].reduce((v,d) => v + sample(variant === 'clock' ? 0.207 : 0.170,theta+d).emitted,0)/3);
+          spill.push([-0.06,0,0.06].reduce((v,d) => v + sample(variant === 'clock' ? 0.389 : 0.320,theta+d).emitted,0)/3);
+          visibleBody.push([-0.06,0,0.06].reduce((v,d) => v + sample(variant === 'clock' ? 0.207 : 0.170,theta+d).visible,0)/3);
+          visibleSpill.push([-0.06,0,0.06].reduce((v,d) => v + sample(variant === 'clock' ? 0.389 : 0.320,theta+d).visible,0)/3);
         }
         const mean = (a: number[]) => a.reduce((x,y)=>x+y,0)/a.length;
         const correlate = (a: number[], b: number[]) => {
@@ -277,13 +289,17 @@ it.each(['dark', 'light'])('tracks resolved dark/light sectors while the source 
         };
         return { angle, body, spill, visibleBody, visibleSpill, correlation: correlate(body,spill),
           visibleCorrelation: correlate(visibleBody,visibleSpill), dimSector: visibleSpill.indexOf(Math.min(...visibleSpill)) };
-      }, {angle,theme});
+      }, {angle,theme,variant});
       results.push(result);
-      writeFileSync(join(evidence, 'structure-'+theme+'.json'), JSON.stringify(results,null,2));
+      writeFileSync(join(evidence, 'structure-'+variant+'-'+theme+'.json'), JSON.stringify(results,null,2));
       await page.screenshot({ path: join(evidence, 'structure-'+theme+'-'+angle+'.png') });
       expect(result.correlation).toBeGreaterThan(0.6);
       expect(result.visibleCorrelation).toBeGreaterThan(0.6);
-      expect(Math.max(...result.visibleSpill)-Math.min(...result.visibleSpill)).toBeGreaterThan(2);
+      // Retain OP2's absolute brightness assertion for its unchanged profile.
+      // Standalone deliberately halves intensity; geometry/intensity tests pin
+      // that reduction, while this new row requires real visible source structure.
+      if (variant === 'clock') expect(Math.max(...result.visibleSpill)-Math.min(...result.visibleSpill)).toBeGreaterThan(2);
+      else expect(Math.max(...result.visibleSpill)-Math.min(...result.visibleSpill)).toBeGreaterThan(0);
       expect(Math.min(...result.spill)).toBeLessThan(Math.max(...result.spill) * 0.7);
     }
     writeFileSync(join(evidence, 'structure-'+theme+'.json'), JSON.stringify(results,null,2));

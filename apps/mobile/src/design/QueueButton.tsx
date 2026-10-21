@@ -170,7 +170,7 @@ export const QueueButton = memo(function QueueButton() {
         }}
       >
         <Animated.View style={{ transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-          <OrbPoster size={ORB_SIZE} mode={mode} interaction={interaction} />
+          <OrbPoster variant="standalone" size={ORB_SIZE} mode={mode} interaction={interaction} />
         </Animated.View>
       </View>
     </Pressable>

@@ -1,4 +1,4 @@
-import { cancelOrbSpin, createOrbInteraction } from '@stay-focused/shared';
+import { ORB_AMBIENT_PROFILES, type OrbVariant, type ClockGlassReadout, cancelOrbSpin, createOrbInteraction } from '@stay-focused/shared';
 import type { OrbInteractionHandle } from '../generation-core/orbInteraction';
 import { createOrbInteractionSampler } from '../generation-core/orbInteractionFrame';
 import { GLView, type ExpoWebGLRenderingContext } from "expo-gl";
@@ -7,7 +7,6 @@ import { AppState, View } from "react-native";
 import { OrbPoster } from '../generation-core/OrbPoster';
 import * as THREE from "three";
 import { createClockGlass } from '@stay-focused/shared/clock-glass-renderer';
-import type { ClockGlassReadout } from '@stay-focused/shared';
 import clockMetrics from '../../../assets/clock/clock-atlas.json';
 
 import { coreLevelsExtra, createCoreLevels, stepCoreLevels, type CoreLevels, type CoreState } from "../generation-core/coreModel";
@@ -41,6 +40,7 @@ const RENDER_SCALE = 0.6;
 export const dayOrbTouch = { active: false };
 
 interface Runtime {
+  variant: OrbVariant;
   tones: DayOrbTones;
   mode: "light" | "dark";
   reducedMotion: boolean;
@@ -62,6 +62,7 @@ interface Runtime {
  * still and dimmed on failure, a brief brighten on completion.
  */
 export const DayOrb = memo(function DayOrb({
+  variant = 'clock',
   minutes,
   size,
   mode,
@@ -72,6 +73,7 @@ export const DayOrb = memo(function DayOrb({
   onGlassReady,
   interaction: suppliedInteraction,
 }: {
+  variant?: OrbVariant;
   minutes: number;
   /** Canvas size in points; the ball fills DAY_ORB_FILL of it. */
   size: number;
@@ -89,8 +91,8 @@ export const DayOrb = memo(function DayOrb({
   const [foreground, setForeground] = useState(AppState.currentState === "active");
   const [renderingFailed, setRenderingFailed] = useState(false);
   const tones = useMemo(() => dayOrbTones(minutes), [minutes]);
-  const runtime = useRef<Runtime>({ tones, mode, reducedMotion, running: live && foreground, state, clock, canvasSize: size, onGlassReady });
-  runtime.current = { tones, mode, reducedMotion, running: live && foreground, state, clock, canvasSize: size, onGlassReady };
+  const runtime = useRef<Runtime>({ variant, tones, mode, reducedMotion, running: live && foreground, state, clock, canvasSize: size, onGlassReady });
+  runtime.current = { variant, tones, mode, reducedMotion, running: live && foreground, state, clock, canvasSize: size, onGlassReady };
   const controller = useRef<{ wake: () => void; dispose: () => void } | null>(null);
   const context = useRef<ExpoWebGLRenderingContext | null>(null);
   useEffect(() => {
@@ -110,19 +112,19 @@ export const DayOrb = memo(function DayOrb({
       controller.current?.dispose();
       controller.current = null;
     };
-  }, [interaction]);
+  }, [interaction, variant]);
   const create = useCallback((gl: ExpoWebGLRenderingContext) => {
     context.current = gl;
     controller.current?.dispose();
     try { controller.current = buildScene(gl, runtime, interaction); }
     catch { context.current = null; setRenderingFailed(true); }
   }, [interaction]);
-  const inner = size * RENDER_SCALE;
+  const inner = size * RENDER_SCALE * ORB_AMBIENT_PROFILES[variant].canvasScale;
   return (
     <View pointerEvents="none" style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
       {/* Ambient spill renders inside the same transparent GL view. */}
       {renderingFailed
-        ? <OrbPoster size={size * DAY_ORB_FILL} mode={mode} interaction={interaction} />
+        ? <OrbPoster variant={variant} size={size * DAY_ORB_FILL} mode={mode} interaction={interaction} />
         : <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />}
     </View>
   );
@@ -147,12 +149,14 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   renderer.toneMappingExposure = 1.02;
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
+  camera.zoom = 1 / ORB_AMBIENT_PROFILES[runtime.current.variant].canvasScale;
+  camera.updateProjectionMatrix();
   camera.position.set(0, 0.02, CAMERA_DISTANCE);
   const root = new THREE.Group();
   scene.add(root);
   const body = createOrbBody();
   root.add(body.mesh);
-  const aura = createOrbAura();
+  const aura = createOrbAura(runtime.current.variant);
   scene.add(aura.mesh);
 
   let glass: ReturnType<typeof createClockGlass> | null = null;

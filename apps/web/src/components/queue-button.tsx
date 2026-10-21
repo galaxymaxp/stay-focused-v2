@@ -110,7 +110,7 @@ export function QueueButton() {
           />
         ) : null}
         <span className="queue-orb" aria-hidden="true">
-          <OrbStill interaction={orbInteraction} className="queue-orb-frame" />
+          <OrbStill variant="standalone" interaction={orbInteraction} className="queue-orb-frame" />
         </span>
         <span className="queue-label">Queue</span>
       </button>
