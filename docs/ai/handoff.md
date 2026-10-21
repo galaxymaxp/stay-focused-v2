@@ -9686,3 +9686,76 @@ runtime/performance evidence. No emulator is running; recording NOT RUN.
 - UI/, apps/mobile/.gitignore, supabase/.temp/ and ignored tmp/ preserved and
   excluded from staging. Existing Owner Pause remains. TB1 endpoint reached;
   do not start LP2, release or FULLSEND in this run.
+
+
+## LP2 legal discoverability - unattended local closure (2026-10-21)
+
+LP2 / legal discoverability (2026-10-21): **PASS for the finite unattended local code scope**.
+Confirmed existing LP1 bundled routes and tiny Settings footer links; neither
+profile menu exposed legal information. Native/web Settings now have standard
+Privacy Policy and Terms of Use rows in About, with version information.
+Profile/account menus open Privacy in two taps and retain the existing Terms
+cross-link. Phone web reuses the same menu behind a topbar avatar because its
+desktop sidebar is hidden. Signed-out/download links and legal copy remain.
+Implementation: c6586db4; docs checkpoint hash is in Git and LP2.status.
+FRESH forced root typecheck/lint/build: 8/8 tasks each, 0 cached; six existing
+lint warnings, zero new. Shared 696/72 files, mobile 1633/171, web 569/75;
+explicit web build 23/23 pages and Android HBC export PASS. Root API build
+37/37 pages; API tests NOT APPLICABLE (client navigation only). Post-restoration
+forced typecheck 8/8, 0 cached, PASS. Unstaged/staged hygiene checks PASS.
+Six isolated browser cases and 12 inspected light/dark captures cover native
+components through RN Web, phone web and desktop web; both Settings routes,
+two profile taps and Terms cross-link pass with no external requests/page errors.
+First helper failures, new-warning repairs and two deliberately interrupted
+builds are retained in acceptance. Native/physical rendering, actual authenticated
+routes and deployed/live state remain UNVERIFIED (owner to confirm).
+Rollout and Device checks NOT RUN, skipped entirely. No service call, email,
+environment-file edit, remote SQL/migration, Scheduler operation, deploy or push.
+Original owner paths and Owner Pause preserved. LP2 endpoint reached; no RB9,
+release or FULLSEND started.
+
+Commits:
+- c6586db4 fix(legal): expose policies in settings and profile menus
+- docs(legal): close LP2 local acceptance and gates (this documentation checkpoint;
+  exact hash in Git and tmp/overnight/LP2.status).
+
+Branch overnight/2026-10-15_feedback; baseline 60865bc3. Confirmed source:
+mobile features/settings/SettingsScreen.tsx, design/primitives.tsx ProfileButton,
+web features/settings.tsx and components/shell.tsx AccountMenu. LP1 native/web
+privacy/terms routes are intact and bundle shared copy; no legal text regression.
+Native About keeps AppUpdateAbout's installed version/update/share behavior.
+Website displays its own package version. Existing RowLink/Sheet/AccountMenu
+and tokens are reused; no new dependencies, colors, glass or animation behavior.
+Phone account links keep 44px targets and the popover fits the viewport.
+
+[Acceptance](acceptance/lp2-legal-discoverability.md) records the full owner
+roadmap path, baseline, matrix, exact gate commands/counts/timings, first attempts,
+visual fixture boundaries and limitations. Focused mobile 18/18 and web 5/5;
+post-restoration typecheck 40.302s, 8/8 tasks and 0 cached. Local screenshots
+are under tmp/overnight/LP2-visual/ with results.json; 6/6 cases, 12 captures.
+These use synthetic account state/inert unrelated network sections, RN Web,
+zero safe insets, web SVG icon masks and a simulated local router. They do not
+establish Expo/Next Router, actual authentication, native rendering or performance.
+Eight frozen source/test hashes match; no meaningful assertion was weakened.
+Two deliberate build interruptions repaired one test lint warning and a named
+JSON import warning. Both full typecheck/lint attempts passed; failures were
+limited to the initial guard-path launch and browser helper lookup. All original
+logs are retained, and the final complete serial gates are green.
+
+**Owner steps remaining**
+
+- Rollout: NOT RUN, skipped entirely. Review the local commits/evidence, then
+  separately initiate publication. No push, deploy, OTA/EAS or install here.
+- Device checks: NOT RUN, skipped entirely. Realme: Today avatar -> Privacy &
+  Terms; follow Terms and Back; Settings -> About -> both legal rows, version,
+  light/dark and offline. Physical/native rendering and actual navigation,
+  accessibility and performance are UNVERIFIED (owner to confirm).
+- Actual authenticated web routes/Next Router, deployed revisions, live
+  production/database/Scheduler state are UNVERIFIED (owner to confirm).
+- Vercel CLI is absent. Strongly recommend `npm i -g vercel` for separately
+  authorized future env pull/deploy/log tooling. Installation and all Vercel
+  commands NOT RUN in LP2.
+- No service call, email, environment-file edit, remote SQL/migration or
+  Scheduler operation is performed. Original UI/, apps/mobile/.gitignore,
+  supabase/.temp/ and ignored tmp/ remain untouched and excluded from staging.
+  Existing Owner Pause remains; no RB9, release or FULLSEND is started.

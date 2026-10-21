@@ -1,5 +1,32 @@
 # Roadmap
 
+<!-- LP2 begin -->
+LP2 / legal discoverability (2026-10-21): **PASS for the finite unattended local code scope**.
+Confirmed existing LP1 bundled routes and tiny Settings footer links; neither
+profile menu exposed legal information. Native/web Settings now have standard
+Privacy Policy and Terms of Use rows in About, with version information.
+Profile/account menus open Privacy in two taps and retain the existing Terms
+cross-link. Phone web reuses the same menu behind a topbar avatar because its
+desktop sidebar is hidden. Signed-out/download links and legal copy remain.
+Implementation: c6586db4; docs checkpoint hash is in Git and LP2.status.
+FRESH forced root typecheck/lint/build: 8/8 tasks each, 0 cached; six existing
+lint warnings, zero new. Shared 696/72 files, mobile 1633/171, web 569/75;
+explicit web build 23/23 pages and Android HBC export PASS. Root API build
+37/37 pages; API tests NOT APPLICABLE (client navigation only). Post-restoration
+forced typecheck 8/8, 0 cached, PASS. Unstaged/staged hygiene checks PASS.
+Six isolated browser cases and 12 inspected light/dark captures cover native
+components through RN Web, phone web and desktop web; both Settings routes,
+two profile taps and Terms cross-link pass with no external requests/page errors.
+First helper failures, new-warning repairs and two deliberately interrupted
+builds are retained in acceptance. Native/physical rendering, actual authenticated
+routes and deployed/live state remain UNVERIFIED (owner to confirm).
+Rollout and Device checks NOT RUN, skipped entirely. No service call, email,
+environment-file edit, remote SQL/migration, Scheduler operation, deploy or push.
+Original owner paths and Owner Pause preserved. LP2 endpoint reached; no RB9,
+release or FULLSEND started.
+[Acceptance and exact gates](ai/acceptance/lp2-legal-discoverability.md).
+<!-- LP2 end -->
+
 <!-- TB1 begin -->
 TB1 / bottom tab press (2026-10-21): **PASS for the finite unattended local code scope**.
 Confirmed installed Expo Router's borderless Android ripple. Shared tab options
