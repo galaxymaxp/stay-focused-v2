@@ -98,7 +98,7 @@ describe("Page secondary headers", () => {
     const root = await mount();
     expect(root.findByType("ScrollView" as never).props.scrollEventThrottle).toBeUndefined();
   });
-  it("composes the collapse handler and caller, hides accessibility descendants and removes the gap", async () => {
+  it("composes the collapse handler and caller, hides accessibility descendants and preserves the measured inset", async () => {
     const onScroll = vi.fn();
     const root = await mount({ hideHeaderBelowOnScroll: true, onScroll, back: true, headerAction: createElement("HeaderAction"), headerBelowFixed: createElement("FixedControls") });
     const region = () => root.findByProps({ testID: "page-collapsible-header" });
@@ -106,18 +106,23 @@ describe("Page secondary headers", () => {
     await act(async () => measured.props.onLayout({ nativeEvent: { layout: { height: 50 } } }));
     const down = event(100);
     await act(async () => root.findByType("ScrollView" as never).props.onScroll(down));
-    expect(onScroll).toHaveBeenCalledExactlyOnceWith(down);
+    expect(onScroll).toHaveBeenCalledExactlyOnceWith({ nativeEvent: down.nativeEvent });
     expect(root.findByType("ScrollView" as never).props.scrollEventThrottle).toBe(16);
-    expect(region().props).toMatchObject({ accessibilityElementsHidden: true, importantForAccessibility: "no-hide-descendants", pointerEvents: "none" });
-    expect(region().props.style.height.__getValue()).toBe(0);
+    expect(region().props.animatedProps).toMatchObject({ accessibilityElementsHidden: true, importantForAccessibility: "no-hide-descendants", pointerEvents: "none" });
+    expect(region().props.style[0]).toMatchObject({ position: "absolute", top: 0 });
+    const mask = root.findByProps({ testID: "page-header-mask" });
+    expect(mask.props.style).toMatchObject({ height: 50, overflow: "hidden" });
+    expect(mask.props.pointerEvents).toBe("box-none");
+    expect(mask.parent?.props.style.overflow).toBeUndefined();
+    expect(root.findByType("ScrollView" as never).props.contentContainerStyle.paddingTop).toBe(50);
     expect(region().findAllByType("HeaderAction" as never)).toHaveLength(0);
     expect(region().findAllByType("FixedControls" as never)).toHaveLength(0);
     expect(root.findAllByType("HeaderAction" as never)).toHaveLength(1);
     expect(root.findAllByProps({ label: "Back" })).toHaveLength(1);
     await act(async () => root.findByType("ScrollView" as never).props.onScroll(event(-10)));
-    expect(region().props.accessibilityElementsHidden).toBe(false);
-    expect(region().props.importantForAccessibility).toBe("auto");
-    expect(region().props.style.height.__getValue()).toBe(50);
+    expect(region().props.animatedProps.accessibilityElementsHidden).toBe(false);
+    expect(region().props.animatedProps.importantForAccessibility).toBe("auto");
+    expect(root.findByType("ScrollView" as never).props.contentContainerStyle.paddingTop).toBe(50);
   });
   it("preserves native RefreshControl and refreshEnabled on an opted-in Page", async () => {
     const onRefresh = vi.fn();
@@ -137,7 +142,7 @@ describe("Page secondary headers", () => {
     expect(scroll.props.onLayout).toBeTypeOf("function");
     expect(scroll.props.onContentSizeChange).toBeTypeOf("function");
     await act(async () => scroll.props.onScroll(event(1000)));
-    expect(root.findByProps({ testID: "page-collapsible-header" }).props.accessibilityElementsHidden).toBe(false);
+    expect(root.findByProps({ testID: "page-collapsible-header" }).props.animatedProps.accessibilityElementsHidden).toBe(false);
   });
   it("does not collapse a non-scrolling Page", async () => {
     const root = await mount({ hideHeaderBelowOnScroll: true, scroll: false });

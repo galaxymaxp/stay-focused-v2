@@ -44,6 +44,7 @@ import { useReviewerImages } from './use-reviewer-images';
 import { ReviewerHeader } from './reviewer-header';
 import { useAction } from '../../lib/hooks';
 import { downloadStudyFile, EXPORT_FAILURE } from '../study-export';
+import { useHideOnScroll } from '../../lib/use-hide-on-scroll';
 
 // Web counterpart of apps/mobile/src/features/reviewer/ReviewerReader.tsx:
 // topics and search on the left, the Reviewer in a reading column, and Study
@@ -89,6 +90,8 @@ export function ReviewerReader({
   const segments = useMemo(() => reviewerSegments(reviewer), [reviewer]);
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const searchHeader = useHideOnScroll({ forceVisible: searchFocused || query.length > 0 || deferredQuery.length > 0 });
   const matches = useMemo(() => findReviewerMatches(segments, deferredQuery), [segments, deferredQuery]);
   const [activeMatch, setActiveMatch] = useState(0);
   const searching = deferredQuery.trim().length >= MIN_QUERY_LENGTH;
@@ -336,13 +339,17 @@ export function ReviewerReader({
       {reviewer.generationNotice ? <Notice>{reviewer.generationNotice}</Notice> : null}
       <div className={`reviewer-layout${passage ? " with-panel" : ""}${picking ? " picking" : ""}`}>
         <nav className="reviewer-toc" aria-label="Topics">
-          <label className="reviewer-search">
+          <div className="scroll-search-slot" style={searchHeader.slotStyle}>
+          <label ref={searchHeader.measureRef} className="reviewer-search" style={searchHeader.style}
+            inert={searchHeader.hidden} aria-hidden={searchHeader.hidden || undefined}>
             <span className="sr-only">Search topics, terms, definitions</span>
             <input
               type="search"
               aria-label="Search topics, terms, definitions"
               placeholder="Search topics, terms, definitions"
               value={query}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setSearchFocused(false)}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && matches.length) {
@@ -352,6 +359,7 @@ export function ReviewerReader({
               }}
             />
           </label>
+          </div>
           {searching && (
             <div className="row between search-steps">
               <span className="meta" aria-live="polite">

@@ -3684,9 +3684,13 @@ mark.find-active {
     grid-template-columns: minmax(0, 1fr);
   }
   .reviewer-toc {
-    position: static;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    pointer-events: none;
     max-height: none;
   }
+  .reviewer-toc > .search-steps { pointer-events: auto; }
   .toc-list {
     display: none;
   }
@@ -4485,11 +4489,9 @@ mark.find-active {
   .generate-tools {
     display: contents;
   }
-  .generate-tools > .generate-course-search {
+  .generate-tools .generate-course-search,
+  .reviewer-search {
     flex: none;
-    position: sticky;
-    top: 0;
-    z-index: 2;
     background: var(--bg);
   }
   .generate-tools > .button {
@@ -5444,7 +5446,7 @@ mark.find-active {
 .page-heading > .row > div { min-width: 0; }
 .page-heading p { overflow-wrap: anywhere; }
 .course-heading .page-heading > .row.wrap { flex: 0 1 auto; }
-.generate-tools > label { flex: 1 1 240px; min-width: 0; }
+.generate-tools label.generate-course-search { flex: 1 1 240px; min-width: 0; }
 .generate-tools > .button { flex: 0 0 auto; max-width: 100%; }
 .generate-course-tile { position: relative; display: grid; min-width: 0; }
 .generate-course-tile > .course-card { min-width: 0; padding-right: 64px; }

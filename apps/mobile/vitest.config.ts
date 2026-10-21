@@ -4,7 +4,10 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     // The native module cannot load under Node; tests get an inert stand-in.
-    alias: { "expo-haptics": path.resolve(__dirname, "src/testSupport/expoHapticsStub.ts") },
+    alias: {
+      "expo-haptics": path.resolve(__dirname, "src/testSupport/expoHapticsStub.ts"),
+      "react-native-reanimated": path.resolve(__dirname, "src/testSupport/reanimatedStub.ts"),
+    },
   },
   test: {
     environment: "node",

@@ -18,7 +18,10 @@ import {
   type AccessibilityActionInfo,
   type StyleProp,
   type ViewStyle,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
+import Reanimated from "react-native-reanimated";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "../auth";
@@ -255,7 +258,12 @@ export function Page({
   const auth = useAuth();
   const [pulling, setPulling] = useState(false);
   const collapsing = hideHeaderBelowOnScroll && scroll;
-  const header = useHideOnScroll({ enabled: collapsing, forceVisible: headerBelowAlwaysVisible });
+  const observeScroll = (event: NativeScrollEvent) => {
+    // Native worklets forward the native payload, rather than a pooled JS event.
+    onScroll?.({ nativeEvent: event } as NativeSyntheticEvent<NativeScrollEvent>);
+  };
+  const header = useHideOnScroll({ enabled: collapsing, forceVisible: headerBelowAlwaysVisible, onScroll: onScroll ? observeScroll : undefined });
+  const PageScrollView = collapsing ? Reanimated.ScrollView : ScrollView;
   // Screens nested inside a tab already sit above the tab bar.
   const insideTabs = useContext(BottomTabBarHeightContext) !== undefined;
   const pullToRefresh = onRefresh
@@ -313,22 +321,12 @@ export function Page({
         <Copy muted size="caption">Offline access · Saved work is available. Online features reconnect automatically.</Copy>
       </View> : null}
       {headerBelowFixed}
-      {collapsing ? (
-        <Animated.View
-          testID="page-collapsible-header"
-          style={header.style}
-          accessibilityElementsHidden={!header.visible}
-          importantForAccessibility={header.visible ? "auto" : "no-hide-descendants"}
-          pointerEvents={header.visible ? "auto" : "none"}
-        >
-          <View onLayout={header.onLayout} style={header.contentStyle}>{headerBelow}</View>
-        </Animated.View>
-      ) : headerBelow}
+      {!collapsing && headerBelow}
       <View style={{ flex: 1 }}>
       {scroll ? (
-        <ScrollView
+        <PageScrollView
           ref={scrollRef}
-          onScroll={collapsing ? (event) => { header.onScroll(event); onScroll?.(event); } : onScroll}
+          onScroll={collapsing ? header.onScroll : onScroll}
           onLayout={collapsing ? header.onViewportLayout : undefined}
           onContentSizeChange={collapsing ? header.onContentSizeChange : undefined}
           scrollEnabled={scrollEnabled}
@@ -344,14 +342,27 @@ export function Page({
           contentContainerStyle={{
             paddingHorizontal: spacing[5],
             paddingBottom: 32,
+            paddingTop: collapsing ? header.height : undefined,
             gap: density.screenGap,
           }}
         >
           {children}
           {actions.length > 0 ? <PageLinks actions={actions} /> : null}
-        </ScrollView>
+        </PageScrollView>
       ) : (
         <View style={{ flex: 1, paddingHorizontal: 20 }}>{children}</View>
+      )}
+      {collapsing && (
+        <View testID="page-header-mask" pointerEvents="box-none"
+          style={{ position: "absolute", top: 0, left: 0, right: 0, height: header.height, overflow: "hidden", zIndex: 1 }}>
+        <Reanimated.View
+          testID="page-collapsible-header"
+          animatedProps={header.animatedProps}
+          style={[{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 1, backgroundColor: colors.backgroundPrimary }, header.style]}
+        >
+          <View onLayout={header.onLayout}>{headerBelow}</View>
+        </Reanimated.View>
+        </View>
       )}
       {overlay}
       </View>

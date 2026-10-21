@@ -17,6 +17,7 @@ import { afterAll, beforeAll, expect, it } from "vitest";
 // explicitly not ExpoGL, Android rendering or physical interaction acceptance.
 const root = resolve("src").replaceAll("\\", "/");
 const stubs: Record<string, string> = {
+  "react-native-reanimated": `export { Animated as default } from "react-native";`,
   "react-native": `import React from "react"; import * as Web from "react-native-web";
     export * from "react-native-web";
     export function useWindowDimensions() { return { ...Web.useWindowDimensions(), fontScale: window.__scale }; }

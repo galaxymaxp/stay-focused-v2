@@ -110,7 +110,14 @@ describe('Reviewer review-time header', () => {
     expect(page().props.headerBelowAlwaysVisible).toBe(true);
     await act(async () => search().props.onChangeText('Cells'));
     expect(scrollTo).toHaveBeenCalledWith({ y: 1128, animated: false });
+    // Content includes the constant inset; jumps keep their context BELOW the
+    // pinned search, including a larger-font header (120pt) and content chrome.
+    await act(async () => rendered!.root.findByProps({ testID: 'reviewer-search-overlay-content' }).props.onLayout({ nativeEvent: { layout: { height: 120 } } }));
+    const content = rendered!.root.findAllByType('View' as never).find(node => node.props.collapsable === false && node.props.onLayout);
+    await act(async () => content!.props.onLayout({ nativeEvent: { layout: { y: 320 } } }));
+    expect(page().props.overlay.props.children[0].props.anchorOffset(0)).toBe(200);
     await act(async () => search().props.onSubmitEditing());
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 1328, animated: false });
     await act(async () => page().props.onScroll({ nativeEvent: { contentOffset: { y: 1128 }, contentSize: { height: 3000 }, layoutMeasurement: { height: 700 } } }));
     expect(page().props.headerBelowAlwaysVisible).toBe(true);
     expect(rendered!.root.findByProps({ testID: 'reviewer-search' })).toBeDefined();

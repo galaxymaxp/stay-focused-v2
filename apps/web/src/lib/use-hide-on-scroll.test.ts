@@ -33,6 +33,24 @@ afterEach(async () => {
 });
 
 describe("web course search scroll visibility", () => {
+  it("reserves the measured header height while hidden and remeasures without a scroll", async () => {
+    let resize = () => {};
+    const disconnect = vi.fn();
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: () => void) { resize = callback; }
+      observe() {}
+      disconnect = disconnect;
+    });
+    await mount();
+    let height = 52;
+    await act(async () => header.measureRef({ getBoundingClientRect: () => ({ height }) } as HTMLElement));
+    expect(header.slotStyle).toMatchObject({ height: 52, pointerEvents: "none" });
+    expect(header.style).toMatchObject({ position: "absolute", pointerEvents: "auto" });
+    await scroll(100);
+    expect(header.slotStyle.height).toBe(52);
+    height = 92; await act(async () => resize()); expect(header.slotStyle.height).toBe(92);
+    await act(async () => header.measureRef(null)); expect(disconnect).toHaveBeenCalled();
+  });
   it("uses a 12px accumulated direction threshold and restores at the top", async () => {
     await mount();
     for (const y of [4, 8, 11]) { await scroll(y); expect(header.hidden).toBe(false); }
@@ -50,7 +68,7 @@ describe("web course search scroll visibility", () => {
   });
   it("animates translation and opacity for 200ms with ease", async () => {
     await mount(); await scroll(100);
-    expect(header.style).toEqual({ transform: "translateY(calc(-100% - 16px))", opacity: 0,
+    expect(header.style).toMatchObject({ transform: "translateY(calc(-100% - 16px))", opacity: 0,
       transition: "transform 200ms ease, opacity 200ms ease", pointerEvents: "none" });
     await scroll(88);
     expect(header.style).toMatchObject({ transform: "translateY(0)", opacity: 1 });

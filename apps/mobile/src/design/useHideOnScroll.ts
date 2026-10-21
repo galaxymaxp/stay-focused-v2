@@ -1,98 +1,109 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Animated, Easing, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, type ViewStyle } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import type { LayoutChangeEvent, NativeScrollEvent } from "react-native";
+import { cancelAnimation, runOnJS, useAnimatedProps, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import { motion, useTheme } from "./theme";
 
-export interface HeaderVisibilityState {
-  visible: boolean;
-  /** Lowest offset while visible, highest while hidden: accumulates slow drags. */
-  anchorY: number;
+/** Clamp elastic offsets before taking deltas, so bounce cannot reverse direction. */
+export function boundedScroll(y: number, content: number, viewport: number) {
+  "worklet";
+  if (![y, content, viewport].every(Number.isFinite) || content < 0 || viewport <= 0) return NaN;
+  return Math.max(0, Math.min(y, Math.max(0, content - viewport)));
 }
 
-interface HeaderScrollMetrics {
-  y: number;
-  headerHeight: number;
-  contentHeight: number;
-  viewportHeight: number;
+export function clampHeader(offset: number, delta: number, height: number) {
+  "worklet";
+  return Math.max(0, Math.min(height, offset + delta));
+}
+
+export function snapHeader(offset: number, height: number, y: number, forced = false) {
+  "worklet";
+  return forced || y <= 0 || offset < height / 2 ? 0 : height;
+}
+
+export function useHideOnScroll({ enabled = true, forceVisible = false, onScroll }: {
+  enabled?: boolean;
   forceVisible?: boolean;
-}
-
-/** A direction reversal must travel more than 8pt; hiding also needs height + 24pt. */
-export function nextHeaderVisibility(prev: HeaderVisibilityState, metrics: HeaderScrollMetrics): HeaderVisibilityState {
-  const { y, headerHeight, contentHeight, viewportHeight, forceVisible } = metrics;
-  if (![y, headerHeight, contentHeight, viewportHeight].every(Number.isFinite)) return prev;
-  if (forceVisible || y <= 0 || contentHeight <= viewportHeight) return { visible: true, anchorY: Math.max(0, y) };
-  if (viewportHeight <= 0 || headerHeight <= 0) return prev;
-  // Collapsing expands the viewport. At the bottom, native offset correction
-  // (or elastic rebound) must not look like the student scrolling back up.
-  const maximumY = Math.max(0, contentHeight - viewportHeight);
-  const offset = Math.min(y, maximumY);
-  const previousAnchor = Math.min(prev.anchorY, maximumY);
-  const anchorY = prev.visible ? Math.min(previousAnchor, offset) : Math.max(previousAnchor, offset);
-  if (prev.visible && offset > headerHeight + 24 && offset - anchorY > 8) return { visible: false, anchorY: offset };
-  if (!prev.visible && anchorY - offset > 8) return { visible: true, anchorY: offset };
-  return { visible: prev.visible, anchorY };
-}
-
-export function useHideOnScroll({ enabled = true, forceVisible = false }: { enabled?: boolean; forceVisible?: boolean } = {}) {
+  /** Existing reader/scrubber observer; header motion never waits for JS. */
+  onScroll?: (event: NativeScrollEvent) => void;
+} = {}) {
   const { reducedMotion } = useTheme();
-  const [visible, setVisible] = useState(true);
-  const [height, setHeight] = useState<number | null>(null);
-  const decision = useRef<HeaderVisibilityState>({ visible: true, anchorY: 0 });
-  const metrics = useRef({ y: 0, headerHeight: 0, contentHeight: 0, viewportHeight: 0 });
-  const progress = useRef(new Animated.Value(1)).current;
+  const [height, setHeight] = useState(0);
+  const measuredHeight = useSharedValue(0);
+  const offset = useSharedValue(0);
+  const previousY = useSharedValue(0);
+  const viewport = useSharedValue(0);
+  const content = useSharedValue(0);
   const forced = !enabled || forceVisible;
 
-  const reconcile = useCallback(() => {
-    const next = nextHeaderVisibility(decision.current, { ...metrics.current, forceVisible: forced });
-    if (decision.current.visible !== next.visible) setVisible(next.visible);
-    decision.current = next;
-  }, [forced]);
-
-  useEffect(() => { reconcile(); }, [reconcile]);
-  const shown = forced || visible;
   useEffect(() => {
-    progress.stopAnimation();
-    if (reducedMotion) progress.setValue(shown ? 1 : 0);
-    else Animated.timing(progress, {
-      toValue: shown ? 1 : 0,
-      duration: motion.small,
-      easing: Easing.inOut(Easing.quad),
-      useNativeDriver: false, // Height must participate in layout to remove the gap.
-    }).start();
-    return () => progress.stopAnimation();
-  }, [progress, reducedMotion, shown]);
+    cancelAnimation(offset);
+    // A focus/query or preference change must expose the search immediately.
+    offset.value = 0;
+    return () => cancelAnimation(offset);
+  }, [forced, reducedMotion, offset]);
 
-  const onLayout = useCallback((event: LayoutChangeEvent) => {
-    const measured = event.nativeEvent.layout.height;
-    if (!Number.isFinite(measured) || measured < 0) return;
-    metrics.current.headerHeight = measured;
-    setHeight(current => current === measured ? current : measured);
-    reconcile();
-  }, [reconcile]);
-  const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
-    metrics.current = { ...metrics.current, y: contentOffset.y, contentHeight: contentSize.height, viewportHeight: layoutMeasurement.height };
-    reconcile();
-  }, [reconcile]);
-  // A resize or refreshed short list can reveal the header without a scroll event.
-  const onViewportLayout = useCallback((event: LayoutChangeEvent) => {
-    metrics.current.viewportHeight = event.nativeEvent.layout.height;
-    reconcile();
-  }, [reconcile]);
-  const onContentSizeChange = useCallback((_width: number, contentHeight: number) => {
-    metrics.current.contentHeight = contentHeight;
-    reconcile();
-  }, [reconcile]);
-
-  return {
-    onScroll, onLayout, onViewportLayout, onContentSizeChange, visible: shown,
-    style: {
-      overflow: "hidden" as const,
-      height: height === null ? undefined : progress.interpolate({ inputRange: [0, 1], outputRange: [0, height] }),
-      opacity: progress,
-    },
-    // Measure natural height independently of the clipped outer height, even hidden.
-    contentStyle: height === null ? undefined : { position: "absolute", top: 0, left: 0, right: 0 } satisfies ViewStyle,
+  const settle = () => {
+    "worklet";
+    const target = snapHeader(offset.value, measuredHeight.value, previousY.value, forced || content.value <= viewport.value);
+    offset.value = reducedMotion ? target : withTiming(target, { duration: motion.small });
   };
+  const scrollHandler = useAnimatedScrollHandler({
+    onBeginDrag: () => { cancelAnimation(offset); },
+    onScroll: event => {
+      const y = boundedScroll(event.contentOffset.y, event.contentSize.height, event.layoutMeasurement.height);
+      if (!Number.isFinite(y)) return;
+      viewport.value = event.layoutMeasurement.height;
+      content.value = event.contentSize.height;
+      const previous = boundedScroll(previousY.value, event.contentSize.height, event.layoutMeasurement.height);
+      const next = clampHeader(offset.value, y - previous, measuredHeight.value);
+      cancelAnimation(offset);
+      // Reduced motion still accumulates travel, but renders endpoints only.
+      offset.value = forced || y === 0 || content.value <= viewport.value ? 0 : next;
+      previousY.value = y;
+      if (onScroll) runOnJS(onScroll)(event);
+    },
+    onEndDrag: settle,
+    onMomentumBegin: () => { cancelAnimation(offset); },
+    onMomentumEnd: settle,
+  });
+
+  const style = useAnimatedStyle(() => {
+    const hidden = forced ? 0 : reducedMotion
+      ? snapHeader(offset.value, measuredHeight.value, previousY.value)
+      : offset.value;
+    return { transform: [{ translateY: -hidden }] };
+  });
+  const animatedProps = useAnimatedProps(() => {
+    const hidden = !forced && measuredHeight.value > 0 && (reducedMotion
+      ? snapHeader(offset.value, measuredHeight.value, previousY.value) === measuredHeight.value
+      : offset.value >= measuredHeight.value);
+    return {
+      pointerEvents: hidden ? "none" as const : "auto" as const,
+      accessibilityElementsHidden: hidden,
+      importantForAccessibility: hidden ? "no-hide-descendants" as const : "auto" as const,
+    };
+  });
+  const onLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.height;
+    if (!Number.isFinite(next) || next < 0) return;
+    cancelAnimation(offset);
+    const wasHidden = measuredHeight.value > 0 && offset.value >= measuredHeight.value;
+    measuredHeight.value = next;
+    offset.value = wasHidden ? next : Math.min(offset.value, next);
+    setHeight(current => current === next ? current : next);
+  }, [measuredHeight, offset]);
+  const onViewportLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.height;
+    if (!Number.isFinite(next) || next <= 0) return;
+    viewport.value = next;
+    if (content.value <= viewport.value) offset.value = 0;
+  }, [content, offset, viewport]);
+  const onContentSizeChange = useCallback((_width: number, next: number) => {
+    if (!Number.isFinite(next) || next < 0) return;
+    content.value = next;
+    if (next <= viewport.value) { offset.value = 0; previousY.value = 0; }
+  }, [content, offset, previousY, viewport]);
+
+  return { height, style, animatedProps, onLayout, onScroll: scrollHandler, onViewportLayout, onContentSizeChange };
 }

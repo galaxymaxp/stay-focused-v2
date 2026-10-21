@@ -102,7 +102,8 @@ export function ReviewerReaderScreen({
   const scrollRef = useRef<ScrollView>(null);
   const rootRef = useRef<View>(null);
   const rootY = useRef(0);
-  const topicScroll = useStudyAnswerScroll(scrollRef, () => rootY.current);
+  const searchHeight = useRef(0);
+  const topicScroll = useStudyAnswerScroll(scrollRef, () => rootY.current - searchHeight.current);
   const blockNodes = useRef(new Map<string, View>());
   const segmentRefs = useRef(new Map<string, Measurable>());
   const sectionY = useRef<number[]>([]);
@@ -233,7 +234,7 @@ export function ReviewerReaderScreen({
       if (!anchor) return 0;
       const section = sectionY.current[anchor.sectionIndex] ?? 0;
       const within = anchor.id === reviewer.sections[anchor.sectionIndex]?.id ? 0 : blockY.current.get(anchor.id) ?? 0;
-      return rootY.current + (anchor.id === reviewer.sections[anchor.sectionIndex]?.id ? section : within);
+      return rootY.current - searchHeight.current + (anchor.id === reviewer.sections[anchor.sectionIndex]?.id ? section : within);
     },
     [anchors, reviewer.sections],
   );
@@ -252,7 +253,7 @@ export function ReviewerReaderScreen({
       if (!target || !root) return;
       target.measureLayout(
         root,
-        (_x, y) => scrollTo(rootY.current + y - JUMP_CONTEXT, true),
+        (_x, y) => scrollTo(rootY.current + y - searchHeight.current - JUMP_CONTEXT, true),
         () => undefined,
       );
     },
@@ -324,7 +325,9 @@ export function ReviewerReaderScreen({
         onTouchEnd: () => scrubber.current.touch?.onTouchEnd(),
         onTouchCancel: () => scrubber.current.touch?.onTouchCancel(),
       }}
-      headerBelow={<>
+      headerBelow={<View testID="reviewer-search-overlay-content" onLayout={(event) => {
+        searchHeight.current = event.nativeEvent.layout.height;
+      }}>
         {snapshotStatus}
         <ReviewerSearchBar
           query={query}
@@ -338,7 +341,7 @@ export function ReviewerReaderScreen({
           onPrevious={() => setActiveMatch((index) => (matches.length ? (index - 1 + matches.length) % matches.length : 0))}
           onNext={() => setActiveMatch((index) => (matches.length ? (index + 1) % matches.length : 0))}
         />
-      </>}
+      </View>}
       overlay={
         <>
         <SectionScrubber

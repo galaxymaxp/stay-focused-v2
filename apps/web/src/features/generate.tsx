@@ -175,7 +175,8 @@ export function GenerateScreen() {
       <Heading title="Generate" subtitle="Canvas material or your own notes." />
       <div className="stack">
         <div className="row wrap generate-tools">
-          <label className="grow generate-course-search" style={searchHeader.style}
+          <div className="scroll-search-slot" style={searchHeader.slotStyle}>
+          <label ref={searchHeader.measureRef} className="grow generate-course-search" style={searchHeader.style}
             inert={searchHeader.hidden} aria-hidden={searchHeader.hidden || undefined}>
             <span className="sr-only">Search courses</span>
             <input
@@ -188,6 +189,7 @@ export function GenerateScreen() {
               onBlur={() => setSearchFocused(false)}
             />
           </label>
+          </div>
           <Link className="button subtle" href="/canvas">
             <Icon name="globe" />
             Connection and sync
