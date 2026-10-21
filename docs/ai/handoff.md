@@ -1,5 +1,71 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff — FULLSEND (20261021-2245)
+
+What changed:
+Shipped OT1/OG1/OL1/RS1/TB1/LP2 from source70c415d13ef75c2e334fc6d544edfdc35d34e5ff;
+previous maine71dd2aaf836751f3b694eb60b2b2274d2c484b0 retained by normal
+merge56170ac. Tested application/test maine8b44dd242a2e8a3340d8287bf6b2f4f57ac0a52.
+Fresh clone; source UI/, apps/mobile/.gitignore, supabase/.temp/ left local,
+not shipped. Expo patches43038b9, web workers64cc1e7, native0536abf,
+publisher fixture9df3602, preview Node24e62e31c, causal browser probee8b44dd.
+
+Verification (exact counts):
+FRESH forced root typecheck/lint/build8/8 each,0 cached; six existing warnings.
+Shared348/36 source cases/files, Canvas75/1, OCR27/3, engine606,
+API2452 pass+3 existing live skips/213 files, mobile1633/171, web569/75,
+contract20/20, publisher27/27; Doctor21/21. API/web37/37 and23/23 pages,
+Android/iOS/web exports. Complete CI39637163181 SUCCESS. Failed first
+Doctor/web/browser CI39634165945/publisher/EAS attempts and repairs
+are recorded in the acceptance report; no assertions/deadlines weakened or
+tests newly skipped. Docs-only application reruns NOT APPLICABLE; final diff
+and staged hygiene FRESH PASS. Final docs SHA/CI in external FS5 result/status.
+
+Deployments (IDs, SHAs):
+Migrations none. Worker Cloud Build56025bca-0794-42dd-9506-79b1c9c6b42a SUCCESS,
+asia-northeast1-docker.pkg.dev/stay-focus-492811/generation/worker:64cc1e7,
+digest7d973fd7cd6b9fa2d1d7daeddaa549cd252a2e0b2a5e681c9f6db7e2ada982aa;
+generation-worker-00032-gbv Ready/100%, health200/startup errors0; dispatch set.
+Website dpl_2yGbZmy658n1QJW8Fgjw6c9YgYiQ production64cc1e7,
+https://stay-focused-1p3sqgzh2-galaxymaxps-projects.vercel.app,
+alias https://stay-focused-ten.vercel.app. API dpl_CK6u8TsPnGnKi2bFqbYvTBVQewsB
+productione8b44dd, https://stay-focused-v2-prototype-4trdwmfbc-galaxymaxps-projects.vercel.app.
+Direct/proxied health200 reports exacte8b44dd; website200. Initial complete
+10-minute error/fatal/5xx scans0, follow-up API20-minute scans0.
+First EASd6242c5b failed before Gradle; targeted preview Node24.16.0 pin;
+single rebuilda26aa1fe-623e-49e5-95fb-0c2caa1f86ea FINISHED frome62e31c.
+Realme adb install-r SUCCESS,2.3.0/code7/runtime2.3.0-sdk57, built-in update;
+verified package/runtime/signature, matching installed APK hash
+0910d589b42c02c04f032dff7362da69258cdd081c5be1c2dc83798452cc12e6.
+Public https://github.com/galaxymaxp/stay-focused-releases/releases/tag/v2.3.0%2B7;
+canonical APK132024227bytes, exact digest. First publisher timed out creating
+empty draft; completed its same draft after inspection/asset verification.
+No asset/release overwrite/deletion, third build, credential change, uninstall,
+data clear or OTA. Completed release actions were not repeated on resume.
+
+Live checks:
+FRESH4 PASS/2 FAIL on installed2.3.0/code7. PASS limited smoke: Today light
+body/dark time, restrained standalone glow, Generate scroll endpoints, profile/
+Settings legal links and Back. FAIL OL1/TB1: return/post-tab captures lose
+header/body/tab text; some Today captures show square poster/background.
+Native composition versus adb capture cause remains UNVERIFIED; mirrors prior
+FS4 symptom but no causal regression claim. Full palette/theme parity, active
+state/motion/performance and frame-by-frame jitter NOT RUN. Desktop UI NOT RUN:
+empty browser inventory/IAB unavailable. Zero generations/start/retry/clear
+or manual sync. Automatic restored, palette unchanged; phone Today/Asleep.
+Private captures remain ignored in .local/fullsend-20261021-2245.
+
+Next steps:
+Investigate native redraw/capture behavior and complete broader physical
+acceptance. Final docs push, main-ref refresh and observations in external result.
+
+Blockers:
+None for shipped release; no owner deployment pending. Desktop UI unavailable.
+
+Risks:
+Release PASS through STEP6 coexists with PARTIAL device visual acceptance;
+two smoke failures remain open. Details: docs/ai/acceptance/fullsend-20261021-2245.md.
+
 ## Handoff ? FULLSEND (20261020-2101)
 
 What changed:

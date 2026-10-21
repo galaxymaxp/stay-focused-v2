@@ -1,5 +1,41 @@
 # Roadmap
 
+<!-- FS5 begin -->
+FS5 / FULLSEND 20261021-2245: **release shipped; device visual acceptance PARTIAL**.
+OT1, OG1, OL1, RS1, TB1 and LP2 shipped from source
+70c415d13ef75c2e334fc6d544edfdc35d34e5ff in a fresh clone. Previous main
+e71dd2aaf836751f3b694eb60b2b2274d2c484b0 retained by normal merge56170ac.
+Application release64cc1e7; native/toolchain repairs0536abf/e62e31c;
+final tested application/test main e8b44dd242a2e8a3340d8287bf6b2f4f57ac0a52.
+FRESH forced root typecheck/lint/build8/8 each,0 cached; six existing warnings.
+FRESH suites: shared348/36, Canvas75/1, OCR27/3, engine606, API2452 pass+
+3 existing live skips/213 files, mobile1633/171, web569/75, contract20/20,
+publisher27/27; Doctor21/21. Final complete CI39637163181 SUCCESS.
+First Doctor/web/CI/publisher/EAS failures and passing repairs are retained in
+the acceptance report. No migrations. Worker:64cc1e7,
+generation-worker-00032-gbv Ready/100%, health200/startup errors0; dispatch set.
+Website dpl_2yGbZmy658n1QJW8Fgjw6c9YgYiQ READY/production at64cc1e7.
+API dpl_CK6u8TsPnGnKi2bFqbYvTBVQewsB READY/production ate8b44dd;
+direct/proxied health200/ok reports exacte8b44dd. Initial complete error scans0.
+Native rebuild a26aa1fe-623e-49e5-95fb-0c2caa1f86ea FINISHED frome62e31c;
+Node24.16.0, existing frozen signing credentials. Verified matching signature,
+package/runtime and APK hash; in-place Realme install SUCCESS:
+2.3.0/code7/runtime2.3.0-sdk57, built-in update. Public APK published:
+https://github.com/galaxymaxp/stay-focused-releases/releases/tag/v2.3.0%2B7.
+No third build, credential change, uninstall, data clear or OTA.
+STEP7 bounded smoke:4 PASS (light Today tint, restrained standalone glow,
+Generate scroll endpoints, legal navigation),2 FAIL (OL1/TB1 captures show
+blank regions after navigation). Native composition versus adb capture cause
+remains unproven; device visual acceptance is not complete. Desktop UI NOT RUN:
+browser inventory empty/IAB unavailable. Zero generation submissions.
+Automatic theme restored; Today returned; Realme confirmed Asleep.
+Source UI/, apps/mobile/.gitignore and supabase/.temp/ left local, not shipped.
+Next: investigate native redraw/capture failures and finish broader physical
+acceptance. No deployment pending. Final docs SHA/CI and source-ref ancestry
+are recorded after commit in the external FS5 result/status.
+Report: docs/ai/acceptance/fullsend-20261021-2245.md.
+<!-- FS5 end -->
+
 <!-- LP2 begin -->
 LP2 / legal discoverability (2026-10-21): **PASS for the finite unattended local code scope**.
 Confirmed existing LP1 bundled routes and tiny Settings footer links; neither
