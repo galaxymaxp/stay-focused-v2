@@ -1,3 +1,23 @@
+<!-- OX1 begin -->
+OX1 / orb compositing integrity (2026-10-22): **STOPPED at STEP 0**.
+Scope: OX1 STEP 0-2, local gates/docs/commits, with Rollout and Device checks
+skipped entirely. No later task, production call, environment-file edit or push.
+Baseline branch overnight/2026-10-15_feedback at 70c415d1 is the intentionally
+retained FS5 source checkout, as confirmed by the existing release Git report.
+Source/installed Expo inspection and 36 actual web sequences (805 frames,
+13,518 samples) did not reproduce the square: zero visible partial-clock samples,
+outer alpha/RGB leakage and page-corner difference. Twelve mobile-component
+browser cases likewise show no square; they cannot establish native-surface
+behavior. FRESH focused shared 12/12, mobile 26/26, web 21/21, 0 failed/skipped.
+Required source attribution remains unresolved, so no speculative code change,
+mask or dependency modification was made. Full gates NOT RUN; documentation
+diff/staged checks PASS. Scoped documentation commit hash in Git/OX1.status.
+Native appearance/lifecycle/performance and live state UNVERIFIED (owner to
+confirm); exact focused owner capture request in report/handoff. Owner paths
+and Owner Pause preserved. OX2 remains blocked on OX1 PASS.
+[Acceptance](acceptance/ox1-orb-compositing-integrity.md).
+<!-- OX1 end -->
+
 <!-- LP2 begin -->
 LP2 / legal discoverability (2026-10-21): **PASS for the finite unattended local code scope**.
 Confirmed existing LP1 bundled routes and tiny Settings footer links; neither

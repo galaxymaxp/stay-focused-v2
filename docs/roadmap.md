@@ -1,5 +1,24 @@
 # Roadmap
 
+<!-- OX1 begin -->
+OX1 / orb compositing integrity (2026-10-22): **STOPPED at STEP 0**.
+Finite scope is OX1 only: establish the square's cause, then the smallest complete
+web/mobile repair, before/after evidence, serial gates and local commits.
+Physical work and rollout are owner-only; OX2 depends on a real OX1 PASS.
+The local actual-component matrix did not reproduce the owner-reported square:
+36 web sequences, 805 frames, 13,518 samples, zero partial-clock samples or
+outer alpha leakage; 12 mobile-component browser cases also show no square.
+Browser host adapters cannot prove native TextureView presentation. A safe
+source cause remains unestablished, triggering OX1's explicit stop rule.
+No runtime repair was made or claimed. FRESH focused tests: shared 12/12,
+mobile 26/26, web 21/21; full gates NOT RUN, documentation hygiene PASS.
+Record the owner-only capture/layer-isolation request; resume OX1 only with
+evidence supporting attribution, preserving the external aura. Native/live
+state UNVERIFIED (owner to confirm); Rollout/Device checks NOT RUN. No service,
+environment-file, release or push operation. Original paths and Owner Pause
+preserved. [Acceptance](ai/acceptance/ox1-orb-compositing-integrity.md).
+<!-- OX1 end -->
+
 <!-- LP2 begin -->
 LP2 / legal discoverability (2026-10-21): **PASS for the finite unattended local code scope**.
 Confirmed existing LP1 bundled routes and tiny Settings footer links; neither

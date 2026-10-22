@@ -1,5 +1,28 @@
 # Current State
 
+<!-- OX1 begin -->
+OX1 / orb compositing integrity (2026-10-22): **STOPPED at STEP 0**.
+The owner-reported Realme square was not reproduced in local software rendering;
+no safe source-level cause or repair was established. No runtime code, dependency,
+blend math, pixel format or mask changed. Thirty-six actual web-component
+sequences (violet/gold/pearl, both themes, Today/Generation, cold/reload/component
+routes) produced 805 frames and 13,518 samples: zero partial-clock samples,
+outer alpha/RGB leakage or page-corner difference. Twelve mobile-component
+React Native Web cases also show no square; their browser GL/SVG adapters do
+not establish Android TextureView behavior. FRESH focused suites: shared 12/12,
+mobile 26/26, web 21/21, no skips. Full gates NOT RUN at the required stop;
+documentation diff/staged hygiene FRESH PASS. Prior local PASS is not native
+acceptance. The source branch intentionally remains at the pre-FS5 source pin;
+the existing FS5 Git report explains its separate release clone.
+Native physical rendering, lifecycle/performance and live state remain
+UNVERIFIED (owner to confirm). Rollout and Device checks NOT RUN, skipped entirely.
+Owner capture/layer-isolation request is recorded in the report and handoff;
+no unattended question, service call, environment-file edit, deploy or push.
+Only scoped documentation is committed; exact hash in Git/OX1.status. Owner
+paths and Owner Pause preserved. OX2 remains blocked until OX1 has real PASS
+evidence. [Acceptance and stop evidence](ai/acceptance/ox1-orb-compositing-integrity.md).
+<!-- OX1 end -->
+
 <!-- LP2 begin -->
 LP2 / legal discoverability (2026-10-21): **PASS for the finite unattended local code scope**.
 Confirmed existing LP1 bundled routes and tiny Settings footer links; neither

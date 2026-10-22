@@ -9759,3 +9759,73 @@ logs are retained, and the final complete serial gates are green.
   Scheduler operation is performed. Original UI/, apps/mobile/.gitignore,
   supabase/.temp/ and ignored tmp/ remain untouched and excluded from staging.
   Existing Owner Pause remains; no RB9, release or FULLSEND is started.
+
+## OX1 orb compositing integrity - STEP 0 stop (2026-10-22)
+
+**STOPPED.** The owner-reported Realme square was not reproduced locally and
+no safe source-level cause was established. This triggers OX1 STEP 0's explicit
+physical-only/unattributed stop rule. No product code, dependency, pixel format,
+blend math or masking changed. The square remains unresolved. OX2 is blocked.
+
+Commit: `docs(orb): record OX1 source-attribution stop` (this scoped documentation
+checkpoint; exact hash in Git and ignored OX1.progress/OX1.status). Branch
+overnight/2026-10-15_feedback, baseline 70c415d1. Existing FS5 status and
+28174c7:docs/ai/acceptance/fullsend-20261021-2245.md explain the separate release
+clone and intentionally unchanged source checkout; no branch mismatch remains.
+FS5 was not rerun and no branch switch/merge/fetch was performed.
+
+[Acceptance](acceptance/ox1-orb-compositing-integrity.md) records the exact paths,
+installed Expo flags, hypotheses, matrix, commands, failed first attempts and
+limits. Installed Android GLView is a non-opaque TextureView with EGL alpha 8;
+native context reports premultipliedAlpha false versus browser true. That is
+not sufficient evidence to blame the alpha contract or change it speculatively.
+
+FRESH web baseline: 36 actual DayRingClock/GenerationOrb sequences, three
+palettes (purple uses key violet), both themes, cold/hard reload/component route,
+390/1440 widths, cache disabled, Slow 4G/4x CPU plus local delayed atlas.
+805 screencast images / 13,518 rAF samples; zero visible partial-clock samples,
+border/corner alpha/RGB, page errors and external requests. Against the actual
+page background, 344,364 outside-corner pixels have maximum RGB difference 0;
+sampled external aura remains nonzero. Twelve actual mobile DayOrb/OrbPoster
+browser-adapter cases provide 36 poster/live/resumed PNGs, zero border alpha,
+page errors or external traffic. All five contact sheets and full violet-dark
+poster/live images were inspected; no local square was visible. Evidence:
+tmp/overnight/OX1-before/, OX1-native-web/, OX1-*-contact.png and OX1-summary.json.
+No after captures exist because no repair was justified. Native helper replaces
+Expo surface/asset and SVG host boundaries; it is not Android rendering proof.
+
+FRESH serial diagnostic suites: shared 12/12 across 3 files, mobile 26/26 in
+1 file, web 21/21 across 3 files: **59 passed / 0 failed / 0 skipped**. Commands
+and logs are in the report and OX1-focused.json. Full root typecheck/lint/build,
+full shared/mobile/web suites and separate API/web/Android builds: **NOT RUN**
+at the required STEP 0 stop. Relevant API tests: **NOT APPLICABLE**, no server
+changes. Documentation diff and staged checks: **FRESH PASS**, exit 0. No gate
+cache results reused. Initial invalid purple-key capture run was interrupted
+and excluded; corrected violet run exits 0. Native first wrapper reported exit 1
+from bundler stderr warnings; repeated explicit exit-code run and Node manifest
+record exit 0. Original logs retained; assertions/config were not weakened.
+
+**Owner steps remaining**
+
+- Exact question for owner: On the installed FS5 Realme build, does the violet
+  square persist for at least 10 seconds after a cold Today open, and does it
+  also occur in standalone Generation or change after Today -> Generate ->
+  Today and background -> foreground, in each theme? Can matching on-screen
+  photo/recording and ordinary screen capture from the same state be supplied,
+  with installed version/runtime, to isolate native presentation versus
+  framebuffer/poster/clock composition? Further native framebuffer/compositor
+  diagnostics may be needed before choosing a fix. This question is recorded
+  only; none was sent during the unattended run.
+- Device checks: **NOT RUN**, skipped entirely. Native/physical appearance,
+  context restoration, performance and capture behavior remain **UNVERIFIED
+  (owner to confirm)**. Browser component switching/live-prop cycles are
+  approximations, not physical acceptance or actual Android lifecycle evidence.
+- Rollout: **NOT RUN**, skipped entirely. No implemented fix exists to publish.
+  Actual authenticated web routes, deployed revisions, live database/Scheduler
+  state are **UNVERIFIED (owner to confirm)**. No Supabase/Vercel/Google Cloud/
+  Canvas/Resend call, email, environment-file edit, SQL/migration apply, Scheduler
+  operation, deployment, OTA/EAS, install or push occurred.
+- Vercel CLI unavailable: strongly recommend `npm i -g vercel` for separately
+  authorized future env/deploy/log tooling. Installation and Vercel commands
+  NOT RUN. Original UI/, apps/mobile/.gitignore, supabase/.temp/, ignored tmp/
+  and Owner Pause preserved. OX2/release/FULLSEND remain unstarted.
