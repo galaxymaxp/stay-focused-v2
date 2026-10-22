@@ -10098,3 +10098,79 @@ tmp/ artifacts preserved and excluded from commits.
 - Vercel CLI unavailable: strongly recommend `npm i -g vercel` for future
   separately authorized env/deploy/log work. Installation and all Vercel commands
   NOT RUN here. No service contacted and no next task/release initiated.
+
+## PBR-AF1 — renewed audit and supported local repair — 2026-10-23
+
+**PASS for mandatory LOCAL audit/repair/gate scope**, implementation ef80dfc6.
+Initial branch overnight/2026-10-15_feedback / source 85959030. Owner direction
+processed from exact runner answer
+chatgpt-owner-1792691511294-971f0f34-866c-4ea9-856b-57750399b31c.md.
+[Acceptance and sanitized evidence index](acceptance/pbr-af1-audit-and-fix.md)
+and ignored tmp/overnight/PBR-AF1/ logs/progress preserve every checkpoint.
+
+Reproduced/fixed: overlapping Library invalidations plus duplicate list/stat
+summary scans. Same public synthetic 300-item schedule: summary 604 -> 2,
+stats 302 -> 2, max 1 active summary call. First saved result, late writes,
+complete rows, owner-switch denial, failed-read recovery and per-item committed
+progress retained. No schema/auth/RLS/provider/native/rendering change.
+
+FRESH full suites: shared 706/72 files (includes emitted copies), Canvas 75/1,
+OCR 27/3, engine 606, API 2,452 passed + 3 existing live skips/213,
+mobile 1,651/172, web 575/76: **6,092 passed / 0 failed / 3 existing skips**.
+Focused Library 80/4, resume 65/5, reader navigation 21/2, long-reader host 2/1 pass.
+Forced root typecheck/lint/build 8/8 each, zero cached. API 37/web 23 static pages,
+Android 38-file JS/assets export pass. Generated Next type files restored;
+final forced typecheck 8/8, zero cached. Staged/unstaged diff and owned-path/
+history/held-sequence checks FRESH PASS. Six existing lint warnings remain.
+First expected Library baseline 74 pass/4 fail; first added owner/error fixture
+78 pass/2 fail corrected double ID prefixes; original held-request harness
+drain interrupted and corrected; CJS probe entry corrected. No weakened
+assertion or unresolved failed gate, no observed product flake. Exact logs and
+helper corrections are in acceptance; test/build times are not device latency.
+
+Measured separately: source 2.2.0/code 6/runtime 2.2.0-sdk57; existing matched
+2.3.0/code 7 APK 132,024,227 B, SHA256 0910d589...cc12e6, native 93,639,812 B/four ABIs;
+current HBC 10,946,724 B (+1,623 versus historical PBR0), no APK saving. Web
+chunks 2,585,223 raw / 821,493 local gzip bytes. Reader synthetic 120-section
+fixture preserves 4,440 segments/120 anchors; development host mount 647.192 ms /
+search 1,835.517 ms do not establish physical performance or a safe reader fix.
+API synthetic 0/100/240/300 plus 1,000 hidden rows preserves exact owned results
+and rejects failed evidence; plans/live latency remain unknown.
+
+Commits:
+
+- `8d6e60a3 docs(perf): freeze PBR-AF1 renewed audit acceptance`
+- `da8daa6f docs(perf): checkpoint reproduced Library read amplification`
+- `5ca0ca9f docs(perf): checkpoint verified Library repair and renewed inventories`
+- `3074a473 docs(perf): preserve PBR-AF1 progress and held roadmap boundaries`
+- `54aef02b docs(perf): checkpoint fresh PBR-AF1 full-suite results`
+- `ef80dfc6 perf(library): coalesce owner-scoped local refresh reads`
+- Final docs(perf): close PBR-AF1 local acceptance checkpoint; exact hash in
+  Git and tmp/overnight/PBR-AF1.status after committing this footer.
+
+**Owner steps remaining**
+
+- Native text **UNRESOLVED / UNREPRODUCED**; native repair BLOCKED on attribution.
+  Exact owner question, recorded only: which original FS7 route order, background
+  dwell, Appearance state and active OTA reproduce missing labels, and are the
+  same labels absent simultaneously on screen and capture? Recover original
+  FS7 evidence, then separately authorize the pinned Realme 2.3.0/code 7/hash /
+  active update/runtime matrix. Distinguish 01a162a3 and 01a16304. Record ten
+  resume cycles, same-route/Today-Generation/Appearance round trips, Light/Dark/
+  Automatic and Reduced Motion with synchronized lifecycle/focus/surface/Text
+  markers and bounded 0/1/5/15/30/55s screen-versus-capture observations. Use
+  public/empty content; redact academic data/credentials, preserve pending work.
+- **Device checks and Rollout NOT RUN**, skipped entirely. No service/provider/
+  account/email/Scheduler call, environment edit, remote SQL/migration, deploy,
+  EAS/OTA/native release build/install, push or spending. No new native fix is
+  ready for closure. PBR-RT1 stays STOPPED; PBR-MB1/PBR-LP1/PBR-AS1/PBR-LR1
+  stay HELD, not started/advanced. Unrelated OX/parity/Owner Pause and UI/,
+  apps/mobile/.gitignore, supabase/.temp/ and previous ignored evidence preserved.
+- **UNVERIFIED (owner to confirm):** active binary/OTA/live revisions/database/
+  applied migrations/regions/queue/Scheduler/providers, native failure cause and
+  screen/capture attribution, physical latency/RAM/GPU/font/compositor behavior,
+  authenticated acceptance and beta/release readiness. Review API history plans,
+  image badge semantics with LC1, stage timing, compatible packaging and target
+  device reader traces before material choices. No native closure or release GO.
+- Vercel CLI unavailable: strongly recommend npm i -g vercel for future
+  separately authorized env/deploy/log tooling. Install/commands NOT RUN.

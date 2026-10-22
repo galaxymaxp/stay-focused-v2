@@ -1,20 +1,22 @@
 <!-- PBR-AF1 begin -->
 ## PBR-AF1 renewed audit (2026-10-23)
 
-**IN PROGRESS**, depends on PBR0; finite scope frozen in
-[acceptance](acceptance/pbr-af1-audit-and-fix.md) at 8d6e60a3 before runtime edits.
-Owner's new audit/repair direction is read and recorded by exact answer filename.
-Include existing web/mobile/API experience, Library, exact existing APK and
-exports, long-reviewer rendering and resume source/evidence. Reproduce and save
-each finding before supported minimal repair, verify identical fixtures, run
-serial offline suites/gates, reconcile docs and commit scoped local work.
-No unrelated OX/parity work, service calls, environment edits, native release
-configuration/build/install, device checks, rollout or push.
-D2 read amplification reproduced; repair focused tests 80/80 and forced
-typecheck/lint 8/8 each, no cached tasks; remaining full gates pending.
-Native text UNREPRODUCED: physical attribution remains owner work.
-PBR-RT1 STOPPED and all four dependent IDs HELD remain unchanged; this independent
-audit neither closes their prerequisites nor starts them. Stop at AF1 endpoint.
+**PASS for mandatory LOCAL scope**, depends on PBR0; acceptance frozen before
+runtime edits at 8d6e60a3, implementation ef80dfc6. All frozen audit rows,
+supported Library repair, identical-fixture verification, full serial offline
+gates, reconciled planning/handoff and scoped local commits are complete.
+[Acceptance, exact commands, failures and evidence](acceptance/pbr-af1-audit-and-fix.md).
+Library 300-item fixture: summary 604 -> 2 / stats 302 -> 2 / max 1 active read,
+complete results and owner/pending/offline/progress behavior retained. FRESH
+full suites 6,092 pass / 3 existing live skips / 0 fail; root forced typecheck/
+lint/build 8/8 each, zero cached, final restored-tree typecheck 8/8. API/web and
+Android JS/assets exports plus reader2-case host profile PASS; no APK saving.
+Native text UNRESOLVED / UNREPRODUCED; native repair BLOCKED on essential
+physical attribution. PBR-RT1 stays STOPPED; all four dependent IDs stay HELD.
+No OX/parity continuation, service calls, installs, environment edits, native
+release work, device operation, remote SQL, deployment or push. Rollout and
+Device checks NOT RUN; live state UNVERIFIED (owner to confirm).
+Finite endpoint reached. Owner/supervisor review is next; no task advanced.
 <!-- PBR-AF1 end -->
 
 <!-- PBR execution 2026-10-22 begin -->

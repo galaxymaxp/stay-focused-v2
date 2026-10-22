@@ -1,16 +1,24 @@
 # Current State
 
 <!-- PBR-AF1 begin -->
-PBR-AF1 (2026-10-23): **IN PROGRESS**, independent renewed local audit under
-the owner's new answer, dependent on PBR0. Acceptance frozen at 8d6e60a3;
-diagnostic checkpoints da8daa6f / 5ca0ca9f. Reproduced Library read amplification:
-300 synthetic progress events plus late write caused 604 summary / 302 stats
-reads. Local repair uses one summary scan for list/stats and serializes screen
-invalidations; same fixture now 2 / 2, maximum one active summary read.
-Focused Library 80/80 and forced typecheck/lint 8/8 each, zero cached; full
-gates pending. Native text remains UNREPRODUCED with missing physical evidence.
-PBR-RT1 remains STOPPED; all four dependent IDs remain HELD. No rollout/device
-operation or service call. [Durable audit](ai/acceptance/pbr-af1-audit-and-fix.md).
+PBR-AF1 (2026-10-23): **PASS for mandatory LOCAL renewed audit/repair scope**.
+Implementation ef80dfc6: coalesces owner-scoped Library progress reads and shares
+the summary scan with stats. Identical synthetic 300-item workload: summary reads
+604 -> 2, stats 302 -> 2, max 1 active summary call; complete results, late writes,
+owner switch, failed-read recovery and per-item progress preserved. FRESH full
+suites 6,092 passed / 0 failed / 3 existing live skips. Forced root typecheck,
+lint and serial build 8/8 each, zero cached; final post-restoration typecheck 8/8.
+API 37/web 23 pages and Android 38-file JS/assets export PASS; diff/staged hygiene
+and history/scope validation PASS. Six existing lint warnings; first expected
+regression failures and harness corrections retained in acceptance.
+Reader host profile 2/2 preserves all 4,440 large-fixture text segments; host
+timings are not native latency. Existing APK 132,024,227 B unchanged; HBC +1,623 B
+versus PBR0, no APK saving claimed. Native text **UNRESOLVED / UNREPRODUCED**,
+essential native attribution BLOCKED/OWNER-TO-VERIFY. PBR-RT1 stays STOPPED;
+PBR-MB1/PBR-LP1/PBR-AS1/PBR-LR1 stay HELD. No beta/release readiness claim.
+Rollout/Device checks NOT RUN; live state UNVERIFIED (owner to confirm).
+No service call, install, environment edit, remote SQL, deployment or push.
+[Final acceptance and owner recipe](ai/acceptance/pbr-af1-audit-and-fix.md).
 <!-- PBR-AF1 end -->
 
 <!-- PBR-RT1 begin -->
