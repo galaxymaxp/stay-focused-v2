@@ -1,3 +1,35 @@
+<!-- FS7 begin -->
+FS7 / FULLSEND 20261022-1512: **shipped through STEP 6; device acceptance PARTIAL**.
+FS7's owner authorization supersedes earlier local-only rollout restrictions
+for this release. Persistent readiness passed twice at source
+2670285815e47885fb8220c9596b91daa61dde84. Fresh clone merge
+83f9474603ed45488c75d7028dad170f79374263 retains previous main 28174c76 and
+its release/native/test fixes. Only docs conflicted; both entries were kept.
+OX1's padded SVG repair (39ff7362) and OX2P's light glass (1140c737) and local
+acceptance (26702858) shipped. Historical OX1/OX2/FS6 statuses are preserved.
+Source UI/, apps/mobile/.gitignore and supabase/.temp/ are left local, not shipped.
+FRESH root typecheck/lint/build: 8/8 each, 0 cached; six existing lint warnings.
+Doctor 21/21; shared 353 source cases/36 files, Canvas 75/1, OCR 27/3,
+engine 606, API 2452 passed + 3 existing live skips/213 files, mobile 1643/172,
+web 575/76, provider contract 20/20. Complete CI 39741781659 SUCCESS.
+Migrations: none. Worker build d51b0164-095c-411b-b033-2596d4ad6ade SUCCESS;
+revision generation-worker-00033-7sv Ready/100%, health 200/ok, startup errors 0.
+API dpl_F16grTGjt5Be1pV3HhzHpSDGrYoo and website dpl_292JfCBzE1J4F21wqXUaJ5ziwQ3v
+READY at 83f9474; API/website/proxy healthy; deployment-scoped 5xx records 0.
+OTA group bc0231d4-8b5c-4ded-bbb8-0c543e5e9970 applied on the Realme:
+2.3.0 / code 7 / runtime 2.3.0-sdk57; About update 01a162a3 verified.
+Device: 5 PASS / 1 FAIL. Light/dark Today and standalone Generation orbs are
+complete. First resume capture loses native text; recovered by the 54.9-second
+follow-up. Physical acceptance remains PARTIAL; native redraw cause unverified.
+Automatic restored; palette/settings retained; phone left Today/asleep.
+Paid generations: 0. Desktop 1440px public sign-in/proxy PASS, no page errors/5xx.
+Authenticated web visuals NOT RUN (fresh browser has no session).
+No deployment pending. Next: diagnose native resume text redraw and complete
+authenticated web/broader physical acceptance. Final docs SHA and source-ref
+ancestry are in the external FS7 result.
+[Release, exact gates and copied readiness JSON](acceptance/fullsend-20261022-1512.md).
+<!-- FS7 end -->
+
 <!-- OX2P begin -->
 OX2P / website + mobile light glass (2026-10-22): **PASS for the finite unattended local code scope**.
 Exact source prerequisite 39ff7362 and separate Realme padding report confirmed;
