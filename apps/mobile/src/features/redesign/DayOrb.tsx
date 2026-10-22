@@ -166,10 +166,11 @@ export const DayOrb = memo(function DayOrb({
   const inner = size * RENDER_SCALE * ORB_AMBIENT_PROFILES[variant].canvasScale;
   return (
     <View pointerEvents="none" style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {/* Ambient spill renders inside the same transparent GL view. */}
-      <Animated.View pointerEvents="none" accessibilityElementsHidden testID="orb-poster-layer" style={{ position: 'absolute', opacity: opacity.current.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }}>
+      {/* Nothing paints while loading: the complete first frame fades in from empty.
+          The poster is only the final fallback. Ambient spill renders inside the GL view. */}
+      {loadStatus === 'failed' && <View pointerEvents="none" accessibilityElementsHidden testID="orb-poster-layer" style={{ position: 'absolute' }}>
         <OrbPoster variant={variant} size={size * DAY_ORB_FILL} mode={mode} interaction={posterInteraction} />
-      </Animated.View>
+      </View>}
       {loadStatus !== 'failed' && <Animated.View pointerEvents="none" accessibilityElementsHidden testID="orb-live-layer" style={{ position: 'absolute', opacity: opacity.current }}>
         <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />
       </Animated.View>}

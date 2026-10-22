@@ -27,6 +27,8 @@ it('renders a same-size still and preloads the split module before data is ready
   expect(renderToStaticMarkup(createElement(DeferredDayOrb, props))).toContain('width:240px;height:240px');
   await act(async () => { root = create(createElement(DeferredDayOrb, props)); });
   expect(root!.root.findByProps({ 'data-testid': 'day-orb-still' })).toBeTruthy();
+  // The still is mounted for failure only; nothing paints while the scene loads.
+  expect(root!.root.findByProps({ 'data-orb-load': 'loading' })).toBeTruthy();
   await act(async () => { await vi.dynamicImportSettled(); });
   expect(mocks.load).toHaveBeenCalledOnce();
   expect(mocks.render).not.toHaveBeenCalled();
@@ -44,6 +46,7 @@ it('keeps the static frame without requesting animation for reduced motion', asy
   await frame(); await frame();
   expect(mocks.render).not.toHaveBeenCalled();
   expect(root!.root.findByProps({ 'data-testid': 'day-orb-still' })).toBeTruthy();
+  expect(root!.root.findByProps({ 'data-orb-load': 'still' })).toBeTruthy();
 });
 it('preserves the standalone Generation change-only live pose under Reduce Motion', async () => {
   reduced = true;

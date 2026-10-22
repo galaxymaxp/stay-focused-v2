@@ -12,7 +12,7 @@ import { useOrbLoad } from './useOrbLoad';
 type Props = { minutes: number; size?: number; ready: boolean; interaction?: OrbInteractionHandle;
   variant?: OrbVariant; state?: CoreState; clock?: ClockGlassReadout; onGlassReady?: (ready: boolean) => void };
 
-/** The poster commits first; chunk and atlas start together before data readiness. */
+/** An empty frame commits first; chunk and atlas start together before data readiness. */
 export function DeferredDayOrb({ minutes, size, ready, variant = 'clock', state, clock, onGlassReady, interaction: suppliedInteraction }: Props) {
   const interaction = useOrbInteraction(suppliedInteraction);
   const { poster, scene } = usePosterInteraction(interaction);
@@ -49,7 +49,10 @@ export function DeferredDayOrb({ minutes, size, ready, variant = 'clock', state,
   if (Orb && ready && loadStatus !== 'failed' && (!reduced || interactiveStill || needsPose)) {
     return <Orb variant={variant} state={state} minutes={minutes} size={size} interaction={scene} clock={clock} onGlassReady={onGlassReady} />;
   }
-  return <div className="day-orb" data-orb-variant={variant} data-orb-load={loadStatus === 'failed' ? 'failed' : 'loading'} aria-hidden="true" style={{ width: size ?? '100%', height: size ?? '100%' }}>
+  // Reduce Motion without a pose shows its still as the final state (and keeps it
+  // while a deliberate gesture loads the scene); everything else stays empty.
+  const load = loadStatus === 'failed' ? 'failed' : reduced && !needsPose ? 'still' : 'loading';
+  return <div className="day-orb" data-orb-variant={variant} data-orb-load={load} aria-hidden="true" style={{ width: size ?? '100%', height: size ?? '100%' }}>
     <OrbLoadPoster poster={poster} interaction={interaction} variant={variant} diameter={size ? size * DAY_ORB_FILL : `${DAY_ORB_FILL * 100}%`} />
   </div>;
 }

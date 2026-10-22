@@ -99,6 +99,12 @@ it('hides every live layer until the atlas composite has been presented by endFr
   expect(rendered!.root.findByProps({ testID: 'orb-live-layer' }).props.style.opacity.value).toBe(1);
   expect(mocks.timing).not.toHaveBeenCalled();
 });
+it('paints no poster fill ahead of the live frame', async () => {
+  await render(); await startGL();
+  expect(rendered!.root.findAllByProps({ testID: 'orb-poster' })).toHaveLength(0);
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(rendered!.root.findAllByProps({ testID: 'orb-poster' })).toHaveLength(0);
+});
 it('animates the whole live surface once for 250ms using the native driver', async () => {
   await render(); await startGL();
   await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
@@ -127,7 +133,7 @@ it('withdraws a ready surface if Expo replaces its context without a component r
   const count = mocks.render.mock.calls.length;
   await startGL();
   expect(rendered!.root.findAllByType(GLView)).toHaveLength(0);
-  expect(rendered!.root.findByProps({ testID: 'orb-poster-layer' }).props.style.opacity.inverseOf.value).toBe(0);
+  expect(rendered!.root.findAllByProps({ testID: 'orb-poster' })).toHaveLength(1);
   expect(mocks.render).toHaveBeenCalledTimes(count); expect(warn).toHaveBeenCalledOnce();
 });
 
