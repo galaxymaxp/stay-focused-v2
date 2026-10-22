@@ -1,3 +1,30 @@
+<!-- OX2P begin -->
+OX2P / website + mobile light glass (2026-10-22): **PASS for the finite unattended local code scope**.
+Exact source prerequisite 39ff7362 and separate Realme padding report confirmed;
+historical OX1 STOPPED and old OX2 held status remain unchanged. Implementation
+1140c737 refines shared light-only liquid/reflection coverage and translucent
+static posters. Native padded SVG containment is retained; no new render pass,
+clock compositor, loading timer, gesture, backend or dependency change. All five
+dark fixed-pose RGBA comparisons with 39ff have maximum difference 0; current
+web/mobile adapters match exactly locally in both themes.
+FRESH root forced typecheck/lint/build: 8/8 each, 0 cached, six existing warnings.
+Full suites: shared 706 tests/72 files, mobile 1643/172, web 575/76;
+2924 passed, 0 failed/skipped. Explicit API/web builds
+and Android HBC export PASS. Both diff checks PASS. FRESH 120 throttled normal
+and 40 Reduced Motion web sequences cover all five palettes, both themes,
+Today/Generation and 390/1440 widths; no sampled partial clock, alpha/RGB corner
+leak, page-corner change, page error or external request. Twenty RN Web cases
+and inspected before/after contact sheets pass locally. Current local web does
+not reproduce the owner's square/layered-load symptom; startup easing stays OX4.
+Rollout and Device checks NOT RUN, skipped entirely. Physical acceptance after
+these shader changes, authenticated/deployed web and live state remain
+UNVERIFIED (owner to confirm). No service call, environment-file edit, remote
+SQL/migration, Scheduler/email, deploy, OTA/install, push or later-scope work.
+Owner Pause and unrelated paths preserved. Local endpoint reached; owner review
+and separately authorized device/rollout work remain.
+[Acceptance and exact gates](acceptance/ox2p-light-glass-follow-up.md).
+<!-- OX2P end -->
+
 <!-- OX1-device begin -->
 OX1-device / finite owner-authorized physical debugging (2026-10-22): **PASS
 for native square removal in the isolated Realme test app**. Baseline bcef0477

@@ -9864,3 +9864,53 @@ shows the square until publication is separately approved. Historical OX1
 status/report and Owner Pause are preserved. No push, deployment, OTA, FULLSEND,
 production mutation, uninstall, data clear or OX2. Scoped local commit hash is
 in the completion report/Git. Owner/supervisor review is the next action.
+
+## OX2P - unattended website + mobile light glass (2026-10-22)
+
+**PASS for the finite local code scope.** Source 39ff7362 and its separate Realme
+SVG-bitmap report satisfy the prerequisite; historical OX1.status stays STOPPED
+with its original hash, and old OX2 stays held/unrun. Shared light optical
+coverage/studio and poster stops now produce restrained clear glass and colored
+liquid. Android padded containment is preserved; all five bounded dark RGBA
+comparisons with 39ff are unchanged. No new render pass or startup timing change.
+Current local web does not reproduce the reported square/partial-load symptom;
+remaining poster-to-live easing is separate OX4 backlog, not implemented here.
+
+Commits: 1140c737 fix(orb): refine light glass across web and mobile; followed by
+this docs(orb): close OX2P local light-glass acceptance commit (exact hash in Git
+and tmp/overnight/OX2P.status). Both are local, with the required author.
+
+FRESH forced root typecheck/lint/build: 8/8 tasks each, 0 cached, six pre-existing
+warnings. Full suites: shared 706 tests/72 files, mobile 1643/172, web 575/76;
+2924 passed, 0 failed/skipped. Separate API build 37/37,
+web 23/23 and Android HBC export pass. Both staged/unstaged diff checks pass;
+final declaration restoration/typecheck is retained in the acceptance ledger.
+Focused shared/mobile/web 23/48/46 plus new shader 5/5 overlap full suites.
+First new-test expectation/helper/wrapper failures are retained in the report;
+no thresholds were lowered. No full serial gate invocation failed.
+
+FRESH browser proof: 120 normal-motion sequences (2679 frames, 44238 rAF samples) plus 40 Reduced Motion sequences (218 frames, 18723 samples); all five palettes,
+both themes, Today/Generation, 390/1440, cache-disabled Slow 4G + 4x CPU,
+cold/reload/component routes and focus resume. Zero sampled partial clock,
+outer alpha/RGB leak, page-corner change, page error or external request.
+Twenty RN Web poster/live/resumed cases pass. Before/after and sequence contact
+sheets were inspected. Browser adapters do not establish physical native GPU
+presentation. [Acceptance, exact commands and artifacts](acceptance/ox2p-light-glass-follow-up.md).
+
+**Owner steps remaining:** Rollout and Device checks **NOT RUN**, skipped
+entirely. Review these local commits/images; separately confirm Realme shader,
+poster/Queue, gestures/waves, clock readability, Reduced Motion, AppState,
+no-square behavior and GPU/performance/battery; confirm real authenticated
+website routes/slow loading. Physical acceptance after these shader changes,
+deployed revisions and live preference/database/Scheduler state are
+**UNVERIFIED (owner to confirm)**. Original release is unchanged. No Supabase,
+Vercel, Google Cloud, Canvas or Resend call, environment-file edit, remote SQL,
+Scheduler/email, deployment, OTA/EAS/install, push, FULLSEND or later task.
+Owner Pause, UI/, apps/mobile/.gitignore, supabase/.temp/ and ignored tmp/ are
+preserved. Vercel CLI is unavailable; strongly recommend npm i -g vercel only
+for future separately authorized env/deploy/log work. No install was run.
+
+Final restoration checkpoint: FRESH forced typecheck 8/8, 0 cached, exit 0
+(43.149s); both generated Next declarations restored. Final 10,944,818-byte
+Android HBC contains the new light uniforms/density shader. All 11 source
+hashes and expected evidence counts match; final staged/unstaged hygiene PASS.
