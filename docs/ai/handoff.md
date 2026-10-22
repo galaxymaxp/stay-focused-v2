@@ -9914,3 +9914,82 @@ Final restoration checkpoint: FRESH forced typecheck 8/8, 0 cached, exit 0
 (43.149s); both generated Next declarations restored. Final 10,944,818-byte
 Android HBC contains the new light uniforms/density shader. All 11 source
 hashes and expected evidence counts match; final staged/unstaged hygiene PASS.
+
+
+## PBR0 - website and Android pre-beta baseline (2026-10-22)
+
+**PASS for the finite unattended audit scope.** No product implementation,
+dependency, release configuration or migration changed. Source baseline
+245380ea131ed14c5b3abb2d00a7aec6d88c828e on overnight/2026-10-15_feedback;
+locally recorded github/main was 23 behind/0 ahead before this work, no fetch.
+Source 2.2.0/code6/runtime2.2.0-sdk57 is deliberately separate from FS5's
+2.3.0/code7 APK and FS7/newer 2.3.0-runtime OTAs. Latest local Git release report
+is c0569007: application acf9481, source pin 245380ea, OTA 01a16304. All live
+state remains UNVERIFIED; no service query was made.
+
+Commits:
+
+- bdd1c021 docs(perf): establish PBR0 website and Android baseline
+- docs(perf): record PBR0 audit checkpoint (this checkpoint; exact hash in Git
+  and tmp/overnight/PBR0.status, which lists both local commits).
+
+[Acceptance audit](acceptance/pbr0-prebeta-performance-audit.md) contains exact
+source/release fingerprints, all screen/workflow inventories, existing
+SP1/SP2/SP2b optimizations, fresh byte/count/fixture evidence, P0/P1/P2 priorities,
+no-feature-removal gates, targets-only thresholds, privacy-safe telemetry plan,
+measurement procedures, representative matrix and GO/NO-GO checklist.
+Conditional PBR1–PBR5 proposals await supervisor review; PBR6 is owner-only.
+Pending OX3/OX4/QI1/LC1, held web parity and Owner Pause are preserved.
+
+MEASURED: exact existing local APK **132,024,227 bytes**, hash
+0910d589b42c02c04f032dff7362da69258cdd081c5be1c2dc83798452cc12e6, manifest
+2.3.0/code7, native libraries **93,639,812 bytes** across four ABIs. User's
+117 MB report remains UNVERIFIED as to artifact/units. Fresh web Today/Library
+First Load JS **213/223 kB**; 71 JS chunks **2,585,223 raw / 821,493 gzip bytes**
+across the whole build, not one route. Standalone Android HBC **10,945,101 bytes**,
+36 assets; not a rebuilt APK. Synthetic current service reproduces two reads
+for Library page/exact reviewer and six for complete 240-card traversal.
+Source-inferred risks include repeated hidden-ID/local derived reads, eager
+long-document mounts and packaging/metric attribution. No latency saving claimed.
+
+FRESH gates (exact command/result table in report): root forced typecheck/lint/
+build **8/8 each, 0 cached**; six existing lint warnings. Shared **706/72 files**
+includes emitted copies; Canvas **75/1**, OCR **27/3**, engine **606 passed**,
+API **2452 passed / 3 existing live skips / 213 files**, mobile **1645/172**,
+web **575/76**, zero test failures. Separate API build **37/37**, web **23/23**,
+Android offline export **1 HBC/36 assets** PASS. Root export also covers iOS/web
+as build outputs only. Next declarations restored, final forced typecheck
+**8/8, 0 cached** PASS. Unstaged/staged diff checks and source-path/docs-only
+scope checks PASS. No gate cache reused, failed suite/build attempt, new skip,
+assertion weakening or observed flake. Two first synthetic probes failed alias
+resolution without --tsconfig; corrected local commands pass, original logs
+retained. Exploratory read/path failures and existing tool warnings are recorded.
+Temporary gate/sample/fixture/APK evidence remains ignored and uncommitted.
+
+FRESH local browser integrity: **12 normal-motion sequences / 3609 rAF samples**,
+zero premature visible clock and loading poster samples; existing tests also
+cover Reduced Motion/fallback. Synthetic loopback Chromium/software GL is not
+physical startup, native GPU or production authenticated navigation evidence.
+Historical **FS7 5 PASS/1 FAIL remains PARTIAL** (initial resume native text loss,
+later recovery at 54.9s). Newer release report's successful Appearance/GL round
+trips is narrower and does not close the entire resume/performance matrix.
+
+**Owner steps remaining**
+
+- Rollout: **NOT RUN**, skipped entirely. Review commits and audit before
+  generating any optimization job. No deploy, worker publication, OTA/EAS,
+  release/push, remote SQL/migration application, Scheduler, email or tester
+  invitations. PBR6 publication/distribution is owner-only.
+- Device checks: **NOT RUN**, skipped entirely. Confirm active binary/runtime/
+  OTA, repeat agreed native resume/Appearance/route and lower-end RAM/network
+  matrix, and complete authenticated desktop/responsive website acceptance.
+- **UNVERIFIED (owner to confirm):** live revisions/DB/applied migrations/index
+  plans/regions/queue/Scheduler, actual P50/P95/startup/Web Vitals/native GPU/
+  battery, and reported 117 MB artifact identity. Exact offline code7 APK size
+  is measured; current active OTA is a separate question.
+- Keep Owner Pause and pending OX3/OX4/QI1/LC1/held web parity. No automatic next
+  slice. Vercel CLI unavailable; strongly recommend npm i -g vercel for future
+  separately authorized env/deploy/log work. No install/Vercel command ran.
+- UI/, apps/mobile/.gitignore, supabase/.temp/ and pre-existing ignored tmp/
+  evidence are preserved and excluded. No .env file was edited, no service was
+  called, no private academic fixture or provider error was committed.

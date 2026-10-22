@@ -1,5 +1,32 @@
 # Current State
 
+<!-- PBR0 begin -->
+PBR0 / website + Android pre-beta baseline (2026-10-22): **PASS for the finite
+unattended audit scope**, source 245380ea on overnight/2026-10-15_feedback.
+No app/source implementation, dependency, config or migration changes.
+Exact local 2.3.0/code7 APK weighs **132,024,227 bytes**; native libraries
+93,639,812 bytes across four ABIs. User-reported 117 MB remains unidentified.
+Fresh web: Today 213 kB / Library 223 kB First Load JS; standalone Android HBC
+10,945,101 bytes. These are separate source/export/binary measurements, not
+device latency. Existing SP1/SP2/SP2b optimizations are retained; remaining
+read/render/packaging/offline work is evidence-ranked in the audit.
+FRESH forced root typecheck/lint/build: 8/8 each, 0 cached; six existing warnings.
+Shared 706/72 files (includes emitted copies), Canvas 75/1, OCR 27/3, engine
+606 evaluations, API 2452 passed + 3 existing live skips/213 files, mobile
+1645/172, web 575/76; all executed cases pass. Separate API/web/Android builds,
+post-restoration forced typecheck and diff/staged hygiene PASS.
+Historical FS7 physical **5 PASS/1 FAIL** stays PARTIAL; newer narrow GL recovery
+proof is distinguished. Authenticated desktop web and live revisions/DB/regions/
+queue/Scheduler, actual startup/Web Vitals/P50/P95 remain **UNVERIFIED (owner to
+confirm)**. Rollout and Device checks **NOT RUN**, skipped entirely.
+PBR1–PBR5 are conditional small code-only proposals; **supervisor review must
+precede any next job**. PBR6 is owner-only. Pending OX3/OX4/QI1/LC1, held web
+parity and Owner Pause remain unchanged. No remote service, environment-file
+edit, SQL/migration apply, deploy/OTA/EAS, Scheduler/email or push.
+Audit commit bdd1c021; documentation checkpoint follows separately.
+[Audit, measurements, conditional roadmap and owner matrix](ai/acceptance/pbr0-prebeta-performance-audit.md).
+<!-- PBR0 end -->
+
 <!-- OX2P begin -->
 OX2P / website + mobile light glass (2026-10-22): **PASS for the finite unattended local code scope**.
 Exact source prerequisite 39ff7362 and separate Realme padding report confirmed;
