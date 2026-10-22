@@ -49,6 +49,8 @@ export interface LocalArtifactStore extends ImageManifestStore, AssistCache, Top
   readQuizAnswerKey(ownerUserId: string, quizId: string, bodyUpdatedAt: string): Promise<QuizAnswerKey | null>;
   saveQuizAnswerKey(ownerUserId: string, key: QuizAnswerKey, bodyUpdatedAt: string): Promise<void>;
   offlineStats(ownerUserId: string): Promise<OfflineStats>;
+  /** List and readiness derived from the same owner-bound summary scan. */
+  readLibraryOverview(ownerUserId: string): Promise<{ items: LocalLibrarySummary[]; offlineStats: OfflineStats }>;
   /** Remove cloud copies only; keep summaries and unsynced student work. */
   clearBodies(ownerUserId: string): Promise<void>;
   readActivitySummaries(ownerUserId: string): Promise<ActivitySummary[] | null>;
@@ -420,25 +422,13 @@ export function createLocalArtifactStore(
 
     async offlineStats(ownerUserId) {
       requireOwner(ownerUserId);
-      const row = await db.getFirstAsync<{ total: number; current: number; approximate_bytes: number }>(
-        `SELECT COUNT(*) AS total,
-          COALESCE(SUM(CASE WHEN payload_json IS NOT NULL AND payload_schema = ?
-            AND payload_cloud_updated_at IS NOT NULL
-            AND payload_cloud_updated_at >= cloud_updated_at THEN 1 ELSE 0 END), 0) AS current,
-          COALESCE(SUM(LENGTH(CAST(payload_json AS BLOB))), 0)
-            + COALESCE((SELECT SUM(LENGTH(CAST(result_json AS BLOB))) FROM study_assists
-              WHERE owner_user_id = ?), 0) AS approximate_bytes
-          FROM library_artifacts WHERE owner_user_id = ?`,
-        [LOCAL_PAYLOAD_SCHEMA, ownerUserId, ownerUserId]);
-      const images = await db.getFirstAsync<{ bytes: number }>('SELECT COALESCE(SUM(bytes), 0) AS bytes FROM offline_image_manifests WHERE owner_user_id=?', [ownerUserId]);
       const summaries = await this.listSummaries(ownerUserId);
-      const failures = await db.getAllAsync<{ artifact_id: string }>(
-        `SELECT artifact_id FROM library_artifacts WHERE owner_user_id=?
-          AND body_failure_version=cloud_updated_at AND body_failure_permanent=1`, [ownerUserId]);
-      const failedIds = new Set(failures.map(item => item.artifact_id));
-      return { total: row?.total ?? 0, current: summaries.filter(item => item.offlineReady).length,
-        failedPermanent: summaries.filter(item => !item.offlineReady && failedIds.has(item.id)).length,
-        approximateBytes: (row?.approximate_bytes ?? 0) + (images?.bytes ?? 0) };
+      return readOfflineStats(db, ownerUserId, summaries);
+    },
+    async readLibraryOverview(ownerUserId) {
+      requireOwner(ownerUserId);
+      const items = await this.listSummaries(ownerUserId);
+      return { items, offlineStats: await readOfflineStats(db, ownerUserId, items) };
     },
 
     async clearBodies(ownerUserId) {
@@ -477,6 +467,23 @@ export function createLocalArtifactStore(
       notifyOfflineImages(ownerUserId);
     },
   };
+}
+
+async function readOfflineStats(db: LocalSqlExecutor, ownerUserId: string, summaries: readonly LocalLibrarySummary[]): Promise<OfflineStats> {
+  const row = await db.getFirstAsync<{ total: number; approximate_bytes: number }>(
+    `SELECT COUNT(*) AS total,
+      COALESCE(SUM(LENGTH(CAST(payload_json AS BLOB))), 0)
+        + COALESCE((SELECT SUM(LENGTH(CAST(result_json AS BLOB))) FROM study_assists
+          WHERE owner_user_id = ?), 0) AS approximate_bytes
+      FROM library_artifacts WHERE owner_user_id = ?`, [ownerUserId, ownerUserId]);
+  const images = await db.getFirstAsync<{ bytes: number }>('SELECT COALESCE(SUM(bytes), 0) AS bytes FROM offline_image_manifests WHERE owner_user_id=?', [ownerUserId]);
+  const failures = await db.getAllAsync<{ artifact_id: string }>(
+    `SELECT artifact_id FROM library_artifacts WHERE owner_user_id=?
+      AND body_failure_version=cloud_updated_at AND body_failure_permanent=1`, [ownerUserId]);
+  const failedIds = new Set(failures.map(item => item.artifact_id));
+  return { total: row?.total ?? 0, current: summaries.filter(item => item.offlineReady).length,
+    failedPermanent: summaries.filter(item => !item.offlineReady && failedIds.has(item.id)).length,
+    approximateBytes: (row?.approximate_bytes ?? 0) + (images?.bytes ?? 0) };
 }
 
 function parseActivitySummary(json: string): ActivitySummary | null {

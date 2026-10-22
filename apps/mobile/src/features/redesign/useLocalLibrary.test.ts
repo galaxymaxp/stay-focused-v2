@@ -13,12 +13,15 @@ import {
 } from "../../services/localLibrary/localLibrary.testSupport";
 import { runOfflineCatchUp, stopOfflineCatchUp } from "../../services/localLibrary/offlineCatchUp";
 import { migrateLocalLibrary } from "../../services/localLibrary/schema";
+import { notifyOfflineImages } from "../../services/localLibrary/imageManifest";
+import type { LocalSqlDatabase } from "../../services/localLibrary/sqlDatabase";
 import { useLocalArtifact, useLocalLibrary } from "./useLocalLibrary";
 
 const mocks = vi.hoisted(() => ({
   owner: "",
   focused: true,
   store: null as LocalArtifactStore | null,
+  db: null as LocalSqlDatabase | null,
   request: vi.fn(),
   // Production memoizes the client per access token.
   client: { baseUrl: "https://api.example", accessToken: "token" },
@@ -75,6 +78,7 @@ beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const { db } = openNodeSqlite();
   await migrateLocalLibrary(db);
+  mocks.db = db;
   mocks.store = createLocalArtifactStore(db);
   mocks.owner = OWNER_A;
   mocks.focused = true;
@@ -88,6 +92,85 @@ afterEach(async () => {
 });
 
 describe("useLocalLibrary", () => {
+  it.each([0, 100, 240, 300])('coalesces overlapping progress reads and keeps the latest %i synthetic summaries', async (count) => {
+    // Public synthetic workload, with a held device read to model a busy SQLite queue.
+    const summaries = Array.from({ length: count }, (_, index) => draftDetail({ id: `activity:synthetic-${index}` }).artifact);
+    await mocks.store!.upsertSummaries(OWNER_A, summaries);
+    mocks.request.mockRejectedValue(new RemoteError('connection'));
+    await act(async () => { rendered = create(createElement(LibraryProbe)); });
+    await flush();
+    const read = mocks.store!.listSummaries.bind(mocks.store!);
+    const gate = deferred<void>();
+    let active = 0;
+    let maximum = 0;
+    const list = vi.spyOn(mocks.store!, 'listSummaries').mockImplementation(async owner => {
+      active += 1;
+      maximum = Math.max(maximum, active);
+      try { await gate.promise; return await read(owner); }
+      finally { active -= 1; }
+    });
+    const statsQueries = vi.spyOn(mocks.db!, 'getFirstAsync');
+    await act(async () => {
+      notifyOfflineImages(OWNER_A);
+      for (let index = 0; index < count; index += 1) notifyOfflineImages(OWNER_A);
+    });
+    // Every invalidation during a read must cause one fresh follow-up, not a
+    // parallel owner-wide scan for every event. The follow-up sees late writes.
+    const late = draftDetail({ id: 'activity:synthetic-late', title: 'Synthetic late write' }).artifact;
+    await mocks.store!.upsertSummaries(OWNER_A, [late]);
+    await act(async () => gate.resolve());
+    await flush();
+    const expected = await read(OWNER_A);
+    const statsReads = statsQueries.mock.calls.filter(([sql]) => sql.includes('COUNT(*) AS total')).length;
+    console.info('[PBR-AF1 synthetic Library]', JSON.stringify({ count, explicitNotifications: count + 1, lateWriteNotifications: 1, summaryReads: list.mock.calls.length, statsReads, maximumConcurrentReads: maximum }));
+    expect(library.items).toEqual(expected);
+    expect(library.offlineStats).toMatchObject({ total: count + 1 });
+    expect(maximum).toBe(1);
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(statsReads).toBe(2);
+  });
+
+  it('drops queued reads on owner change and never publishes a delayed prior-owner result', async () => {
+    await mocks.store!.upsertSummaries(OWNER_A, [draftDetail({ id: 'synthetic-a' }).artifact]);
+    await mocks.store!.upsertSummaries(OWNER_B, [draftDetail({ id: 'synthetic-b' }).artifact]);
+    mocks.request.mockRejectedValue(new RemoteError('connection'));
+    await act(async () => { rendered = create(createElement(LibraryProbe)); });
+    await flush();
+    const gate = deferred<void>();
+    const read = mocks.store!.readLibraryOverview.bind(mocks.store!);
+    const overview = vi.spyOn(mocks.store!, 'readLibraryOverview').mockImplementation(async owner => {
+      if (owner === OWNER_A) await gate.promise;
+      return read(owner);
+    });
+    await act(async () => { notifyOfflineImages(OWNER_A); });
+    await act(async () => { notifyOfflineImages(OWNER_A); });
+    mocks.owner = OWNER_B;
+    await act(async () => rendered!.update(createElement(LibraryProbe)));
+    await flush();
+    expect(library.items.map(item => item.id)).toEqual(['activity:synthetic-b']);
+    await act(async () => gate.resolve());
+    await flush();
+    expect(overview.mock.calls.filter(([owner]) => owner === OWNER_A)).toHaveLength(1);
+    expect(library.items.map(item => item.id)).toEqual(['activity:synthetic-b']);
+  });
+
+  it('accepts a new invalidation after a failed local read without clearing saved content', async () => {
+    mocks.request.mockRejectedValue(new RemoteError('connection'));
+    await mocks.store!.upsertSummaries(OWNER_A, [draftDetail({ id: 'synthetic-saved' }).artifact]);
+    await act(async () => { rendered = create(createElement(LibraryProbe)); });
+    await flush();
+    const overview = vi.spyOn(mocks.store!, 'readLibraryOverview').mockRejectedValueOnce(new Error('synthetic_busy'));
+    await act(async () => notifyOfflineImages(OWNER_A));
+    await flush();
+    expect(library.items.map(item => item.id)).toEqual(['activity:synthetic-saved']);
+    await act(async () => { await mocks.store!.upsertSummaries(OWNER_A, [draftDetail({ id: 'synthetic-new' }).artifact]); });
+    await flush();
+    expect(overview.mock.calls.length).toBeGreaterThan(1);
+    expect(library.items.map(item => item.id)).toEqual(['activity:synthetic-saved', 'activity:synthetic-new']);
+    expect(library.offlineStats).toMatchObject({ total: 2 });
+    expect(library.errorCode).toBe('connection');
+  });
+
   it('keeps the shared job after blur and displays each committed item through its subscription', async () => {
     const details = [draftDetail({ id: 'activity:a' }), draftDetail({ id: 'activity:b' }), draftDetail({ id: 'activity:c' })];
     const pending = details.map(() => deferred<unknown>());

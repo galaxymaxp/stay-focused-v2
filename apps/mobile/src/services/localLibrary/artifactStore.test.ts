@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { ActivityDetail, ActivitySummary, LibraryArtifactDetail, QuizAttempt } from "@stay-focused/shared";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createLocalArtifactStore, LOCAL_PAYLOAD_SCHEMA } from "./artifactStore";
 import {
@@ -304,6 +304,16 @@ describe('offline storage controls', () => {
     raw.prepare('UPDATE library_artifacts SET payload_schema = 99 WHERE owner_user_id = ?').run(OWNER_A);
     expect((await store.offlineStats(OWNER_A)).current).toBe(0);
     expect(await store.offlineStats(OWNER_B)).toMatchObject({ total: 1, current: 0 });
+    // Overview retains every existing readiness/byte/failure rule and only
+    // scans owner-wide derived summaries once for the list and stats together.
+    for (const owner of [OWNER_A, OWNER_B]) {
+      const items = await store.listSummaries(owner);
+      const offlineStats = await store.offlineStats(owner);
+      const list = vi.spyOn(store, 'listSummaries');
+      await expect(store.readLibraryOverview(owner)).resolves.toEqual({ items, offlineStats });
+      expect(list).toHaveBeenCalledExactlyOnceWith(owner);
+      list.mockRestore();
+    }
   });
   it('clears bodies and assists, keeping aliases, snapshots and unsynced work', async () => {
     const { store, raw } = await freshStore();

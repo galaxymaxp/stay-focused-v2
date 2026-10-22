@@ -84,9 +84,27 @@ export function useLocalLibrary() {
         }
         return;
       }
-      const readLocal = async () => {
-        const [items, offlineStats] = await Promise.all([store.listSummaries(ownerUserId), store.offlineStats(ownerUserId)]);
-        if (live) setState((old) => ({ ...old, owner: ownerUserId, items: mergeSavedData(old.items, items.filter(item => !old.supersededReviewerIds.includes(item.id))), localReady: true, offlineStats, refreshing: offlineCatchUpRunning(ownerUserId) && offlineCatchUpError(ownerUserId) !== 'connection', errorCode: offlineCatchUpError(ownerUserId) }));
+      let localRead: Promise<void> | null = null;
+      let localDirty = false;
+      const readLocal = (): Promise<void> => {
+        if (!live) return Promise.resolve();
+        localDirty = true;
+        if (!localRead) localRead = Promise.resolve().then(async () => {
+          // Keep the first saved result immediate. Events received during it
+          // require a fresh follow-up, but never parallel owner-wide scans.
+          try {
+            while (live && localDirty) {
+              localDirty = false;
+              try {
+                const { items, offlineStats } = await store.readLibraryOverview(ownerUserId);
+                if (live) setState((old) => ({ ...old, owner: ownerUserId, items: mergeSavedData(old.items, items.filter(item => !old.supersededReviewerIds.includes(item.id))), localReady: true, offlineStats, refreshing: offlineCatchUpRunning(ownerUserId) && offlineCatchUpError(ownerUserId) !== 'connection', errorCode: offlineCatchUpError(ownerUserId) }));
+              } catch (error) {
+                if (!localDirty) throw error;
+              }
+            }
+          } finally { localRead = null; }
+        });
+        return localRead;
       };
       unsubscribe = subscribeOfflineLibrary(ownerUserId, () => { void readLocal().catch(() => undefined); });
       await readLocal().catch(() => {
