@@ -2025,9 +2025,13 @@ details[open] > :not(summary) {
 }
 .day-orb { position: relative; }
 .orb-poster-layer { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+/* Nothing paints while loading: the complete first frame fades in from empty.
+   The poster is only a final state (failure, or a deliberate Reduce Motion still). */
 .day-orb .orb-live { opacity: 0; }
 .day-orb[data-orb-load="ready"] .orb-live { opacity: 1; transition: opacity 250ms ease; }
-.day-orb[data-orb-load="ready"] .orb-poster-layer { opacity: 0; transition: opacity 250ms ease; }
+.day-orb .orb-poster-layer { opacity: 0; }
+.day-orb[data-orb-load="failed"] .orb-poster-layer,
+.day-orb[data-orb-load="still"] .orb-poster-layer { opacity: 1; }
 .day-orb[data-orb-load="failed"] .orb-live { display: none; }
 .day-orb .orb-poster-layer .orb-static-source {
   --orb-poster-deep: var(--orb-poster-light);
@@ -2038,8 +2042,7 @@ details[open] > :not(summary) {
   background: radial-gradient(circle at 40% 32%, var(--orb-poster-color) 0%, var(--orb-poster-color) 45%, var(--orb-poster-deep) 100%);
 }
 @media (prefers-reduced-motion: reduce) {
-  .day-orb[data-orb-load="ready"] .orb-live,
-  .day-orb[data-orb-load="ready"] .orb-poster-layer { transition: none; }
+  .day-orb[data-orb-load="ready"] .orb-live { transition: none; }
 }
 .day-orb-fallback {
   width: 60%;

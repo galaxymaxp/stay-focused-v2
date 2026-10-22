@@ -101,9 +101,11 @@ async function settle(page: Page, name: string) {
   await page.waitForSelector('[data-orb-load="ready"]', { timeout: 30_000 });
   await page.waitForTimeout(350);
   const samples = await page.evaluate(() => (window as unknown as ProbeWindow).__samples);
-  expect(samples.some(s => s.status === 'loading' && s.poster === 1 && s.live === 0)).toBe(true);
+  // No fill paints ahead of the scene: loading is empty, and the complete frame fades in alone.
+  expect(samples.some(s => s.status === 'loading' && s.live === 0)).toBe(true);
+  expect(samples.filter(s => s.poster > 0)).toEqual([]);
   expect(samples.filter(s => s.clock && s.live > 0 && !s.complete)).toEqual([]);
-  expect(samples.some(s => s.live > 0 && s.live < 1 && s.poster > 0)).toBe(true);
+  expect(samples.some(s => s.live > 0 && s.live < 1)).toBe(true);
   expect(samples.at(-1)).toMatchObject({ status: 'ready', live: 1, poster: 0, duration: '0.25s' });
   writeFileSync(join(evidence, `${name}.json`), JSON.stringify(samples, null, 2));
   await page.screenshot({ path: join(evidence, `${name}.png`) });

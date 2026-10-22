@@ -43,7 +43,7 @@ async function mount(reducedMotion = false, extra: Partial<Parameters<typeof Day
   return interaction;
 }
 function draw() { const pending = [...frames.values()]; frames.clear(); pending.forEach(fn => fn(Date.now())); }
-it('keeps the poster until a complete atlas/body/aura draw, including Reduce Motion', async () => {
+it('stays empty until a complete atlas/body/aura draw, including Reduce Motion', async () => {
   const ready = vi.fn(); await mount(true, { clock: { text: '12:00 PM', fontSize: 40 }, onGlassReady: ready });
   await act(async () => draw());
   expect(mocks.render).not.toHaveBeenCalled(); expect(ready).not.toHaveBeenCalledWith(true);

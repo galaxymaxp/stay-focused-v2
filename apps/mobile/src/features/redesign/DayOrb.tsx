@@ -107,11 +107,16 @@ export const DayOrb = memo(function DayOrb({
   runtime.current = { variant, tones, mode, reducedMotion, running: live && foreground, state, clock, canvasSize: size, onGlassReady, onFrameReady: frameReady, onFailure: failure };
   const controller = useRef<{ wake: () => void; dispose: () => void } | null>(null);
   const context = useRef<ExpoWebGLRenderingContext | null>(null);
-  useEffect(() => {
+  const startGate = useCallback(() => {
+    gate.current?.dispose();
     const current = createOrbLoadGate(setLoadStatus, () => console.warn('Orb unavailable; keeping static poster.'));
     gate.current = current;
-    return () => { current.dispose(); gate.current = null; };
+    return current;
   }, []);
+  useEffect(() => {
+    const current = startGate();
+    return () => { current.dispose(); if (gate.current === current) gate.current = null; };
+  }, [startGate]);
   useEffect(() => {
     gate.current?.setActive(live && foreground);
   }, [live, foreground]);
@@ -155,21 +160,30 @@ export const DayOrb = memo(function DayOrb({
     };
   }, [sceneInteraction, variant, failure]);
   const create = useCallback((gl: ExpoWebGLRenderingContext) => {
-    // Expo can recreate a destroyed surface without remounting this component.
-    // Treat that context loss as a final fallback, never as an already-ready canvas.
-    if (context.current) { if (context.current !== gl) failure(); return; }
+    if (context.current === gl) return;
+    if (context.current) {
+      // Android destroys the surface while another screen covers Today, and Expo
+      // hands over a new context without remounting. Rebuild on it and reveal it
+      // as a fresh load: hidden until its first complete frame, never a blank canvas.
+      opacity.current?.setValue(0);
+      try { controller.current?.dispose(); } catch { /* the old context is already gone */ }
+      controller.current = null;
+      setLoadStatus('loading');
+      startGate().setActive(runtime.current.running);
+    }
     context.current = gl;
     controller.current?.dispose();
     try { controller.current = buildScene(gl, runtime, sceneInteraction); }
     catch { context.current = null; failure(); }
-  }, [sceneInteraction, failure]);
+  }, [sceneInteraction, failure, startGate]);
   const inner = size * RENDER_SCALE * ORB_AMBIENT_PROFILES[variant].canvasScale;
   return (
     <View pointerEvents="none" style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-      {/* Ambient spill renders inside the same transparent GL view. */}
-      <Animated.View pointerEvents="none" accessibilityElementsHidden testID="orb-poster-layer" style={{ position: 'absolute', opacity: opacity.current.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }}>
+      {/* Nothing paints while loading: the complete first frame fades in from empty.
+          The poster is only the final fallback. Ambient spill renders inside the GL view. */}
+      {loadStatus === 'failed' && <View pointerEvents="none" accessibilityElementsHidden testID="orb-poster-layer" style={{ position: 'absolute' }}>
         <OrbPoster variant={variant} size={size * DAY_ORB_FILL} mode={mode} interaction={posterInteraction} />
-      </Animated.View>
+      </View>}
       {loadStatus !== 'failed' && <Animated.View pointerEvents="none" accessibilityElementsHidden testID="orb-live-layer" style={{ position: 'absolute', opacity: opacity.current }}>
         <GLView onContextCreate={create} style={{ width: inner, height: inner, transform: [{ scale: 1 / RENDER_SCALE }] }} />
       </Animated.View>}
