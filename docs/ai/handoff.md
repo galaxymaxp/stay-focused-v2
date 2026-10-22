@@ -9829,3 +9829,38 @@ record exit 0. Original logs retained; assertions/config were not weakened.
   authorized future env/deploy/log tooling. Installation and Vercel commands
   NOT RUN. Original UI/, apps/mobile/.gitignore, supabase/.temp/, ignored tmp/
   and Owner Pause preserved. OX2/release/FULLSEND remain unstarted.
+
+## OX1-device — separately authorized Realme square repair (2026-10-22)
+
+**PASS for physical square removal in the isolated native diagnostic app.**
+The owner explicitly authorized this physical follow-up after bcef0477's stop.
+The release's square reproduces in an SVG-only OrbPoster with no GL surface.
+Android SVG's bitmap clips the spill outside the 100-unit viewport. Expanding
+the actual bitmap/viewport to include the full spill plus a clear guard removes
+the square, preserves the body size and retains feathered external light.
+Only OrbPoster runtime code and eight targeted regression tests change.
+
+FRESH forced typecheck/lint/build: 8/8 tasks each, 0 cached. Full shared 696/72
+files, mobile 1641/172, web 569/75: 2906 pass, 0 failures/skips. Focused mobile
+37/37 overlaps the full suite. Explicit web build and Android HBC export pass.
+All original warnings remain. Physical Realme RMX3151/Android13 checks include
+12 dark/light × gold/pearl/violet × Today/Generate captures, ten native tab
+cycles, resume, glass clock text, tap palette/held rotation and 31-second Reduced
+Motion stability (0 pixel difference, 0 UI frames during that idle interval).
+The bounded normal sample has p99 18ms, GPU p99 12ms; no matched battery claim.
+
+[Separate acceptance report](acceptance/ox1-realme-physical-debug.md) contains
+cause, isolation, exact native package/build boundaries, commands, first failed
+attempts and private evidence paths under tmp/overnight/OX1-device/. Diagnostics
+reuse the release's actual native binaries in .ox1physical with disabled OTA,
+local source bundles and an explicitly adapted atlas URI. This is an offline
+real-component shell, not authenticated production-route acceptance. Clean
+Gradle rebuild was interrupted during uncached NDK provisioning; no remote build.
+
+Original release 2.3.0/code7, install/update timestamps and data are unchanged.
+Its Automatic theme, original green palette and OS animation scale 1 are
+restored; phone returned to release Today. That release intentionally still
+shows the square until publication is separately approved. Historical OX1
+status/report and Owner Pause are preserved. No push, deployment, OTA, FULLSEND,
+production mutation, uninstall, data clear or OX2. Scoped local commit hash is
+in the completion report/Git. Owner/supervisor review is the next action.

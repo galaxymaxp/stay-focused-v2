@@ -1,5 +1,24 @@
 # Current State
 
+<!-- OX1-device begin -->
+OX1 / owner-authorized Realme follow-up (2026-10-22): **PASS for the physical
+square repair in an isolated native test application**. The actual release and
+an SVG-only OrbPoster reproduce the square. Android rasterizes its oversized
+spill into the declared, too-small SVG bitmap; a padded viewport removes the
+cutoff while preserving body size and external light. Only mobile OrbPoster and
+eight regression cases change. Physical dark/light × gold/pearl/violet ×
+Today/Generate captures, ten navigation cycles, resume, live glass text,
+tap/rotation and 31-second Reduced Motion stability pass in the offline shell.
+FRESH root typecheck/lint/build: 8/8 each, 0 cached; shared 696, mobile 1641,
+web 569 tests pass; Android HBC export passes. The release/data remain intact;
+no deploy, OTA, push or production mutation. Clean Gradle APK rebuild was not
+completed; the device test reuses the release's exact native binaries under a
+separate package with local source bundles and explicit asset adaptation.
+The historical OX1 stop/status remains unchanged; this separately authorized
+resolution awaits owner/supervisor review, with OX2 and release unstarted.
+[Physical evidence and limits](ai/acceptance/ox1-realme-physical-debug.md).
+<!-- OX1-device end -->
+
 <!-- OX1 begin -->
 OX1 / orb compositing integrity (2026-10-22): **STOPPED at STEP 0**.
 The owner-reported Realme square was not reproduced in local software rendering;

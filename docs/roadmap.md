@@ -1,5 +1,22 @@
 # Roadmap
 
+<!-- OX1-device begin -->
+OX1 / physical follow-up (2026-10-22): **PASS for the confirmed square repair
+on the Realme in an isolated native test app**. New owner scope explicitly
+authorizes ADB, source repair, local device builds/validation and local commits;
+it excludes rollout, OTA, production changes, push and FULLSEND. The native SVG
+poster's clipped backing bitmap is confirmed by physical layer isolation.
+The corrected viewport retains the complete spill and original sphere geometry.
+FRESH 12 theme/palette/surface captures, ten native tab cycles, resume, touch,
+glass text and 31-second Reduced Motion checks pass. Root forced gates 8/8 each,
+0 cached; shared/mobile/web 696/1641/569 tests and Android export pass.
+Native diagnostics reuse installed release binaries under a separate identity;
+clean Gradle rebuild and full authenticated production routes are unverified.
+Preserve the old OX1 status/stop history for supervisor reconciliation. This
+follow-up ends at the local commit; do not start OX2 or a release automatically.
+[Separate physical report](ai/acceptance/ox1-realme-physical-debug.md).
+<!-- OX1-device end -->
+
 <!-- OX1 begin -->
 OX1 / orb compositing integrity (2026-10-22): **STOPPED at STEP 0**.
 Finite scope is OX1 only: establish the square's cause, then the smallest complete

@@ -1,3 +1,22 @@
+<!-- OX1-device begin -->
+OX1-device / finite owner-authorized physical debugging (2026-10-22): **PASS
+for native square removal in the isolated Realme test app**. Baseline bcef0477
+on overnight/2026-10-15_feedback. Endpoint: actual reproduction, layer isolation,
+smallest repair, physical matrix, fresh gates, report and scoped local commit.
+Cause: SVG spill outside a 100-unit viewport is clipped by Android's bitmap.
+Change: enlarge the actual poster raster while retaining body size/layout; no
+GL/alpha/blend/dependency/web change, black backing or clipping mask.
+Physical: 12 palette/theme/surface captures, ten tab cycles, resume, glass time,
+tap/held rotation and 31-second Reduced Motion stability pass in the offline
+native shell. FRESH root forced gates 8/8 each, 0 cached; shared 696, mobile
+1641, web 569 tests; explicit web build and Android HBC export pass. The native
+test reuses installed release binaries in a separate identity; clean Gradle APK
+rebuild and authenticated production routes are not claimed. Historical OX1
+status/report and Owner Pause preserved. No OX2, push, release, OTA, FULLSEND,
+remote build or production-service mutation. Owner/supervisor review next.
+[Acceptance and evidence](acceptance/ox1-realme-physical-debug.md).
+<!-- OX1-device end -->
+
 <!-- OX1 begin -->
 OX1 / orb compositing integrity (2026-10-22): **STOPPED at STEP 0**.
 Scope: OX1 STEP 0-2, local gates/docs/commits, with Rollout and Device checks
