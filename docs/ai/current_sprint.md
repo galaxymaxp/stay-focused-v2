@@ -1,3 +1,22 @@
+<!-- FS8 begin -->
+FS8 / FULLSEND 20261022-1719: **shipped; Realme orb acceptance PASS**. Ships
+`90383ef2` (orb stays empty until its first complete frame; poster only for
+failure or the web Reduce Motion still) and `245380ea` (mobile Today orb rebuilds
+on a replacement GL context instead of sticking on the poster after Settings
+covers Today). Tested main `acf9481`. Fresh gates: typecheck/lint/build 8/8, 0
+cached (first build attempt hit a Windows file-read error; rerun passed); shared
+353, Canvas 75, OCR 27, engine 606, API 2452 + 3 skips, mobile 1645, web 575,
+provider 20. CI 39757286388 SUCCESS. No migration or worker change. API READY at
+`acf9481`; website `dpl_Bt6ivQjFbkva3MykeVznrq6fegmJ` on stay-focused-ten.vercel.app;
+OTA `5c027739-bb01-4532-8108-12c1f46a8ac4` (update `01a16304`, runtime
+2.3.0-sdk57) running on the Realme. The orb stays live after Settings round trips
+in Light, Dark and Automatic; Appearance restored to Automatic.
+Next: FS7's open items remain (native resume text redraw on first resume capture;
+authenticated web visuals). OX3 Queue fade and OX4 startup easing stay backlog;
+Owner Pause preserved. No deployment pending.
+[Release record](acceptance/fullsend-20261022-1719.md).
+<!-- FS8 end -->
+
 <!-- FS7 begin -->
 FS7 / FULLSEND 20261022-1512: **shipped through STEP 6; device acceptance PARTIAL**.
 FS7's owner authorization supersedes earlier local-only rollout restrictions

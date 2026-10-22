@@ -1,5 +1,40 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff — FULLSEND (20261022-1719)
+
+What changed:
+Shipped two orb fixes from source 245380ea (release/fullsend-20261022-1719) by
+normal merge acf9481 over previous main babcb0bc. 90383ef2: web and mobile orb
+stays empty while loading and fades in from its first complete frame; the
+static poster is only a failure/Reduce Motion state. 245380ea: mobile Today orb
+rebuilds on a replacement GL context after Settings or another screen covers
+Today, instead of staying on the poster until a cold restart.
+
+Verification (exact counts):
+FRESH at acf9481: npm ci 1,591; Doctor 21/21; typecheck/lint 8/8, 0 cached, six
+existing warnings; build first attempt FAILED (Windows file-read error in Metro on
+untouched generationRecovery.ts), forced rerun 8/8, 0 cached. Shared 353/36,
+Canvas 75/1, OCR 27/3, engine 606/0, API 2452 + 3 skips/213, mobile 1645/172, web
+575/76, provider 20/20, diff check PASS. CI 39757286388 SUCCESS.
+
+Deployments (IDs, SHAs):
+Migrations and worker: NOT APPLICABLE (no paths changed). API Git deploy READY at
+acf9481; proxied health reports acf9481. Website dpl_Bt6ivQjFbkva3MykeVznrq6fegmJ
+READY, alias stay-focused-ten.vercel.app. OTA group 5c027739-bb01-4532-8108-12c1f46a8ac4,
+Android update 01a16304-432c-703e-838e-c4ea04e4b3d9, runtime 2.3.0-sdk57.
+
+Live checks:
+PASS: Realme About shows 2.3.0 (7) · update 01a16304. Settings round trips with
+Light, Dark and Automatic each return to a live GLView orb, no "Orb unavailable".
+NOT RUN: deployed-website desktop visual check; deployment 5xx scans.
+
+Next steps:
+FS7 open items (native resume text redraw; authenticated web visuals). OX3/OX4
+backlog under Owner Pause. Source checkout b25-3-3-work stays on
+overnight/2026-10-15_feedback and does not yet contain this release's docs.
+
+[Full record](acceptance/fullsend-20261022-1719.md).
+
 ## Handoff — FULLSEND (20261022-1512)
 
 What changed:
