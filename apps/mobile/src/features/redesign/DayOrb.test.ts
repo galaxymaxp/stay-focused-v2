@@ -125,16 +125,33 @@ it('keeps a hidden scene pending and lets it render when focus returns', async (
   await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
   expect(mocks.render).toHaveBeenCalledTimes(2);
 });
-it('withdraws a ready surface if Expo replaces its context without a component remount', async () => {
+it('rebuilds on a replacement context and reveals it only after a complete frame', async () => {
   const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
   await render({ reducedMotion: true }); await startGL();
   await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
-  expect(rendered!.root.findByProps({ testID: 'orb-live-layer' }).props.style.opacity.value).toBe(1);
+  const live = () => rendered!.root.findByProps({ testID: 'orb-live-layer' }).props.style.opacity.value;
+  expect(live()).toBe(1);
   const count = mocks.render.mock.calls.length;
+  // Expo hands over a new surface after another screen covered Today.
   await startGL();
+  expect(live()).toBe(0);
+  expect(rendered!.root.findAllByType(GLView)).toHaveLength(1);
+  expect(rendered!.root.findAllByProps({ testID: 'orb-poster' })).toHaveLength(0);
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  expect(mocks.render.mock.calls.length).toBeGreaterThan(count);
+  expect(live()).toBe(1);
+  // The replacement gets a fresh load deadline rather than inheriting the old gate.
+  await act(async () => { vi.advanceTimersByTime(24_000); });
+  expect(rendered!.root.findAllByType(GLView)).toHaveLength(1); expect(warn).not.toHaveBeenCalled();
+});
+it('falls back to the poster when the replacement context cannot build a scene', async () => {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  await render({ reducedMotion: true }); await startGL();
+  await act(async () => { vi.advanceTimersByTime(16); mocks.frame.mock.lastCall![0](Date.now()); });
+  mocks.fail = true; await startGL();
   expect(rendered!.root.findAllByType(GLView)).toHaveLength(0);
   expect(rendered!.root.findAllByProps({ testID: 'orb-poster' })).toHaveLength(1);
-  expect(mocks.render).toHaveBeenCalledTimes(count); expect(warn).toHaveBeenCalledOnce();
+  expect(warn).toHaveBeenCalledOnce();
 });
 
 it.each(ORB_IDLE_PALETTE)('keeps Today and idle Generation appearance identical for $key across live theme changes', async color => {
