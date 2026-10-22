@@ -71,3 +71,54 @@ telemetry and local Turbo cache only. Gates run serially.
 Rollout and Device checks: **NOT RUN**, skipped entirely by unattended rules.
 Pinned native reproduction/attribution and authenticated live acceptance remain
 owner work; no local PASS will close PBR-RT1 or establish beta/release readiness.
+
+## Finding D2 — overlapping and duplicate local Library reads (before repair)
+
+2026-10-22T18:06:37.780Z; source 8d6e60a3, source mobile 2.2.0/code6,
+Node/SQLite + React test renderer, no OTA/native renderer. **MEASURED**,
+high cause confidence. Exact command: `node tmp/overnight/PBR-AF1/run.cjs library`;
+four focused files, **FRESH 74 passed / 4 failed / 0 skipped**. The new
+parameterized hook regression fails on maximum overlapping summary reads.
+
+Fixture: 0/100/240/300 public synthetic draft summaries, one initial image
+notification plus N progress notifications during a held local read, then one
+committed late summary (which itself notifies). Initial cloud read fails with
+synthetic `connection`, so saved data and offline state stay visible.
+
+| Existing summaries | Explicit events + late-write event | Summary reads | Stats reads | Maximum overlapping summary calls |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 1 + 1 | 4 | 2 | 4 |
+| 100 | 101 + 1 | 204 | 102 | 204 |
+| 240 | 241 + 1 | 484 | 242 | 484 |
+| 300 | 301 + 1 | 604 | 302 | 604 |
+
+Observed full content/stats equality passes, but work scales with redundant
+notifications. Expected: one active derived read plus one fresh follow-up for
+invalidations received during it, with late writes included and owner fences
+preserved. Owning code: `useLocalLibrary.ts` subscription independently starts
+`Promise.all(listSummaries, offlineStats)` for every event;
+`artifactStore.ts:offlineStats` internally calls `listSummaries` again. Each
+summary read parses image, response, quiz and pending-draft metadata.
+
+Failing proof: `tmp/overnight/PBR-AF1/library-1792692397781.log`, SHA256
+`af66eb1df7cc434977a5d9ac72e582139ef72aebb22e8fc29196bbd1b4a621d6`.
+The first harness attempt `library-1792692318*.log` did not finish: its held
+mock remote ignored abort and blocked afterEach draining. Only that runner's
+process tree was terminated. Replacing the mock with an immediate synthetic
+connection failure fixes the harness; no product/assertion weakening occurred.
+Next action: reuse the owner-bound summary scan for list/stats and serialize
+overlapping screen invalidations with a dirty follow-up; no debounce timer,
+catch-up throttle change, write batching or lost progress notification.
+
+## Finding B0 — native resume text remains UNREPRODUCED
+
+2026-10-22T18:04:16.966Z; same source/build boundary. Source recheck confirms
+DayOrb replacement-context disposal/rebuild/load gating already exists.
+DayRingClock's foreground/focus timer, ThemeProvider AppState/Appearance,
+authenticated owner-key stack and AppLifecycle show no newly demonstrated
+native text removal cause. FRESH existing resume/navigation suites: **65 passed /
+0 failed / 0 skipped / 5 files**, `resume-1792692256976.log`. These are JS mocks,
+not fresh physical proof; historical combined 8-case probe is not rerun as
+native evidence. Original FS7 captures remain unavailable locally; OX1 captures
+belong to a different isolated diagnostic shell. No speculative repair.
+Missing essential native attribution blocks this repair path only, per AF1.
