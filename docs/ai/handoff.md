@@ -9993,3 +9993,108 @@ trips is narrower and does not close the entire resume/performance matrix.
 - UI/, apps/mobile/.gitignore, supabase/.temp/ and pre-existing ignored tmp/
   evidence are preserved and excluded. No .env file was edited, no service was
   called, no private academic fixture or provider error was committed.
+
+## PBR-RT1 - Android resume-text evidence stop (2026-10-22)
+
+**STOPPED at STEP 1, before implementation.** The actual FS7 missing-native-text
+cause cannot be substantiated from the available local evidence. This is the
+prompt's required physical-attribution stop, not a failed implementation gate.
+No runtime code, dependency, font, navigation, release configuration or permanent
+regression test changed; no fix is established. FS7 remains **5 PASS / 1 FAIL,
+physical PARTIAL**. Existing replacement-GL-context recovery is already present;
+the later Appearance/live-GL success does not close the broader missing-text flow.
+
+Commits:
+
+- `0a150687 docs(perf): record PBR-RT1 native-text evidence stop`
+- `docs(perf): checkpoint PBR-RT1 stopped handoff` (this documentation checkpoint;
+  exact hash and both commits are recorded in Git and `tmp/overnight/PBR-RT1.status`).
+
+Branch `overnight/2026-10-15_feedback`, initial source
+`a4e5c4ccda1408f853db2e6a1f102b823a343ff0`. Initial local upstream snapshot
+2 ahead / 23 behind github/main, no fetch. Author galaxymaxp <omgraythekid@gmail.com>.
+Owned files: `docs/current-state.md`, `docs/roadmap.md`,
+`docs/ai/current_sprint.md`,
+`docs/ai/acceptance/pbr-rt1-android-resume-text.md`, and this appended handoff.
+[Acceptance report](acceptance/pbr-rt1-android-resume-text.md) contains the matrix,
+source/dependency trace, release boundaries, diagnostic details and exact commands.
+
+FRESH final investigative suites: existing focused mobile **65 passed / 0 failed /
+0 skipped / 5 files** (DayOrb, ring-orb-spin, AppLifecycle, navigationStructure,
+TabPressButton); ignored combined actual DayRingClock/DayOrb synthetic probe
+**8 passed / 0 failed / 0 skipped / 1 file**. Total **73 passed / 6 files**,
+not physical proof. The probe simulates 80 resume/focus/theme cycles with
+same/replaced GL contexts, normal/Reduced Motion and fonts loaded/unloaded,
+complete native Text host children/accessibility, fallback and cleanup. Native
+Text/GL/atlas/animation/focus boundaries are stubbed; no real Android pixels,
+font loading, TextureView/EGL, Activity/window/native-stack or screenshot path.
+It does not reproduce FS7. First probe attempt **4 passed / 4 failed** was a
+harness effect/timer-flush error; corrected harness retains every assertion and
+passes with unchanged product code. Both attempts retained; no observed flake.
+Existing Vite/react-test-renderer warnings remain; an exploratory Windows
+wildcard read was corrected, and broad inventory output was narrowed.
+
+FRESH unstaged/staged diff checks and documentation path/scope/sequence/history
+validation PASS, exit 0. Exact five runner task descriptions/dependencies match;
+historical planning/handoff bodies preserved. Full mobile/shared/API/web suites,
+root forced typecheck/lint/build, separate API/web builds and Android offline
+export: **NOT RUN at mandatory pre-implementation STEP 1 stop**. No historical
+PBR0 gate is reused. Cause-specific correction/regression acceptance: **BLOCKED**.
+Serial local tests use repository-local TEMP/TMP/TMPDIR, inspected PBR0 Node
+loopback network guard, Expo offline, disabled telemetry, npm offline and local
+Turbo cache only. No cached test/Turbo result reused. Test duration is not
+startup, device latency or native frame evidence.
+
+MEASURED LOCALLY: source manifest 2.2.0/code6/runtime 2.2.0-sdk57; exact baseline
+HEAD and passing diagnostic counts above. HISTORICAL: FS7 report from local Git
+c9cb867d pins source 26702858/application 83f9474/update 01a162a3 on the
+2.3.0/code7/runtime 2.3.0-sdk57 binary, with complete text recovered at a 54.9 s
+follow-up (not a measured failure duration). Newer c0569007 report pins source
+245380ea/application acf9481/update 01a16304 on that same binary/runtime and
+proves narrower Appearance round trips. Current code includes the later GL
+repair. `tmp/overnight/FS7.progress`/`.status` repeat the failure but provide no
+native cause trace. Original release-clone `.local/` capture paths are absent
+here; inspected OX1-device logs belong to a separate SVG diagnostic shell and
+cannot attribute FS7. No private screen/source content was displayed or copied.
+
+Frozen finite sequence reconciled from absolute runner BACKLOG's
+"PBR execution 2026-10-22": **PBR0 -> PBR-RT1 -> PBR-MB1 -> PBR-LP1 -> PBR-AS1 ->
+PBR-LR1**. Only PBR-RT1 executed. All four dependents remain **HELD, approved
+roadmap only, NOT QUEUED/STARTED/COMPLETED**. Actual predecessor PASS with fresh
+authorized supervisor review is required; no follow-up initiated. Historical
+PBR1-PBR5 proposals, pending OX2/OX3/OX4/QI1/LC1, held parity and Owner Pause
+remain intact. Original UI/, apps/mobile/.gitignore, supabase/.temp/ and ignored
+tmp/ artifacts preserved and excluded from commits.
+
+**Owner steps remaining**
+
+- Exact owner question, recorded only: On the pinned Realme 2.3.0/code7 binary,
+  what original FS7 route order, background dwell, Appearance/system-theme state
+  and active OTA reproduce missing native labels, and do those same labels
+  disappear on the physical display as in a simultaneous capture? Provide
+  synchronized sanitized AppState/focus, Activity/window/surface/context and
+  native Text/view/font/error evidence through first failure and recovery before
+  choosing a repair. Recover original FS7 evidence first; the report omits exact
+  route order/dwell. No unattended question was sent.
+- Device checks: **NOT RUN**, skipped entirely. With separate authorization,
+  pin model/OS/binary fingerprint/active update/runtime/channel; repeat original
+  FS7 flow and ten background/foreground cycles, distinguishing same-route
+  resume, Today/standalone Generation without submission, and Settings >
+  Appearance > Today. Light/Dark/Automatic, normal/Reduced Motion, public/empty
+  text state; compare page/tab native labels, SVG labels, GL clock and native
+  fallback on screen versus capture with actual timestamps (resume and bounded
+  1/5/15/30/55 s follow-ups). Redact academic content/credentials. No build,
+  install, OTA switch, force-stop/data reset or lost pending state is implied.
+- Rollout: **NOT RUN**, skipped entirely. Review local documentation and obtain
+  essential physical attribution before retry or any dependent publication.
+  No fix is ready for publication. No deploy/worker/EAS/OTA/native release build,
+  install/push, remote migration/SQL, provider/email/Scheduler/account/credential
+  operation or environment-file edit occurred.
+- **UNVERIFIED (owner to confirm):** current active binary/OTA, actual failure
+  cause/recovery interval, native screen-versus-capture attribution, Android
+  lifecycle/GPU/font/compositor behavior and performance, broader authenticated
+  native/web acceptance, current live revisions/database/regions/queues/Scheduler.
+  Missing live state alone was not the stop; missing native cause evidence was.
+- Vercel CLI unavailable: strongly recommend `npm i -g vercel` for future
+  separately authorized env/deploy/log work. Installation and all Vercel commands
+  NOT RUN here. No service contacted and no next task/release initiated.
