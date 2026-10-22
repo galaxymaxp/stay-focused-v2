@@ -1,5 +1,34 @@
 # Current State
 
+<!-- PBR-RT1 begin -->
+PBR-RT1 / Android Resume-Text Recovery (2026-10-22): **STOPPED at STEP 1**,
+before implementation, on source a4e5c4cc / overnight/2026-10-15_feedback.
+FS7's missing native text after resume is not attributed by the available
+local evidence. The existing replacement-GL-context repair is already present;
+newer narrower Appearance/live-GL success does not close FS7's 5 PASS / 1 FAIL.
+FRESH existing focused mobile suites: **65 passed / 5 files**. Ignored combined
+DayRingClock/DayOrb probe: **8 passed / 1 file**, 80 synthetic resume cycles;
+neither test-host Text nor software rendering proves Android native pixels.
+First probe attempt **4 passed / 4 failed** due to harness effect/timer flushing;
+corrected harness passes without product edits or weakened assertions.
+Documentation scope/path and unstaged/staged hygiene: FRESH PASS. Full suites,
+root typecheck/lint/build and API/web/Android exports: NOT RUN at the required
+pre-implementation evidence stop. No runtime code or permanent regression added.
+Essential pinned-device screen-versus-capture and synchronized lifecycle/native
+Text/surface evidence remains **UNVERIFIED (owner to confirm)**; the exact owner
+question and privacy-safe matrix are recorded in the acceptance report/handoff.
+Rollout and Device checks NOT RUN, skipped entirely; no service, environment-file,
+deployment, native build/install, remote SQL, Scheduler/email or push operation.
+Frozen sequence: PBR0 -> **PBR-RT1 STOPPED** -> PBR-MB1 -> PBR-LP1 -> PBR-AS1 ->
+PBR-LR1. All four dependents are held, not started or queued; actual predecessor
+PASS plus fresh authorized supervisor review is required. These explicit IDs
+govern the owner-approved sequence; older PBR1-PBR5 categories remain historical
+proposals. Pending OX2/OX3/OX4/QI1/LC1, held parity, Owner Pause, owner artifacts
+and all previous evidence remain intact. Safe documentation committed locally;
+exact hashes in Git and ignored PBR-RT1.status. No later task initiated.
+[Acceptance, source boundaries, tests and owner evidence](ai/acceptance/pbr-rt1-android-resume-text.md).
+<!-- PBR-RT1 end -->
+
 <!-- PBR0 begin -->
 PBR0 / website + Android pre-beta baseline (2026-10-22): **PASS for the finite
 unattended audit scope**, source 245380ea on overnight/2026-10-15_feedback.
