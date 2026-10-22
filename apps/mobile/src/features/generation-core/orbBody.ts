@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-import { orbAppearance, ORB_MAX_IMPULSES, ORB_RIPPLE_MS, ORB_WAVE_AMPLITUDE, ORB_WAVE_CAP, orbWaveGain, type OrbWave } from '@stay-focused/shared';
+import { orbAppearance, ORB_GLASS_MATERIAL, ORB_MAX_IMPULSES, ORB_RIPPLE_MS, ORB_WAVE_AMPLITUDE, ORB_WAVE_CAP, orbWaveGain, type OrbWave } from '@stay-focused/shared';
 
 export const ORB_RADIUS = 0.95;
 
@@ -59,6 +59,8 @@ uniform vec3 uDeep;
 uniform vec3 uGlowColor;
 uniform vec3 uEnvFloor;
 uniform vec3 uEnvSky;
+uniform vec4 uGlass;
+uniform float uLightMode;
 // Where the inner light sits, in ball radii from the centre (zero: the centre).
 uniform vec3 uLight;
 varying vec3 vNormal;
@@ -101,10 +103,10 @@ void main() {
     // The liquid stays inside a smaller volume, leaving a clear band of glass at the edge.
     float held = 1.0 - smoothstep(0.5, 0.7, r2);
     float sheet = smoothstep(0.3, 0.9, liquid(uSpin * x)) * held;
-    float density = sheet * 0.38;
+    float density = sheet * uGlass.x;
     vec3 toLight = x - uLight;
     float centre = exp(-dot(toLight, toLight) * 3.2);
-    vec3 emit = mix(uDeep, uBase, sheet) * (0.06 + centre * light * 2.1);
+    vec3 emit = mix(uDeep, uBase, sheet) * (uGlass.y + centre * light * uGlass.z);
     glow += (1.0 - cover) * emit * density;
     cover += (1.0 - cover) * density;
   }
@@ -117,7 +119,11 @@ void main() {
   glow += uGlowColor * caustic * (0.08 + light * 0.1);
 
   vec3 color = glow + studio(reflect(-v, n)) * fresnel;
-  float alpha = clamp(cover + fresnel * 0.9 + caustic * 0.08, 0.0, 1.0);
+  // The studio reflection defines clear glass on paper, separately from the
+  // rotating liquid. No opaque base or additional render pass is needed.
+  float specular = pow(max(dot(reflect(-v, n), normalize(vec3(-0.55, 0.72, 0.42))), 0.0), 48.0) * uLightMode;
+  color += vec3(0.22) * specular;
+  float alpha = clamp(cover + fresnel * uGlass.w + caustic * 0.08 + specular * 0.18, 0.0, 1.0);
   color = mix(color, vec3(dot(color, vec3(0.299, 0.587, 0.114))) * 0.45, uError);
   // Accumulated light is already weighted by coverage; un-weight it for tone mapping, then re-apply.
   gl_FragColor = vec4(color / max(alpha, 0.001), alpha);
@@ -150,6 +156,7 @@ export function createOrbBody() {
     uGlow: { value: 0 }, uLevel: { value: 0 }, uError: { value: 0 },
     uBase: { value: new THREE.Color() }, uDeep: { value: new THREE.Color() }, uGlowColor: { value: new THREE.Color() },
     uEnvFloor: { value: new THREE.Color() }, uEnvSky: { value: new THREE.Color() },
+    uGlass: { value: new THREE.Vector4() }, uLightMode: { value: 0 },
     uLight: { value: new THREE.Vector3() },
     uWaveCount: { value: 0 }, uWaveGain: { value: 1 },
     uWaves: { value: Array.from({ length: ORB_MAX_IMPULSES }, () => new THREE.Vector4(0, 0, 1, -1)) },
@@ -170,8 +177,11 @@ export function createOrbBody() {
       uniforms.uBase.value.set(tones.base);
       uniforms.uDeep.value.set(tones.deep);
       uniforms.uGlowColor.value.set(tones.glow);
-      uniforms.uEnvFloor.value.set(tones.envFloor);
-      uniforms.uEnvSky.value.set(tones.envSky);
+      const glass = ORB_GLASS_MATERIAL[frame.mode];
+      uniforms.uEnvFloor.value.set(glass.floor);
+      uniforms.uEnvSky.value.set(glass.sky);
+      uniforms.uGlass.value.set(glass.density, glass.ambient, glass.emission, glass.rimOpacity);
+      uniforms.uLightMode.value = frame.mode === 'light' ? 1 : 0;
       uniforms.uWaveGain.value = orbWaveGain(frame.waves ?? []);
       uniforms.uWaveCount.value = Math.min(ORB_MAX_IMPULSES, frame.waves?.length ?? 0);
       for (let i = 0; i < ORB_MAX_IMPULSES; i++) {

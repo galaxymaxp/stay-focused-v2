@@ -1,5 +1,5 @@
 "use client";
-import { orbIdleColor, ORB_THEME_TONES } from '@stay-focused/shared';
+import { orbIdleColor, ORB_THEME_TONES, ORB_GLASS_MATERIAL } from '@stay-focused/shared';
 import { useEffect, useMemo, useRef, type CSSProperties } from 'react';
 import type { OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 
@@ -31,6 +31,9 @@ export function OrbLoadPoster({ poster, interaction, variant, diameter }: {
       '--orb-poster-color': orbIdleColor(interaction.state.current, Date.now(), true),
       '--orb-poster-light': ORB_THEME_TONES.light.deep,
       '--orb-poster-dark': ORB_THEME_TONES.dark.deep,
+      '--orb-poster-start': ORB_GLASS_MATERIAL.light.posterOpacity[0] * 100 + '%',
+      '--orb-poster-mid': ORB_GLASS_MATERIAL.light.posterOpacity[1] * 100 + '%',
+      '--orb-poster-edge': ORB_GLASS_MATERIAL.light.posterOpacity[2] * 100 + '%',
     } as CSSProperties} />
   </div>;
 }

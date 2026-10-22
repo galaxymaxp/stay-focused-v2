@@ -43,3 +43,11 @@ for (const variant of ['clock', 'standalone'] satisfies OrbVariant[]) {
     }
   }
 }
+
+it('uses translucent liquid stops without fading or clipping the whole native bitmap', async () => {
+  const interaction = { state: { current: createOrbInteraction(3) }, wake: { current: null } };
+  await act(async () => { rendered = create(createElement(OrbPoster, { mode: 'light', size: 240, interaction })); });
+  const stops = rendered!.root.findAllByType('Stop' as never).slice(0, 3);
+  expect(stops.every(stop => stop.props.stopOpacity > 0 && stop.props.stopOpacity < 0.5)).toBe(true);
+  expect(rendered!.root.findByType('View' as never).props.style).not.toHaveProperty('opacity');
+});

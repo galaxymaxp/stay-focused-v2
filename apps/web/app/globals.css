@@ -2031,9 +2031,12 @@ details[open] > :not(summary) {
 .day-orb[data-orb-load="failed"] .orb-live { display: none; }
 .day-orb .orb-poster-layer .orb-static-source {
   --orb-poster-deep: var(--orb-poster-light);
+  background: radial-gradient(circle at 40% 32%, color-mix(in srgb, var(--orb-poster-color) var(--orb-poster-start), transparent) 0%, color-mix(in srgb, var(--orb-poster-color) var(--orb-poster-mid), transparent) 45%, color-mix(in srgb, var(--orb-poster-deep) var(--orb-poster-edge), transparent) 100%);
+}
+:root[data-theme="dark"] .day-orb .orb-poster-layer .orb-static-source {
+  --orb-poster-deep: var(--orb-poster-dark);
   background: radial-gradient(circle at 40% 32%, var(--orb-poster-color) 0%, var(--orb-poster-color) 45%, var(--orb-poster-deep) 100%);
 }
-:root[data-theme="dark"] .day-orb .orb-poster-layer .orb-static-source { --orb-poster-deep: var(--orb-poster-dark); }
 @media (prefers-reduced-motion: reduce) {
   .day-orb[data-orb-load="ready"] .orb-live,
   .day-orb[data-orb-load="ready"] .orb-poster-layer { transition: none; }

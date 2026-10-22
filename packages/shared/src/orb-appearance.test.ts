@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ORB_IDLE_PALETTE } from './orb-interaction';
-import { orbAppearance, orbPaletteAppearance, orbPosterGradient, ORB_THEME_TONES } from './orb-appearance';
+import { orbAppearance, orbPaletteAppearance, orbPosterGradient, orbPosterStops, ORB_THEME_TONES } from './orb-appearance';
 
 describe('orb appearance', () => {
   it.each(ORB_IDLE_PALETTE)('resolves $key in both themes without changing its synced color', color => {
@@ -22,4 +22,16 @@ describe('orb appearance', () => {
     expect(orbAppearance('dark', sample).base).toBe(sample);
     expect(orbAppearance('light', sample).base).toBe(sample);
   });
+});
+
+it.each(ORB_IDLE_PALETTE)('keeps $key fallback coverage translucent on paper and opaque in the dark studio', color => {
+  const light = orbPosterStops('light', color.hex);
+  const dark = orbPosterStops('dark', color.hex);
+  expect(light.slice(0, 2).map(stop => stop.color)).toEqual([color.hex, color.hex]);
+  expect(dark.slice(0, 2).map(stop => stop.color)).toEqual([color.hex, color.hex]);
+  expect(light[2]!.color).toBe(ORB_THEME_TONES.light.deep);
+  expect(dark[2]!.color).toBe(ORB_THEME_TONES.dark.deep);
+  for (const stop of light) { expect(stop.opacity).toBeGreaterThan(0); expect(stop.opacity).toBeLessThan(0.5); }
+  expect(dark.every(stop => stop.opacity === 1)).toBe(true);
+  expect(orbPosterGradient('dark', color.hex)).toBe(`radial-gradient(circle at 40% 32%, ${color.hex} 0%, ${color.hex} 45%, ${ORB_THEME_TONES.dark.deep} 100%)`);
 });

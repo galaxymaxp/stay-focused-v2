@@ -1,5 +1,5 @@
 import { Color, Matrix3, ShaderMaterial } from "three";
-import { ORB_IDLE_PALETTE, orbPaletteAppearance } from '@stay-focused/shared';
+import { ORB_IDLE_PALETTE, orbPaletteAppearance, ORB_GLASS_MATERIAL } from '@stay-focused/shared';
 import { describe, expect, it, vi } from "vitest";
 
 import { createOrbBody } from "./orbBody";
@@ -22,7 +22,7 @@ describe("orb body", () => {
       body.update({ ...frame, idleColor: color.hex, mode });
       const appearance = orbPaletteAppearance(color.key, mode);
       for (const [uniform, tone] of [[body.uniforms.uBase, appearance.base], [body.uniforms.uDeep, appearance.deep],
-        [body.uniforms.uGlowColor, appearance.glow], [body.uniforms.uEnvFloor, appearance.envFloor], [body.uniforms.uEnvSky, appearance.envSky]] as const) {
+        [body.uniforms.uGlowColor, appearance.glow], [body.uniforms.uEnvFloor, ORB_GLASS_MATERIAL[mode].floor], [body.uniforms.uEnvSky, ORB_GLASS_MATERIAL[mode].sky]] as const) {
         expect(uniform.value.equals(new Color(tone))).toBe(true);
       }
     }
@@ -70,5 +70,24 @@ it('defaults ripple to zero and resets idle overrides before a generation state'
   body.update(frame);
   expect(body.uniforms.uBase.value.equals(base)).toBe(true);
   expect(body.uniforms.uWaves.value[0]!.w).toBe(-1);
+  body.dispose();
+});
+
+it('restores the dark optical response after a light-theme change without rebuilding resources', () => {
+  const body = createOrbBody();
+  body.update(frame);
+  const optical = body.uniforms.uGlass.value.clone();
+  const geometry = body.mesh.geometry;
+  const material = body.mesh.material;
+  body.update({ ...frame, mode: 'light' });
+  expect(body.uniforms.uGlass.value.x).toBeLessThan(optical.x);
+  expect(body.uniforms.uGlass.value.y).toBeGreaterThan(optical.y);
+  expect(body.uniforms.uGlass.value.w).toBeLessThan(optical.w);
+  expect(body.uniforms.uLightMode.value).toBe(1);
+  body.update(frame);
+  expect(body.uniforms.uGlass.value.equals(optical)).toBe(true);
+  expect(body.uniforms.uLightMode.value).toBe(0);
+  expect(body.mesh.geometry).toBe(geometry);
+  expect(body.mesh.material).toBe(material);
   body.dispose();
 });
