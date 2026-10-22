@@ -241,3 +241,47 @@ These source concerns are not relabelled repaired or production-verified.
 Library operation-count repair is the only demonstrated local cause so far.
 Remote plan/telemetry/product decisions are larger material choices for handoff,
 not requirements introduced into this local repair.
+
+## Gate ledger (checkpoint; build/probe rows pending)
+
+Every command is fresh local execution on the exact working repair indexed by
+`identity.json` (baseline and working source SHA256 per owned code/test file).
+Documentation-only HEAD advances during gates do not change the tested code.
+Serial runner `run.cjs` uses inspected PBR0 loopback-only Node network guard,
+repository-local TEMP/TMP/TMPDIR, npm offline, Expo offline/no-dotenv, disabled
+Expo/Next/Turbo telemetry and Turbo `local:rw`. No remote cache result is used;
+compiler/Metro internal caches are not purged. Raw output is in the ignored
+evidence directory, indexed by timestamped `commands.jsonl`.
+
+| Exact command | Result / freshness |
+| --- | --- |
+| Focused resume/navigation command in B0 | FRESH PASS: 65 tests / 5 files |
+| Focused Library command in D2 | FRESH final PASS: 80 tests / 4 files; earlier baseline 74 pass/4 fail and extended fixture 78 pass/2 fail retained |
+| `npm run test --workspace @stay-focused/mobile -- src/features/reviewer/SectionScrubber.test.ts src/features/reviewer/reviewerNavigation.test.ts --maxWorkers=1` | FRESH PASS: 21 tests / 2 files |
+| `npm run typecheck -- --force` | FRESH PASS: 8/8 tasks, 0 cached |
+| `npm run lint -- --force` | FRESH PASS: 8/8 tasks, 0 cached, 0 errors / 6 existing warnings (5 mobile import ordering, 1 web unused useMemo) |
+| `npm run test --workspace @stay-focused/shared -- --maxWorkers=2` | FRESH PASS: 706 tests / 72 files, including emitted-copy tests |
+| `npm run test --workspace @stay-focused/canvas -- --maxWorkers=2` | FRESH PASS: 75 tests / 1 file |
+| `npm run test --workspace @stay-focused/ocr -- --maxWorkers=2` | FRESH PASS: 27 tests / 3 files |
+| `npm run test --workspace @stay-focused/engine` | FRESH PASS: 606 offline evaluations, 0 failed |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | FRESH PASS: 2,452 passed / 3 existing live skips / 213 files |
+| `npm run test --workspace @stay-focused/mobile -- --maxWorkers=2` | FRESH PASS: 1,651 passed / 172 files, 0 skipped |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1` | FRESH PASS: 575 passed / 76 files, 0 skipped |
+| `npm run build --workspace @stay-focused/api` | PENDING: serial runner in progress |
+| `npm run build --workspace @stay-focused/web` | PENDING |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | PENDING: offline JS/assets export only |
+| `npm run build -- --force --concurrency=1` | PENDING |
+| Long-reader synthetic host probe | PENDING |
+| `git diff --check`; `git diff --cached --check` | FRESH PASS at each completed documentation checkpoint; final checks PENDING |
+| Planning history/path/held-sequence validation | FRESH PASS at checkpoint; final check PENDING |
+| Rollout; Device checks | NOT RUN: skipped entirely |
+
+Full suites total **6,092 passed / 0 failed / 3 existing live skips**; focused
+and probe runs are additional checks, not added again to that total. No new
+skip, assertion weakening or observed product flake. Three live skips are one
+activity-maker and two quiz-generation cases, deliberately outside offline
+authorization. No provider request or private source generation occurred.
+
+One commentary update prematurely called the aggregate green before web had
+returned; it was immediately corrected. Only the completed 575/76 web result
+and timestamped command ledger establish the final full-suite count.
