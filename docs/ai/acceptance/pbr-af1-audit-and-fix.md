@@ -102,7 +102,7 @@ summary read parses image, response, quiz and pending-draft metadata.
 
 Failing proof: `tmp/overnight/PBR-AF1/library-1792692397781.log`, SHA256
 `af66eb1df7cc434977a5d9ac72e582139ef72aebb22e8fc29196bbd1b4a621d6`.
-The first harness attempt `library-1792692318*.log` did not finish: its held
+The first harness attempt `library-1792692303699.log` did not finish: its held
 mock remote ignored abort and blocked afterEach draining. Only that runner's
 process tree was terminated. Replacing the mock with an immediate synthetic
 connection failure fixes the harness; no product/assertion weakening occurred.
@@ -122,3 +122,86 @@ not fresh physical proof; historical combined 8-case probe is not rerun as
 native evidence. Original FS7 captures remain unavailable locally; OX1 captures
 belong to a different isolated diagnostic shell. No speculative repair.
 Missing essential native attribution blocks this repair path only, per AF1.
+
+## D2 repair and immediate verification checkpoint
+
+2026-10-22T18:10:23.604Z. **FIXED WITH LOCAL PROOF** (full gates pending).
+`LocalArtifactStore.readLibraryOverview(owner)` reuses one owner-bound derived
+summary scan for items and offline stats; standalone stats retains its API and
+readiness/bytes/permanent-failure behavior. Removed only an unused SQL aggregate
+whose result was never read. No schema or stored-data changes.
+The Library hook now has one effect-local read flight, with a dirty follow-up
+for overlapping invalidations. It publishes the first result immediately, then
+reads again for late writes; cleanup discards queued work and stale publication.
+Failure releases the flight so later invalidations can recover. No new timer,
+progress/write batching, download limit, focus throttle or background job change.
+
+Identical D2 fixture after: **all four sizes use 2 summary reads / 2 stats
+aggregate reads / maximum 1 active summary call** (including the late write).
+300-item reduction is 604 -> 2 summary scans and 302 -> 2 stats scans;
+these are controlled operation counts, not physical latency percentages.
+Test instrumentation now observes actual stats aggregate queries rather than
+only the standalone stats method; the fixture/event schedule is unchanged.
+Complete list equality and final stats are asserted for every size.
+
+FRESH focused files: first repair **78 passed / 4 files**, then final extended
+regressions **80 passed / 0 failed / 0 skipped / 4 files**
+(`library-1792692623605.log`). Additional checks cover delayed prior-owner
+results with queued invalidations, read-failure recovery retaining saved content,
+list/stat equivalence for both owners and exactly one scan per overview.
+Existing per-committed-item progress/blur/refocus, partial failure, cancellation,
+body/key retry/version and local pending work suites remain green.
+First extended run **78 passed / 2 failed** (`library-1792692598296.log`):
+new fixtures accidentally supplied an already-prefixed draft ID, whereas the
+fixture factory adds `activity:`. Corrected those new inputs; assertions retained.
+No product failure or flake hidden. FRESH forced root typecheck **8/8 tasks,
+0 cached** (`typecheck-1792692631736.log`).
+
+## Finding D1/B1 — API experience read audit
+
+2026-10-22T18:11:35.076Z; current source and same source build, no OTA.
+Command `node tmp/overnight/PBR-AF1/run.cjs service` runs
+`repository-probe.ts` against the actual trusted repository and a public
+synthetic in-memory PostgREST adapter. No SDK client/service created; fetch
+throws. **MEASURED LOCAL COUNTS**, not PostgreSQL plans or API latency.
+
+| Visible summaries | Pages | Reads, no superseded history | Reads, 1,000 superseded rows | DB JSON bytes, no history / with history |
+| ---: | ---: | ---: | ---: | ---: |
+| 0 | 1 | 2 | 7 | 4 / 56,899 |
+| 100 | 1 | 2 | 7 | 36,973 / 93,868 |
+| 240 | 3 | 6 | 21 | 89,942 / 260,627 |
+| 300 | 3 | 6 | 21 | 112,325 / 283,010 |
+
+Exact full-result equality/hash is stable for each history pair; caller-supplied
+other-owner identity cannot override the trusted owner. Queries exclude payload
+columns; failed hidden-history reads reject instead of publishing partial data.
+Log `service-1792692695077.log` includes result hashes and desktop-adapter times.
+First probe launch failed on CJS top-level await; wrapped its entry in async main
+and reran unchanged assertions/fixture. `service-1792692680367.log` retained.
+
+The history walk is a confirmed cost, **SOURCE-INFERRED performance concern**,
+not a proved incorrect result or slow database plan. Each HTTP page is a separate
+authorized request and must receive current supersession evidence. No unsafe
+cross-request cache, omitted IDs, new index or projection rewrite is justified
+by adapter counts alone. Next action: owner local-history/cardinality and plan
+review before a material contract/cache decision. Current exact detail/summary
+projection, Today request-local dedupe, saved-first screens, shared job reader,
+Canvas pagination/Retry-After and durable 202/cancel semantics remain present.
+
+## Finding S1/S2 — exact existing APK and export boundary
+
+2026-10-22T18:05Z read-only ZIP inventory, saved immediately as `apk.json`.
+**MEASURED** 1,729 entries; exact APK **132,024,227 bytes**, SHA256
+`0910d589b42c02c04f032dff7362da69258cdd081c5be1c2dc83798452cc12e6`.
+108 native entries total **93,639,812 compressed bytes** across arm64-v8a,
+armeabi-v7a, x86 and x86_64; assets **8,793,910 compressed bytes**.
+Exact checksum matches PBR0's manifest-inspected 2.3.0/code7/runtime2.3.0-sdk57
+binary, not current source2.2.0/code6 or an active-device observation.
+First PowerShell summary aggregation used OrderedDictionary values which
+Measure-Object could not resolve; reread the saved JSON as objects and verified
+the sums. No artifact modification. 117 MB owner report remains unidentified.
+No native packaging/signing/config/ABI/module/font changes or native build.
+No APK savings claimed from the Library JavaScript repair. Fresh export ledger
+will be recorded after mandatory local builds; existing export identity stays
+separate. Static native export imports and full-font packaging remain measured
+PBR0 hypotheses, without a proven compatible byte-saving change in this slice.
