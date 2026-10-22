@@ -1,3 +1,22 @@
+<!-- PBR-AF1 begin -->
+## PBR-AF1 renewed audit (2026-10-23)
+
+**IN PROGRESS**, depends on PBR0; finite scope frozen in
+[acceptance](acceptance/pbr-af1-audit-and-fix.md) at 8d6e60a3 before runtime edits.
+Owner's new audit/repair direction is read and recorded by exact answer filename.
+Include existing web/mobile/API experience, Library, exact existing APK and
+exports, long-reviewer rendering and resume source/evidence. Reproduce and save
+each finding before supported minimal repair, verify identical fixtures, run
+serial offline suites/gates, reconcile docs and commit scoped local work.
+No unrelated OX/parity work, service calls, environment edits, native release
+configuration/build/install, device checks, rollout or push.
+D2 read amplification reproduced; repair focused tests 80/80 and forced
+typecheck/lint 8/8 each, no cached tasks; remaining full gates pending.
+Native text UNREPRODUCED: physical attribution remains owner work.
+PBR-RT1 STOPPED and all four dependent IDs HELD remain unchanged; this independent
+audit neither closes their prerequisites nor starts them. Stop at AF1 endpoint.
+<!-- PBR-AF1 end -->
+
 <!-- PBR execution 2026-10-22 begin -->
 ## Frozen owner performance sequence (2026-10-22)
 

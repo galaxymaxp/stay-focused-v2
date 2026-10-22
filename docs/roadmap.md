@@ -1,5 +1,18 @@
 # Roadmap
 
+<!-- PBR-AF1 begin -->
+PBR-AF1 (2026-10-23): **IN PROGRESS**, renewed pre-beta audit and immediate
+supported local repairs, depends on PBR0. Owner answer
+`chatgpt-owner-1792691511294-971f0f34-866c-4ea9-856b-57750399b31c.md`
+supersedes the earlier skip. Finite endpoint: renewed source/build/APK/API/
+Library/long-reader/resume audit, demonstrated local repairs with before/after
+proof, full applicable offline gates, reconciled docs and scoped local commits.
+Native text may remain explicitly unresolved; no release readiness claim.
+PBR-RT1 stays STOPPED and PBR-MB1/PBR-LP1/PBR-AS1/PBR-LR1 stay HELD, not
+executed or advanced by this independent audit. Preserve OX/parity/Owner Pause.
+Scope and findings: [acceptance](ai/acceptance/pbr-af1-audit-and-fix.md).
+<!-- PBR-AF1 end -->
+
 <!-- PBR execution 2026-10-22 begin -->
 ## Frozen owner performance sequence (2026-10-22)
 

@@ -205,3 +205,39 @@ No APK savings claimed from the Library JavaScript repair. Fresh export ledger
 will be recorded after mandatory local builds; existing export identity stays
 separate. Static native export imports and full-font packaging remain measured
 PBR0 hypotheses, without a proven compatible byte-saving change in this slice.
+
+## Remaining PBR0 source findings — bounded recheck
+
+2026-10-22T18:16Z, same source/build identity; **SOURCE-INFERRED**, no live
+provider, private data or device measurements. Owning code and current result:
+
+- O1: `localLibrary/imageManifest.ts:imagesReady` still treats `skipped_cap` as
+  settled; `imagesNeedConnection` and `ReviewerReader.tsx` retain the separate
+  connection warning. Existing cap/quotas/text are preserved. This is an existing
+  product badge/completeness decision overlapping held LC1, not evidence to
+  enlarge offline downloads or silently change meaning. Owner/supervisor review
+  remains the next action; no LC1 work started.
+- A1/B1: `processing-jobs/ai-reviewer.ts` still computes a call budget then runs
+  the AI-first path; `engine/src/ai-first-reviewer.ts:138,145` normalizes in both
+  paths, and :107 still assigns total duration to provider wait with zero stage
+  timings. No provider timing percentile or completeness-preserving measured
+  CPU bottleneck is established. Actual planning/provider timing is unknown;
+  no speculative generation/concurrency/model/source-contract change made.
+- U1: `design/primitives.tsx` segments retain minHeight32 plus top/bottom hitSlop6.
+  Effective native accessibility/overlap is unmeasured, not a proved 32pt target
+  failure. Existing tokens, gestures, focus, Reduced Motion and held OX scope
+  remain. Owner accessibility/font-scale/keyboard matrix is still required.
+- Saved-first native/web Library, exact reviewer detail, dynamic web export,
+  offline pending draft/quiz handling, job reader and native GL gating remain
+  present. Native export still statically imports format builders; a safe
+  byte-saving import boundary is not established by file names alone.
+- Server bearer verification and trusted owner predicates remain unchanged.
+  No database/RLS/grant/auth/storage-policy edits. OCR keeps 100 total/40
+  OCR-required durable pages, synchronous/Canvas40 and provider5-page requests;
+  completeness and durable202/persist-before-success/cancel semantics unchanged.
+  Fresh complete suites below check these contracts without service calls.
+
+These source concerns are not relabelled repaired or production-verified.
+Library operation-count repair is the only demonstrated local cause so far.
+Remote plan/telemetry/product decisions are larger material choices for handoff,
+not requirements introduced into this local repair.

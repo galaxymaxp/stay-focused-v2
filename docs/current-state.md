@@ -1,5 +1,18 @@
 # Current State
 
+<!-- PBR-AF1 begin -->
+PBR-AF1 (2026-10-23): **IN PROGRESS**, independent renewed local audit under
+the owner's new answer, dependent on PBR0. Acceptance frozen at 8d6e60a3;
+diagnostic checkpoints da8daa6f / 5ca0ca9f. Reproduced Library read amplification:
+300 synthetic progress events plus late write caused 604 summary / 302 stats
+reads. Local repair uses one summary scan for list/stats and serializes screen
+invalidations; same fixture now 2 / 2, maximum one active summary read.
+Focused Library 80/80 and forced typecheck/lint 8/8 each, zero cached; full
+gates pending. Native text remains UNREPRODUCED with missing physical evidence.
+PBR-RT1 remains STOPPED; all four dependent IDs remain HELD. No rollout/device
+operation or service call. [Durable audit](ai/acceptance/pbr-af1-audit-and-fix.md).
+<!-- PBR-AF1 end -->
+
 <!-- PBR-RT1 begin -->
 PBR-RT1 / Android Resume-Text Recovery (2026-10-22): **STOPPED at STEP 1**,
 before implementation, on source a4e5c4cc / overnight/2026-10-15_feedback.
