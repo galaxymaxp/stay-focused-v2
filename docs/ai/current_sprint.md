@@ -1,3 +1,23 @@
+<!-- PBR-EV1 begin -->
+## PBR-EV1 archive recovery checkpoint (2026-10-23)
+
+Frozen scope: owner panel option 1, existing FS7 evidence only; no fresh device
+diagnostic or code fix. **STOPPED during STEP 1** when actual recovered
+first/follow-up PNGs showed the opposite text ordering from the report.
+[Acceptance, hashes, provenance and exact owner question](acceptance/pbr-ev1-fs7-evidence-recovery.md).
+STEP 0 complete; STEP 1 partial; STEP 2 safe findings only; STEP 3 limited to
+safe documentation/boundary validation. FRESH forced typecheck 8/8, 0 cached;
+lint interrupted at stop; API/Android builds NOT RUN; focused tests NOT
+APPLICABLE. Documentation integrity and staged/unstaged hygiene PASS.
+PBR-RT1 remains STOPPED; four dependent IDs remain HELD, unqueued/unstarted;
+**beta readiness BLOCKED**. Physical-screen attribution, original capture
+identity/chronology, actual recovery and live state UNVERIFIED (owner to
+confirm). Owner reconcile existing archive before retry; no next task.
+No source/device/service/environment/release/push action. Rollout/Device
+checks NOT RUN. Historical acceptance, OX2 hold, performance/visual roadmap,
+parity and Owner Pause preserved.
+<!-- PBR-EV1 end -->
+
 <!-- PBR-AF1 begin -->
 ## PBR-AF1 renewed audit (2026-10-23)
 

@@ -1,5 +1,22 @@
 # Current State
 
+<!-- PBR-EV1 begin -->
+PBR-EV1 (2026-10-23): **STOPPED during archive-only STEP 1** on recovered
+pixel/report contradiction. The sibling FS7 release clone exists: first
+`after-resume.png` shows Generation text, while `stable-after-resume.png`
+lacks it, opposite to the historical recovery narrative. Exact hashes,
+recorded Today -> Generation x3 -> Home/resume order and 54.9-second capture
+spacing are preserved in [recovery checkpoint](ai/acceptance/pbr-ev1-fs7-evidence-recovery.md).
+Physical-screen attribution, original file chronology and actual recovery
+remain UNVERIFIED (owner to confirm); no cause or fix inferred. FRESH forced
+typecheck 8/8, 0 cached; lint interrupted at stop, builds NOT RUN, focused
+tests NOT APPLICABLE. Safe docs integrity and staged/unstaged hygiene PASS.
+PBR-RT1 stays STOPPED; PBR-MB1/PBR-LP1/PBR-AS1/PBR-LR1 stay HELD;
+**beta readiness BLOCKED**. No source change, device action, service call,
+release or push. Rollout/Device checks NOT RUN. Owner archive reconciliation
+required before retry; previous acceptance/OX/parity/Owner Pause preserved.
+<!-- PBR-EV1 end -->
+
 <!-- PBR-AF1 begin -->
 PBR-AF1 (2026-10-23): **PASS for mandatory LOCAL renewed audit/repair scope**.
 Implementation ef80dfc6: coalesces owner-scoped Library progress reads and shares

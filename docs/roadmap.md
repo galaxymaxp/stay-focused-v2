@@ -1,5 +1,20 @@
 # Roadmap
 
+<!-- PBR-EV1 begin -->
+PBR-EV1 (2026-10-23), owner option 1 archive recovery only: **STOPPED during
+STEP 1**. Recovered first/follow-up PNGs contradict FS7's text-recovery
+narrative; exact artifacts/hashes, route order, timing limits and owner
+question are in [checkpoint](ai/acceptance/pbr-ev1-fs7-evidence-recovery.md).
+No source/native repair or new device diagnostic. PBR-RT1 STOPPED and all four
+PBR-MB1/PBR-LP1/PBR-AS1/PBR-LR1 HELD statuses remain unchanged; no successor
+queued/started. **Beta readiness BLOCKED**. Owner must reconcile existing
+capture identity/physical observation before retry; live state UNVERIFIED.
+FRESH typecheck 8/8, 0 cached; lint interrupted at stop; builds NOT RUN;
+focused tests NOT APPLICABLE; safe documentation/hygiene PASS. Rollout and
+Device checks NOT RUN. OX2 block, pending performance/visual work, parity and
+Owner Pause preserved; no automatic next task, service/release action or push.
+<!-- PBR-EV1 end -->
+
 <!-- PBR-AF1 begin -->
 PBR-AF1 (2026-10-23): **PASS for mandatory LOCAL audit/repair/gate scope**,
 depends on PBR0; implementation ef80dfc6. New owner answer
