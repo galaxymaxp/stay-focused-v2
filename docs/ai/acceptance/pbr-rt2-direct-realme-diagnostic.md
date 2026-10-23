@@ -218,3 +218,16 @@ See events.jsonl. All device timestamps remain actual recorded read timings.
 
 Local documentation commits follow; exact hashes are recorded in Git and the
 appended handoff/checkpoint. No implementation commit.
+
+## Local commit checkpoint
+
+Main documentation commit: a915993bc6bba6c99fb175985f145feb55a4de89
+(docs(perf): record PBR-RT2 direct Realme diagnostic blocker), author
+ galaxymaxp <omgraythekid@gmail.com>. Five documentation paths only; no product
+implementation. A separate scoped handoff footer records this hash; its own hash
+is recorded by Git and the final response, without a self-referential amendment.
+Final source code is unchanged from baseline 32a7d220. Historical acceptance files,
+unrelated untracked work and all original evidence remain intact. No push.
+Final supported controller receipt/state is retained locally under
+PBR-RT2/supervisor-review-final.json and final-state.json; the final review must
+pin the committed footer HEAD. No performance-task admission or native PASS.

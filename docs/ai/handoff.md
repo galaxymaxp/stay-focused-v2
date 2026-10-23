@@ -10433,3 +10433,13 @@ permission requested. Receipt: ignored PBR-RT2/supervisor-review-1.json.
 First root build interrupted for Turbo environment propagation; corrected
 guarded rerun PASS; log and timing clarification retained. Docs/custody37/37,
 0 failed. Local commit follows; final committed HEAD gets fresh controller review.
+
+PBR-RT2 local commit checkpoint: `a915993bc6bba6c99fb175985f145feb55a4de89`
+(docs(perf): record PBR-RT2 direct Realme diagnostic blocker). Five docs paths
+only, owner identity galaxymaxp <omgraythekid@gmail.com>; no product changes or
+push. Final exact footer HEAD and controller receipt are recorded in Git/local
+closure and final response. Full suites4809 pass/0fail/3 existing live skips;
+65 focused pass; forced gates8/8 each0cached; Android JS38files PASS;
+docs/custody37/37 and both diff checks PASS. One interrupted root attempt
+retained, corrected guarded PASS. No native repair, release or dependent-task
+admission; same original untracked work and historical reports preserved.
