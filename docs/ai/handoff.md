@@ -10262,3 +10262,97 @@ STEP 2 safe findings only; STEP 3 safe docs/boundary validation only.
   block, pending performance/visual work, parity and Owner Pause preserved.
 - Vercel CLI unavailable: strongly recommend `npm i -g vercel` for future
   separately authorized env/deploy/log tooling. Install/commands NOT RUN here.
+
+## PBR-RDP - Realme read-only diagnostic preparation (2026-10-23)
+
+**PASS for local documentation preparation only. Separate physical diagnostic
+NOT RUN.** The complete PBR-RDP prompt's UNATTENDED header controls. Owner
+authorized a bounded Realme diagnostic after EV1's screenshot contradiction;
+the current bridge offers documentation preparation only, no device-execution
+action. No device was examined and no capture/native log was collected.
+
+[Owner-present runbook, evidence fields, stop rules and original-artifact
+protection](acceptance/pbr-rdp-realme-runbook.md). STEP 0 baseline complete at
+d728939fa2c45a3d84b6dc42bc15843259d0450f on overnight/2026-10-15_feedback;
+local upstream snapshot 13 ahead / 23 behind github/main, no fetch. STEP 1
+runbook and STEP 2 exact owner checklist/handoff complete. Git/source,
+AGENTS/AUTOPILOT, planning, existing RT1/AF1/EV1 acceptance and ADR-001/011
+reviewed. No new implementation contradiction. Existing FS7 opposite PNG/text
+ordering stays unresolved; prior acceptance records remain unchanged.
+
+Checklist pins Realme RMX3151/Android 13 and independently verified native
+version/code/full OTA/runtime/channel, distinguishes source 2.2.0/code6 from
+historical 2.3.0/code7 and FS7 01a162a3 from later 01a16304. About's displayed
+prefix is insufficient. Requires already-isolated public/empty state, no pending
+work and owner presence; no connectivity/app settings change to create it.
+At most 20 minutes/ten resumes in the existing theme/motion state, logged
+Today -> Generation x3, measured background dwell, actual 0/1/5/15/30/55-second
+observations, physical-screen notes independent from sequential screenshot/tree
+assessment. Stops on unexpected identity/OTA, privacy, service activity or risk;
+first safe symptom gets only its remaining bounded observations, no further
+cycles/fix. Manifest/hash custody, original/derivative mapping and strict privacy
+limits protect original evidence. All of these device steps remain prospective.
+
+Commits:
+
+- bee62e32 docs(perf): prepare bounded Realme diagnostic runbook
+- docs(perf): checkpoint PBR-RDP preparation handoff (this footer; exact hash
+  recorded after commit in Git and ignored tmp/overnight/PBR-RDP.status).
+
+FRESH local results, unchanged implementation d728939f:
+
+- npm run typecheck -- --force: exit 0, **8/8 tasks, 0 cached**, 57.164 s.
+- npm run lint -- --force: exit 0, **8/8 tasks, 0 cached**, zero errors,
+  six existing warnings (five mobile import-order / one web unused import),
+  101.891 s.
+- npm run build --workspace @stay-focused/api: exit 0, **37/37 static pages**,
+  146.541 s. Build-generated API next-env.d.ts inspected and restored through
+  Git checkout filtering to the baseline tracked content; source diff empty.
+- Relevant shared/API/mobile tests **NOT APPLICABLE**, docs only, zero tests
+  executed. Android offline export **NOT APPLICABLE / command NOT RUN**, no
+  runtime/config/native/assets change. Root/web builds **NOT RUN**, outside
+  applicable documentation scope. No old test counts reused as fresh evidence.
+- Documentation checker **FRESH 43 passed / 0 failed**; tracked historical
+  planning/policy/acceptance/declaration content, append-only handoff bytes,
+  local links, required evidence, owned scope and secret-pattern checks.
+  git diff --check and git diff --cached --check **FRESH PASS**, exit 0,
+  including exact staged documentation for each local commit.
+- **Seven preparation gates PASS**: read-only scope, provenance, no device
+  action, no native change, no lost features, no secrets, RT1/four holds intact.
+  This is no native/production/beta acceptance verdict.
+
+First checker attempt **39 passed / 4 failed**: raw LF Git blobs versus existing
+Windows CRLF policy/handoff/web declaration bytes. Validator corrected to
+normalize tracked-content comparison and preserve a byte-exact pre-append
+handoff snapshot; no product/policy file changed to make it pass. Narrowed
+truncated reads and resolved guessed paths by inventory. No implementation gate
+failure or product flake observed; no failed gate remains unresolved. Logs,
+runner, checker, progress/status and local inspection outputs remain ignored
+under tmp/overnight/PBR-RDP*. Nothing under tmp committed.
+
+**Owner steps remaining**
+
+- **Device checks: NOT RUN**, skipped entirely. Conduct the separately
+  authorized owner-present read-only diagnostic only through a capable bridge,
+  with the runbook's identity/isolation/privacy preflight satisfied. Current
+  preparation bridge has no device-execution action. No settings, install,
+  reset, force-stop, OTA/version switch, new instrumentation or remote service
+  is authorized by this preparation. Report unavailable identity as UNVERIFIED
+  and stop that future session rather than adapting the phone.
+- **Rollout: NOT RUN**, skipped entirely. No fix is ready to publish. No
+  push/deploy/Google worker/OTA/EAS/native build/install, Supabase/Vercel/Google
+  Cloud/Canvas/Resend call, remote SQL/migration apply, Scheduler/email,
+  environment-file edit, credential/account operation or spending occurred.
+- **UNVERIFIED (owner to confirm):** current phone/binary/full OTA/runtime/
+  channel, original FS7 custody/chronology and physical-screen attribution,
+  failure/recovery interval and native cause, physical performance, all live
+  revisions/database/applied migrations/regions/queues/Scheduler/provider state.
+  Local build/test timing is not device performance or pixel evidence.
+- PBR-RT1 and PBR-EV1 remain **STOPPED**; PBR-MB1/PBR-LP1/PBR-AS1/PBR-LR1
+  remain **HELD**, unqueued/unstarted. **Beta readiness BLOCKED**. Review future
+  evidence before retry/supervisor review; no automatic successor. OX2's original
+  block, pending OX3/OX4/QI1/LC1, parity and Owner Pause preserved. Unrelated
+  UI/, apps/mobile/.gitignore, supabase/.temp/ and prior ignored evidence intact.
+- Vercel CLI unavailable: strongly recommend npm i -g vercel for future
+  separately authorized env/deploy/log tooling. Installation/all Vercel commands
+  NOT RUN; no service contacted here.
