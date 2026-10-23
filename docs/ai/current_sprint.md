@@ -1,3 +1,16 @@
+<!-- PBR-RDP device preflight begin -->
+PBR-RDP authorized device session (2026-10-23): **STOPPED at preflight**.
+ADB freshly confirms Realme RMX3151 / Android 13 / API 33 and native
+2.3.0/code 7; 13 read-only checks exited 0. Phone has an active validated
+network; full active OTA/runtime/channel/embedded identity UNVERIFIED.
+Runbook preflight stops apply: **0 launches/resume cycles/screenshots/tree
+dumps**; physical text diagnosis INCONCLUSIVE. No settings or app changes.
+[Fresh results and remaining prerequisites](acceptance/pbr-rdp-realme-preflight-20261023.md).
+ADB access is now available; earlier preparation-only results below are historical.
+PBR-RT1/EV1 STOPPED, four dependents HELD, beta readiness BLOCKED; no successor
+or rollout. Other roadmap/Owner Pause states preserved.
+<!-- PBR-RDP device preflight end -->
+
 <!-- PBR-RDP begin -->
 PBR-RDP / Realme diagnostic preparation (2026-10-23): **PASS for local
 documentation preparation only**. [Owner-present runbook](acceptance/pbr-rdp-realme-runbook.md)

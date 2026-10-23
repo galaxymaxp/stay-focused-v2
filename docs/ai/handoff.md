@@ -10356,3 +10356,39 @@ under tmp/overnight/PBR-RDP*. Nothing under tmp committed.
 - Vercel CLI unavailable: strongly recommend npm i -g vercel for future
   separately authorized env/deploy/log tooling. Installation/all Vercel commands
   NOT RUN; no service contacted here.
+
+## PBR-RDP - authorized Realme ADB preflight (2026-10-23)
+
+**STOPPED at preflight; native text diagnosis INCONCLUSIVE.** Direct chat owner
+requested execution against connected, authorized Realme. ADB is available in
+this session, superseding the earlier preparation bridge limitation. Historical
+preparation/FS7 evidence is preserved.
+
+Source `a94c2bb7`, branch `overnight/2026-10-15_feedback`; metadata session
+`pbr-rdp-20261023T030250693Z`, 03:02:50–03:02:52 UTC / 11:02 Manila.
+**FRESH: 13/13 recorded device reads exit 0.** Realme RMX3151, Android 13/API 33,
+package com.galaxymaxp.stayfocusedv2, native 2.3.0/code 7. Airplane mode 0,
+Wi-Fi/mobile-data settings 1; active default network and validated capability.
+Full active OTA/runtime/channel/embedded identity UNVERIFIED. System night mode
+yes, animation scale 1, preferred rotation 0; app preferences not established.
+
+Runbook preflight items 4/5 require stopping before transitions when full OTA
+identity or existing isolation is unavailable. **0 app launches/navigation/
+resume cycles, 0 screenshots/tree dumps, 0 logcat.** No physical observation,
+cause or recovery claim. No settings, installation, source/native/configuration,
+service, release, environment-file, remote SQL, rollout or push action.
+
+[Acceptance and exact commands](acceptance/pbr-rdp-realme-preflight-20261023.md).
+Sanitized command ledger/results plus SHA256/size manifest retained under ignored
+tmp/overnight/PBR-RDP-device/pbr-rdp-20261023T030250693Z/. Initial custody
+verification FRESH PASS for both files. Documentation/diff checks FRESH PASS at
+closure; code suites/builds NOT APPLICABLE / NOT RUN, no implementation changes.
+Scoped documentation commit follows; exact hash in Git/local closure file.
+Initial inspection wildcard/upstream/ADR-path corrections recorded in acceptance;
+no device command failed. Unrelated untracked paths preserved.
+
+**Owner steps remaining:** independently establish full active OTA identity and
+pin intended baseline, already-isolated public/empty safe app state and physical
+observer before bounded transitions. No automatic setting change/workaround.
+Rollout NOT RUN. RT1/EV1 STOPPED; MB1/LP1/AS1/LR1 HELD; beta BLOCKED. Other
+OX/parity/Owner Pause states and contradictory archived originals unchanged.
