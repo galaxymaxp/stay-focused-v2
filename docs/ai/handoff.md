@@ -10443,3 +10443,39 @@ closure and final response. Full suites4809 pass/0fail/3 existing live skips;
 docs/custody37/37 and both diff checks PASS. One interrupted root attempt
 retained, corrected guarded PASS. No native repair, release or dependent-task
 admission; same original untracked work and historical reports preserved.
+
+
+## PBR-RT2 recovery / independent performance continuation — 2026-10-23
+
+Owner's direct PC recovery instruction supersedes the earlier blanket performance
+hold. See acceptance/pbr-rt2-recovery-and-performance-resumption.md for exact
+scope, evidence and controller procedure. Initial HEAD 359cc51ab9c9e0da1f9a668a88a16a7e6feeb985, branch
+overnight/2026-10-15_feedback; unrelated untracked paths preserved.
+
+Fresh 13/13 metadata checks confirm one authorized Realme RMX3151 Android13/API33,
+native2.3.0/code7. Installed base APK SHA256 matches the historical132024227-byte
+archive; binary configured runtime2.3.0-sdk57/channel preview confirmed locally.
+Active OTA/runtime/channel/embedded identity still UNKNOWN. Active validated
+network; existing public/empty isolated state NOT PROVEN. No app launch, capture
+or physical resume cycles; **STOPPED / INCONCLUSIVE**, no attributable cause/fix.
+Fresh original screenshot inspection/hashes confirm EV1's opposite pixel ordering
+versus FS7 narrative. Original reports, statuses and artifact bytes preserved.
+
+Current independent chain: PBR0 PASS + PBR-AF1 PASS -> PBR-MB1 -> PBR-LP1 ->
+PBR-AS1 -> PBR-LR1. MB1 eligible for fresh supported publication, later IDs await
+predecessor PASS and review. AF1's Library coalescing is already complete; profile
+current code, no duplicate repair. Only one new task fits alongside historical
+OX2 under controller two-TOTAL-pending limit. OX2/OX1 and release gates unchanged.
+
+Recovery changes are docs only: app unit/typecheck/lint/build/performance gates
+NOT APPLICABLE; fresh documentation/custody and Git diff checks required before
+local commit. Implementation gates remain mandatory for workers. Runner39828
+already idle, Manual Pause OFF, supervisor chatgpt; no restart/duplicate. Publish
+through existing review lease and bridge guard only, verify actual pickup before
+claiming running. Controller ledger/status and final report record publication.
+
+Owner steps remaining: full active identity and already isolated safe public app
+state plus independent observer conditions before physical retry. Device/beta/
+release gates BLOCKED. No production, push, deploy, migration, OTA, native build,
+install, device setting/data/account change or FULLSEND. No owner action is needed
+for the independent local lane if the bridge accepts its reviewed task.

@@ -1,3 +1,33 @@
+<!-- PBR recovery 2026-10-23 begin -->
+## Current owner scope: resume independent local performance work
+
+2026-10-23 direct owner PC instruction supersedes the earlier four-task hold.
+**PBR-RT2 physical diagnostic remains STOPPED; resume-text INCONCLUSIVE and
+DEFERRED for independent development.** Full active OTA/runtime/channel and
+embedded identity UNKNOWN; safe public/empty isolation NOT PROVEN; 0 resume
+cycles. Fresh authorized Realme checks confirm Android13/API33, native2.3.0/code7
+and installed APK SHA256 matching the archive; binary configured runtime
+2.3.0-sdk57 / preview does not establish active OTA identity.
+
+Approved finite order: **PBR-MB1 -> PBR-LP1 -> PBR-AS1 -> PBR-LR1**.
+MB1 now depends on actual **PBR0 PASS + PBR-AF1 PASS**, removing only the
+unnecessary rendering-diagnostic prerequisite for LOCAL measurements. MB1 is
+eligible, awaiting fresh supported supervisor publication; remaining tasks await
+their actual predecessor PASS and review. PBR-AF1's completed Library coalescing
+repair is baseline, not duplicate work. Historical RT1/EV1 STOPPED and RT2/FS7
+reports stay intact; earlier hold statements below are historical checkpoints
+superseded only for this independent lane. Device, beta/tester and release gates
+remain BLOCKED; OX2 still depends on OX1 STOPPED.
+
+Existing runner PID39828, active supervisor chatgpt, Manual Pause OFF at recovery
+inspection; no restart or duplicate. Two TOTAL pending limit means only MB1 can
+be admitted now alongside preserved OX2. Continue subsequent approved IDs through
+fresh reviews as slots permit. No push/deploy/migration/OTA/native build/install,
+FULLSEND, production or secret changes. Every implementation retains fresh tests,
+forced typecheck/lint/build and measured before/after proof where applicable.
+[Recovery evidence, deferral authority and dependency rationale](ai/acceptance/pbr-rt2-recovery-and-performance-resumption.md).
+<!-- PBR recovery 2026-10-23 end -->
+
 # Roadmap
 
 <!-- PBR-RT2 begin -->
@@ -85,22 +115,23 @@ rollout steps remain. No automatic next task or beta/release readiness claim.
 Source: absolute runner BACKLOG.md, section "PBR execution 2026-10-22", after
 PBR0 PASS (`bdd1c021`, `a4e5c4cc`). These explicit execution IDs govern this
 finite scope; the audit's older conditional PBR1-PBR5 names are categories,
-not substitute tasks. Only PBR-RT1 is executed by this prompt.
+not substitute tasks. Updated by the 2026-10-23 direct owner recovery instruction; see current scope above.
 
 | Order | ID | Authorized task | Depends on | Current result / exit evidence |
 | --- | --- | --- | --- | --- |
 | PBR-E1 | PBR-RT1 | P0 Android Resume-Text Recovery: reproduce FS7, trace lifecycle/render/GL/navigation/native Text, implement only supported fix and regressions | PBR0 | **STOPPED at STEP 1**: cause unsubstantiated locally; essential physical attribution missing. 65 existing + 8 synthetic tests pass, not native acceptance. Requires cause-specific reproduction, minimal repair and meaningful regressions plus applicable gates. |
-| PBR-E2 | PBR-MB1 | P0 Performance Measurement Baseline: startup, navigation, Library and API local baseline plus privacy-safe instrumentation | PBR-RT1 | **HELD; approved roadmap only, NOT QUEUED/STARTED.** Distinguish cold/warm, synthetic/local/device, measured/inferred; fake clock/redaction/disabled-sink tests; no invented production percentiles or physical metrics. |
-| PBR-E3 | PBR-LP1 | P1 Library Performance: profile repeated DB/local-storage reads and optimize demonstrated bottlenecks | PBR-MB1 | **HELD; approved roadmap only, NOT QUEUED/STARTED.** Audit D1/D2: experience/repository.ts, useLocalLibrary.ts, librarySync.ts, artifactStore.ts. Fixtures 0/100/240/300 plus large history, changed/unchanged; compare reads/elapsed and full result equivalence, owner switch/cancellation/pagination/offline/partial failure. No remote DB plan/migration. |
-| PBR-E4 | PBR-AS1 | P1 APK Size Optimization: native libs/assets/fonts/compression/release packaging with byte-attributed safe local improvements | PBR-LP1 | **HELD; approved roadmap only, NOT QUEUED/STARTED.** Exact existing APK 132024227 B/native 93639812 B, four ABIs; compare equivalent local exports/archive inventories. Preserve ABIs/modules/features/exports/fonts/signing/OTA; native release build/install requires explicit owner authorization; no fabricated rebuilt-APK saving. |
-| PBR-E5 | PBR-LR1 | P1 Long-Reviewer Rendering: profile representative long reviewers, reduce demonstrated rerenders/memory | PBR-AS1 | **HELD; approved roadmap only, NOT QUEUED/STARTED.** Audit R1; mobile ReviewerReader and web reader after source discovery. Compare identical fixture counts/timings and full text/search/anchors/selection/images/accessibility/export behavior; no truncation/content cap or hidden feature removal. |
+| PBR-E2 | PBR-MB1 | P0 Performance Measurement Baseline: startup, navigation, Library and API local baseline plus privacy-safe instrumentation | PBR0, PBR-AF1 | **ELIGIBLE; awaiting fresh supervisor publication.** Distinguish cold/warm, synthetic/local/device, measured/inferred; fake clock/redaction/disabled-sink tests; no invented production percentiles or physical metrics. |
+| PBR-E3 | PBR-LP1 | P1 Library Performance: profile repeated DB/local-storage reads and optimize demonstrated bottlenecks | PBR-MB1 | **APPROVED; await actual predecessor PASS and supervisor review; NOT QUEUED/STARTED.** Audit D1/D2: experience/repository.ts, useLocalLibrary.ts, librarySync.ts, artifactStore.ts. Fixtures 0/100/240/300 plus large history, changed/unchanged; compare reads/elapsed and full result equivalence, owner switch/cancellation/pagination/offline/partial failure. No remote DB plan/migration. |
+| PBR-E4 | PBR-AS1 | P1 APK Size Optimization: native libs/assets/fonts/compression/release packaging with byte-attributed safe local improvements | PBR-LP1 | **APPROVED; await actual predecessor PASS and supervisor review; NOT QUEUED/STARTED.** Exact existing APK 132024227 B/native 93639812 B, four ABIs; compare equivalent local exports/archive inventories. Preserve ABIs/modules/features/exports/fonts/signing/OTA; native release build/install requires explicit owner authorization; no fabricated rebuilt-APK saving. |
+| PBR-E5 | PBR-LR1 | P1 Long-Reviewer Rendering: profile representative long reviewers, reduce demonstrated rerenders/memory | PBR-AS1 | **APPROVED; await actual predecessor PASS and supervisor review; NOT QUEUED/STARTED.** Audit R1; mobile ReviewerReader and web reader after source discovery. Compare identical fixture counts/timings and full text/search/anchors/selection/images/accessibility/export behavior; no truncation/content cap or hidden feature removal. |
 
-Strict dependency order: **PBR0 -> PBR-RT1 -> PBR-MB1 -> PBR-LP1 -> PBR-AS1 ->
-PBR-LR1**. A predecessor must actually PASS with reviewed evidence before
-dependent execution/publication. STOPPED/FAILED holds every dependent; no
-automatic follow-up or bypass prompt. A retry needs new evidence or owner
-direction and a fresh authorized supervisor review. Preserve OX2's historical
-hold, OX3/OX4/QI1/LC1, held parity, Owner Pause and all unrelated roadmaps.
+Current local dependency order: **PBR0 + PBR-AF1 -> PBR-MB1 -> PBR-LP1 ->
+PBR-AS1 -> PBR-LR1**. Actual predecessor PASS and fresh supervisor review remain
+required. Owner explicitly defers unsubstantiated resume-text work independently;
+RT1/EV1 STOPPED and RT2 preflight stop remain device/release gates, with no false
+PASS. Preserve OX2's OX1 dependency, OX3/OX4/QI1/LC1, held parity, Manual Pause,
+configured supervisor and all unrelated roadmaps. LP1 starts from the completed
+AF1 repair and must not duplicate it.
 Every implementation retains source/privacy/ownership/features, fresh relevant
 tests, forced root gates, affected exports, exact counts and scoped local
 commits. Synthetic evidence stays labelled. Local-only: no release, device

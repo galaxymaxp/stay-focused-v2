@@ -1,3 +1,33 @@
+<!-- PBR recovery 2026-10-23 begin -->
+## Current owner scope: resume independent local performance work
+
+2026-10-23 direct owner PC instruction supersedes the earlier four-task hold.
+**PBR-RT2 physical diagnostic remains STOPPED; resume-text INCONCLUSIVE and
+DEFERRED for independent development.** Full active OTA/runtime/channel and
+embedded identity UNKNOWN; safe public/empty isolation NOT PROVEN; 0 resume
+cycles. Fresh authorized Realme checks confirm Android13/API33, native2.3.0/code7
+and installed APK SHA256 matching the archive; binary configured runtime
+2.3.0-sdk57 / preview does not establish active OTA identity.
+
+Approved finite order: **PBR-MB1 -> PBR-LP1 -> PBR-AS1 -> PBR-LR1**.
+MB1 now depends on actual **PBR0 PASS + PBR-AF1 PASS**, removing only the
+unnecessary rendering-diagnostic prerequisite for LOCAL measurements. MB1 is
+eligible, awaiting fresh supported supervisor publication; remaining tasks await
+their actual predecessor PASS and review. PBR-AF1's completed Library coalescing
+repair is baseline, not duplicate work. Historical RT1/EV1 STOPPED and RT2/FS7
+reports stay intact; earlier hold statements below are historical checkpoints
+superseded only for this independent lane. Device, beta/tester and release gates
+remain BLOCKED; OX2 still depends on OX1 STOPPED.
+
+Existing runner PID39828, active supervisor chatgpt, Manual Pause OFF at recovery
+inspection; no restart or duplicate. Two TOTAL pending limit means only MB1 can
+be admitted now alongside preserved OX2. Continue subsequent approved IDs through
+fresh reviews as slots permit. No push/deploy/migration/OTA/native build/install,
+FULLSEND, production or secret changes. Every implementation retains fresh tests,
+forced typecheck/lint/build and measured before/after proof where applicable.
+[Recovery evidence, deferral authority and dependency rationale](ai/acceptance/pbr-rt2-recovery-and-performance-resumption.md).
+<!-- PBR recovery 2026-10-23 end -->
+
 # Current State
 
 <!-- PBR-RT2 begin -->
