@@ -43,26 +43,26 @@ material is not inspected. The owner's 117 MB artifact/units remain unidentified
 | All payloads | 1,729 | 130,931,817 | 170,030,903 |
 
 Archive overhead (headers/alignment/signing/directory, not separately decoded):
-**1,092,410 bytes**. Each ABI has27 libraries, all stored uncompressed:
-arm64-v8a24,860,944; armeabi-v7a17,151,772; x8626,109,856;
-x86_6425,517,240 bytes. ABI support is required, not removable overhead.
-Five packaged TTFs total2,004,756 raw /932,190 compressed bytes; exact hashes
-and obfuscated resource names are in `apk-before.json`. There are0 duplicate
-entry names and40 groups of byte-identical payloads; their references and
+**1,092,410 bytes**. Each ABI has 27 libraries, all stored uncompressed:
+arm64-v8a 24,860,944; armeabi-v7a 17,151,772; x86 26,109,856;
+x86_64 25,517,240 bytes. ABI support is required, not removable overhead.
+Five packaged TTFs total 2,004,756 raw / 932,190 compressed bytes; exact hashes
+and obfuscated resource names are in `apk-before.json`. There are 0 duplicate
+entry names and 40 groups of byte-identical payloads; their references and
 resource qualifications must be examined before inferring removable duplicates.
 No signature/certificate entry contents are read or extracted by the helper.
 
-Tracked source asset inventory:65 files /5,646,237 bytes across mobile assets,
+Tracked source asset inventory: 65 files / 5,646,237 bytes across mobile assets,
 web public and shared assets, including platform copies and branding sources.
-This is not APK contribution. Current app manifest remains **2.2.0/code6 /
-runtime2.2.0-sdk57**, distinct from the archived **2.3.0/code7** release.
+This is not APK contribution. Current app manifest remains **2.2.0/code 6 /
+runtime2.2.0-sdk57**, distinct from the archived **2.3.0/code 7** release.
 Local installed Node24.16.0/Expo57.0.30/RN0.86.3/Next15.5.27 tool identities
 are recorded, rather than inferred as the archived binary's dependencies.
 
 ## Measurement and safety contract
 
 New helpers, fixtures, logs, copies and hashes live only in ignored
-`tmp/overnight/PBR-AS1/`. `identity-before.json` records46,216 original
+`tmp/overnight/PBR-AS1/`. `identity-before.json` records 46,216 original
 input-file hashes, including inherited AF1/MB1/LP1 custody and unrelated owner
 files; no environment file is read. Archive payload hashes are computed in
 memory without extraction. Repeated exports run the same installed Expo
@@ -74,7 +74,7 @@ Reuse the inspected loopback-only PBR0 Node network guard, repo-local
 TEMP/TMP/TMPDIR, npm/Expo offline, EXPO_NO_DOTENV=1, telemetry off, local-only
 Turbo cache and loose env mode. A task-local wrapper also makes `.env*` reads
 unavailable to Next tooling without opening or modifying those files.
-Initial guard checks3/3 PASS (environment-read denial, outbound fetch denial,
+Initial guard checks 3/3 PASS (environment-read denial, outbound fetch denial,
 outbound socket denial). No dependency installation or cache purge.
 
 Tracked Expo/Metro/Babel/EAS scripts/configuration and ignored local Android
@@ -160,45 +160,45 @@ flag is changed based on an unverified release configuration. Preview remains
 APK, production profile semantics and remote version source remain unchanged.
 
 Forty identical-payload groups contain 111 named entries. Relative to one
-representative per group, repeated payloads account for 50,448 raw /28,005
+representative per group, repeated payloads account for 50,448 raw / 28,005
 compressed entry bytes, excluding headers. These are identity counts, **not
 removable bytes or achieved savings**: nine groups are Commons Codec named
-language tables and31 groups are Android resources (including qualified color,
+language tables and 31 groups are Android resources (including qualified color,
 XML, PNG and nine-patch paths). Resource IDs, qualifiers and library lookup names
 can require distinct entries despite byte equality. There are no duplicate names,
 fonts, native libraries or assets entries. No resource-table rewrite/exclusion
 or dependency patch is justified by equality alone.
 
-The fresh Android export has 36 assets +1 HBC +metadata =38 files,
-14,671,618 bytes. Its 36 assets total 3,719,720 bytes: TTF2,001,440,
-PNG1,684,855, WAV32,806, XML619. HBC is10,949,445 bytes and metadata2,453.
-No duplicate emitted payloads. All11 local literal asset/config references
-resolve; all9 non-JSON payload references match exactly one emitted file.
+The fresh Android export has 36 assets + 1 HBC + metadata = 38 files,
+14,671,618 bytes. Its 36 assets total 3,719,720 bytes: TTF 2,001,440,
+PNG 1,684,855, WAV 32,806, XML 619. HBC is 10,949,445 bytes and metadata 2,453.
+No duplicate emitted payloads. All 11 local literal asset/config references
+resolve; all 9 non-JSON payload references match exactly one emitted file.
 The two JSON imports are code inputs, not omitted downloadable assets.
 references.cjs uses the installed TypeScript AST, actual metadata and SHA256,
-with **FRESH67/67 checks passed,0 failed** in reference-audit.json.
+with **FRESH 67/67 checks passed, 0 failed** in reference-audit.json.
 
 - clockFonts.ts requires all three Inter weights (1,030,596 raw bytes).
-  DayRingClock.CenterReadout uses600 for mode labels,700 for time and500 for
+  DayRingClock.CenterReadout uses 600 for mode labels, 700 for time and 500 for
   duration; System is a load-failure fallback, not an equivalent replacement.
   The full TTFs match both export and archive hashes (res/Ih.ttf, res/Lp.ttf,
-  res/kZ.ttf), totaling497,937 compressed APK bytes. The GL clock atlas only
+  res/kZ.ttf), totaling 497,937 compressed APK bytes. The GL clock atlas only
   contains canonical clock glyphs; it cannot replace label/font coverage.
-- DayOrb loads the40,796-byte local clock atlas and retains plain-text/poster
+- DayOrb loads the 40,796-byte local clock atlas and retains plain-text/poster
   fallback when its local asset/GL frame fails. CanvasSyncScreen explicitly
-  shows the1,621,928-byte bundled tutorial with its accessible six-step label.
+  shows the 1,621,928-byte bundled tutorial with its accessible six-step label.
   Both remain available offline. These PNGs have no exact payload-hash match in
   the older archive, so no source-to-archive PNG subtraction is claimed.
-- Four feedback WAVs total32,806 bytes and match archive/export hashes exactly.
+- Four feedback WAVs total 32,806 bytes and match archive/export hashes exactly.
   Deleting or recoding them would change media/feedback behavior, not a free
   optimization. Native app/adaptive/monochrome icons are config references;
   unused source branding and platform copies are not automatically APK payloads.
-- Material Symbols regular970,844 raw /431,959 compressed APK bytes matches the
+- Material Symbols regular 970,844 raw / 431,959 compressed APK bytes matches the
   installed full font and emitted payload. Expo Router's native-tabs Android
   materialIconConverter imports expo-symbols; its utils selects the regular
   font. Replacing Router internals, subsetting glyphs or deleting a dependency
   font violates required compatibility/coverage without additional proof.
-  The fifth small APK font is3,316 raw /2,294 compressed bytes; it is not
+  The fifth small APK font is 3,316 raw / 2,294 compressed bytes; it is not
   attributed to a current export or removed based on its obfuscated name.
 - Native studyExport imports the shared saved-content builders for PDF/DOCX/PPTX;
   metadata emits a single Android HBC. Moving a static import to a promise does
@@ -210,3 +210,158 @@ module removal, ABI filter or packaging change is proposed. Additional native
 compression/shrinking experiments and their exact rebuilt bytes are owner work;
 this task can finish all provable local rows without them. ADR NOT APPLICABLE.
 Mandatory gates and the second equivalent Android export remain pending here.
+
+## STEP 3: equivalent artifacts, exact raw difference and limits
+
+Both standalone commands were identical:
+`npm run build --workspace @stay-focused/mobile -- --platform android`.
+Product/config/package/lock/asset inputs are unchanged; only documentation HEAD
+advanced from 1831c8c2 to 1320404c. The task-local guard's Vite environment-file
+visibility repair occurred between exports; both Expo runs already had
+EXPO_NO_DOTENV=1, the same offline settings and the same actual Metro bundle hash.
+Original before/after inventories and complete exported files are retained.
+No native build, reinstall or APK modification is involved.
+
+| Actual artifact / input | Before bytes | After bytes | Raw delta |
+| --- | ---: | ---: | ---: |
+| Existing archived APK | 132,024,227 | 132,024,227 | 0 |
+| Its compressed native libraries | 93,639,812 | 93,639,812 | 0 |
+| Its compressed assets | 8,793,910 | 8,793,910 | 0 |
+| Its compressed fonts | 932,190 | 932,190 | 0 |
+| Tracked source assets, 65 files | 5,646,237 | 5,646,237 | 0 |
+| Standalone Android JS/assets export, 38 files | 14,671,618 | 14,671,619 | +1 |
+| HBC (only changed exported file) | 10,949,445 | 10,949,446 | +1 |
+| Other 37 exported files | 3,722,173 | 3,722,173 | 0 |
+
+Before HBC SHA256:
+`44869cd9c9f381eb6b745e7e92a861d603a0db9ef11a1bad7b3ec7d0b28fffb6`.
+After HBC SHA256:
+`dc92cfd679598a6d6c4753c21c0d787af180d0976fb5ee1e5fb0f4487d8b9f44`.
+Both metadata files name index-b1140c3d5f4d980071543d1ea13e651b.hbc.
+Every compared file's raw name/size/SHA256 and delta is in comparison.json;
+37 files are byte-identical. Archive and source inventories are byte-identical,
+including every compared payload hash, compression method and ABI/library total.
+
+The first helper incorrectly demanded complete raw-export identity:
+**39 checks passed / 3 failed**, exit 1, preserved in comparison-first-failed.json.
+Investigation found the installed Expo serializer
+`node_modules/@expo/metro-config/build/serializer/exportHermes.js:65` creates
+`expo-bundler-${Math.random()}-${Date.now()}/index.js` under local TEMP.
+Hermes embeds that source filename in debug metadata. The before filename is 140
+bytes; after 141. This accounts for the **entire +1 raw byte**, without a code or
+asset change. It is not evidence of an app size regression or optimization.
+
+Strict corrected comparison: validate the known filename prefix and random/
+timestamp grammar, exactly one such path, both original valid SHA1 footers,
+embedded source hashes, total-length fields and both filename-length fields.
+Only the source filename bytes, length fields at offsets 32/9,283,496/9,283,512,
+and final 20 checksum bytes are normalized in memory. Every remaining byte must
+match. Actual exported files remain untouched. A deliberately corrupted non-debug
+byte is still rejected by the equality check. **FRESH 96/96 passed, 0 failed**,
+not a relaxed product gate or deletion of a failing application assertion.
+Canonical comparison SHA256 for both is
+`2025faa93930b9c710504526fa9b56555c4751540834787739222b464a5912a3`;
+embedded Hermes source hash is
+`3392e47acb970662cdfc1816559d66558d224d54`. The raw bytes/hashes above remain
+primary; canonical values are diagnostic, not rebuilt APK or savings evidence.
+
+Tool-identity.json pins installed Hermes compiler 250829098.0.17, actual local
+hermesc.exe SHA256
+`998c85044f67c6bb68038c318dfdcd97285bc3bcaec53e29dda05fc257c1661b`,
+serializer/CLI/network-guard hashes and --version output (HBC 98). No package or
+compiler changed. Full font-file equality additionally preserves all 2,926 glyphs
+per Inter font and 4,045 in Material Symbols; font-coverage.json records cmap table
+hashes and lengths. No font coverage or media-quality trade is taken.
+
+This is a reproducible unchanged-source local comparison, with an explicitly
+explained non-deterministic debug filename. Native rebuilt-APK savings are
+**NOT RUN / UNVERIFIED (owner to confirm)**. Neither Metro export bytes nor
+historical owner 117 MB can substitute for an equivalent newly built native APK.
+Physical startup/rendering/RAM, active OTA identity, authenticated browser and
+production outcomes remain owner checks. Final mandatory root gate and closure
+are recorded below after completion.
+
+## Final local verdict and gate ledger
+
+**PASS for mandatory AS1 LOCAL scope; justified no-source-change verdict.**
+Rows 0, 1a, 1b, 2, 3, G, C complete. Acceptance freeze 1831c8c2; measured decision
+1320404c; final documentation commit is recorded by Git and PBR-AS1.status.
+Runtime/config/assets/packages are unchanged from ecf4c5ed. Local evidence does
+not establish native savings, physical acceptance or beta/release readiness.
+
+Every successful row below is **FRESH**, not reused from LP1/MB1. Forced Turbo
+gates have 0 cache hits; compiler/Metro/OS caches may remain warm. All commands
+use the guarded offline runner, repo-local temp and local-only Turbo cache.
+Only documentation HEAD advanced during these gates; command timestamps/HEADs,
+exits/log paths are in commands.jsonl. Wall times are command cost, not latency.
+
+| Exact command | Result | Seconds |
+| --- | --- | ---: |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | 38-file Android offline JS/assets export; not a native build | 136.846 |
+| `npm run test --workspace @stay-focused/mobile -- src/features/redesign/overnight-clock.test.ts src/features/redesign/DayOrb.test.ts src/features/export/saveStudyFile.test.ts --maxWorkers=1` | 37 passed / 3 files / 0 failed / 0 skipped | 4.921 |
+| `npm run test --workspace @stay-focused/shared -- src/study-export --maxWorkers=1` | 11 passed / 1 file / 0 failed / 0 skipped | 2.043 |
+| `npm run test --workspace @stay-focused/shared -- --maxWorkers=2` | 716 passed / 74 files / 0 failed / 0 skipped | 15.180 |
+| `npm run test --workspace @stay-focused/mobile -- --maxWorkers=2` | 1,658 passed / 174 files / 0 failed / 0 skipped | 63.937 |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | 2,455 passed / 214 files / 0 failed / 3 existing live skips | 167.875 |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached | 47.302 |
+| `npm run lint -- --force` | 8/8 tasks, 0 cached; 0 errors / 6 existing warnings | 89.349 |
+| `npm run build --workspace @stay-focused/api` | 37/37 static pages; 18 workflow steps / 1 workflow | 124.792 |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | 38-file Android offline JS/assets export; not a native build | 61.124 |
+| `npm run build -- --force --concurrency=1 --env-mode=loose` | 8/8 tasks, 0 cached; API 37/web 23; Android/iOS/web offline JS/assets exports | 360.777 |
+| `npm run typecheck -- --force` | 8/8 tasks, 0 cached | 45.329 |
+
+Full relevant suites: **4,829 passed / 0 failed / 3 existing live skips**.
+Shared 716 includes 37 source and 37 pre-existing emitted-copy files; this is not
+716 unique source assertions. API skips are the existing 1 live activity + 2
+live quiz cases; no new skip, failed product assertion or observed flake.
+Focused 48 passes are additional, not double-counted. Full mobile includes the
+existing ring-orb-spin Inter weight/accessibility/plain-text-fallback cases.
+Reference 67 and artifact-comparison 96 checks are additional evidence checks.
+Existing Vite native-config, React test renderer, Expo color warnings and five
+mobile import-order + one web unused-useMemo lint warnings are retained.
+
+First failures are retained, not relabelled successful: initial Android export
+exit 1 before Metro (guard's workspace-relative require); focused Vitest exit 1
+before test execution (Vite saw environment-file existence before denied read).
+Corrected only ignored guard path/visibility/ESM handling; successful reruns are
+above. No environment content was opened or modified. First artifact verifier
+39 pass/3 fail on raw HBC equality is retained; exact metadata attribution and
+strict 96-check correction are explained above. Read-only Python alias/Windows
+wildcard/guessed-path discovery failures used installed Node/discovered paths,
+without installs or product changes. attempts.json and original logs remain.
+
+Standalone web tests/build: **NOT APPLICABLE**, no web/shared behavior change;
+mandatory root build includes web 23/23 pages. Workflow/provider-live/remote SQL,
+native release build/install, physical/authenticated-browser/production tests,
+rollout and Device checks: **NOT RUN**, expressly outside scope. Existing full
+API tests use local adapters/PGlite, not a remote database. Generated Next
+ambient declarations were inspected and restored to the original tracked
+baseline; final forced typecheck verifies that restored source.
+
+Final ownership/custody, build identities and evidence-index hashes are added
+below after the local closure check. No generated/private fixture, export,
+log, APK, local Android project or tmp path is committed. No new ADR is needed.
+
+**Owner steps remaining**: all rollout/device/rebuilt-native measurements and
+live outcomes remain NOT RUN / UNVERIFIED (owner to confirm), as frozen above.
+Review AS1 actual local PASS before approving LR1; do not publish it here.
+MB1/LP1 remain complete; RT1/EV1 STOPPED and physical RT2 INCONCLUSIVE/deferred
+stay intact, OX2 remains blocked on OX1 and unrelated roadmaps/Owner Pause stay
+preserved. No controller/queue/predecessor status change. Vercel CLI is absent;
+strongly recommend npm i -g vercel for separately authorized future tooling.
+Installation and Vercel commands are NOT RUN in this scope.
+
+Final custody/build verification: **FRESH 46,237/46,237 passed, 0 failed**, including
+46,212 unchanged original path-keyed hashes (inherited Windows path aliases
+can name the same file). All historical planning text and the full previous
+handoff prefix are preserved, with no new replacement characters and only five
+owned Markdown paths. API build ID P55gH1yFsCDvegNGsGeRa; web build ID
+tSMVzJuotFgjdh_dxWwL-. Root mobile export: 84 files /
+35,320,693 bytes across Android/iOS/web; individual hashes are in verification.json.
+These are local build/export identities, not deployed revisions or native APKs.
+Final staged/unstaged diff hygiene is checked at the scoped local commit boundary.
+
+Final documentation/index review: **FRESH 28/28 passed, 0 failed**. Both
+`git diff --check` and `git diff --cached --check` pass at the final scoped
+commit boundary. Original failures, raw inventories, per-file hashes and exact
+command results are indexed by ignored tmp/overnight/PBR-AS1/SHA256.json.

@@ -1,3 +1,42 @@
+<!-- PBR-AS1 completion begin -->
+## PBR-AS1 current local checkpoint: PASS
+
+2026-10-23: APK/source/equivalent Android export investigation and all mandatory
+local gates complete. **No safe source/config size correction justified; zero
+runtime/asset/font/native/dependency changes, no APK savings claim.**
+[Acceptance, exact bytes/hashes, commands and limits](ai/acceptance/pbr-as1-apk-size-optimization.md).
+
+Existing APK stays 132,024,227 bytes, native 93,639,812 across all four ABIs.
+Two guarded standalone Android exports are 14,671,618 / 14,671,619 bytes; the
+entire +1 byte is a random Hermes debug-filename length difference. All 37 other
+files and every remaining HBC byte match after narrowly declared debug metadata
+normalization; raw originals retained. Source 65 assets / 5,646,237 bytes unchanged.
+Reference audit 67/67 and strict artifact comparison 96/96 PASS. Fonts/glyphs,
+media/offline access, all exports/modules/ABIs/signing/OTA semantics preserved.
+
+FRESH shared 716/mobile 1,658/API 2,455 = **4,829 passed / 0 failed / 3 existing live
+skips** (shared includes emitted copies). Focused 48 pass; forced root typecheck,
+lint and serial build 8/8 each, 0 cached; explicit API and two Android JS/assets
+exports PASS. Guard-startup failures and first 39 pass/3 fail raw-comparison
+assumption are preserved, corrected and rerun with strict checks. Six existing
+lint warnings; no product assertion failure, new skip or observed flake.
+
+Local commits 1831c8c2 and 1320404c plus final documentation checkpoint recorded in
+Git/PBR-AS1.status. Original evidence and unrelated untracked owner files kept.
+MB1 and LP1 remain completed (LP1 has no further justified Library optimization).
+**LR1 follows actual AS1 PASS plus fresh approval**; no LR1 publication/work,
+controller/queue change or unrelated task. Earlier eligibility wording below is
+history. OX2 stays blocked by OX1; unrelated roadmap and Owner Pause intact.
+
+RT1/EV1 STOPPED, physical RT2 STOPPED /resume-text INCONCLUSIVE/deferred;
+active Realme OTA/runtime/channel/embedded identity and safe isolation UNVERIFIED.
+Source 2.2.0/code 6 differs from archive 2.3.0/code 7. Rebuilt-native savings,
+physical startup/rendering/RAM, authenticated browser and live production state
+UNVERIFIED (owner to confirm). Rollout and Device checks NOT RUN; no beta/tester/
+release readiness claim. No push/deploy/service/SQL/migration/Scheduler/email/
+native build/install/OTA/EAS/environment-file action or spending.
+<!-- PBR-AS1 completion end -->
+
 <!-- PBR-LP1 completion begin -->
 ## PBR-LP1 current local checkpoint: PASS
 

@@ -10615,3 +10615,91 @@ build/install/tester distribution/spending are owner work; none performed.
 No environment file opened/edited by task helpers. Vercel CLI unavailable;
 strongly recommend npm i -g vercel for separately authorized future tooling;
 installation NOT RUN.
+
+## PBR-AS1 APK size investigation - 2026-10-23
+
+**Status: PASS for mandatory LOCAL scope; justified no-change verdict.**
+Branch overnight/2026-10-15_feedback, initialecf4c5ed (27 ahead / 23 behind local
+upstream snapshot, no fetch). Actual PBR0/AF1/MB1/LP1 PASS and LP1 commit ancestry
+verified; current prompt's owner approval authorizes AS1 only. Untracked UI/,
+apps/mobile/.gitignore, supabase/.temp/ and original ignored evidence preserved.
+[Acceptance and exact evidence](acceptance/pbr-as1-apk-size-optimization.md).
+
+Before/after APK 132,024,227 bytes, SHA256
+0910d589b42c02c04f032dff7362da69258cdd081c5be1c2dc83798452cc12e6,
+1,729 entries; native 93,639,812 bytes across27 libraries per each of four ABIs.
+Compressed assets 8,793,910, fonts 932,190 bytes unchanged. Forty identical payload
+groups (111 named entries) do not prove any safely removable resource/library
+lookup. No duplicate names/fonts/native/assets and no source correction proved.
+Native compression/shrinking requires separate equivalent owner native builds;
+no packaging/signing/runtime/ABI/module/font/quality/feature/export change.
+
+Source 65 assets / 5,646,237 bytes unchanged. Offline Android exports38 files,
+14,671,618 ->14,671,619 bytes. HBC10,949,445 ->10,949,446; the entire +1 byte is
+installed Expo's Math.random/Date.now debug source pathname length. Other 37 files
+match exactly; strict comparison accounts only for filename, length fields,
+size and valid checksums, compares all remaining bytes and detects a corrupted
+non-debug byte. Raw SHA256s and canonical diagnostic hash remain in acceptance/
+comparison.json; no APK saving or physical metric inferred from Metro output.
+Full font hashes preserve 2,926 glyphs/Inter and 4,045/Material Symbols. Literal
+asset/config references, metadata, offline tutorial, full weights, local sounds,
+atlas/GL/plain-text fallbacks and saved PDF/DOCX/PPTX exports remain intact.
+
+FRESH full shared 716/mobile 1,658/API 2,455 = **4,829 pass / 0 fail / 3 existing live
+skips**; shared counts include emitted copies. Focused mobile 37/shared export11
+PASS. Reference audit 67/67; strict artifact comparison 96/96 PASS. Forced root
+typecheck/lint/build 8/8 each, 0 cached; six existing lint warnings. Explicit
+API 37/37 and two standalone Android offline JS/assets exports PASS; root includes
+web 23/23 and Android/iOS/web exports. Standalone web tests/build NOT APPLICABLE
+(no web/shared behavior change). Native/physical/live outcomes NOT RUN.
+
+First Android/first focused startup failed before execution due only to ignored
+guard relative-path/environment-file visibility handling; fixed without reading
+or editing environment files or changing products/tests. Original failed logs
+retained. First raw-comparison helper39 pass/3 fail is preserved, investigated and
+replaced by strict 96/96 metadata-aware evidence checks, not hidden raw equality.
+Python alias/Windows guessed-path discovery attempts corrected locally. No
+failed product assertions, new skips or observed flake. Next-generated ambient
+files inspected/restored; final forced typecheck checks the original source.
+
+Local scoped owner-authored commits:
+
+- 1831c8c2 docs(perf): freeze PBR-AS1 size investigation acceptance
+- 1320404c docs(perf): record AS1 byte attribution and no-change verdict
+
+Final documentation checkpoint follows this footer; its exact hash is in Git
+and tmp/overnight/PBR-AS1.status, without amending its own history. Only five
+owned Markdown files are committed. All logs/inventories/fixtures/tool hashes/
+original and failed comparisons remain ignored under tmp/overnight/PBR-AS1/.
+Fresh final custody/build identities and exact check count are recorded below.
+MB1/LP1 remain complete; no repeated Library optimization. LR1 requires actual
+AS1 PASS and fresh approval; no publication or successor work performed.
+OX2 stays blocked on OX1, unrelated scope/Owner Pause and controller untouched.
+
+**Owner steps remaining**: Rollout and Device checks **NOT RUN**, skipped
+entirely. No push/deploy/service/provider/remote SQL/migration/email/Google worker/
+Scheduler/OTA/EAS/native build/install/tester distribution/spending/environment
+file action. Rebuilt APK savings, identity of owner-reported117 MB artifact,
+active full Realme OTA/runtime/channel/embedded identity, safe public isolation,
+physical rendering/startup/RAM, authenticated browser, deployed revisions/DB/
+applied migrations/Scheduler/production outcomes **UNVERIFIED (owner to confirm)**.
+RT1/EV1 STOPPED, physical RT2 STOPPED/resume-text INCONCLUSIVE and deferred remain
+unchanged. Source 2.2.0/code 6 is distinct from archive 2.3.0/code 7. Before separately
+authorized physical work, satisfy the preserved RT2 identity/isolation/observation
+preflight. No beta/release readiness claim. Vercel CLI absent; strongly recommend
+npm i -g vercel for separately authorized future tooling; installation NOT RUN.
+
+Final custody/build verification: **FRESH 46,237/46,237 passed, 0 failed**, including
+46,212 unchanged original path-keyed hashes (inherited Windows path aliases
+can name the same file). All historical planning text and the full previous
+handoff prefix are preserved, with no new replacement characters and only five
+owned Markdown paths. API build ID P55gH1yFsCDvegNGsGeRa; web build ID
+tSMVzJuotFgjdh_dxWwL-. Root mobile export: 84 files /
+35,320,693 bytes across Android/iOS/web; individual hashes are in verification.json.
+These are local build/export identities, not deployed revisions or native APKs.
+Final staged/unstaged diff hygiene is checked at the scoped local commit boundary.
+
+Final documentation/index review: **FRESH 28/28 passed, 0 failed**. Both
+`git diff --check` and `git diff --cached --check` pass at the final scoped
+commit boundary. Original failures, raw inventories, per-file hashes and exact
+command results are indexed by ignored tmp/overnight/PBR-AS1/SHA256.json.
