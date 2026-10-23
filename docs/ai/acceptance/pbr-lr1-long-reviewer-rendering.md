@@ -267,3 +267,20 @@ FRESH standalone and root page generation: API 37/37 and web 23/23. Both
 Next-generated next-env.d.ts files were inspected and restored byte-for-byte
 to the initial source; final forced typecheck after restoration is 8/8,
 0 cached. No generated declaration or output is included in the commits.
+
+## Closure checkpoint
+
+Implementation/tests/measurement report committed as e1bde90c. Three current
+planning documents reconcile the finite LOCAL endpoint; handoff appended without
+rewriting its historical prefix. Original tracked inputs outside the nine owned
+paths, inherited probe/guard/status hashes and historical planning text are
+verified by verify.cjs. All 23 unrelated owner-file hashes also match the prior
+AS1 custody snapshot; no environment file is read. Final verification count and local documentation commit
+are recorded by verification.json, Git and PBR-LR1.status. Staged/unstaged diff
+checks are required at that final commit boundary. RowC then PASS; no remaining
+mandatory LOCAL code/gate work. All Owner steps remaining above are NOT RUN.
+
+Final FRESH verify.cjs: **2,135/2,135 passed, 0 failed**, including original
+source, inherited statuses/probes, 23 owner artifacts, historical text and new
+document links. Both git diff --check and git diff --cached --check pass at the
+final scoped commit boundary. SHA256.json indexes all retained task evidence.

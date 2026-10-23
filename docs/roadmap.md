@@ -1,3 +1,41 @@
+<!-- PBR-LR1 completion begin -->
+## PBR-LR1 current local checkpoint: PASS
+
+2026-10-23: Long-reviewer profiling, narrowly supported repair and mandatory
+LOCAL gates complete. Implementation `e1bde90c` memoizes only the existing
+full owner/reviewer/section/canonical-content React key in both TopicAssist
+wrappers. No content, parser, image, selection or export implementation change.
+[Acceptance, raw evidence identities, exact counts and limits](ai/acceptance/pbr-lr1-long-reviewer-rendering.md).
+
+Identical public synthetic 0/1/12/120/240-topic schedules preserve all complete
+output/segment/anchor/canonical/export-layout hashes and host render/node counts.
+240-topic key serializations: mobile 2,640 -> 720; web 2,400 -> 720. Four unchanged
+parent updates add 0 after versus 960 calls before in each client. Full exact key
+and owner/content resets remain; no truncation, cap or cross-owner cache.
+Comparison 771/771 PASS. This proves reduced repeat serialization; mixed host
+timings and GC-contaminated heap proxies establish no native/RAM/latency gain.
+
+FRESH full shared 716/mobile 1,661/API 2,455/web 578 = **5,410 passed / 0 failed /
+3 existing live skips** (shared includes emitted copies). Focused 362+66 PASS;
+corrected probes 2/2 before and 2/2 after. Forced root typecheck/lint/serial build
+8/8 each, 0 cached; explicit API/web builds and Android offline JS/assets PASS.
+Initial red work-count tests, probe harness failures and first lint 5/8 with 3
+new test-style errors are retained; corrected gates green, six existing warnings.
+Scoped local commits/evidence custody in Git, acceptance and PBR-LR1.status.
+
+**Finite MB1 -> LP1 -> AS1 -> LR1 LOCAL roadmap endpoint reached.** MB1
+instrumentation and AF1 Library coalescing remain prior work; LP1/AS1 findings
+remain complete. No next initiative, queue/controller publication or physical
+repair retry is authorized. Earlier eligibility/hold wording below is history.
+OX2 stays blocked by OX1; unrelated roadmap/Owner Pause and owner artifacts intact.
+RT1/EV1 STOPPED; RT2 physical STOPPED/resume-text INCONCLUSIVE and deferred.
+Active OTA/runtime/channel/embedded identity, isolation, physical frames/rendering/
+RAM, authenticated browser and production state UNVERIFIED (owner to confirm).
+Rollout/Device checks NOT RUN; no beta/release readiness. Source 2.2.0/code 6 differs
+from archive 2.3.0/code 7. No push/deploy/service/SQL/migration/Scheduler/email/env
+file/device/native build/install/OTA/EAS or spending action.
+<!-- PBR-LR1 completion end -->
+
 <!-- PBR-AS1 completion begin -->
 ## PBR-AS1 current local checkpoint: PASS
 

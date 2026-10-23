@@ -10703,3 +10703,82 @@ Final documentation/index review: **FRESH 28/28 passed, 0 failed**. Both
 `git diff --check` and `git diff --cached --check` pass at the final scoped
 commit boundary. Original failures, raw inventories, per-file hashes and exact
 command results are indexed by ignored tmp/overnight/PBR-AS1/SHA256.json.
+
+## PBR-LR1 long-reviewer rendering - 2026-10-23
+
+**Status: PASS for mandatory LOCAL scope.** Branch overnight/2026-10-15_feedback,
+initial d747fcd2 (30 ahead /23 behind local upstream snapshot; no fetch).
+Actual PBR0/AF1/MB1/LP1/AS1 PASS and all reported status commits verified ancestors.
+Owner prompt grants manual approval of existing LR1 after actual AS1 PASS.
+Untracked UI/, apps/mobile/.gitignore, supabase/.temp/ and ignored owner evidence
+preserved. [Acceptance](acceptance/pbr-lr1-long-reviewer-rendering.md).
+
+Only runtime change: reuse the existing complete JSON identity in mobile/web
+TopicAssist through useMemo(owner,selection). Every serialized key value and
+content/owner/reviewer/section reset is unchanged. New regressions prove exact
+removed-work counts, same-content active-answer retention, current full children,
+changed identity reset and late old-owner/unmounted completion isolation.
+No parser/image/selection/export/virtualization/content-size/cache rewrite.
+
+One warmup and 3 samples at each 0/1/12/120/240 topics per client per cohort:
+60 measured schedules plus 20 warmups across before/after. Largest full source
+JSON 1,070,213 code units; 10,800 complete segments. Exact full output/navigation/
+canonical/export-layout/parser hashes and host node/commit counts match all
+schedules: FRESH strict comparison 771/771,0 failed. Key calls at 240 topics:
+mobile 2,640 -> 720, web 2,400 -> 720; identical parent updates 960 -> 0 each.
+Avoided repeat output 8,463,840 / 7,405,860 UTF-16 code units respectively. These
+are serialization/work proxies, not native bytes or retained heap savings.
+Rerenders persist; mixed three-sample timings/GC deltas establish no speedup.
+Full timing/heap samples, original probes, source/tool/diff and artifact hashes
+remain ignored in tmp/overnight/PBR-LR1/, indexed by SHA256.json.
+
+FRESH full shared 716/74 files, mobile 1661/174, API 2455/214 plus 3 existing live
+skips, web 578/76: **5410 pass /0 fail / 3 existing live skips**. Shared includes
+emitted copies. Focused mobile 362/web 66 PASS; corrected full-reader probes 2/2
+before and 2/2 after; guard 3/3 PASS. Forced root typecheck/lint/build 8/8 each,
+0 cached; explicit API/web builds and Android offline JS/assets export PASS.
+Build/export identities and exact commands/results are in acceptance/gate-results.
+Six existing lint warnings; no product flake/new skip/test weakening.
+
+First failures retained: red focused mobile 361 pass/1 fail and web 65 pass/1 fail
+(the new expected key-count regression); first probe mobile circular mock JSON
+and interrupted expensive web assertion worker 1 error; second probe 1 pass/1 fail;
+corrected third 2/2 PASS. First lint 5/8 successful, 0 cached, 3 web test children-prop
+style errors; corrected test syntax, then forced lint/typecheck and full suites
+PASS. No runtime change after successful comparison. Discovery path errors and
+all original logs remain; no failed first attempt is presented as a passing run.
+
+Local scoped commits (author galaxymaxp <omgraythekid@gmail.com>):
+
+- 5f3bf300 docs(perf): freeze PBR-LR1 rendering acceptance
+- 93cec189 docs(perf): record LR1 complete-content baseline
+- e1bde90c perf(reviewer): reuse exact topic render identities
+
+Final scoped documentation checkpoint follows this footer; its exact hash is in
+Git and PBR-LR1.status, without self-amending history. Current-state/roadmap/sprint
+now record the finite MB1 -> LP1 -> AS1 -> LR1 LOCAL endpoint. No new initiative,
+queue/controller/dependency change or physical retry. MB1/AF1 are baseline work,
+not duplicate LR1 claims. OX2 blocked by OX1 and unrelated Owner Pause preserved.
+Final custody/doc/diff checks are recorded in the acceptance closure entry.
+
+**Owner steps remaining**: Rollout and Device checks **NOT RUN**, skipped
+entirely. Physical/native/authenticated acceptance and production performance,
+full active Realme OTA/runtime/channel/embedded identity, safe public/empty
+isolation, independent physical-screen observations, deployed revisions/DB/
+applied migrations/Scheduler/provider state **UNVERIFIED (owner to confirm)**.
+RT1/EV1 STOPPED; RT2 physical STOPPED/resume-text INCONCLUSIVE/deferred remain.
+Source 2.2.0/code 6 differs from archived 2.3.0/code 7. Satisfy preserved RT2 runbook
+preflight before separately authorized physical work; local test-host evidence
+does not establish beta/tester/release readiness. Push/deploy/service/remote SQL/
+migration/email/Google worker/Scheduler/OTA/EAS/native build/install/distribution/
+account or environment changes/spending remain owner work; none performed here.
+Vercel CLI absent; strongly recommend npm i -g vercel for separately authorized
+future env/deploy/log tooling. Installation NOT RUN.
+
+Final FRESH custody/documentation verification: **2,135/2,135 passed, 0 failed**.
+Both `git diff --check` and `git diff --cached --check` pass at the final scoped
+commit boundary. Historical planning/handoff text, all unrelated tracked inputs,
+23 owner artifacts and inherited status/probe hashes are preserved. Source and
+per-file local build/export hashes plus original attempts remain in the ignored
+evidence index; all generated Next declarations were restored before final
+forced typecheck 8/8, 0 cached. No physical/production result is inferred.
