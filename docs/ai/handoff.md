@@ -11041,3 +11041,47 @@ apps/mobile/.gitignore and supabase/.temp/ retained.
 FRESH preservation checks: **182/182 PASS, 0 failed**; 147 prior statuses,
 23 unrelated owner files and byte-exact prior planning/handoff content retained.
 Git LF-to-CRLF working-copy warnings are recorded; diff gates have no errors.
+
+
+## UX3 card feedback - LOCAL PASS (2026-10-24)
+
+Implementation 6ee3d7c0, acceptance freeze c5584807. Existing course-arrow removal
+is preserved; own-source entry arrows are removed, and web/mobile feedback now
+animates within three points per edge, with keyboard/touch cancellation and
+static reduced-motion feedback. Routes, titles/counts/order and independent
+pin/options action inventory remain. No API/data/provider/dependency change.
+[Acceptance, exact gates, failed attempts and limits](acceptance/ux3-card-hover.md).
+
+FRESH full suites **5,419 passed / 0 failed / 3 existing live skips**: mobile
+1,665/176 files, web 583/77, shared 716/74, API 2,455/214. Focused mobile 181/15,
+web 79/10. Forced typecheck/lint/serial root build each 8/8, 0 cached; standalone
+API/web and offline Android JS/assets export PASS; six existing lint warnings.
+144 responsive/theme/text/motion cases, four hover/return traces, 12 touch flows,
+four menu and six keyboard navigation flows PASS; action inventory 57/57,
+guard 3/3 and both diff checks PASS. Earlier orb timeout and corrected collectors
+are retained; complete final serial web rerun passes without orb changes.
+
+**Owner steps remaining:** Rollout/Device checks NOT RUN, skipped entirely.
+Served revision/authenticated/physical/native acceptance and production state
+UNVERIFIED (owner to confirm). No push/deploy/services/SQL/env-file/native/device
+work. Preserve WEB-A1 STOP/dependents and all historical holds/owner files.
+UX3 endpoint complete; TC2 then TP1 remain saved successors, with no queue or
+controller change. Scoped local identities follow in Git/UX3.status.
+
+
+
+Commits: c5584807 freeze; 6ee3d7c0 implementation; documentation subject
+"docs(ux): close UX3 local card feedback verification" (final hash in Git and
+UX3.status). Author galaxymaxp <omgraythekid@gmail.com>. No tmp staged.
+Final code/test hashes are unchanged from final-source.json. Exact commands,
+first failures/reruns, fresh/cache labels and synthetic boundaries are in the
+acceptance report. Initial full web 580/1 orb timeout is retained; final 583/77
+passes. Workflow/provider/live acceptance NOT APPLICABLE / NOT RUN for this UI
+slice. Owner steps remaining and all UNVERIFIED limits above are mandatory.
+Vercel CLI absent; strongly recommend npm i -g vercel for separately authorized
+future env/deploy/log tooling. Installation NOT RUN.
+
+FRESH final custody: **2,135/2,135 PASS**, zero failures; eight prerequisite
+statuses, original UX1 FAILED, 23 owner artifacts and full prior planning/handoff
+text retained. Code index matched all 11 tested files with CRLF/LF normalization
+only. LF-to-CRLF Git warnings are recorded; both diff checks have no errors.

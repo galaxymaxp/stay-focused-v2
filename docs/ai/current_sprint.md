@@ -1,3 +1,30 @@
+<!-- UX3 completion begin -->
+## UX3 current LOCAL checkpoint: PASS (2026-10-24)
+
+Implementation 6ee3d7c0, acceptance freeze c5584807. Existing course-arrow removal
+is preserved; own-source entry arrows are removed, and web/mobile feedback now
+animates within three points per edge, with keyboard/touch cancellation and
+static reduced-motion feedback. Routes, titles/counts/order and independent
+pin/options action inventory remain. No API/data/provider/dependency change.
+[Acceptance, exact gates, failed attempts and limits](acceptance/ux3-card-hover.md).
+
+FRESH full suites **5,419 passed / 0 failed / 3 existing live skips**: mobile
+1,665/176 files, web 583/77, shared 716/74, API 2,455/214. Focused mobile 181/15,
+web 79/10. Forced typecheck/lint/serial root build each 8/8, 0 cached; standalone
+API/web and offline Android JS/assets export PASS; six existing lint warnings.
+144 responsive/theme/text/motion cases, four hover/return traces, 12 touch flows,
+four menu and six keyboard navigation flows PASS; action inventory 57/57,
+guard 3/3 and both diff checks PASS. Earlier orb timeout and corrected collectors
+are retained; complete final serial web rerun passes without orb changes.
+
+**Owner steps remaining:** Rollout/Device checks NOT RUN, skipped entirely.
+Served revision/authenticated/physical/native acceptance and production state
+UNVERIFIED (owner to confirm). No push/deploy/services/SQL/env-file/native/device
+work. Preserve WEB-A1 STOP/dependents and all historical holds/owner files.
+UX3 endpoint complete; TC2 then TP1 remain saved successors, with no queue or
+controller change. Scoped local identities follow in Git/UX3.status.
+<!-- UX3 completion end -->
+
 ## UX3 finite authorized scope (2026-10-24)
 
 Active: complete pictured Library/Generate navigation feedback after genuine
