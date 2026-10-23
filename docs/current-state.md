@@ -1,3 +1,38 @@
+<!-- PBR-MB1 completion begin -->
+## PBR-MB1 current local checkpoint: PASS
+
+2026-10-23: current-source startup/cache/navigation/Library/API synthetic
+measurements and opt-in privacy-safe instrumentation are complete. Runtime
+commit `b788663e288f5d970d87cd7d54710c94abf21813`. [Acceptance, exact intervals, hashes, attempts and commands](ai/acceptance/pbr-mb1-performance-baseline.md).
+No optimization or physical/production speedup is claimed. AF1 ef80dfc6 remains
+the Library baseline: all0/100/240/300 changed/unchanged schedules retain2
+summary reads /2 stats reads /max1 active read; complete results match.
+API0/1000-history page walks preserve exact hidden IDs, cursors and ownership.
+
+FRESH full suites: shared711/mobile1658/API2455/web575/Canvas75/OCR27/engine606
+= **6107 passed /0 failed /3 existing live skips** (shared includes emitted
+copies). Forced root typecheck/lint/build each8/8,0 cached; explicit API/web
+builds and38-file Android offline JS/assets export PASS. Initial typecheck
+test-typing failure and mobile additive-assertion failure are recorded, corrected
+and rerun. No new skip or product flake. All work is scoped local commits.
+
+Approved order remains **PBR-MB1 -> PBR-LP1 -> PBR-AS1 -> PBR-LR1**.
+LP1 is next only after fresh supervisor review/publication of MB1 PASS; start
+with this baseline and AF1 completed work, optimize only demonstrated remaining
+costs or document no justified further local optimization. AS1 awaits LP1 PASS
+and review; LR1 awaits AS1 PASS and review. No successor work or queue change.
+Historical OX2 remains blocked by OX1; unrelated roadmaps and Owner Pause intact.
+
+RT1/EV1 STOPPED; RT2 physical preflight STOPPED / resume-text INCONCLUSIVE
+and deferred for independent development. Source2.2.0/code6/runtime2.2.0-sdk57
+is distinct from archived installed2.3.0/code7/binary-configured2.3.0-sdk57/preview.
+Active OTA/full runtime/channel/embedded identity and safe isolation remain
+UNVERIFIED; no device/beta/release gate passes. Rollout and Device checks are
+owner steps, NOT RUN. No push/deploy/service/remote SQL/migration/environment
+file/device/native build/install/OTA/EAS/Scheduler action or spending.
+Earlier eligibility/publication wording below is a recovery checkpoint;
+the independent lane disposition above is current.
+<!-- PBR-MB1 completion end -->
 <!-- PBR recovery 2026-10-23 begin -->
 ## Current owner scope: resume independent local performance work
 
@@ -11,9 +46,10 @@ and installed APK SHA256 matching the archive; binary configured runtime
 
 Approved finite order: **PBR-MB1 -> PBR-LP1 -> PBR-AS1 -> PBR-LR1**.
 MB1 now depends on actual **PBR0 PASS + PBR-AF1 PASS**, removing only the
-unnecessary rendering-diagnostic prerequisite for LOCAL measurements. MB1 is
-eligible, awaiting fresh supported supervisor publication; remaining tasks await
-their actual predecessor PASS and review. PBR-AF1's completed Library coalescing
+unnecessary rendering-diagnostic prerequisite for LOCAL measurements. MB1 now
+has PASS for local measurements/instrumentation and committed checks; PBR-LP1
+awaits fresh supervisor review/publication. AS1 and LR1 await their predecessor
+PASS and review. PBR-AF1's completed Library coalescing
 repair is baseline, not duplicate work. Historical RT1/EV1 STOPPED and RT2/FS7
 reports stay intact; earlier hold statements below are historical checkpoints
 superseded only for this independent lane. Device, beta/tester and release gates

@@ -10479,3 +10479,75 @@ state plus independent observer conditions before physical retry. Device/beta/
 release gates BLOCKED. No production, push, deploy, migration, OTA, native build,
 install, device setting/data/account change or FULLSEND. No owner action is needed
 for the independent local lane if the bridge accepts its reviewed task.
+
+## PBR-MB1 local baseline — 2026-10-23
+
+**PASS for mandatory LOCAL code/measurement/instrumentation/gate/docs scope.**
+Initial447c0e51, branch overnight/2026-10-15_feedback; runtime/tests
+`b788663e288f5d970d87cd7d54710c94abf21813`. Original unrelated UI/, apps/mobile/.gitignore,
+supabase/.temp/ and historical reports/statuses preserved. No push.
+[Acceptance and reproducible measurements](acceptance/pbr-mb1-performance-baseline.md).
+
+Public synthetic Node/SQLite/React adapters measure fresh/warm local setup,
+saved-cache reads, entry/notification dispatch, all0/100/240/300 Library changed
+and unchanged schedules, and API0/1000-history pagination. Complete results and
+page/history hashes match. AF1 retained:2 summary/2 stats/max1 active read.
+API reads remain2/2/6/6 without history and7/7/21/21 with1000 hidden rows.
+These are adapter counts/host timings, not PostgreSQL or native latency.
+No optimization/speedup is claimed. Optional shared measurement observer has
+fixed numeric allowlisted events, injected clock, no default clock/sink/buffer/
+timer/network; sink failures and cancellation cannot change study behavior.
+
+FRESH full suites: shared711/73files, mobile1658/174files, API2455/214files
+(+3 existing live skips), web575/76files, Canvas75/1file, OCR27/3files,
+engine606/0failed; **6107 pass /0 fail /3 existing live skips**. Shared includes
+emitted copies, not unique source coverage. Focused shared5/mobile86/API3 PASS.
+Forced root typecheck/lint/build8/8 each,0 cached. Explicit API37/web23 static
+pages, Android38-file offline JS/assets export PASS. Six existing lint warnings.
+Staged/unstaged diff hygiene PASS; FRESH docs/custody validation99/99,0 failed;
+hashes in ignored PBR-MB1/verification.json and SHA256.json. Final typecheck/lint
+run after generated Next declaration restoration. No test weakening/new skip.
+
+First attempts retained: probe import1 suite failed/2 tests passed; invalid
+enabled tsx cohort emitted0 events and was excluded, corrected shared import
+verifies1/page; typecheck6/8 successful with3 new test TS2345 errors corrected;
+mobile1654 pass/3 failed due new assertions including unrelated setup events,
+corrected boundary assertions1657 PASS and final router-throw extension1658 PASS.
+No observed product flake. Final matched frozen/current API and off/on probes
+include complete DTO hashes, fixed events and injected clock-call counts.
+
+The first final-document helper had a closing-delimiter syntax error before
+writing; corrected helper syntax check and assembly PASS. Failure retained in
+closure-attempts.log; no application or gate change.
+
+Commits made (owner author galaxymaxp <omgraythekid@gmail.com>):
+
+- `803748e8 docs(perf): freeze PBR-MB1 local measurement acceptance`
+- `49c18aa1 docs(perf): checkpoint current-source synthetic baseline`
+- `4c4c9e9b docs(perf): checkpoint measurement safety and verification attempts`
+- `b788663e feat(perf): add opt-in privacy-safe local measurements`
+
+The final scoped documentation checkpoint follows this footer; its exact hash
+is recorded in Git and tmp/overnight/PBR-MB1.status, without amending history.
+
+Next eligible task: PBR-LP1 only after fresh supervisor review/publication of
+actual MB1 PASS. Begin with MB1 and AF1 ef80dfc6; require attributable evidence
+for further optimization or document no justified local change. AS1 after LP1
+PASS/review, LR1 after AS1 PASS/review. No successor or unrelated scope executed;
+historical OX2 remains blocked by OX1. No controller/queue/status bypass.
+
+**Owner steps remaining**: Rollout and Device checks **NOT RUN**, skipped
+entirely. RT1/EV1 STOPPED and RT2 physical preflight STOPPED / resume-text
+INCONCLUSIVE remain intact; active OTA/full runtime/channel/embedded identity,
+safe public/empty isolation, physical rendering/startup/frames/RAM, authenticated
+acceptance, deployments/DB/applied migrations/regions/Scheduler/provider state
+and production percentiles are **UNVERIFIED (owner to confirm)**. Source
+2.2.0/code6/runtime2.2.0-sdk57 and JS export are distinct from the archived
+installed2.3.0/code7/binary configured2.3.0-sdk57/preview; no new device read.
+Before separately authorized physical measurements, satisfy the RT2 runbook
+identity/isolation/observer preflight; measure20 cold/20 warm launches and
+navigation/frame cohorts on the pinned identity. No release/beta readiness.
+Any production/service/worker/Scheduler/push/deploy/SQL/migration/OTA/EAS/native
+build/install/tester distribution or spending remains owner work; no environment
+file was touched. Vercel CLI unavailable; strongly recommend npm i -g vercel
+for separately authorized future env/deploy/log tooling; installation NOT RUN.
