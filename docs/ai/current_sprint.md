@@ -1,3 +1,58 @@
+## PBR-UX1b finite corrective scope (2026-10-23)
+
+Active scope: measure and narrowly repair the evidenced tap-wave gate, complete
+the preserved UX1 audit and all missing local gates/docs/scoped commits. Start
+`ee3bfb8d`; LR1 and its six local prerequisite statuses remain required PASS.
+Acceptance B0/B1/B2/B3/BG/BC is frozen in
+[the audit](acceptance/pbr-ux1-queue-actions-audit.md) before source edits.
+Original FAILED status/logs and five inherited documentation edits are retained.
+No UX2 implementation or controller/queue/manifest modification. Local guarded
+synthetic evidence only; rollout/device/live state remain owner work. End after
+corrective PASS, or record FAILED/STOPPED under the unattended rules.
+
+<!-- PBR-UX1 failed checkpoint begin -->
+## PBR-UX1 current local checkpoint: FAILED
+
+2026-10-23: Finite owner-authorized Queue/course-actions audit resumed after
+interruption at acceptance freeze `ee3bfb8d`; LR1 and all six local prerequisites
+remain PASS. [Audit, bounded proposal, exact attempts and limits](acceptance/pbr-ux1-queue-actions-audit.md).
+Runtime/source/tests/dependencies/data are unchanged. Existing unrelated owner
+files, roadmap holds and historical evidence remain intact.
+
+The source-extracted synthetic comparison covers 96 scenarios at widths
+320/360/390/414/768/1280 and normal/doubled text, plus loading/error/offline/empty.
+Mobile Queue Completed-header overflow is reproduced at doubled text, with no
+default-text reproduction. Historical failed rows establish retained history,
+not a current generation defect. Action/navigation source checks 57/57 PASS;
+custody/evidence checks 2,321/2,321 PASS, including 36 contrast pairs. Native
+accessibility/physical/production behavior is UNVERIFIED (owner to confirm).
+
+**Hard stop: full web suite remains red.** Three completed runs each finish
+577 passed / 1 failed (75 files passed / 1 failed). The existing generation
+tap-wave assertion at generation-screen.browser.test.ts:252 expects 5 impulses,
+receives 4/3/4. Isolated unchanged test passes 1 with 12 filtered skips; that
+does not satisfy the full gate. Cause unresolved; no test/runtime workaround.
+FRESH mobile full 1,661/174 files, focused mobile 81 / web 74 PASS; forced root
+typecheck/lint 8/8 each, 0 cached, six existing warnings. These task runs preceded
+interruption. API/Android JS-assets/web/root builds and queued shared/API suites
+NOT RUN after the gate stop. No cached predecessor result is claimed as fresh.
+
+PBR-UX1 FAILED holds every dependent successor. Product scope has a bounded
+proposal and no unresolved owner decision, but implementation/approval cannot
+proceed from this failed verification checkpoint. Next work: separately resolve
+the full-web blocker, then resume missing gates and scoped documentation commit.
+Only the freeze is committed; final audit/planning/handoff edits remain
+uncommitted under the failed-gate rule. No further runtime/roadmap task started.
+
+**Owner steps remaining:** Rollout/Device checks NOT RUN, skipped entirely.
+Production revisions/database/migrations/Scheduler/providers, authenticated
+browser, native assistive technology/fontScale/focus and physical results
+UNVERIFIED. RT1/EV1 STOPPED; RT2 physical STOPPED / resume-text INCONCLUSIVE and
+deferred. OX2 remains blocked by OX1; unrelated Owner Pause retained. No push,
+service call, deploy, SQL/migration, env-file change, real retry/clear, native
+build/install/OTA/EAS/device/email/Scheduler/spending action or release claim.
+<!-- PBR-UX1 failed checkpoint end -->
+
 <!-- PBR-LR1 completion begin -->
 ## PBR-LR1 current local checkpoint: PASS
 
