@@ -157,7 +157,7 @@ gate/recovery work continued beyond the required safe documentation checkpoint.
 | `npm run build --workspace @stay-focused/mobile -- --platform android` | **NOT RUN** at stop; inspected offline export only |
 | Relevant shared/API/mobile focused tests | **NOT APPLICABLE** to archive/docs-only changes; 0 tests executed; no historical suite reused as fresh proof |
 | `git diff --check`; `git diff --cached --check` | **FRESH PASS**, exit 0 for safe documentation checkpoint, including exact staged content |
-| Documentation integrity, links/provenance/hash transcription and historical preservation | **FRESH PASS** for recorded facts and explicit limits; original bodies preserved, five owned Markdown paths only |
+| `node tmp/overnight/PBR-EV1/check-docs.cjs` (initial preservation pass used `--preserve`) | **FRESH final PASS**, 36 checks / 0 failed; documentation links, saved-manifest hash transcription, scope, preserved historical bodies/Next declarations and added-text secret patterns; initial pre-footer pass 35/35 |
 | Provenance corroboration of recovery narrative | **BLOCKED** by opposite pixel ordering; STOPPED, no success/recovery claim |
 | PBR-RT1 stop / four holds / feature preservation / scope / no unsupported claim or secret leakage | **FRESH PASS** by scoped diff and preserved baseline comparison; no runtime change or native-cause claim |
 | Rollout; Device checks | **NOT RUN**, skipped entirely |

@@ -10174,3 +10174,91 @@ Commits:
   device reader traces before material choices. No native closure or release GO.
 - Vercel CLI unavailable: strongly recommend npm i -g vercel for future
   separately authorized env/deploy/log tooling. Install/commands NOT RUN.
+
+## PBR-EV1 - FS7 archive evidence contradiction (2026-10-23)
+
+**STOPPED during STEP 1**, under the prompt's surprise/contradiction stop rule.
+Owner panel option 1 authorized only recovery of existing FS7 evidence; no
+source/native fix, new device diagnostic or release. Initial branch
+overnight/2026-10-15_feedback / HEAD 821b2416, local upstream 11 ahead / 23
+behind, no fetch. Original untracked UI/, apps/mobile/.gitignore,
+supabase/.temp/ and ignored evidence preserved/excluded.
+
+[Recovery checkpoint, exact file/hash provenance and recorded owner question](acceptance/pbr-ev1-fs7-evidence-recovery.md).
+The actual sibling release clone exists at
+`C:/Users/Fely Max Dilinila/Documents/Projects/stay-focused-v2-fullsend-20261022-1512`;
+its `.local/fullsend-20261022-1512/` contains the PNG/XML pair and metadata.
+Read-only Git c9cb867d/babcb0b and runner FS7 log/results corroborate historical
+identity 2.3.0/code7/runtime 2.3.0-sdk57/update 01a162a3. Source 2.2.0/code6
+and later update 01a16304 remain separate. Original reports are unmodified.
+
+Recovered command order: Light Today/standalone Generation, Dark Appearance
+selection -> Today/Generation, three Today -> Generation cycles, Home ->
+launcher resume. No explicit Home-to-launch dwell; no synchronized native
+lifecycle/Text/surface trace. Capture mtimes are 16:10:41.966 and 16:11:36.817
++08:00 on October 22: 54.851 s spacing, consistent with logged 54.9, not a
+measured failure/recovery duration. Public Generation pair inspected only.
+
+**Contradiction:** currently recovered `after-resume.png` SHA256
+`486145d3c9d7bb1772a224e3cd682e3686014ed966da1023c5437cf168f5d8b9`
+shows status/helper/View Queue/Generation details and back arrow;
+`stable-after-resume.png` SHA256
+`8b3698a5dcbe96150e14026a1b752acebc88f7fe029d520be63ae129d67fe0df`
+lacks them, while orb/backgrounds/system status remain. Historical report/log
+says first missing, later recovered. Both full XML dumps are byte-identical
+and retain four TextView strings; separate dump/capture cannot prove physical
+pixels. No filename swap, narrative rewrite or native-cause inference. Hashes
+computed now do not authenticate original chronology/no-overwrite history.
+No raw log, XML, screenshot, academic content or secret committed.
+
+Commits:
+
+- `31137b67 docs(perf): record PBR-EV1 archive evidence contradiction`
+- `docs(perf): checkpoint PBR-EV1 stopped handoff` (this footer; exact hash in
+  Git and ignored `tmp/overnight/PBR-EV1.status` after commit).
+
+FRESH `npm run typecheck -- --force`: **8/8 tasks, 0 cached, exit 0**, runner
+59.128 s, source 821b2416. `npm run lint -- --force` began but was interrupted
+at the contradiction: no final counts/normal lint exit, **BLOCKED/INTERRUPTED**;
+owned runner PID 43272 and child tree terminated, session exit 1 retained.
+API build and Android offline JS/assets export **NOT RUN** at stop; focused
+shared/API/mobile tests **NOT APPLICABLE** (docs only, zero tests executed).
+No historical tests reused as fresh evidence. Inspected runner used local temp,
+loopback-only Node guard, npm/Expo offline/no-dotenv, disabled telemetry and
+local Turbo cache. No installs or live commands. Safe documentation validation
+**FRESH 36/36, 0 failed**; exact staged/unstaged diff checks exit 0. Historical
+planning/handoff bytes and Next declarations preserved; five Markdown paths
+only across both local commits. Provenance corroboration of the recovery
+narrative is **BLOCKED**, not a green native acceptance gate.
+
+First inspection issues retained in report: PowerShell upstream literal and
+inline Node quoting, absent guessed app.config.ts, UI-automator footer rejected
+by direct XML casting, overbroad output narrowed. File-based bounded extraction
+corrected inspection without evidence/source changes. No observed flake or
+completed failed implementation gate. STEP 0 done; STEP 1 partial/STOPPED;
+STEP 2 safe findings only; STEP 3 safe docs/boundary validation only.
+
+**Owner steps remaining**
+
+- Exact question, recorded only: can you reconcile original FS7 first-failure
+  versus follow-up filename/timestamp/checksum mapping with the opposite text
+  ordering above? Supply any already-saved original screenshots/recording if
+  different and confirm whether the physical display also lost those labels;
+  include existing dwell/system-theme/native notes if available. The route
+  loop is recovered. No new capture/install/reset/OTA switch is authorized;
+  no unattended question was sent.
+- **UNVERIFIED (owner to confirm):** original pixel identity/untampered
+  chronology, physical-screen versus capture, actual recovery interval/cause,
+  native lifecycle/font/GL/compositor attribution, current active binary/OTA,
+  all live production/database/Scheduler/provider state. PBR-RT1 stays
+  **STOPPED**; PBR-MB1/PBR-LP1/PBR-AS1/PBR-LR1 stay **HELD**, unqueued/unstarted.
+  **Beta readiness BLOCKED**; no automatic retry or successor. Historical FS7
+  5 PASS / 1 FAIL/PARTIAL is preserved as a conflicting historical result.
+- **Rollout and Device checks NOT RUN**, skipped entirely. No FULLSEND,
+  service call, deploy/worker/OTA/EAS, native build/install, remote SQL or
+  migration application, Scheduler/email, environment-file edit, push or cost.
+  Owner must review archive discrepancy before separately authorizing any
+  native diagnostic or release. No fix ready for publication. OX2's original
+  block, pending performance/visual work, parity and Owner Pause preserved.
+- Vercel CLI unavailable: strongly recommend `npm i -g vercel` for future
+  separately authorized env/deploy/log tooling. Install/commands NOT RUN here.
