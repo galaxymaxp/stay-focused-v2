@@ -1,4 +1,5 @@
 import { router, usePathname, useRootNavigationState } from "expo-router";
+import { localMeasurements } from '@stay-focused/shared';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 
@@ -121,7 +122,11 @@ export function AppLifecycle() {
     if(!pendingNotification || pendingNotification.owner!==ownerUserId || isRestoring || !navigation?.key ||
       pathname==='/' || pathname==='/sign-in' || pathname==='/sign-up' || pathname.startsWith('/auth'))return;
     setPendingNotification(null);
-    router.push({pathname:pendingNotification.destination.pathname,params:pendingNotification.destination.params});
+    const finish = localMeasurements.start('navigation.notification_dispatch');
+    try {
+      router.push({pathname:pendingNotification.destination.pathname,params:pendingNotification.destination.params});
+      finish('success');
+    } catch (error) { finish('error'); throw error; }
   },[ownerUserId,isRestoring,navigation?.key,pathname,pendingNotification]);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { readSavedSnapshot, savedSnapshot, type SavedSnapshot } from "@stay-focused/shared";
+import { localMeasurements, readSavedSnapshot, savedSnapshot, type SavedSnapshot } from "@stay-focused/shared";
 import type { LocalSqlExecutor } from "./sqlDatabase";
 
 export interface ScreenSnapshotStore {
@@ -20,11 +20,17 @@ export function createScreenSnapshotStore(db: LocalSqlExecutor): ScreenSnapshotS
       });
     },
     async readScreenSnapshot<T>(ownerUserId: string, key: string) {
-      if (!ownerUserId) return null;
-      const row = await db.getFirstAsync<{ snapshot_json: string }>(
-        "SELECT snapshot_json FROM screen_snapshots WHERE owner_user_id = ? AND cache_key = ?", [ownerUserId, key]);
-      try { return readSavedSnapshot<T>(row ? JSON.parse(row.snapshot_json) as unknown : null, ownerUserId, key); }
-      catch { return null; }
+      const finish = localMeasurements.start('library.snapshot_read');
+      try {
+        if (!ownerUserId) { finish('empty'); return null; }
+        const row = await db.getFirstAsync<{ snapshot_json: string }>(
+          "SELECT snapshot_json FROM screen_snapshots WHERE owner_user_id = ? AND cache_key = ?", [ownerUserId, key]);
+        let snapshot: SavedSnapshot<T> | null;
+        try { snapshot = readSavedSnapshot<T>(row ? JSON.parse(row.snapshot_json) as unknown : null, ownerUserId, key); }
+        catch { snapshot = null; }
+        finish(snapshot ? 'success' : 'empty');
+        return snapshot;
+      } catch (error) { finish('error'); throw error; }
     },
     async saveScreenSnapshot<T>(ownerUserId: string, key: string, data: T) {
       const snapshot = savedSnapshot(ownerUserId, key, data);

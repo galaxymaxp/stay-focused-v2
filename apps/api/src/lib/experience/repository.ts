@@ -1,4 +1,5 @@
 import type { Database } from '@stay-focused/db';
+import { localMeasurements } from '@stay-focused/shared';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ExperienceFailure } from './errors';
 import type { LibraryArtifactSummary, LibraryArtifactType } from '@stay-focused/shared';
@@ -96,28 +97,33 @@ export function experienceRepository(client: SupabaseClient<Database>): Experien
       }
     },
     async libraryPage(userId, filters) {
-      const offset = filters.offset ?? 0, limit = filters.limit ?? 50;
-      if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new ExperienceFailure(400, 'invalid_request');
-      const [visible, hidden] = await Promise.all([
-        scopedLibrary(userId, filters).eq('superseded', false).order('updated_at', { ascending: false }).order('id').range(offset, offset + limit),
-        (async () => {
-          const ids: string[] = [];
-          for (let start = 0; start < 10_000; start += 200) {
-            let query = client.from('experience_library_v1').select('id,user_id').eq('user_id', userId).eq('superseded', true);
-            if (filters.type) query = query.eq('artifact_type', filters.type);
-            if (filters.courseId) query = query.eq('course_id', filters.courseId);
-            const result = await query.order('updated_at', { ascending: false }).order('id').range(start, start + 199);
-            if (result.error || !result.data) fail(result.error);
-            ids.push(...result.data.filter(row => row.user_id === userId).map(row => row.id));
-            if (result.data.length < 200) return ids;
-          }
-          return fail(null);
-        })(),
-      ]);
-      if (visible.error || !visible.data) fail(visible.error);
-      const rows = visible.data.filter(row => row.user_id === userId);
-      const items = await withManualMaterialDescriptions(client, userId, rows.slice(0, limit).map(row => row.summary as unknown as LibraryArtifactSummary));
-      return { items, nextOffset: rows.length > limit ? offset + limit : null, supersededReviewerIds: hidden };
+      const finish = localMeasurements.start('api.library_page');
+      try {
+        const offset = filters.offset ?? 0, limit = filters.limit ?? 50;
+        if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) throw new ExperienceFailure(400, 'invalid_request');
+        const [visible, hidden] = await Promise.all([
+          scopedLibrary(userId, filters).eq('superseded', false).order('updated_at', { ascending: false }).order('id').range(offset, offset + limit),
+          (async () => {
+            const ids: string[] = [];
+            for (let start = 0; start < 10_000; start += 200) {
+              let query = client.from('experience_library_v1').select('id,user_id').eq('user_id', userId).eq('superseded', true);
+              if (filters.type) query = query.eq('artifact_type', filters.type);
+              if (filters.courseId) query = query.eq('course_id', filters.courseId);
+              const result = await query.order('updated_at', { ascending: false }).order('id').range(start, start + 199);
+              if (result.error || !result.data) fail(result.error);
+              ids.push(...result.data.filter(row => row.user_id === userId).map(row => row.id));
+              if (result.data.length < 200) return ids;
+            }
+            return fail(null);
+          })(),
+        ]);
+        if (visible.error || !visible.data) fail(visible.error);
+        const rows = visible.data.filter(row => row.user_id === userId);
+        const items = await withManualMaterialDescriptions(client, userId, rows.slice(0, limit).map(row => row.summary as unknown as LibraryArtifactSummary));
+        const page = { items, nextOffset: rows.length > limit ? offset + limit : null, supersededReviewerIds: hidden };
+        finish('success', items.length);
+        return page;
+      } catch (error) { finish('error'); throw error; }
     },
     async librarySummary(userId, id) {
       const result = await client.from('experience_library_v1').select('summary,user_id').eq('user_id', userId).eq('id', id).maybeSingle();

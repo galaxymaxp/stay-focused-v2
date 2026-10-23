@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppLifecycle } from './AppLifecycle';
+import { localMeasurements, type LocalMeasurement } from '@stay-focused/shared';
 
 const fake = vi.hoisted(() => ({ setActive: vi.fn(), active: true, owner: 'owner', catchUp: vi.fn(), stop: vi.fn(), listener: vi.fn(), push:vi.fn(), notify:vi.fn(), restoring:false, rootReady:true, pathname:'/today', offline:false, updateCheck:vi.fn(), updateSuspend:vi.fn(), updateOnline:vi.fn(), unsupported:false }));
 vi.mock('../services/useAppUpdate', () => ({ appUpdateStore: { check: fake.updateCheck, suspend: fake.updateSuspend, refreshOnline: fake.updateOnline }, useAppUpdate: () => ({ unsupported: fake.unsupported }) }));
@@ -17,13 +18,18 @@ vi.mock('../services/completionNotifications', () => ({ subscribeToProcessingNot
 vi.mock('../services/processingOutboxReconciliation', () => ({ reconcileReviewerProcessingOutbox: async () => undefined }));
 vi.mock('../services/generationRecovery', () => ({ resumeAutomaticGenerations: vi.fn() }));
 let rendered: ReactTestRenderer | undefined;
+let events: LocalMeasurement[];
+let removeObserver: () => void;
+const dispatchEvents = () => events.filter(event => event.name === 'navigation.notification_dispatch');
 beforeEach(() => {
+  events = []; let tick = 0;
+  removeObserver = localMeasurements.observe({ now: () => tick += 2, sink: event => { events.push(event); } });
   vi.clearAllMocks(); vi.useFakeTimers(); fake.active = true; fake.owner = 'owner';
   fake.offline=false; fake.unsupported=false;
   fake.listener.mockReturnValue({ remove() {} });fake.notify.mockReturnValue({remove:vi.fn()});fake.restoring=false;fake.rootReady=true;fake.pathname='/today';
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
-afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; vi.useRealTimers(); });
+afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; removeObserver(); vi.useRealTimers(); });
 async function render() { await act(async () => { rendered = create(createElement(AppLifecycle)); }); }
 describe('app-wide offline catch-up lifecycle', () => {
   it('suspends offline/background admission and resumes the same owner when the session reconnects', async () => {
@@ -83,9 +89,11 @@ describe('notification routing after restoration',()=>{
   it('holds a cold tap until the root navigator and entry redirect are ready',async()=>{
     fake.restoring=true;fake.rootReady=false;fake.pathname='/';await render();
     await act(async()=>fake.notify.mock.calls[0]![0]({screen:'processing',jobId:'job-1'}));expect(fake.push).not.toHaveBeenCalled();
+    expect(dispatchEvents()).toEqual([]);
     fake.restoring=false;fake.rootReady=true;await act(async()=>rendered!.update(createElement(AppLifecycle)));expect(fake.push).not.toHaveBeenCalled();
     fake.pathname='/today';await act(async()=>rendered!.update(createElement(AppLifecycle)));
     expect(fake.push).toHaveBeenCalledExactlyOnceWith({pathname:'/processing',params:{jobId:'job-1'}});
+    expect(dispatchEvents()).toEqual([{ name: 'navigation.notification_dispatch', outcome: 'success', durationMs: 2 }]);
     await act(async()=>rendered!.update(createElement(AppLifecycle)));expect(fake.push).toHaveBeenCalledOnce();
   });
   it('routes a warm test tap without a job and ignores unknown destinations',async()=>{
@@ -95,5 +103,23 @@ describe('notification routing after restoration',()=>{
   it('drops pending notifications when their owner signs out or changes',async()=>{
     fake.pathname='/';await render();await act(async()=>fake.notify.mock.calls[0]![0]({screen:'processing',jobId:'private-job'}));
     fake.owner='other';fake.pathname='/today';await act(async()=>rendered!.update(createElement(AppLifecycle)));expect(fake.push).not.toHaveBeenCalled();
+    expect(dispatchEvents()).toEqual([]);
+  });
+  it('dispatches exactly once when an optional sink rejects, without emitting route params', async () => {
+    removeObserver();
+    removeObserver = localMeasurements.observe({ now: () => 2, sink: async event => { events.push(event); throw new Error('private sink'); } });
+    await render();
+    await act(async () => fake.notify.mock.calls[0]![0]({ screen: 'processing', jobId: 'private-job' }));
+    expect(fake.push).toHaveBeenCalledExactlyOnceWith({ pathname: '/processing', params: { jobId: 'private-job' } });
+    expect(dispatchEvents()).toEqual([{ name: 'navigation.notification_dispatch', outcome: 'success', durationMs: 0 }]);
+    expect(JSON.stringify(events)).not.toMatch(/private-job|processing|owner|token|example/);
+  });
+  it('preserves a thrown router failure and records only a fixed error outcome', async () => {
+    const failure = new Error('private route failure');
+    fake.push.mockImplementationOnce(() => { throw failure; });
+    await render();
+    await expect(act(async () => fake.notify.mock.calls[0]![0]({ screen: 'processing', jobId: 'private-job' }))).rejects.toBe(failure);
+    expect(dispatchEvents()).toEqual([{ name: 'navigation.notification_dispatch', outcome: 'error', durationMs: 2 }]);
+    expect(JSON.stringify(events)).not.toMatch(/private-job|private route|processing|owner|token/);
   });
 });

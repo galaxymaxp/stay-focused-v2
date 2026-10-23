@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { localMeasurements, type LocalMeasurement } from '@stay-focused/shared';
 
 import { createLocalArtifactStore, type LocalArtifactStore } from "../../services/localLibrary/artifactStore";
 import {
@@ -48,6 +49,8 @@ class RemoteError extends Error {
 const categories = { reviewer: { status: "available" }, quiz: { status: "available" }, activity_output: { status: "available" } };
 
 let rendered: ReactTestRenderer | undefined;
+let measurementEvents: LocalMeasurement[];
+let removeMeasurementObserver: () => void;
 let library: ReturnType<typeof useLocalLibrary>;
 let artifact: ReturnType<typeof useLocalArtifact>;
 function LibraryProbe() {
@@ -75,6 +78,9 @@ function deferred<T>() {
 }
 
 beforeEach(async () => {
+  measurementEvents = [];
+  let tick = 0;
+  removeMeasurementObserver = localMeasurements.observe({ now: () => tick++, sink: event => { measurementEvents.push(event); } });
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const { db } = openNodeSqlite();
   await migrateLocalLibrary(db);
@@ -89,9 +95,38 @@ afterEach(async () => {
   rendered = undefined;
   await stopOfflineCatchUp(OWNER_A);
   await stopOfflineCatchUp(OWNER_B);
+  removeMeasurementObserver();
+  expect(measurementEvents.every(event => Object.keys(event).every(key => ['name', 'outcome', 'durationMs', 'count'].includes(key)))).toBe(true);
+  expect(JSON.stringify(measurementEvents)).not.toMatch(/11111111|22222222|api\.example|token|synthetic-|Cells/);
 });
 
 describe("useLocalLibrary", () => {
+  it('finishes a held read as cancelled after unmount without publishing counts or starting queued work', async () => {
+    mocks.request.mockRejectedValue(new RemoteError('connection'));
+    await act(async () => { rendered = create(createElement(LibraryProbe)); }); await flush();
+    const gate = deferred<void>();
+    const original = mocks.store!.readLibraryOverview.bind(mocks.store!);
+    const read = vi.spyOn(mocks.store!, 'readLibraryOverview').mockImplementation(async owner => { await gate.promise; return original(owner); });
+    await act(async () => notifyOfflineImages(OWNER_A));
+    await act(async () => notifyOfflineImages(OWNER_A));
+    const saved = library;
+    await act(async () => rendered!.unmount()); rendered = undefined;
+    measurementEvents.length = 0;
+    await act(async () => gate.resolve()); await flush();
+    expect(read).toHaveBeenCalledTimes(1); expect(library).toBe(saved);
+    expect(measurementEvents).toEqual([{ name: 'library.overview_read', outcome: 'cancelled', durationMs: expect.any(Number) }]);
+  });
+
+  it('keeps full saved-first results and errors when the optional sink throws', async () => {
+    removeMeasurementObserver();
+    removeMeasurementObserver = localMeasurements.observe({ now: () => 10, sink: () => { throw new Error('private observer'); } });
+    await mocks.store!.upsertSummaries(OWNER_A, [draftDetail({ id: 'synthetic-saved' }).artifact]);
+    mocks.request.mockRejectedValue(new RemoteError('connection'));
+    await act(async () => { rendered = create(createElement(LibraryProbe)); }); await flush();
+    expect(library.items).toEqual(await mocks.store!.listSummaries(OWNER_A));
+    expect(library.errorCode).toBe('connection'); expect(library.refreshing).toBe(false);
+  });
+
   it.each([0, 100, 240, 300])('coalesces overlapping progress reads and keeps the latest %i synthetic summaries', async (count) => {
     // Public synthetic workload, with a held device read to model a busy SQLite queue.
     const summaries = Array.from({ length: count }, (_, index) => draftDetail({ id: `activity:synthetic-${index}` }).artifact);
@@ -152,6 +187,7 @@ describe("useLocalLibrary", () => {
     await flush();
     expect(overview.mock.calls.filter(([owner]) => owner === OWNER_A)).toHaveLength(1);
     expect(library.items.map(item => item.id)).toEqual(['activity:synthetic-b']);
+    expect(measurementEvents).toContainEqual({ name: 'library.overview_read', outcome: 'cancelled', durationMs: expect.any(Number) });
   });
 
   it('accepts a new invalidation after a failed local read without clearing saved content', async () => {
@@ -162,6 +198,7 @@ describe("useLocalLibrary", () => {
     const overview = vi.spyOn(mocks.store!, 'readLibraryOverview').mockRejectedValueOnce(new Error('synthetic_busy'));
     await act(async () => notifyOfflineImages(OWNER_A));
     await flush();
+    expect(measurementEvents.some(event => event.name === 'library.overview_read' && event.outcome === 'error')).toBe(true);
     expect(library.items.map(item => item.id)).toEqual(['activity:synthetic-saved']);
     await act(async () => { await mocks.store!.upsertSummaries(OWNER_A, [draftDetail({ id: 'synthetic-new' }).artifact]); });
     await flush();

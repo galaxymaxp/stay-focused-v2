@@ -1,4 +1,4 @@
-import { mergeSavedData } from "@stay-focused/shared";
+import { localMeasurements, mergeSavedData } from "@stay-focused/shared";
 import { readScreenSnapshot, writeScreenSnapshot, screenSnapshotEpoch } from "../../services/screenSnapshots";
 import type {
   LibraryArtifactDetail,
@@ -95,10 +95,13 @@ export function useLocalLibrary() {
           try {
             while (live && localDirty) {
               localDirty = false;
+              const finish = localMeasurements.start('library.overview_read');
               try {
                 const { items, offlineStats } = await store.readLibraryOverview(ownerUserId);
+                finish(live ? 'success' : 'cancelled', live ? items.length : undefined);
                 if (live) setState((old) => ({ ...old, owner: ownerUserId, items: mergeSavedData(old.items, items.filter(item => !old.supersededReviewerIds.includes(item.id))), localReady: true, offlineStats, refreshing: offlineCatchUpRunning(ownerUserId) && offlineCatchUpError(ownerUserId) !== 'connection', errorCode: offlineCatchUpError(ownerUserId) }));
               } catch (error) {
+                finish(live ? 'error' : 'cancelled');
                 if (!localDirty) throw error;
               }
             }

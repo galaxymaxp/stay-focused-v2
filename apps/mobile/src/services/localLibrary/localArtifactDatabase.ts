@@ -1,3 +1,4 @@
+import { localMeasurements } from '@stay-focused/shared';
 import { createLocalArtifactStore, type LocalArtifactStore } from "./artifactStore";
 import { migrateLocalLibrary } from "./schema";
 
@@ -11,6 +12,7 @@ let opening: Promise<LocalArtifactStore | null> | null = null;
  */
 export function getLocalArtifactStore(): Promise<LocalArtifactStore | null> {
   opening ??= (async () => {
+    const finish = localMeasurements.start('library.setup');
     try {
       // Loaded lazily: an older binary without the native module (for example
       // one reached by an over-the-air update) falls back to cloud reads
@@ -19,8 +21,11 @@ export function getLocalArtifactStore(): Promise<LocalArtifactStore | null> {
       const db = await openDatabaseAsync(DATABASE_NAME);
       await db.execAsync("PRAGMA journal_mode = WAL;");
       await migrateLocalLibrary(db);
-      return createLocalArtifactStore(db);
+      const store = createLocalArtifactStore(db);
+      finish('success');
+      return store;
     } catch {
+      finish('error');
       opening = null;
       return null;
     }
