@@ -1,3 +1,12 @@
+## UX3 finite authorized scope (2026-10-24)
+
+Active: complete pictured Library/Generate navigation feedback after genuine
+PBR-UX2 local PASS. Frozen acceptance: [UX3](acceptance/ux3-card-hover.md).
+Preserve existing course arrow removal, routes/actions, Library sizing, all
+historical holds and unrelated files. Complete own-source entry treatment and
+smooth bounded feedback; local synthetic gates/docs/commits only. Endpoint UX3;
+TC2/TP1 saved successors. Rollout/device checks skipped and UNVERIFIED.
+
 <!-- WEB-A1 stopped checkpoint begin -->
 ## WEB-A1 source preflight: STOPPED (2026-10-24)
 
