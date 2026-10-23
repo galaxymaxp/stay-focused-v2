@@ -26,6 +26,7 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { useAuth } from "../auth";
 import { haptic } from "./haptics";
+import { NavigationFeedbackContext } from "./navigationFeedback";
 import { QueueButton } from "./QueueButton";
 import { Avatar } from './Avatar';
 import { useProfileAvatar } from './ProfileAvatarProvider';
@@ -422,6 +423,7 @@ export function RowLink({
   onLongPress,
   selected,
   testID,
+  navigationFeedback = false,
 }: {
   children: ReactNode;
   label: string;
@@ -436,9 +438,13 @@ export function RowLink({
   onLongPress?: () => void;
   selected?: boolean;
   testID?: string;
+  /** Opt in only inside a CourseFeedback surface. */
+  navigationFeedback?: boolean;
 }) {
   const { colors } = useTheme();
   const press = usePressMotion(disabled);
+  const feedback = useContext(NavigationFeedbackContext);
+  const navigation = navigationFeedback ? feedback : null;
   return (
     <Animated.View style={{ transform: [{ scale: press.scale }] }}>
     <Pressable
@@ -455,8 +461,11 @@ export function RowLink({
       delayLongPress={onLongPress ? 380 : undefined}
       disabled={disabled}
       accessibilityState={{ disabled, selected }}
-      onPressIn={press.onPressIn}
-      onPressOut={press.onPressOut}
+      {...(navigation ? {
+        onPressIn: navigation.onPressIn, onPressOut: navigation.onPressOut,
+        onHoverIn: navigation.onHoverIn, onHoverOut: navigation.onHoverOut,
+        onFocus: navigation.onFocus, onBlur: navigation.onBlur,
+      } : { onPressIn: press.onPressIn, onPressOut: press.onPressOut })}
       style={({ pressed }) => ({
         minHeight: hitTarget.min,
         flexDirection: "row",
@@ -465,11 +474,15 @@ export function RowLink({
         margin: inset ? -density.cardPadding : 0,
         padding: inset ? density.cardPadding : 0,
         opacity: pressed ? 0.7 : 1,
+        ...(navigation ? { borderRadius: radius.card, borderWidth: 1,
+          borderColor: navigation.active ? colors.accent : colors.separator,
+          backgroundColor: navigation.active ? colors.surfaceSecondary : colors.surfacePrimary,
+          padding: spacing[3] } : {}),
       })}
     >
       {icon}
       <View style={{ flex: 1, minWidth: 0, gap: 2 }}>{children}</View>
-      {trailing ?? <ChevronRight size={16} color={colors.textMuted} />}
+      {trailing ?? (navigationFeedback ? null : <ChevronRight size={16} color={colors.textMuted} />)}
     </Pressable>
     </Animated.View>
   );

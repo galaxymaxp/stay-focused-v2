@@ -32,6 +32,7 @@ import {
   generateCourseStatus,
 } from "../app-model/presentation";
 import { CourseOptions } from "../components/course-options";
+import { CourseNavigation } from "../components/course-navigation";
 import { CourseMark } from "../components/course";
 import { PageCrumb } from "../components/crumbs";
 import { useAuth } from "../components/providers";
@@ -160,14 +161,14 @@ export function GenerateScreen() {
       c.reviewerCount ? `${c.reviewerCount} ${c.reviewerCount === 1 ? "Reviewer" : "Reviewers"}` : null,
     ].filter(Boolean);
     return (
-      <div key={c.id} className="generate-course-tile"><Link href={generateCourseDestination(c) === 'sync' ? '/canvas' : `/generate/${c.id}`} onClick={event => { if (generateCourseDestination(c) === 'sync') { event.preventDefault(); void syncCourse(c.id); } }} className="course-card course-navigation" title={c.name}>
+      <div key={c.id} className="generate-course-tile"><CourseNavigation href={generateCourseDestination(c) === 'sync' ? '/canvas' : `/generate/${c.id}`} onClick={event => { if (generateCourseDestination(c) === 'sync') { event.preventDefault(); void syncCourse(c.id); } }} className="course-card" title={c.name}>
         <CourseMark course={c} identity={identity} size={44} />
         <span className="grow">
           <strong>{identity.title}</strong>
           <span className="meta">{[identity.subtitle, ...counts].filter(Boolean).join(" · ")}</span>
           <span className="meta course-sync-line">{generateCourseStatus(c)}</span>
         </span>
-      </Link>{options(c)}</div>
+      </CourseNavigation>{options(c)}</div>
     );
   };
   return (
@@ -205,7 +206,7 @@ export function GenerateScreen() {
           </section>
         ))}
         <div className="course-grid own-material-group">
-          <Link href="/generate/new" className="course-card own">
+          <div className="own-material-tile"><CourseNavigation href="/generate/new" className="course-card own">
             <span className="content-icon">
               <Icon name="file-text" />
             </span>
@@ -213,8 +214,7 @@ export function GenerateScreen() {
               <strong>Your own material</strong>
               <span className="meta">Paste notes, or upload a PDF or photo</span>
             </span>
-            <Icon name="chevron-right" />
-          </Link>
+          </CourseNavigation></div>
         </div>
         {unsynced.length > 0 && (
           <section className="stack course-group unsynced-group" aria-label="Not synced">

@@ -22,7 +22,7 @@ vi.mock('../lib/canvas-refresh', async importOriginal => ({
 }));
 vi.mock('../lib/canvas-refresh-core', () => ({ performCanvasRefresh: () => new Promise(() => undefined) }));
 import { GenerateScreen, selectGenerateSyncStatus } from './generate';
-import { State } from '../components/ui';
+import { Icon, State } from '../components/ui';
 import { SnapshotStatus } from '../components/snapshot-status';
 let tree: ReactTestRenderer;
 beforeEach(() => {
@@ -56,6 +56,17 @@ it('keeps local course sync feedback when the global refresh is idle', async () 
   mocks.phase = 'idle';
   await sync();
   expect(JSON.stringify(tree.toJSON())).toContain('Syncing from Canvas');
+});
+it('keeps the own-material destination and text without a forward arrow, retaining the sync disclosure', async () => {
+  await act(async () => { tree = create(createElement(GenerateScreen)); });
+  const own = tree.root.findAllByType('a').find(node => node.props.href === '/generate/new')!;
+  expect(own.props.className).toContain('course-navigation');
+  expect(own.findAllByType(Icon).map(icon => icon.props.name)).toEqual(['file-text']);
+  const toggle = tree.root.findByProps({ className: 'subtle unsynced-toggle' });
+  expect(toggle.findByType(Icon).props.name).toBe('chevron-down');
+  expect(toggle.props['aria-expanded']).toBe(false);
+  await act(async () => toggle.props.onClick());
+  expect(toggle.props['aria-expanded']).toBe(true);
 });
 
 const savedAt = '2026-10-18T00:00:00Z';

@@ -1,14 +1,15 @@
 import { ChevronRight, Pin } from "lucide-react-native";
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Pressable, View, type AccessibilityActionEvent, type AccessibilityActionInfo } from "react-native";
 
 import { courseAccent, type CourseIdentity } from "./courseIdentity";
 import { Copy } from "./primitives";
+import { NavigationFeedbackContext } from "./navigationFeedback";
 import { motion, useTheme } from "./theme";
 import { density, hitTarget, radius, spacing } from "./tokens";
 
 function usePressScale() {
-  const feedback = useContext(CourseFeedbackContext);
+  const feedback = useContext(NavigationFeedbackContext);
   const { reducedMotion } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
   useEffect(() => () => scale.stopAnimation(), [scale]);
@@ -20,29 +21,31 @@ function usePressScale() {
   return { scale, active, handlers };
 }
 
-const CourseFeedbackContext = createContext<{
-  active: boolean;
-  onPressIn: () => void; onPressOut: () => void; onFocus: () => void;
-  onBlur: () => void; onHoverIn: () => void; onHoverOut: () => void;
-} | null>(null);
-
 /** Outside SwipeRow's clip. Four reserved points bound even unusually tall cards. */
-export function CourseFeedback({ children, options, compact = false }: { children?: ReactNode; options: ReactNode; compact?: boolean }) {
+export function CourseFeedback({ children, options, compact = false }: { children?: ReactNode; options?: ReactNode; compact?: boolean }) {
   const { reducedMotion, colors } = useTheme();
   const [pressed, setPressed] = useState(false), [focused, setFocused] = useState(false), [hovered, setHovered] = useState(false);
   const [extent, setExtent] = useState(1);
   const active = pressed || focused || hovered;
+  const scale = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    scale.stopAnimation();
+    if (reducedMotion) scale.setValue(1);
+    else Animated.spring(scale, { toValue: active ? Math.min(1.01, 1 + 6 / extent) : 1,
+      ...motion.spring, overshootClamping: true, useNativeDriver: true }).start();
+    return () => scale.stopAnimation();
+  }, [active, extent, reducedMotion, scale]);
   return <View style={{ padding: compact ? 0 : 4 }}>
-    <View onLayout={event => setExtent(Math.max(1, event.nativeEvent.layout.width, event.nativeEvent.layout.height))}
+    <Animated.View onLayout={event => setExtent(Math.max(1, event.nativeEvent.layout.width, event.nativeEvent.layout.height))}
       style={{ borderRadius: radius.card, backgroundColor: active ? colors.surfaceSecondary : undefined,
-        transform: [{ scale: active && !reducedMotion ? Math.min(1.01, 1 + 6 / extent) : 1 }] }}>
-      <CourseFeedbackContext.Provider value={{ active, onPressIn: () => setPressed(true), onPressOut: () => setPressed(false),
+        transform: [{ scale }] }}>
+      <NavigationFeedbackContext.Provider value={{ active, onPressIn: () => setPressed(true), onPressOut: () => setPressed(false),
         onFocus: () => setFocused(true), onBlur: () => { setFocused(false); setPressed(false); setHovered(false); },
         onHoverIn: () => setHovered(true), onHoverOut: () => { setHovered(false); setPressed(false); } }}>
         {children}
-      </CourseFeedbackContext.Provider>
-    </View>
-    <View style={{ marginTop: 4 }}>{options}</View>
+      </NavigationFeedbackContext.Provider>
+    </Animated.View>
+    {options ? <View style={{ marginTop: 4 }}>{options}</View> : null}
   </View>;
 }
 

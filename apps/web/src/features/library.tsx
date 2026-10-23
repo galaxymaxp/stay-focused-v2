@@ -16,6 +16,7 @@ import type {
   ReviewerReaderModel,
 } from "@stay-focused/shared";
 import Link from "next/link";
+import { CourseNavigation } from "../components/course-navigation";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import { courseIdentity } from "../app-model/courseIdentity";
@@ -194,14 +195,14 @@ export function LibraryScreen() {
               const pinned = prefs.pinned.course.includes(group.key);
               return (
                 <div key={group.key} className="library-course">
-                  <Link href={`/library/course/${encodeURIComponent(group.key)}`} className="course-card course-navigation">
+                  <CourseNavigation href={`/library/course/${encodeURIComponent(group.key)}`} className="course-card">
                     <CourseMark course={group.course ?? { id: PERSONAL_LIBRARY_KEY, name: "Personal & other" }} identity={identity} size={44} />
                     <span className="grow">
                       <strong title={group.course?.name ?? identity.title}>{identity.title}</strong>
                       {identity.subtitle && <span className="meta">{identity.subtitle}</span>}
                       <span className="meta library-counts">{describeLibraryCounts(group.counts)}</span>
                     </span>
-                  </Link>
+                  </CourseNavigation>
                   {pinned ? <span className="course-pinned" aria-label="Pinned"><Icon name="pin" /></span> : null}
                   <CourseOptions key={`${ownerId}:${group.key}`} title={identity.title} pinned={pinned} onPin={() => pin("course", group.key, !pinned)} />
                 </div>

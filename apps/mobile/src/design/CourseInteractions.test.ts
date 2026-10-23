@@ -6,9 +6,13 @@ import { CourseCard, CourseFeedback } from "./CourseViews";
 import { courseIdentity } from "./courseIdentity";
 import type { SwipeAction } from "./SwipeRow";
 const state = vi.hoisted(() => ({ owner: "owner-a", path: "/courses", reducedMotion: false, focus: vi.fn() }));
+const animation = vi.hoisted(() => ({ spring: vi.fn() }));
 vi.mock("react-native", () => ({
   View: "View", Pressable: "Pressable", Platform: { OS: "web" },
-  Animated: { View: "AnimatedView", Value: class { stopAnimation() {} }, spring: () => ({ start() {} }) },
+  Animated: { View: "AnimatedView", Value: class { value = 1; stopAnimation() {} setValue(value: number) { this.value = value; } },
+    spring: (value: { value: number }, config: { toValue: number }) => {
+      animation.spring(config); return { start() { value.value = config.toValue; } };
+    } },
   AccessibilityInfo: { setAccessibilityFocus: vi.fn() }, findNodeHandle: () => 1,
 }));
 vi.mock("../auth", () => ({ useAuth: () => ({ session: { user: { id: state.owner } } }) }));
@@ -62,19 +66,28 @@ it("bounds feedback outside clipping, leaves options still, and resets without n
   }));
   await mount(element());
   const card = () => tree.root.findAllByType("Pressable" as never).find(node => node.props.onPress === navigate)!;
-  const wrapper = () => tree.root.findAllByType("View" as never).find(node => node.props.onLayout)!;
+  const wrapper = () => tree.root.findAllByType("AnimatedView" as never).find(node => node.props.onLayout)!;
+  const scale = () => wrapper().props.style.transform[0].scale.value;
   await act(async () => wrapper().props.onLayout({ nativeEvent: { layout: { width: 320, height: 2000 } } }));
   const baseline = wrapper().props.style;
   await act(async () => card().props.onFocus());
-  expect(wrapper().props.style.transform).toEqual([{ scale: 1.003 }]);
+  expect(scale()).toBe(1.003);
+  expect(animation.spring).toHaveBeenLastCalledWith(expect.objectContaining({ toValue: 1.003, overshootClamping: true, useNativeDriver: true }));
   expect(wrapper().props.style).toMatchObject({ borderRadius: baseline.borderRadius });
   expect(wrapper().findAllByType(CourseOptions)).toHaveLength(0);
   expect(tree.root.findAllByType("Chevron" as never)).toHaveLength(0);
-  await act(async () => card().props.onBlur()); expect(wrapper().props.style.transform).toEqual([{ scale: 1 }]);
+  await act(async () => card().props.onBlur()); expect(scale()).toBe(1);
   await act(async () => card().props.onPressIn()); await act(async () => card().props.onPressOut());
-  expect(wrapper().props.style.transform).toEqual([{ scale: 1 }]); expect(navigate).not.toHaveBeenCalled();
+  expect(scale()).toBe(1); expect(navigate).not.toHaveBeenCalled();
+  await act(async () => card().props.onHoverIn()); expect(scale()).toBe(1.003);
+  await act(async () => card().props.onPressIn());
+  await act(async () => card().props.onHoverOut()); expect(scale()).toBe(1);
+  expect(animation.spring).toHaveBeenLastCalledWith(expect.objectContaining({ toValue: 1 }));
+  await act(async () => card().props.onPressIn());
   state.reducedMotion = true; await act(async () => tree.update(element()));
-  await act(async () => card().props.onFocus()); expect(wrapper().props.style.transform).toEqual([{ scale: 1 }]);
+  const calls = animation.spring.mock.calls.length;
+  await act(async () => card().props.onFocus()); expect(scale()).toBe(1);
+  expect(animation.spring).toHaveBeenCalledTimes(calls);
   expect(card().props.style({ pressed: false })).toMatchObject({ borderColor: "accent", backgroundColor: "secondary" });
   await act(async () => card().props.onPress()); expect(navigate).toHaveBeenCalledOnce();
 });

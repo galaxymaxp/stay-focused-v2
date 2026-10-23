@@ -5494,13 +5494,19 @@ mark.find-active {
 .canvas-course .course-options-popover { left: auto; right: 0; }
 .canvas-courses .list-card { overflow: visible; }
 /* Audited course navigation feedback reserves a gutter and never animates menus. */
-.generate-course-tile, .library-course { padding: 6px; min-width: 0; }
-.course-navigation { transform-origin: center; }
-.course-navigation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-@media (hover: hover) and (pointer: fine) {
-  .course-navigation:hover { transform: scale(1.01); }
+.generate-course-tile, .library-course, .own-material-tile { padding: 6px; min-width: 0; }
+.course-navigation {
+  transform-origin: center;
+  transition: transform var(--motion-small) var(--ease-standard),
+    border-color var(--motion-small) var(--ease-standard),
+    box-shadow var(--motion-small) var(--ease-standard);
 }
-.course-navigation:focus-visible, .course-navigation:active { transform: scale(1.01); }
+.course-navigation:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.course-navigation[data-pressed="true"] { border-color: var(--secondary); background-color: var(--hover); }
+@media (hover: hover) and (pointer: fine) {
+  .course-navigation:hover { transform: scale(var(--course-navigation-scale, 1)); }
+}
+.course-navigation:focus-visible, .course-navigation:active, .course-navigation[data-pressed="true"] { transform: scale(var(--course-navigation-scale, 1)); }
 .library-course > .course-options { position: absolute; top: 8px; right: 8px; }
 .library-course > .course-card { padding-right: 64px; }
 .course-pinned { position: absolute; bottom: 14px; right: 16px; color: var(--muted); pointer-events: none; }
@@ -5511,7 +5517,8 @@ mark.find-active {
 .queue-popover-header h2, .queue-section-header h3 { flex: 1 1 100px; min-width: 0; overflow-wrap: anywhere; }
 .queue-popover-header > button, .queue-section-header > button { flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .course-navigation:hover, .course-navigation:focus-visible, .course-navigation:active { transform: none; }
+  .course-navigation { transition: none; }
+  .course-navigation:hover, .course-navigation:focus-visible, .course-navigation:active, .course-navigation[data-pressed="true"] { transform: none; }
 }
 .course-batch { padding: 12px; border-bottom: 1px solid var(--line); min-width: 0; }
 .course-batch-actions { gap: 8px; }

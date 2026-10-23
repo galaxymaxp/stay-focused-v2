@@ -146,10 +146,10 @@ export function GenerateScreen() {
     >
       <Copy muted size="caption" style={{ fontWeight: "600", letterSpacing: 0.4, textTransform: "uppercase" }}>Canvas</Copy>
       <SyncStatus />
-      <RowLink label="Other source" onPress={() => router.push("/generate")}>
+      <CourseFeedback><RowLink navigationFeedback label="Other source" onPress={() => router.push("/generate")}>
         <Copy>Other source</Copy>
         <Copy muted size="caption">Text, Camera or Local File</Copy>
-      </RowLink>
+      </RowLink></CourseFeedback>
       {courses.loading && !courses.data ? <GenerateSkeleton rows={3} /> : null}
       {courses.error && !courses.data ? (
         <Surface><Copy size="h3">{courses.errorCode?.endsWith("api_base_url") ? "App configuration error" : "Courses could not be loaded"}</Copy><Copy muted>{courses.errorCode?.endsWith("api_base_url") ? courses.error.split("\n").slice(1).join("\n") : courses.error}</Copy><Action secondary onPress={courses.refresh}>Try again</Action></Surface>
