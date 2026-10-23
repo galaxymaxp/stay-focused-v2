@@ -96,3 +96,49 @@ First probe attempt: 2 passed / 1 navigation import suite failed before executio
 because helper replacement mangled a relative import; corrected helper path and
 reran unchanged fixtures/assertions. Initial log retained. Exploratory reads of
 three nonexistent guessed test filenames failed; actual paths discovered.
+
+## STEP 2 instrumentation checkpoint
+
+Small shared `localMeasurements` utility: no default observer, clock, buffer,
+timer, console or transport. Explicit local observer installation injects a
+monotonic clock and optional sink; removal/replacement invalidates unfinished
+spans. Six fixed names cover entry decision, cold database setup, snapshot read,
+owner-bound hook overview read, notification router dispatch and API repository
+page. Outcomes are success/empty/error/cancelled, duration is finite nonnegative
+milliseconds, optional count is a nonnegative safe integer on success only.
+No arbitrary metadata argument exists. Runtime allowlists reject forged names
+and outcomes; event objects are frozen. Clock/sink throws and sink rejections
+are contained. Disabled spans invoke no clock/sink and retain no events.
+
+Only the measurement hook uses completion state to classify stale owner/unmount
+reads as cancelled without item counts; existing live/abort/epoch fences continue
+to own publication. Snapshot events carry no owner/key/count. API spans cover
+the existing full page including hidden history, retain all query predicates and
+safe failures, and do not invent an API cancellation contract. Entry spans time
+the synchronous route decision, not auth I/O or committed pixels; Strict Mode
+can repeat render attempts. Notification spans cover the synchronous push call,
+not transition completion. No listener, polling, admission, write or cache change.
+
+Fresh initial focused tests: shared5/1file, mobile85/6files, API3/1file, no
+failures/skips. Existing owner-switch/read-error tests now assert cancelled/error
+events and privacy; new unmount, failed sink, setup retry, snapshot rejection,
+entry decisions and exact trusted-owner history tests check real boundaries.
+Reviewed the React skill checklist: no hook dependency, state/reset, navigation,
+accessibility or rendering structure change; no new async waterfall.
+
+First forced typecheck: FAIL, 6 successful / 8 tasks, 0 cached; three TS2345
+errors in the new entry test's host-string findByType arguments. Changed only
+those assertions to use typed imported mocked components; no any/cast/validation
+weakening. Corrected forced typecheck: FRESH PASS8/8, 0 cached. Logs retained.
+Mandatory full suites/builds remain pending at this checkpoint.
+
+First enabled standalone API probe was invalid as instrumentation evidence:
+zero events despite enabled mode, because tsx dynamic-imported a separate
+CJS/ESM module instance. Original log and script retained. Static import through
+the same shared entry as the repository fixes the harness; assertion now requires
+exactly one event per page. Corrected disabled/enabled reruns PASS; the invalid
+cohort must not enter the final comparison. No product fix was needed.
+
+Inspected Supabase skill security guidance; its service/docs/query workflow is
+inapplicable to this expressly offline task. No SDK API/schema/auth/grant change,
+remote query or service request. Local adapter assertions verify the boundary.
