@@ -106,3 +106,107 @@ RT1/EV1 STOPPED and physical RT2 STOPPED / resume-text INCONCLUSIVE/deferred
 stay unchanged. OX2 stays blocked on OX1; unrelated work/Owner Pause and runner
 queue/controller are untouched. LR1 is next only after actual AS1 PASS and
 fresh approval; do not publish or implement it here.
+
+## STEP 2: justified no-change verdict
+
+**No safe byte-attributed source/config correction is justified in this scope.**
+There are zero runtime, dependency, asset, font, native, signing, OTA or release
+configuration changes. This is the explicitly allowed no-change branch, not a
+claim that the APK got smaller. No new permanent runtime regression is warranted
+without a changed behavior; existing export/fallback suites and an ignored
+artifact/reference audit verify the preserved boundaries.
+
+All 27 library names occur once per ABI, with no duplicate native payloads.
+Below, compressed equals uncompressed bytes in this actual archive. Complete
+per-ABI/per-entry sizes, methods and payload hashes are in apk-before.json and
+the byte-identical repeated apk-after.json; no native build has occurred.
+
+| Library (all four ABIs) | Compressed bytes | Uncompressed bytes |
+| --- | ---: | ---: |
+| libreactnative.so | 26,305,072 | 26,305,072 |
+| libhermesvm.so | 9,789,288 | 9,789,288 |
+| libexpo-sqlite.so | 6,961,772 | 6,961,772 |
+| libappmodules.so | 6,097,716 | 6,097,716 |
+| libreanimated.so | 5,433,028 | 5,433,028 |
+| libexpo-modules-core.so | 5,424,008 | 5,424,008 |
+| libc++_shared.so | 4,672,844 | 4,672,844 |
+| libreact_codegen_rnscreens.so | 4,524,668 | 4,524,668 |
+| libworklets.so | 3,855,888 | 3,855,888 |
+| libreact_codegen_rnsvg.so | 3,274,608 | 3,274,608 |
+| libexpo-gl.so | 3,052,436 | 3,052,436 |
+| libzstd-kmp.so | 2,973,216 | 2,973,216 |
+| libnative-imagetranscoder.so | 2,311,616 | 2,311,616 |
+| libstatic-webp.so | 1,980,508 | 1,980,508 |
+| libjsi.so | 1,558,512 | 1,558,512 |
+| libreact_codegen_rngesturehandler_codegen.so | 1,425,272 | 1,425,272 |
+| libgifimage.so | 1,087,772 | 1,087,772 |
+| libfbjni.so | 635,888 | 635,888 |
+| libreact_codegen_safeareacontext.so | 570,384 | 570,384 |
+| libhermestooling.so | 492,824 | 492,824 |
+| libexpo-updates.so | 384,004 | 384,004 |
+| librnscreens.so | 343,864 | 343,864 |
+| libgesturehandler.so | 305,324 | 305,324 |
+| libnative-filters.so | 88,868 | 88,868 |
+| libandroidx.graphics.path.so | 37,392 | 37,392 |
+| libimagepipeline.so | 30,140 | 30,140 |
+| libdatastore_shared_counter.so | 22,900 | 22,900 |
+
+Native packaging is the dominant measured cost, but changing stored JNI libs
+to legacy compression changes install/loading behavior and requires equivalent
+owner-authorized native builds and device checks. R8/shrink flags in the ignored
+historical Gradle project are not proof of the EAS archive's settings. Tracked
+source has no native Gradle project or release-shrinking override. No source
+flag is changed based on an unverified release configuration. Preview remains
+APK, production profile semantics and remote version source remain unchanged.
+
+Forty identical-payload groups contain 111 named entries. Relative to one
+representative per group, repeated payloads account for 50,448 raw /28,005
+compressed entry bytes, excluding headers. These are identity counts, **not
+removable bytes or achieved savings**: nine groups are Commons Codec named
+language tables and31 groups are Android resources (including qualified color,
+XML, PNG and nine-patch paths). Resource IDs, qualifiers and library lookup names
+can require distinct entries despite byte equality. There are no duplicate names,
+fonts, native libraries or assets entries. No resource-table rewrite/exclusion
+or dependency patch is justified by equality alone.
+
+The fresh Android export has 36 assets +1 HBC +metadata =38 files,
+14,671,618 bytes. Its 36 assets total 3,719,720 bytes: TTF2,001,440,
+PNG1,684,855, WAV32,806, XML619. HBC is10,949,445 bytes and metadata2,453.
+No duplicate emitted payloads. All11 local literal asset/config references
+resolve; all9 non-JSON payload references match exactly one emitted file.
+The two JSON imports are code inputs, not omitted downloadable assets.
+references.cjs uses the installed TypeScript AST, actual metadata and SHA256,
+with **FRESH67/67 checks passed,0 failed** in reference-audit.json.
+
+- clockFonts.ts requires all three Inter weights (1,030,596 raw bytes).
+  DayRingClock.CenterReadout uses600 for mode labels,700 for time and500 for
+  duration; System is a load-failure fallback, not an equivalent replacement.
+  The full TTFs match both export and archive hashes (res/Ih.ttf, res/Lp.ttf,
+  res/kZ.ttf), totaling497,937 compressed APK bytes. The GL clock atlas only
+  contains canonical clock glyphs; it cannot replace label/font coverage.
+- DayOrb loads the40,796-byte local clock atlas and retains plain-text/poster
+  fallback when its local asset/GL frame fails. CanvasSyncScreen explicitly
+  shows the1,621,928-byte bundled tutorial with its accessible six-step label.
+  Both remain available offline. These PNGs have no exact payload-hash match in
+  the older archive, so no source-to-archive PNG subtraction is claimed.
+- Four feedback WAVs total32,806 bytes and match archive/export hashes exactly.
+  Deleting or recoding them would change media/feedback behavior, not a free
+  optimization. Native app/adaptive/monochrome icons are config references;
+  unused source branding and platform copies are not automatically APK payloads.
+- Material Symbols regular970,844 raw /431,959 compressed APK bytes matches the
+  installed full font and emitted payload. Expo Router's native-tabs Android
+  materialIconConverter imports expo-symbols; its utils selects the regular
+  font. Replacing Router internals, subsetting glyphs or deleting a dependency
+  font violates required compatibility/coverage without additional proof.
+  The fifth small APK font is3,316 raw /2,294 compressed bytes; it is not
+  attributed to a current export or removed based on its obfuscated name.
+- Native studyExport imports the shared saved-content builders for PDF/DOCX/PPTX;
+  metadata emits a single Android HBC. Moving a static import to a promise does
+  not establish removal from this offline artifact. All formats stay local,
+  with saved content, MIME, permissions and cancellation semantics preserved.
+
+No quality reduction, asset recompression experiment, font conversion/subsetting,
+module removal, ABI filter or packaging change is proposed. Additional native
+compression/shrinking experiments and their exact rebuilt bytes are owner work;
+this task can finish all provable local rows without them. ADR NOT APPLICABLE.
+Mandatory gates and the second equivalent Android export remain pending here.
