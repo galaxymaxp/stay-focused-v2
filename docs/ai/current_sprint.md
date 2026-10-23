@@ -1,3 +1,38 @@
+<!-- PBR-UX1b completion begin -->
+## PBR-UX1b current local checkpoint: PASS
+
+2026-10-23: Corrective UX1 audit closure complete; gate repair `80f18fad`
+controls browser time only in the existing tap/hold/momentum regression.
+Bounded real-clock traces accepted all five taps; delayed scheduling expired
+older waves at 1803/1806ms. No production defect/physical performance conclusion.
+[Complete audit, exact gates, history and bounded UX2 proposal](acceptance/pbr-ux1-queue-actions-audit.md).
+
+FRESH full web 578/76 files, shared 716/74 and API 2,455/214: 3,749 passed,
+0 failed, 3 existing API live skips. Focused orb/browser 124 + shared orb 21 PASS.
+Forced root typecheck/lint/serial build 8/8 each, 0 cached; standalone API/web
+and Android offline JS/assets exports PASS; six existing lint warnings.
+Original UX1 full mobile 1,661/174 and focused mobile 81/web 74 retained, not
+rerun. Action 57/57; custody/evidence 2320/2320; original evidence preservation
+75/75; guard 3/3; both diff checks PASS. Original 96-scenario findings,
+all actions/permissions and exact successor boundary preserved. Completed-header
+doubled-text overflow and Library title/footnote limits remain UX2 findings.
+
+Original PBR-UX1 FAILED status and three failed full runs remain unchanged.
+This corrective PASS supersedes that failure for UX2 eligibility only; actual
+successor admission/approval remains with the supervisor. No UX2 implementation
+or runner/queue/controller/manifest change. LR1/prerequisites remain PASS;
+scoped local commits and final identities in Git/PBR-UX1b.status. Earlier failed
+checkpoint blocks below are historical and do not describe the corrected gate.
+
+**Owner steps remaining:** Rollout/Device checks NOT RUN, skipped entirely.
+Production/database/migration/Scheduler/provider state, authenticated browser,
+native fontScale/assistive technology/focus/targets and physical performance
+UNVERIFIED (owner to confirm). RT1/EV1 STOPPED; RT2 physical STOPPED / resume-text
+INCONCLUSIVE and deferred. OX2 blocked by OX1; unrelated Owner Pause preserved.
+No push/deploy/service/SQL/migration/env-file/device/native build/install/OTA/EAS/
+email/Scheduler/spending action. Finite corrective endpoint reached.
+<!-- PBR-UX1b completion end -->
+
 ## PBR-UX1b finite corrective scope (2026-10-23)
 
 Active scope: measure and narrowly repair the evidenced tap-wave gate, complete

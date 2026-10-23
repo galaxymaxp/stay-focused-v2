@@ -10782,3 +10782,138 @@ commit boundary. Historical planning/handoff text, all unrelated tracked inputs,
 per-file local build/export hashes plus original attempts remain in the ignored
 evidence index; all generated Next declarations were restored before final
 forced typecheck 8/8, 0 cached. No physical/production result is inferred.
+
+
+## PBR-UX1 resumed audit — FAILED (2026-10-23)
+
+Resumed at `ee3bfb8d` on `overnight/2026-10-15_feedback` (35 ahead /23 behind
+the local upstream snapshot; no fetch). Reread unattended rules/progress, log,
+status/diff, policies/current plans and owning source; preserved the uncommitted
+audit and all unrelated files. No committed work repeated. No runtime/test,
+provider, schema, dependency or data change. LR1 remains PASS; all six dependency
+status hashes and named commit ancestry remain verified.
+
+[Audit, original findings, action inventory and bounded proposal](acceptance/pbr-ux1-queue-actions-audit.md).
+96 adapted browser scenarios use source-extracted original functions and
+synthetic hooks/data at 320/360/390/414/768/1280, normal/200% text, reduced motion
+and loading/error/offline/empty. Corrected geometry reproduces mobile Completed
+header overflow only at doubled text; screenshot review records the left-clipped
+heading after scroll and Library title/footnote overlap. No normal-text or native
+reproduction is claimed. Retained old failures do not establish a current
+generation defect. Every existing course/Queue action, route, pin/selection,
+permission/data consequence is inventoried. Proposal covers Queue reflow,
+course chevron/enlargement feedback and accessible top-level existing-action
+menus; detail generation/selection/destructive actions retain their scope and
+placement. No product scope decision remains, but no successor is approved.
+
+FRESH source action/navigation comparison 57/57 PASS; guard 3/3 PASS; custody/
+evidence 2,321/2,321 PASS, including 36 sampled text contrast pairs (minimum 4.805:1).
+96 original browser scenarios have 0 runtime errors/outbound page requests.
+These are adapted/source proofs; physical assistive-technology results remain
+unverified. All raw attempts, scripts, screenshots, SHA256 index and results
+remain ignored under tmp/overnight/PBR-UX1/.
+
+Required full-web gate FAILS in three completed executions: 577 passed / 1 failed,
+75 files passed / 1 failed each. Commands: npm run test --workspace
+@stay-focused/web -- --maxWorkers=2, then two complete --maxWorkers=1 runs.
+Same generation-screen.browser.test.ts:252 tap-wave assertion expected 5, got 4/3/4.
+Wall times 198.289/342.442/335.961s. Isolated unchanged -t run 1 passed / 12 filtered
+skips in 8.768s. An older serial log was interrupted without a terminal result;
+it is not counted as PASS. Source unchanged throughout. Timing/expiry is only a
+hypothesis; do not manufacture a runtime diagnosis or weaken the assertion.
+Three failed full runs plus isolation exhaust the bounded honest attempts.
+
+FRESH pre-interruption task gates retained: focused mobile 81/12 files and
+web 74/9; full mobile 1,661/174; forced root typecheck/lint 8/8 each, 0 cached,
+0 errors/six existing warnings. No cached predecessor results substituted.
+Queued shared/API full suites and required standalone API/Android JS-assets/web
+and serial forced root builds NOT RUN because the runner stops on web exit 1.
+Final git diff --check and git diff --cached --check PASS; index remains empty.
+No build-generated declaration changed. Full verification stays FAILED; final
+documentation commit stays pending. Current-state/roadmap/sprint now hold
+dependents at this failure while preserving all historical text.
+
+Commits: `ee3bfb8d docs(ux): freeze PBR-UX1 audit acceptance` (author
+galaxymaxp <omgraythekid@gmail.com>). No new commit on resume. Five task-owned
+documentation paths remain uncommitted under unattended rule 5; unrelated UI/,
+apps/mobile/.gitignore and supabase/.temp/ preserved. Nothing under tmp staged.
+
+**Owner steps remaining**:
+
+- Separately resolve the full-web tap-wave gate; distinguish test-order/browser
+  timing from a runtime defect, retain all original failure/isolated-pass logs.
+  Resume PBR-UX1 only to finish missing local gates/docs/scoped commits after
+  that blocker is resolved. FAILED holds dependents; no speculative successor.
+- Rollout and Device checks NOT RUN, skipped entirely. Deployed revisions,
+  database rows/applied migrations/Scheduler/provider state, authenticated
+  browser, native OS fontScale/external keyboard/TalkBack/VoiceOver/focus/targets
+  and physical reduced motion remain UNVERIFIED (owner to confirm). No release
+  readiness or fresh production-generation claim.
+- Preserve RT1/EV1 STOPPED and RT2 physical STOPPED / resume-text INCONCLUSIVE,
+  deferred, without claiming a link to historical Queue failures. OX2 remains
+  blocked by OX1; unrelated roadmap/Owner Pause remains. No service call, deploy,
+  remote SQL/migration/env-file change/push/retry/clear/worker/Scheduler/email/
+  OTA/EAS/native build/install/device/spending action was performed.
+- Vercel CLI is absent; strongly recommend npm i -g vercel for separately
+  authorized future env/deploy/log work. Installation NOT RUN.
+
+## PBR-UX1b corrective audit closure — PASS (2026-10-23, LOCAL only)
+
+Completed the finite correction from ee3bfb8d on overnight/2026-10-15_feedback.
+Scoped commits: d62db151 docs(ux): freeze PBR-UX1b corrective acceptance;
+80f18fad test(web): control orb gesture regression time; final documentation
+commit recorded in Git/PBR-UX1b.status. Author galaxymaxp <omgraythekid@gmail.com>.
+No push. [Full acceptance and exact command table](acceptance/pbr-ux1-queue-actions-audit.md).
+
+Bounded local browser traces prove all five trusted down/up pairs insert one
+tap impulse each. Requested 150ms gaps retained five; delayed 450ms gaps removed
+two at ages 1803/1806ms and retained three. Earlier full failures did not record
+timing, so no exact historical schedule or production defect is invented.
+Only the browser regression changes: install Playwright clock before app load,
+pause after renderer readiness, retain five real clicks/exact 150ms ages, real
+450ms hold/move/release, rotating classification, positive decaying momentum,
+palette and fitted viewport bounds. Shared exact 1799/1800ms expiry tests remain.
+Fake time establishes logic with real pointers, not physical performance.
+
+FRESH gates: full web 578/76 files, shared 716/74, API 2,455/214 — 3,749 passed /
+0 failed / 3 existing live skips. Focused orb/browser 124/15 files, shared orb
+21/1 PASS. Forced root typecheck/lint/serial build each 8/8, 0 cached; standalone
+API/web and offline Android JS/assets exports PASS. Six existing lint warnings.
+Retained original UX1 mobile 1,661/174 and focused mobile 81/web 74 are explicitly
+not fresh corrective executions. Action 57/57, guard 3/3, custody 2320/2320,
+original evidence preservation 75/75, both diff checks PASS. Original 96
+adapted scenarios, all source/action/permission inventory, doubled-text Queue
+Completed-header clipping, Library title/footnote overlap and bounded proposal
+remain intact. Physical/native/accessibility conclusions remain UNVERIFIED.
+
+Preserved original FAILED status, three full-web 577/1 failures, isolated 1/12
+filtered diagnostic and interrupted log. First corrective diagnostic failed
+only fixture import from wrong working directory: 1 failed suite, 13 skipped;
+workspace-corrected traces 1 passed/12 filtered each. No corrected application
+gate failure, new skip or assertion weakening. Original indexed evidence is
+byte-identical (commands append only); test before-image matches baseline.
+Original unrelated UI/, apps/mobile/.gitignore and supabase/.temp/ untouched;
+only task-owned paths committed; no tmp staged. Planning is reconciled.
+The first declaration-restoration shell command also failed with a quoting
+SyntaxError before any write; declaration-attempt1.log preserves it. A checked
+local script then verified generated contents/before-image hashes and restored
+both declarations; the final forced typecheck ran afterward. Extra earlier
+typecheck executions remain logged and are not substituted for that final gate.
+
+Corrective PASS supersedes original UX1 failure for UX2 eligibility only.
+Supervisor retains successor admission/approval; no UX2 code or orchestration
+runner/queue/controller/manifest modification. All LR1 prerequisites preserved.
+
+**Owner steps remaining**:
+
+- Rollout and Device checks NOT RUN, skipped entirely. Deployed revisions,
+  database rows/applied migrations/Scheduler/provider state, authenticated
+  browser, native OS fontScale/external keyboard/TalkBack/VoiceOver/focus/targets/
+  reduced motion and physical performance UNVERIFIED (owner to confirm).
+- Preserve RT1/EV1 STOPPED and RT2 physical STOPPED / resume-text INCONCLUSIVE,
+  deferred separately. OX2 remains blocked by OX1; unrelated Owner Pause intact.
+  Supervisor handles any separately approved successor after this genuine PASS.
+- No service call, deploy, remote SQL/migration/env-file change/push/retry/clear/
+  worker/Scheduler/email/OTA/EAS/native build/install/device/spending action.
+- Vercel CLI is absent; strongly recommend npm i -g vercel for separately
+  authorized future env/deploy/log work. Installation NOT RUN.

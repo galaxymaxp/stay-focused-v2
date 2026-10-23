@@ -1,5 +1,27 @@
 # PBR-UX1: Queue layout, failed entries and course actions audit
 
+<!-- PBR-UX1b final result begin -->
+## Current corrective checkpoint: PBR-UX1b PASS (LOCAL only)
+
+2026-10-23: The evidenced timing-dependent browser regression is repaired in
+`80f18fad`; the original audit and every mandatory local gate are complete.
+FRESH full web **578/76 files**, shared **716/74**, API **2,455/214** pass with
+0 failures and 3 existing API live skips. Focused orb/browser 124 and shared
+orb 21 pass. Forced typecheck/lint/serial build each complete 8/8, 0 cached;
+standalone API/web and offline Android JS/assets exports pass. Mobile 1,661/174
+and focused mobile 81/web 74 are retained original UX1 executions, not fresh
+corrective reruns. Six existing lint warnings remain; no new skip or runtime fix.
+
+All acceptance rows B0/B1/B2/B3/BG/BC pass for this finite local correction and
+completed audit. The measured root cause, minimal clock-only test repair,
+complete preserved action inventory, 96-scenario findings, exact gate table and
+owner limits follow. Original PBR-UX1 FAILED status and all failed/isolated/
+interrupted logs remain intact. This corrective PASS supersedes that failure
+**for UX2 eligibility only**; successor admission/approval belongs to the
+supervisor. No UX2 implementation, queue/controller/manifest change or release
+claim. Rollout and Device checks remain skipped owner steps, UNVERIFIED.
+<!-- PBR-UX1b final result end -->
+
 ## PBR-UX1b corrective acceptance freeze (2026-10-23)
 
 Owner-authorized corrective continuation from `ee3bfb8d` on
@@ -30,7 +52,58 @@ snapshot; no fetch. No tracked dirt. Preserve unrelated `UI/`,
 `apps/mobile/.gitignore`, `supabase/.temp/`, ignored evidence and historical
 STOPPED/FAILED records. No runtime fix, real retry, clear or owner-data mutation.
 
-## Terminal checkpoint: FAILED (required local gate)
+## PBR-UX1b measured timing and minimal repair
+
+Before tracked test edits, the ignored local diagnostic copied the original
+browser fixture and instrumented its actual interaction ref assignments and
+capturing pointer events. Production gesture functions, renderer and timers
+were unchanged. Browser requests were restricted to its loopback fixture.
+Two bounded real-clock schedules captured down/up timestamps, trusted input,
+accepted gesture state, palette transitions, inserted impulses, expiration ages
+and final retained timestamps in `tmp/overnight/PBR-UX1b/timing-{150,450}.json`.
+
+At the original 150ms requested gaps, five down/up pairs had measured holds
+21/0/0/1/0ms. All five impulses were inserted, palette indices progressed
+0 -> 1 -> 2 -> 3 -> 4 -> 0, and all remained at final ages
+839/675/514/341/176ms. With bounded 450ms gaps (a controlled scheduling-delay
+demonstration, not an unchanged full-suite rerun), holds were 1/0/0/0/0ms.
+All five inputs again inserted exactly one impulse and cycled the same palette.
+The renderer removed the first two at ages 1,803ms and 1,806ms; the final three
+were aged 1,442/959/469ms. No pointercancel occurred. Classification is supported
+by the recorded nonrotating/nonscrolling released gesture, sub-250ms holds and
+the actual inserted impulse/color transition, not just an input-event count.
+
+This proves a timing-sensitive test assumption: five accepted taps do not imply
+five waves remain after unbounded protocol/GPU/wait overhead. Earlier failed
+full runs did not record event timing, so their exact schedules and any physical
+performance implications remain unproven. No production input defect was
+established and no runtime repair or lifetime extension is justified.
+
+The sole implementation change is
+`apps/web/src/features/generation-screen.browser.test.ts`: opt this gesture
+case into Playwright clock installation before navigation, let the real
+renderer load, then pause browser time and advance explicit 150ms tap gaps.
+Five real mouse clicks must yield the exact five ages [750,600,450,300,150]
+and return the palette to pearl. Real down/move/up events retain the 450ms hold,
+assert actual rotating classification, positive release velocity, continued
+nonzero but decaying momentum after 100ms, unchanged palette and original
+viewport/canvas/no-scroll bounds. Other browser cases keep their real clocks.
+No expected-count relaxation, skip, timeout increase or production edit.
+
+Existing shared `orb-interaction.test.ts` already asserts a tap inserted at
+20ms is retained at 1819ms (age 1799) and pruned at 1820ms (age exactly 1800),
+plus input-time expiry and reduced-motion clearing. Reuse that meaningful exact
+boundary regression; no redundant shared test was added. Controlled browser
+time verifies logic/real pointer dispatch, not physical responsiveness or FPS.
+
+Diagnostic history: the first harness invocation failed its Vite import because
+it ran from repo root rather than the web workspace: 1 failed suite / 13 skipped,
+no test executed. Correcting only the diagnostic working directory produced
+two PASS runs (1 passed / 12 filtered skips each); logs retained. FRESH focused
+orb/browser run: 15 files / 124 tests PASS, 0 failed; shared orb: 1 file / 21
+tests PASS, 0 failed. Full mandatory verification is recorded at closure below.
+
+## Historical PBR-UX1 terminal checkpoint: FAILED (required local gate)
 
 Source audit, synthetic comparison and bounded proposal are recorded below.
 PBR-UX1 cannot PASS: the full web suite failed three completed attempts with
@@ -468,3 +541,91 @@ indexes retained task evidence; nothing under tmp is staged.
 Local commits: `ee3bfb8d docs(ux): freeze PBR-UX1 audit acceptance` only. No new
 commit on resume; final five documentation paths remain uncommitted under the
 failed-gate rule. No push, deployment, retry, clearing or owner-data mutation.
+
+## PBR-UX1b final gates and corrective closure (2026-10-23)
+
+The original failed checkpoint above remains historical. Corrective runs use
+base `d62db151` with the exact repaired test bytes later committed in
+`80f18fad`; subsequent commands name their actual HEAD in commands.jsonl.
+Test SHA256: `7bd506c5cdcd369acf79392bb18443d3df7ffd7573677648ec138577119bfdd5`.
+All production inputs remain baseline-identical. Both inspected local guard and
+original validation runner remain byte-identical; new diagnostics stay ignored.
+No environment files read/changed, external service call, install or publication.
+All logs, command timestamps/exit codes/durations, source hashes and evidence
+indexes remain under ignored tmp/overnight/PBR-UX1{,b}/; nothing under tmp staged.
+
+| Exact command | Result | Evidence label |
+| --- | --- | --- |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=2` | Test Files  76 passed (76); Tests  578 passed (578); Duration  154.20s (transform 5.03s, setup 0ms, import 19.13s, tests 268.67s, environment 9ms) | FRESH PBR-UX1b |
+| `npm run test --workspace @stay-focused/shared -- --maxWorkers=2` | Test Files  74 passed (74); Tests  716 passed (716); Duration  21.78s (transform 5.16s, setup 0ms, import 17.60s, tests 1.51s, environment 10ms) | FRESH PBR-UX1b |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | Test Files  214 passed (214); Tests  2455 passed \| 3 skipped (2458); Duration  233.09s (transform 21.54s, setup 0ms, import 194.76s, tests 188.72s, environment 42ms) | FRESH PBR-UX1b |
+| `npm run typecheck -- --force` | Tasks:    8 successful, 8 total; Cached:    0 cached, 8 total; Time:    42.893s | FRESH PBR-UX1b |
+| `npm run lint -- --force` | Tasks:    8 successful, 8 total; Cached:    0 cached, 8 total; Time:    1m17.056s | FRESH PBR-UX1b |
+| `npm run build --workspace @stay-focused/api` | exit 0; full log retained | FRESH PBR-UX1b |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | Android Bundled 88027ms apps\mobile\index.js (4318 modules); Exported: dist | FRESH PBR-UX1b |
+| `npm run build --workspace @stay-focused/web` | exit 0; full log retained | FRESH PBR-UX1b |
+| `npm run build -- --force --concurrency=1 --env-mode=loose` | Tasks:    8 successful, 8 total; Cached:    0 cached, 8 total; Time:    6m27.572s | FRESH PBR-UX1b |
+| `npm run test --workspace @stay-focused/web -- src/features/generation-screen.browser.test.ts src/features/knowledge-core/orbInteraction.test.ts src/features/knowledge-core/orbInteractionFrame.test.ts src/features/day-clock --maxWorkers=2` | Test Files  15 passed (15); Tests  124 passed (124); Duration  137.45s (transform 1.50s, setup 0ms, import 6.37s, tests 263.75s, environment 2ms) | FRESH PBR-UX1b |
+| `npm run test --workspace @stay-focused/shared -- src/orb-interaction.test.ts --maxWorkers=2` | Test Files  1 passed (1); Tests  21 passed (21); Duration  412ms (transform 66ms, setup 0ms, import 99ms, tests 24ms, environment 0ms) | FRESH PBR-UX1b |
+| `npm run test --workspace @stay-focused/mobile -- src/features/queue src/design/QueueButton.test.ts src/design/courseIdentity.test.ts src/features/redesign/presentation.test.ts src/features/redesign/libraryPresentation.test.ts src/features/redesign/courseReviewerActions.test.ts src/features/redesign/listPreferences.test.ts --maxWorkers=2` | Test Files  12 passed (12); Tests  81 passed (81); Duration  5.03s (transform 1.87s, setup 0ms, import 4.23s, tests 475ms, environment 2ms) | Retained PBR-UX1 execution; not rerun by UX1b |
+| `npm run test --workspace @stay-focused/web -- src/features/queue src/features/course-batch src/features/generate.test.ts src/features/library.test.ts src/components/queue-button.test.ts src/components/course-options.test.ts --maxWorkers=2` | Test Files  9 passed (9); Tests  74 passed (74); Duration  3.78s (transform 1.64s, setup 0ms, import 4.20s, tests 476ms, environment 1ms) | Retained PBR-UX1 execution; not rerun by UX1b |
+| `npm run test --workspace @stay-focused/mobile -- --maxWorkers=2` | Test Files  174 passed (174); Tests  1661 passed (1661); Duration  71.04s (transform 8.98s, setup 0ms, import 36.94s, tests 51.22s, environment 25ms) | Retained PBR-UX1 execution; not rerun by UX1b |
+
+Fresh full suites total **3,749 passed / 0 failed / 3 existing live skips**.
+Shared includes pre-existing emitted test copies. Diagnostic filtered skips are
+separate from full-suite coverage. No corrected application gate failed; the
+single diagnostic working-directory failure and all original red runs remain
+recorded above. Vite config-loader warnings are unchanged tooling notices.
+Forced lint has 0 errors / six existing warnings; no validation rule changed.
+Workflow/provider/live contracts are NOT APPLICABLE / NOT RUN for this
+test-only correction; API tests are local synthetic/in-process database proof.
+
+FRESH action/navigation 57/57; unchanged-input/custody/evidence 2320/2320,
+0 failed, including all 24 source-extracted bodies, 96 retained scenarios,
+six prerequisite statuses/ancestries, 23 owner artifacts, original historical
+planning/handoff substrings and 36 contrast pairs (minimum 4.805:1).
+The original 2,321 checks are retained historical results; the corrective
+2320-check run explicitly excludes the one authorized changed browser test.
+Separate evidence preservation 75/75 proves the test before-image
+matches baseline and every original indexed evidence file matches exact bytes
+(commands.jsonl keeps its original prefix and only appends new records).
+Original FAILED terminal status SHA256 remains
+`69843c5ffad66ae1b75fe75c3b2c20dfc14d89b6fc3b88d4dbfa931b0c30ba6e`.
+Guard fetch/socket/env-file rejection: 3/3 PASS, FRESH at corrective preflight.
+Both git diff checks PASS at scoped commit boundaries, FRESH; final post-commit
+custody/index checks stay in ignored verification evidence and final commit
+identities are recorded in PBR-UX1b.status.
+Generated Next declarations are restored from inspected exact pre-build copies
+before closure; any resulting final forced typecheck is recorded in the table.
+The first restoration shell command had a PowerShell quoting SyntaxError before
+any write; preserved in declaration-attempt1.log. A following typecheck started
+against generated declarations and its actual result is retained. The checked
+restore-declarations.cjs validates both generated contents and baseline SHA256s
+before restoring; forced typecheck is rerun after the actual restoration. This
+tooling failure never changed an application assertion or deployment setting.
+
+| Corrective row | Final evidence / disposition |
+| --- | --- |
+| B0 | PASS: expected branch/base, policies/ADRs/plans, all six prerequisite PASS statuses/commit ancestry; dirty owner inputs preserved. |
+| B1 | PASS: bounded original 150ms and delayed 450ms trusted pointer traces; all five inputs accepted, expiration measured at 1803/1806ms. Prior full failures' exact schedules remain unmeasured. |
+| B2 | PASS: one browser test path; real pointers, exact five impulse ages, hold classification, decaying release momentum, palette and original viewport bounds; shared 1799/1800ms boundary retained. |
+| B3 | PASS: original 96 scenarios/source bodies, all action/data/permission inventory and bounded UX2 plan retained; mobile Completed doubled-text overflow and Library title/footnote findings preserved. |
+| BG | PASS: exact fresh/retained suites and all required local build/check rows above; no mandatory local gate omitted or weakened. |
+| BC | PASS: audit/current-state/roadmap/sprint reconciled; historical and corrective handoffs, scoped local commits and ignored progress/status. |
+
+Local commits: `d62db151 docs(ux): freeze PBR-UX1b corrective acceptance`;
+`80f18fad test(web): control orb gesture regression time`; final audit/planning/
+handoff commit is identified in Git and PBR-UX1b.status without self-amending.
+All use galaxymaxp <omgraythekid@gmail.com>. No push.
+
+**Owner steps remaining**: Rollout and Device checks NOT RUN, skipped entirely.
+Deployed revisions, database rows/applied migrations/Scheduler/provider state,
+authenticated browser, native fontScale/external keyboard/TalkBack/VoiceOver/
+focus/targets/reduced motion and physical performance are **UNVERIFIED (owner
+to confirm)**. No real retry/clear, provider generation, native build/install,
+OTA/EAS, SQL/migration, worker/Scheduler/email, account/env or spending action.
+RT1/EV1 remain STOPPED; RT2 physical STOPPED / resume-text INCONCLUSIVE and
+deferred, independent of Queue history. OX2 remains blocked by OX1 and unrelated
+Owner Pause stays intact. Supervisor handles genuine successor admission; this
+task ends here. Vercel CLI is absent; strongly recommend `npm i -g vercel` for
+separately authorized future env/deploy/log tooling. Installation NOT RUN.
