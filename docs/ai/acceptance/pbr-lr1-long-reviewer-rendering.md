@@ -65,3 +65,63 @@ and OX2 blocked by OX1 remain intact. Source 2.2.0/code6 differs from archived
 No push/deploy/SQL/migration/email/Google worker/Scheduler/OTA/EAS/native build/
 install/device/account action or spending. This finite roadmap endpoint does
 not authorize another initiative, task publication or physical repair retry.
+
+## STEP 1: fresh baseline and supported repair boundary
+
+FRESH corrected full-reader probe: **2 passed / 2 files / 0 failed / 0 skipped**
+at `5f3bf300`, before runtime edits. Each client runs 0/1/12/120/240 topics,
+one warmup and three measured schedules per size: 30 measured schedules plus
+10 warmups across the clients. Each nonempty schedule mounts, performs three
+unchanged parent updates and one identical artifact-prop replacement, searches
+the unique last evidence sentinel, clears search, selects a point, then unmounts.
+All complete rendered segments are checked after every operation. Web/mobile
+segments and anchors agree; canonical-content and saved export-layout hashes
+are recorded, alongside raw complete render hashes and React Profiler phases.
+
+Each topic has four blocks, 24 prose paragraphs, five headings, four key-point
+lists / 20 items, four tables, four whitespace-sensitive code examples, four
+formulas, four sentinel examples and 24 literal link occurrences. No image
+reference in these text stress fixtures; image states are covered separately
+by existing public synthetic loader/offline/visual tests. Full model JSON lengths
+(UTF-16 code units) are 194 / 4,562 / 52,737 / 532,013 / 1,070,213 respectively.
+Original links, literal markup, accents, Greek and surrogate pairs are preserved.
+The reader does not run parseStudyText on this original content; the standalone
+assist-answer parser fixture is recorded separately and will remain unchanged.
+
+At 240 topics, each complete schedule serializes identical full-content identity
+keys **2,640 times / 11,637,780 code units on mobile**, and **2,400 times /
+10,579,800 on web**. Mobile's mount effect adds one parent render. The first
+three unchanged updates plus identical artifact replacement alone add 960 calls
+per client. Existing memoized source/search derivations are retained; deferred
+query changes intentionally remount topic controls and must keep doing so.
+
+Supported narrow repair: memoize only the existing JSON key computation in each
+TopicAssist wrapper, with owner and existing memoized selection dependencies.
+Keep the full exact serialized value, not a digest or abbreviated identity.
+No global cache, content cap, virtualization, effect suppression, image-map
+change or reader component rewrite. New model objects still compute their key;
+equal content retains state, changed content/owner/reviewer/section resets it.
+
+Failing regressions before repair: focused mobile **361 passed / 1 failed /
+28 files**, web **65 passed / 1 failed / 11 files**; only new removed-work
+expectation fails (five serializations instead of one). Existing semantics and
+new owner/lifecycle tests pass. Original logs retained, not waived gates.
+
+Original probe attempt: mobile circular JSON from mock Page's raw React-element
+props; web assertion repeatedly traversed the entire tree and was deliberately
+interrupted (worker error retained; 1 failed test / 1 worker error, no completed
+web sample). Second: web passed, mobile still hit the mock serialization issue
+(1 passed / 1 failed). Corrected mock renders header/overlay children and omits
+their raw element props; web verification builds one segment index per snapshot.
+Each schedule now has its own EventTarget, avoiding Node's capture-listener
+warning across repeated synthetic mounts; product listeners are unchanged.
+Third full attempt passes. Discovery-only Windows wildcard/guessed ADR/helper
+path errors are retained in session history; no product assertion is removed.
+
+Exact scripts, corrected script hashes, baseline sources, tool versions and
+original attempts are in ignored PBR-LR1/. Guard rejection proof: 3/3 PASS
+before actual outbound access or environment-file reads. Timings and heap
+deltas include test renderer/mocks/spies/effects and are descriptive host
+proxies; temporary JSON/verification allocations and GC prevent interpreting
+heap deltas as retained reader memory. Native, authenticated browser and
+production evidence remain NOT RUN / UNVERIFIED.
