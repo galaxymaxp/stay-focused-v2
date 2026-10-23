@@ -1,3 +1,34 @@
+<!-- PBR-LP1 completion begin -->
+## PBR-LP1 current local checkpoint: PASS
+
+2026-10-23: Library profiling and mandatory local gates complete, **zero runtime
+changes; no justified further local optimization**. [Acceptance, samples,
+hashes and commands](acceptance/pbr-lp1-library-performance.md).
+Baseline MB1 `d8d22603` and AF1 `ef80dfc6` retained. Two repeated public synthetic
+cohorts preserve full items/stats/DTO/cursors/hidden IDs. All 0/100/240/300
+changed/unchanged hook schedules remain 2 summary/2 aggregate stats/max 1 active.
+Each overview uses 8 SQL reads with 1 summary scan; 300-item medians 3.029/3.440ms
+without adversarial unmatched overlays, 11.788/11.078ms with the seeded history.
+API walks stay 2/2/6/6 vs 7/7/21/21 with 1,000 hidden rows. No production SQL,
+physical frame/latency or percent-saving claim; no schema/cache/feature change.
+
+FRESH full shared 716 / mobile 1,658 / API 2,455 = **4,829 passed / 0 failed /
+3 existing live skips** (shared includes emitted copies). Focused 85 pass;
+two 2-test probe cohorts pass; forced root typecheck/lint/build 8/8 each, 0 cached;
+explicit API build PASS; root build includes offline mobile JS/assets and web.
+No application gate failure or flake. Scoped local commits a35b1d3c, 204f8731 plus
+the final docs checkpoint in Git/status. Original evidence/untracked dirt kept.
+
+LP1 is complete; **PBR-AS1 requires fresh supervisor review of actual LP1 PASS**;
+PBR-LR1 follows AS1 PASS/review. No successor work or queue changes. OX2 blocked
+by OX1; unrelated work and Owner Pause intact. Historical RT1/EV1 STOPPED,
+physical RT2 STOPPED / resume-text INCONCLUSIVE and deferred. Active OTA/safe
+isolation and production/authenticated-browser/physical measurements UNVERIFIED.
+Rollout and Device checks NOT RUN; no push/deploy/service/SQL/migration/env file/
+Scheduler/device/native build/install/OTA/EAS/spending. Source 2.2.0/code6 is
+distinct from archived 2.3.0/code7. Earlier LP1 eligibility text below is history.
+<!-- PBR-LP1 completion end -->
+
 <!-- PBR-MB1 completion begin -->
 ## PBR-MB1 current local checkpoint: PASS
 

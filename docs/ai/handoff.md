@@ -10551,3 +10551,67 @@ Any production/service/worker/Scheduler/push/deploy/SQL/migration/OTA/EAS/native
 build/install/tester distribution or spending remains owner work; no environment
 file was touched. Vercel CLI unavailable; strongly recommend npm i -g vercel
 for separately authorized future env/deploy/log tooling; installation NOT RUN.
+
+## PBR-LP1 local Library profiling — 2026-10-23
+
+**PASS for mandatory LOCAL scope, no runtime change.** Resumed at d8d22603 with
+no progress file/LP1 dirt; unrelated UI/, apps/mobile/.gitignore, supabase/.temp/
+and ignored evidence retained. [Acceptance](acceptance/pbr-lp1-library-performance.md).
+Initial branch overnight/2026-10-15_feedback; 24 ahead / 23 behind local upstream
+snapshot, no fetch. No prior committed work redone. Owner author galaxymaxp.
+
+Two identical unchanged-source cohorts: 960 measured isolated store operations
+(96 warmups), 80 hook schedules (16 warmups), 80 API walks (16 warmups).
+Exact full sorted items/stats/DTOs/cursors/hidden-ID hashes match repeat and MB1
+where fixtures overlap. AF1 `ef80dfc6` remains baseline: 2 summary/2 aggregate stats/
+max 1 active hook read. API 2/2/6/6 vs 7/7/21/21 with 1,000 hidden rows retained.
+300-item overview medians 3.029/3.440ms without stress, 11.788/11.078ms with 1,000
+foreign summaries plus 1,000 unmatched rows per 4 overlay tables. Seeded adversarial
+shape, not production cardinality; normal removal cleans related rows. No
+specific safe remaining optimization/production SQL plan is established. Keep
+all 8 owner-bound reads/one summary scan, full history and pending work. No
+speedup, index/cache change, frame/native startup or APK-saving claim.
+
+FRESH full relevant tests: shared 716/74 files (37 source + 37 emitted),
+mobile 1,658/174 files, API 2,455/214 files; **4,829 pass /0 fail /3 existing live
+skips** (activity 1, quiz 2). Focused mobile 82 / API 3 PASS; both 2-file/2-test probe
+cohorts PASS; API adapters exit 0. Forced root typecheck/lint/build 8/8 each, 0
+cached; six existing lint warnings. Explicit API 37/37 pages; root web 23/23 and
+mobile Android/iOS/web offline JS/assets exports PASS. Standalone Android and
+web tests/build NOT APPLICABLE to zero runtime changes. Build hashes, exact
+logs/commands, first discovery failures and custody checks live in ignored
+tmp/overnight/PBR-LP1/. No application gate failure, new skip or product flake.
+The first final documentation verifier exited1 after29,546 unchanged hashes:
+it rejected3 existing historical replacement characters. Baseline/current
+counts are both3, historical prefix unchanged, new LP1 footer0. Corrected the
+helper to verify no new characters and clean owned text; failed attempt kept.
+Corrected final custody/documentation verification: FRESH 29,575/29,575 PASS,
+0 failed; all 29,546 original input hashes unchanged. Root mobile JS/assets
+inventory: 84 files / 35,320,652 bytes across three platforms, not a native APK.
+Exact build IDs/per-file hashes and evidence index recorded locally. Final
+staged/unstaged diff checks PASS; no generated/private artifact is staged.
+
+Local commits:
+
+- a35b1d3c docs(perf): freeze PBR-LP1 profiling acceptance
+- 204f8731 docs(perf): record LP1 measurements and no-change verdict
+
+Final scoped documentation checkpoint follows this footer; exact hash recorded
+in Git and tmp/overnight/PBR-LP1.status without amending history. All tracked
+LP1 changes are documentation. RT1/EV1 STOPPED, RT2 physical STOPPED /
+resume-text INCONCLUSIVE/deferred and OX2 blocked by OX1 remain untouched.
+Next eligible AS1 requires fresh supervisor review of actual LP1 PASS; LR1
+requires AS1 PASS/review. No task publication/controller/queue edits here.
+
+**Owner steps remaining**: Rollout and Device checks **NOT RUN**, skipped
+entirely. Deployed revisions/database/applied migrations/Scheduler, production
+SQL plans/cardinality/timings, authenticated browser, native frame/startup/RAM
+and physical rendering remain **UNVERIFIED (owner to confirm)**. Before physical
+work, satisfy preserved RT2 full active OTA/runtime/channel/embedded identity,
+safe public/empty isolation and independent-observation preflight. Source
+2.2.0/code6 differs from archived installed 2.3.0/code7; no new device claim.
+Push/deploy/service/SQL/migration/email/Google worker/Scheduler/OTA/EAS/native
+build/install/tester distribution/spending are owner work; none performed.
+No environment file opened/edited by task helpers. Vercel CLI unavailable;
+strongly recommend npm i -g vercel for separately authorized future tooling;
+installation NOT RUN.
