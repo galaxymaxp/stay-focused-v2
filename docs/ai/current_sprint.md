@@ -1,3 +1,13 @@
+## PBR-UX2 finite authorized scope (2026-10-23)
+
+Active: bounded UX1-audited Queue header layout repair, course navigation feedback
+and top-level existing-action menus. Owner unattended prompt admits this task
+after actual PBR-UX1b PASS at e0b63bc6; historical UX1 FAILED stays unchanged.
+Acceptance frozen in [PBR-UX2](acceptance/pbr-ux2-queue-actions-fix.md).
+No detail/grid/data/controller/backend/generation change or Android resume-text
+work. Local guarded synthetic tests/gates/docs/scoped commits only; stop at UX2.
+Rollout/device checks skipped; live/physical state UNVERIFIED (owner to confirm).
+
 <!-- PBR-UX1b completion begin -->
 ## PBR-UX1b current local checkpoint: PASS
 
