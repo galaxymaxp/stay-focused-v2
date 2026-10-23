@@ -10917,3 +10917,77 @@ runner/queue/controller/manifest modification. All LR1 prerequisites preserved.
   worker/Scheduler/email/OTA/EAS/native build/install/device/spending action.
 - Vercel CLI is absent; strongly recommend npm i -g vercel for separately
   authorized future env/deploy/log work. Installation NOT RUN.
+
+
+## PBR-UX2 Queue/course interactions - PASS (2026-10-23, LOCAL only)
+
+Owner unattended prompt admits this finite successor after committed UX1b PASS.
+Initial e0b63bc6 on overnight/2026-10-15_feedback (38 ahead/23 behind local
+upstream snapshot; no fetch). All seven dependency PASS statuses/named commit
+ancestries verified. Original UX1 FAILED and RT1/EV1/RT2 holds preserved.
+[Acceptance, full action contract, attempts and exact command table](acceptance/pbr-ux2-queue-actions-fix.md).
+
+Queue headers reflow without concealing failed text or changing retry/clear/
+history behavior. Audited navigation chevrons give way to bounded hover/focus/
+press feedback outside swipe clipping, static reduced-motion styling and stable
+reserved space. Native tile dimensions/grid stay intact. Independent native
+sheets expose the exact Generate factories and Library Pin/Unpin; web reuses
+Move-only options and Library Pin/Unpin. Full labels/selected pin state, keyboard
+entry/dismiss/return, 48/44 targets and owner/route closure are verified locally.
+No detail/global action relocation or backend/data/generation/dependency change.
+
+FRESH full mobile 1,665/176, web 580/76, shared 716/74, API 2,455/214:
+**5,416 passed / 0 failed / 3 existing API live skips**. Focused mobile 181/15,
+web 76/9 PASS. Forced typecheck/lint/serial root build 8/8 each, 0 cached;
+standalone API/web and offline Android JS/assets export PASS. Six existing lint
+warnings. Final typecheck follows exact Next-declaration restoration. Both diff
+checks PASS at scoped code/docs staging boundaries. Action 57/57, guard 3/3;
+96 responsive +96 motion/text scenarios, menu/short/scaled flows 12/12 PASS,
+0 outbound page requests/runtime errors. Native/authenticated results unverified.
+
+Preserved failures: new theme-mock 83/1; lint 7/8 with one test error; typecheck
+7/8 from a narrow test helper; initial full mobile 1,653/12 from missing screen
+adapters/cascades; full web 579/1 hide-on-scroll initial measurement; later mobile
+1,664/1 GenerationLayout core measurement. Adapters/types corrected, assertions
+retained, unrelated flakes resolved by unchanged full serial reruns (exact cause
+unproven). Original browser/custody/coordinate/live-style collector attempts
+remain indexed; corrected probes snapshot text metrics before writes and assert
+full menu clip bounds. No production workaround or test weakening.
+
+Commits, author galaxymaxp <omgraythekid@gmail.com>:
+
+- d9b5a6f0 docs(ux): freeze PBR-UX2 queue and course acceptance
+- 973f3c7f fix(ux): repair queue layout and course action interactions
+- Final documentation commit follows this footer; exact identity in Git and
+  PBR-UX2.status without self-amending. No push; no tmp staged.
+
+Current-state/roadmap/sprint reconciled. Source/callback/owner-input and complete
+historical-text custody checks pass; original unrelated UI/, apps/mobile/.gitignore
+and supabase/.temp/ preserved. Ignored evidence under tmp/overnight/PBR-UX2/
+contains exact commands/source hashes, original attempts, outputs and SHA256 index.
+Final source/index custody counts are appended at closure. Finite UX2 endpoint
+reached; no next initiative admitted. OX2 blocked by OX1; Owner Pause unchanged.
+
+**Owner steps remaining**:
+
+- Rollout and Device checks NOT RUN, skipped entirely. Deployed revisions,
+  database rows/applied migrations/Scheduler/provider state, authenticated browser,
+  native fontScale/assistive technology/external-keyboard focus/targets/reduced
+  motion and physical performance UNVERIFIED (owner to confirm).
+- Preserve RT1/EV1 STOPPED and RT2 physical STOPPED / resume-text INCONCLUSIVE,
+  deferred separately. Existing compact Library title/footnote limitation remains
+  outside this task; no native rendering or release-readiness conclusion.
+- No push/deploy/service/provider call/remote SQL/migration/env-file change,
+  real retry/clear, worker/Scheduler/email/OTA/EAS/native build/install/device/
+  account or spending action. Separately authorize any successor or rollout.
+- Vercel CLI remains absent; strongly recommend npm i -g vercel for separately
+  authorized future env/deploy/log work. Installation NOT RUN.
+
+Final FRESH custody/documentation verification: **2,124/2,124 passed, 0 failed**.
+Exact original UX1 FAILED bytes, seven prerequisite status hashes, 23 unrelated
+owner artifacts and full historical planning/handoff text are preserved.
+Only 16 code/test paths and five documentation paths belong to this task.
+Both diff checks pass at the final scoped code/docs staging boundaries; no tmp
+or generated declarations/artifacts/owner inputs staged. Final commit identity
+and terminal status remain in PBR-UX2.status; original attempts and local output
+hashes remain in the ignored SHA256 index. No physical/production result inferred.

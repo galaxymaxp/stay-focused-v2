@@ -1,3 +1,38 @@
+<!-- PBR-UX2 completion begin -->
+## PBR-UX2 current LOCAL checkpoint: PASS
+
+2026-10-23: Authorized Queue/course-actions slice complete after actual UX1b
+PASS. Code 973f3c7f repairs Queue header reflow, replaces only audited navigation
+chevrons with bounded transient feedback, and exposes exact existing top-level
+course actions in independent accessible menus. Failure reasons/history/retries,
+actions/labels/routes, permissions, owner isolation and offline behavior remain.
+No backend/data/generation/controller/dependency change. Library tile dimensions
+and existing title/footnote limitation remain; Android resume-text stays separate.
+[Acceptance, attempts, exact gates and limits](ai/acceptance/pbr-ux2-queue-actions-fix.md).
+
+FRESH full mobile 1,665/176 files, web 580/76, shared 716/74, API 2,455/214:
+**5,416 pass / 0 fail / 3 existing live skips**. Focused mobile 181/15 and web
+76/9 PASS. Forced typecheck/lint/serial root build each 8/8, 0 cached; standalone
+API/web builds and offline Android JS/assets export PASS; six existing warnings.
+96 responsive scenarios and 96 motion/text cases PASS; menu/short/scaled flows
+12/12, action inventory 57/57 and guard 3/3 PASS. First mobile mock failures,
+web 579/1 flake, later mobile 1,664/1 flake and corrected collector attempts are
+retained; unchanged full serial reruns pass. No exact flake cause is invented.
+
+Scoped local commits: d9b5a6f0 freeze; 973f3c7f implementation; final documentation
+identity in Git/PBR-UX2.status. Original UX1 FAILED and prerequisite/history/owner
+inputs preserved. Every mandatory LOCAL row complete; finite UX2 endpoint reached.
+No successor/controller/queue/manifest publication or new initiative. OX2 blocked
+by OX1 and unrelated Owner Pause remain.
+
+**Owner steps remaining:** Rollout/Device checks NOT RUN, skipped entirely.
+Production/database/migration/Scheduler/provider state, authenticated/native
+fontScale/assistive technology/focus/targets and physical performance UNVERIFIED
+(owner to confirm). RT1/EV1 STOPPED; RT2 physical STOPPED / resume-text INCONCLUSIVE
+and deferred unchanged. No push/deploy/service/remote SQL/migration/env-file/
+worker/Scheduler/email/OTA/EAS/native build/install/device/spending action.
+<!-- PBR-UX2 completion end -->
+
 <!-- PBR-UX1b completion begin -->
 ## PBR-UX1b current local checkpoint: PASS
 
