@@ -66,3 +66,33 @@ AF1 work; AS1 follows LP1, LR1 follows AS1. No successor implemented here.
 Vercel CLI is unavailable. Strongly recommend `npm i -g vercel` for separately
 authorized future env/deploy/log tooling; installation and Vercel commands are
 NOT RUN in this task.
+## STEP 1 baseline checkpoint
+
+FRESH corrected synthetic probe: 12 passed / 3 files, 0 failures/skips.
+Repository adapter: 40 measured walks plus 8 warmups; exact results and safe
+hidden-history failure checked on each walk. Library: 5 runs per size/schedule,
+one full 8-case warmup; setup/navigation: 10 runs each, one warmup. Timings use
+Node performance.now; individual rows and hashes persisted in measurements.json.
+Library interval starts before the first invalidation and ends after gate release
+and React flush (includes explicit harness yield/late-write work); API interval
+covers only the complete awaited page walk, excluding fixture construction/hash.
+Setup interval covers actual lazy module database open/WAL/schema/store creation;
+warm setup resolves the same cached store. Cache miss/hit intervals await the
+actual screen snapshot wrapper. Entry intervals cover actual IndexRoute renderer
+mount while restoring and update to Redirect; notification interval covers valid
+tap callback through actual AppLifecycle effect and one stub router.push.
+
+Before instrumentation medians (ms): cold setup1.887, warm setup0.064;
+cold cache miss0.041, warm cache hit0.061; restoring mount0.409,
+entry decision update0.194, notification dispatch0.245. Not physical startup.
+Library unchanged/changed medians: 0:14.696/15.086, 100:17.798/14.930,
+240:15.269/15.746, 300:15.726/14.993. Every case2 summary/2 stats/max1.
+API 0/100/240/300 medians without history0.044/0.156/0.787/0.634;
+with1000 history1.870/2.379/7.454/7.620. Reads2/2/6/6 versus7/7/21/21,
+identical full visible result hashes across history cohorts. The complete
+hidden ID set is asserted per page. No optimization or device inference.
+
+First probe attempt: 2 passed / 1 navigation import suite failed before execution
+because helper replacement mangled a relative import; corrected helper path and
+reran unchanged fixtures/assertions. Initial log retained. Exploratory reads of
+three nonexistent guessed test filenames failed; actual paths discovered.
