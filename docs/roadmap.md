@@ -1,5 +1,21 @@
 # Roadmap
 
+<!-- PBR-RT2 begin -->
+PBR-RT2 direct-PC diagnostic (2026-10-23): **BLOCKED at identity/isolation
+preflight; rendering INCONCLUSIVE, cause UNRESOLVED.** Fresh local ADB confirms
+one Realme RMX3151 / Android13/API33, package 2.3.0/code7; 13/13 recorded reads
+exit0. Active validated network; full active OTA/runtime/channel UNKNOWN. Runbook
+preflight stops apply: 0 app launches/navigation/resumes/captures/tree dumps.
+No repair justified. Independent physical display and app theme/motion UNKNOWN.
+[New acceptance and exact evidence](ai/acceptance/pbr-rt2-direct-realme-diagnostic.md).
+FRESH full suites: 4809 pass/0 fail/3 existing live skips; 65 focused checks pass.
+Forced root typecheck/lint/build: 8/8 each, 0 cached; Android offline JS export
+PASS. Supported supervisor controller handoff applied; no tasks admitted. Historical RT1/EV1 STOPPED and RDP preparation PASS preserved;
+MB1 -> LP1 -> AS1 -> LR1 HELD, beta BLOCKED. Initial runner idle, enabled, Pause
+OFF; no duplicate runner or queue bypass. No release/install/settings/data change.
+<!-- PBR-RT2 end -->
+
+
 <!-- PBR-RDP device preflight begin -->
 PBR-RDP authorized device session (2026-10-23): **STOPPED at preflight**.
 ADB freshly confirms Realme RMX3151 / Android 13 / API 33 and native

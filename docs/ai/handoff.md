@@ -10392,3 +10392,44 @@ pin intended baseline, already-isolated public/empty safe app state and physical
 observer before bounded transitions. No automatic setting change/workaround.
 Rollout NOT RUN. RT1/EV1 STOPPED; MB1/LP1/AS1/LR1 HELD; beta BLOCKED. Other
 OX/parity/Owner Pause states and contradictory archived originals unchanged.
+
+## PBR-RT2 — direct-PC Realme diagnostic (2026-10-23)
+
+**BLOCKED at identity/isolation preflight; rendering INCONCLUSIVE; cause
+UNRESOLVED.** Direct owner-authorized local ADB, not the unattended bridge.
+Initial HEAD 32a7d220, expected overnight/2026-10-15_feedback; tracked/index
+clean, local github/main snapshot 16 ahead/23 behind, no fetch. Author and
+unrelated UI/, apps/mobile/.gitignore, supabase/.temp/ preserved.
+
+FRESH single Realme RMX3151/Android13/API33, package com.galaxymaxp.stayfocusedv2
+2.3.0/code7. Thirteen metadata reads exit0 at 03:45:15–03:45:16 UTC. Phone has
+active validated network; full OTA/runtime/channel UNKNOWN. Runbook items4/5
+and current owner identity stop apply before navigation/capture. **0 launches,
+0 resume cycles, 0 screenshots/tree dumps/logcat.** Physical display, native
+Text/GL/focus, app theme/motion and reproduction UNKNOWN. No supported cause,
+source change or regression test invented. Historical FS7 PNG/XML contradiction
+and RT1/EV1 STOPPED records unchanged; four dependents HELD, beta BLOCKED.
+
+[Acceptance and sanitized custody](acceptance/pbr-rt2-direct-realme-diagnostic.md).
+Separate ignored evidence tmp/overnight/PBR-RT2/pbr-rt2-20261023T034515540Z/
+contains timestamped command ledger, sanitized metadata and SHA256/bytes manifest;
+no raw private captures. PC-only guarded offline verification on unchanged code:
+shared706/mobile1651/API2452 = **4809 pass, 0 fail, 3 existing live skips**;
+focused resume65/5 files pass. Forced typecheck/lint/build8/8 each,0 cached;
+API37/web23 static pages; standalone Android JS/assets export PASS (not APK).
+Six existing lint warnings; no failed product gate/new skip. Generated Next
+declarations restored and final forced typecheck passes. Exact command timings,
+freshness, outputs and hashes retained locally. Diff/index/docs preservation
+checks recorded at closure. No release/install/OTA/FULLSEND/push, network or
+app settings/data changes, private storage, migrations or paid/provider calls.
+
+Supported controller review 6ea624c7-955c-46f1-840d-86da5bc52dcf applied
+(backlog/ledger/panel status; queued[], rollout false). MB1->LP1->AS1->LR1 remain
+held until native predecessor actually passes. Existing runner remains enabled/
+Pause OFF; no duplicate runner or manual queue/status edits. Blocking prerequisites
+are safe full active OTA/runtime identity and an already isolated public/empty
+state; physical display UNKNOWN unless independently observed. No repeat routine
+permission requested. Receipt: ignored PBR-RT2/supervisor-review-1.json.
+First root build interrupted for Turbo environment propagation; corrected
+guarded rerun PASS; log and timing clarification retained. Docs/custody37/37,
+0 failed. Local commit follows; final committed HEAD gets fresh controller review.
