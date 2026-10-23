@@ -105,3 +105,71 @@ it('out-of-order level completions keep the most recent selected body', async ()
   await act(async () => finish.get('topic_simplify')!(result('topic_simplify')));
   expect(body()).toContain('topic_explain_simply'); expect(body()).not.toContain('topic_simplify');
 });
+
+it('reuses the complete content identity during parent updates and preserves the active answer', async () => {
+  const original = JSON.stringify;
+  const serialized: string[] = [];
+  const spy = vi.spyOn(JSON, 'stringify').mockImplementation((...args: Parameters<typeof JSON.stringify>) => {
+    const value = original(...args);
+    const input: unknown = args[0];
+    if (Array.isArray(input) && input.length === 4 && input[1] === reviewer.id && typeof input[3] === 'string') serialized.push(value);
+    return value;
+  });
+  try {
+    await mount();
+    const expected = original([props.owner, selection.reviewerId, selection.sectionId, selection.canonicalContent]);
+    expect(serialized).toEqual([expected]);
+    await press('Simplify');
+    const answer = body();
+    const reads = mocks.peek.mock.calls.length;
+    for (let update = 0; update < 4; update++) {
+      await act(async () => tree!.update(createElement(TopicAssist, { ...props }, 'UPDATED_COMPLETE_BODY')));
+      expect(body()).toBe(answer);
+      expect(button('Simplify').props['aria-checked']).toBe(true);
+    }
+    expect(serialized).toEqual([expected]);
+    expect(mocks.peek).toHaveBeenCalledTimes(reads);
+    expect(mocks.run).toHaveBeenCalledOnce();
+    // A new model object with identical canonical content must keep the same key/state.
+    await act(async () => tree!.update(createElement(TopicAssist, { ...props, reviewer: structuredClone(reviewer) }, 'UPDATED_COMPLETE_BODY')));
+    expect(serialized).toEqual([expected, expected]);
+    expect(body()).toBe(answer);
+    await press('Original');
+    expect(body()).toContain('UPDATED_COMPLETE_BODY');
+    expect(body()).not.toContain('topic_simplify');
+  } finally { spy.mockRestore(); }
+});
+it('discards pending old-owner results on owner change and after unmount', async () => {
+  let finish!: (value: TopicResult) => void;
+  mocks.run.mockImplementation(() => new Promise<TopicResult>(resolve => { finish = resolve; }));
+  await mount(); await press('Simplify');
+  expect(body()).toContain('Creating your explanation');
+  const reads = mocks.peek.mock.calls.length;
+  await act(async () => tree!.update(createElement(TopicAssist, { ...props, owner: 'different-owner' }, 'NEW_OWNER_COMPLETE_BODY')));
+  expect(mocks.peek.mock.calls.slice(reads).every(call => call[0] === 'different-owner')).toBe(true);
+  expect(body()).toContain('NEW_OWNER_COMPLETE_BODY');
+  expect(button('Simplify').props['aria-checked']).toBe(false);
+  const completes = mocks.complete.mock.calls.length;
+  await act(async () => finish(result('topic_simplify')));
+  expect(body()).toContain('NEW_OWNER_COMPLETE_BODY');
+  expect(body()).not.toContain('topic_simplify');
+  expect(mocks.complete).toHaveBeenCalledTimes(completes);
+  await press('Simplify');
+  await act(async () => tree!.unmount()); tree = undefined;
+  const afterUnmount = mocks.complete.mock.calls.length;
+  await act(async () => finish(result('topic_simplify')));
+  expect(mocks.complete).toHaveBeenCalledTimes(afterUnmount);
+});
+it('retains exact content resets for reviewer, section and unavailable selection identities', async () => {
+  await mount(); await press('Simplify');
+  const other = { ...reviewer, id: 'artifact:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' };
+  await act(async () => tree!.update(createElement(TopicAssist, { ...props, reviewer: other })));
+  expect(body()).toContain('CANONICAL_BODY'); expect(button('Simplify').props['aria-checked']).toBe(false);
+  await press('Simplify');
+  const otherSection = { ...other, sections: [{ ...other.sections[0]!, id: 'second-section' }] };
+  await act(async () => tree!.update(createElement(TopicAssist, { ...props, reviewer: otherSection, sectionId: 'second-section' })));
+  expect(body()).toContain('CANONICAL_BODY'); expect(button('Simplify').props['aria-checked']).toBe(false);
+  await act(async () => tree!.update(createElement(TopicAssist, { ...props, reviewer: otherSection, sectionId: 'missing' })));
+  expect(body()).toContain('CANONICAL_BODY');
+  expect(mocks.run).toHaveBeenCalledTimes(2);
+});

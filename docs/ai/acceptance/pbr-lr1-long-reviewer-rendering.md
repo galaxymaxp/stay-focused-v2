@@ -125,3 +125,145 @@ deltas include test renderer/mocks/spies/effects and are descriptive host
 proxies; temporary JSON/verification allocations and GC prevent interpreting
 heap deltas as retained reader memory. Native, authenticated browser and
 production evidence remain NOT RUN / UNVERIFIED.
+
+## STEP 2 and STEP 3: exact key reuse, unchanged complete results
+
+Only `TopicAssist.tsx` on mobile and `topic-assist.tsx` on web change at runtime:
+the existing full JSON key is computed with useMemo using owner/selection.
+All original identity values, child props, hooks, effects and content remain.
+There is no module/owner cache; React may safely recompute the same value.
+The selection was already memoized by reviewer-object/section identity. A new
+model object computes its key even when content is equal, preserving the exact
+previous state/reset behavior. Deferred-query outer keys still remount controls.
+
+Added three meaningful tests per client: exact work count with full serialized
+key and active-answer/tree equality, old-owner/unmounted pending results, and
+reviewer/section/missing-selection resets. Existing exact-content reset tests
+also pass. FRESH focused reruns: **mobile 362/362 (28 files), web 66/66
+(11 files), 0 failed / 0 skipped**. No expectation/test was weakened.
+
+Identical corrected probes after the edit: **FRESH 2/2 PASS, 0 failed/skipped**.
+Comparison helper: **771/771 PASS, 0 failed**, including unchanged fixture/probe
+script hashes, every schedule's complete output hashes, source/model length and
+hash, ordered segments/anchors, canonical selections, parser fixture, export
+layout, node count, search invocation count and React commit count. All five
+complete input models are saved as fixtures.json. Runtime file/diff hashes are
+in runtime-after.json; baseline originals and tool hashes are retained separately.
+The two corrected cohorts execute serially, each in fresh Vitest processes;
+installed Node24.16.0, React/test-renderer19.2.3, Vitest4.1.11, Windows x64.
+One warmup per size per client, then three samples; fixed order, warm OS/module/
+JIT caches possible. No cache purge or randomized experiment.
+
+| Topics / complete segments | Mobile key calls before -> after | Web key calls before -> after | Key output code units mobile before -> after | Web before -> after |
+| --- | ---: | ---: | ---: | ---: |
+| 0 / 0 | 0 -> 0 | 0 -> 0 | 0 -> 0 | 0 -> 0 |
+| 1 / 45 | 11 -> 3 | 10 -> 3 | 47,575 -> 12,975 | 43,250 -> 12,975 |
+| 12 / 540 | 132 -> 36 | 120 -> 36 | 572,088 -> 156,024 | 520,080 -> 156,024 |
+| 120 / 5,400 | 1,320 -> 360 | 1,200 -> 360 | 5,786,220 -> 1,578,060 | 5,260,200 -> 1,578,060 |
+| 240 / 10,800 | 2,640 -> 720 | 2,400 -> 720 | 11,637,780 -> 3,173,940 | 10,579,800 -> 3,173,940 |
+
+Calls are deterministic in every warmup/sample. Each client retains three
+serializations per topic: mount, search remount, clear remount. Four unchanged
+parent updates add **zero**, versus one per topic per update previously.
+The 240-topic schedule avoids 8,463,840 mobile / 7,405,860 web code units of
+repeat serialization. These are UTF-16 output-length/work proxies, not bytes
+of measured retained heap; JS interning/GC/string storage are not inferred.
+The memo holds one key reference and dependency tuple per mounted topic, while
+the complete canonical selection and React key were already retained.
+
+**No rerender reduction, retained-heap saving or host/device speedup is claimed.**
+Commit counts stay mobile 13 / web 12 for each nonempty schedule, and 6 / 5
+for empty; 240-topic final host node counts stay mobile 64,362 / web 40,822.
+Source/search derivations stay one segments execution and three reader searches
+per nonempty schedule (plus one explicit test oracle search). Original reader
+prose invokes no StudyText parser; the independent assist parser sample is
+unchanged. Full search, selection, emphasis and code whitespace remain equal.
+Images/offline behavior/accessibility are additionally covered by fresh focused
+and full client/shared suites; exports use unchanged complete saved models.
+
+Descriptive median act intervals in milliseconds (three measured samples each):
+
+| Client / topics | Mount before -> after | Identical-prop parent update | Search |
+| --- | ---: | ---: | ---: |
+| mobile / 120 | 1009.201 -> 1002.704 | 665.842 -> 715.993 | 1609.062 -> 1099.201 |
+| mobile / 240 | 1946.286 -> 1927.473 | 938.481 -> 936.989 | 2218.922 -> 2276.480 |
+| web / 120 | 140.234 -> 138.013 | 151.139 -> 151.974 | 784.203 -> 888.470 |
+| web / 240 | 682.340 -> 673.659 | 641.138 -> 730.302 | 1743.028 -> 1836.563 |
+
+Mixed timing movement is not evidence of a latency gain; the exact removed
+serialization is the supported result. Hashing/equality verification is outside
+timed act calls. Raw individual samples/Profiler phases/heap deltas remain in
+mobile-before/after.json, web-before/after.json and comparison.json; no samples
+are discarded except explicitly labelled warmups. Heap deltas include snapshot
+serialization, spy retention, verification allocations and uncontrolled GC, so
+they do not establish reader RAM or peak-memory improvement. This small pure
+derived-value repair leaves full rendering, owner privacy, failure checks,
+source completeness, media, semantics, exports and pagination unchanged.
+No ADR is needed. Mandatory full gates and final closure follow below.
+
+React performance review: both new hooks are unconditional pure computations;
+owner and the existing memoized selection cover every serialized input. No
+mutable ref, callback, subscription, dependency, accessibility attribute or
+conditional branch changes. Dropping React's memo only recomputes the same key.
+The tests verify state/lifecycle behavior as well as work counts; they do not
+replace an output-equivalence check with an implementation-only assertion.
+
+## Final mandatory local gates
+
+All successful rows below are **FRESH**, with zero failed tests and no new
+skip or observed product flake. Turbo reports 8/8 successful and 0 cached for
+each forced root gate. Compiler/Metro/OS caches may remain warm. Commands run
+serially through the inspected loopback-only offline runner, local temp, no
+environment-file reads, telemetry off and local-only Turbo cache.
+
+| Exact command | Result | Seconds |
+| --- | --- | ---: |
+| `npm run test --workspace @stay-focused/mobile -- src/features/reviewer src/services/reviewerImages.test.ts src/services/localLibrary/offlineImagePresentation.test.ts src/services/localLibrary/useOfflineReviewerImages.test.ts src/features/export --maxWorkers=2` | Test Files  28 passed (28); Tests  362 passed (362) | 10.059 |
+| `npm run test --workspace @stay-focused/web -- src/features/reviewer src/app-model/reviewerNavigation.test.ts src/features/study-export --maxWorkers=2` | Test Files  11 passed (11); Tests  66 passed (66) | 4.637 |
+| `node node_modules/vitest/vitest.mjs run --config tmp/overnight/PBR-LR1/probe.config.ts --maxWorkers=1 --reporter=verbose` | Test Files  2 passed (2); Tests  2 passed (2) | 185.709 |
+| `npm run typecheck -- --force` | Tasks:    8 successful, 8 total; Cached:    0 cached, 8 total | 38.105 |
+| `npm run lint -- --force` | Tasks:    8 successful, 8 total; Cached:    0 cached, 8 total | 51.142 |
+| `npm run test --workspace @stay-focused/shared -- --maxWorkers=2` | Test Files  74 passed (74); Tests  716 passed (716) | 15.188 |
+| `npm run test --workspace @stay-focused/mobile -- --maxWorkers=2` | Test Files  174 passed (174); Tests  1661 passed (1661) | 61.778 |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=2` | Test Files  214 passed (214); Tests  2455 passed \| 3 skipped (2458) | 165.969 |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=2` | Test Files  76 passed (76); Tests  578 passed (578) | 156.506 |
+| `npm run build --workspace @stay-focused/api` | PASS; artifact identity retained below | 114.112 |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | PASS; artifact identity retained below | 128.908 |
+| `npm run build --workspace @stay-focused/web` | PASS; artifact identity retained below | 47.869 |
+| `npm run build -- --force --concurrency=1 --env-mode=loose` | Tasks:    8 successful, 8 total; Cached:    0 cached, 8 total | 364.619 |
+
+Full relevant suites: shared 716 /74 files (including emitted copies), mobile 1661
+/174, API 2455 /214 plus 3 existing live skips, web 578 /76: **5,410 passed /
+0 failed / 3 existing live skips**. Focused mobile 362 + web 66 are overlapping
+coverage, not added to the full-suite total. Synthetic reader before/after probes
+2/2 each and strict comparison 771/771 are separate evidence. API workflow/provider
+contract commands are NOT APPLICABLE to this pure client computation change;
+no live provider/database/device suite is run.
+
+First forced lint: 5/8 successful tasks, 0 cached, web failed on 3 new test
+react/no-children-prop errors. Corrected createElement calls to pass children as
+arguments in both new test groups; no assertion or lint rule changed. Rerun
+8/8, 0 cached, 0 errors, six existing warnings. Fresh forced typecheck repeated
+after this test-only edit: 8/8, 0 cached. Full suites exercise the final test code.
+Original failed logs/red tests/probe attempts are preserved. The runtime source
+hashes still match the successful after measurement, checked by gate-report.cjs.
+
+Standalone API build ID: aOabaeQhG6XxVqwcjXvvK. Standalone web:
+eTzj6GBH6Ra2j0yPwoopN. Android JS/assets export:
+38 files /14,671,742 bytes, all copied unchanged
+with individual SHA256s under standalone-android-export/. Root build IDs:
+API R71mSox2ecfjg4-innZ3C, web vPP6OJgNGEDHbfHbi48-K; mobile
+84 files /35,320,978 bytes across Android/iOS/web. These are local
+artifacts, not a deployed revision, new native APK, OTA or size-saving claim.
+Build logs and per-file hashes are retained; no generated artifact is staged.
+
+Acceptance rows 0, 1, 2, 3, B, G pass for the mandatory LOCAL scope. Closure row C
+finishes with the planning/handoff reconciliation, source/custody verification,
+diff/index checks and scoped local documentation commit below. Physical/native/
+authenticated-browser/production performance stays NOT RUN / UNVERIFIED; the finite
+roadmap endpoint authorizes no further task, physical retry or release.
+
+FRESH standalone and root page generation: API 37/37 and web 23/23. Both
+Next-generated next-env.d.ts files were inspected and restored byte-for-byte
+to the initial source; final forced typecheck after restoration is 8/8,
+0 cached. No generated declaration or output is included in the commits.

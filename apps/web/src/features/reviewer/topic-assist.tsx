@@ -13,7 +13,9 @@ type Props = {
 };
 export function TopicAssist(props: Props) {
   const selection = useMemo(() => selectTopic(props.reviewer, props.sectionId), [props.reviewer, props.sectionId]);
-  return <TopicAssistContent key={JSON.stringify([props.owner, selection?.reviewerId, selection?.sectionId, selection?.canonicalContent])} {...props} />;
+  // Keep the exact reset identity without reserializing the full topic on parent updates.
+  const contentKey = useMemo(() => JSON.stringify([props.owner, selection?.reviewerId, selection?.sectionId, selection?.canonicalContent]), [props.owner, selection]);
+  return <TopicAssistContent key={contentKey} {...props} />;
 }
 function TopicAssistContent({ reviewer, sectionId, owner, client, online, children }: Props) {
   const selection = useMemo(() => selectTopic(reviewer, sectionId), [reviewer, sectionId]);
