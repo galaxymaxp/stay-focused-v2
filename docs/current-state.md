@@ -1,5 +1,25 @@
 # Current State
 
+<!-- PBR-RDP begin -->
+PBR-RDP / Realme diagnostic preparation (2026-10-23): **PASS for local
+documentation preparation only**. [Owner-present runbook](ai/acceptance/pbr-rdp-realme-runbook.md)
+pins phone/native/OTA identity, existing theme/motion and isolation preconditions,
+chronological bounded observations (20 minutes / at most ten resumes), independent
+physical-screen versus screenshot/tree records, privacy stops and immutable
+artifact custody. Separate authorized physical diagnostic **NOT RUN**: current
+bridge offers documentation preparation only, no device-execution action.
+No source/native/config change or speculative fix. PBR-EV1 and PBR-RT1 remain
+STOPPED; PBR-MB1/PBR-LP1/PBR-AS1/PBR-LR1 remain HELD, unqueued/unstarted;
+**beta readiness BLOCKED**. Known archived FS7 ordering contradiction preserved.
+Current phone/full OTA, native cause, original chronology and live state remain
+**UNVERIFIED (owner to confirm)**. Rollout and Device checks NOT RUN, skipped
+entirely; no service, environment-file, release, device or push action.
+Fresh verification counts and exact commands are in the runbook/handoff.
+Prior acceptance, OX2 block, other pending work, parity and Owner Pause preserved.
+Finite preparation endpoint reached; owner-present diagnostics/review remain,
+with no automatic RT1 retry, successor or release.
+<!-- PBR-RDP end -->
+
 <!-- PBR-EV1 begin -->
 PBR-EV1 (2026-10-23): **STOPPED during archive-only STEP 1** on recovered
 pixel/report contradiction. The sibling FS7 release clone exists: first
