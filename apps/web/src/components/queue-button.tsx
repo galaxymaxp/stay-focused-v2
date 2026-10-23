@@ -156,7 +156,7 @@ export function QueueButton() {
           ) : null}
           {sections.map((group) => (
             <section className="stack" key={group.key}>
-              <div className="row between">
+              <div className="row between queue-section-header">
                 <h3>{group.title}</h3>
                 {group.key === "attention" || group.key === "completed" ? (
                   <button

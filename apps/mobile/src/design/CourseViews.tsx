@@ -1,5 +1,5 @@
 import { ChevronRight, Pin } from "lucide-react-native";
-import { useEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Pressable, View, type AccessibilityActionEvent, type AccessibilityActionInfo } from "react-native";
 
 import { courseAccent, type CourseIdentity } from "./courseIdentity";
@@ -8,6 +8,7 @@ import { motion, useTheme } from "./theme";
 import { density, hitTarget, radius, spacing } from "./tokens";
 
 function usePressScale() {
+  const feedback = useContext(CourseFeedbackContext);
   const { reducedMotion } = useTheme();
   const scale = useRef(new Animated.Value(1)).current;
   useEffect(() => () => scale.stopAnimation(), [scale]);
@@ -15,7 +16,34 @@ function usePressScale() {
     if (reducedMotion) return;
     Animated.spring(scale, { toValue: value, ...motion.spring, useNativeDriver: true }).start();
   };
-  return { scale, onPressIn: () => to(0.975), onPressOut: () => to(1) };
+  const { active = false, ...handlers } = feedback ?? { onPressIn: () => to(0.975), onPressOut: () => to(1) };
+  return { scale, active, handlers };
+}
+
+const CourseFeedbackContext = createContext<{
+  active: boolean;
+  onPressIn: () => void; onPressOut: () => void; onFocus: () => void;
+  onBlur: () => void; onHoverIn: () => void; onHoverOut: () => void;
+} | null>(null);
+
+/** Outside SwipeRow's clip. Four reserved points bound even unusually tall cards. */
+export function CourseFeedback({ children, options, compact = false }: { children?: ReactNode; options: ReactNode; compact?: boolean }) {
+  const { reducedMotion, colors } = useTheme();
+  const [pressed, setPressed] = useState(false), [focused, setFocused] = useState(false), [hovered, setHovered] = useState(false);
+  const [extent, setExtent] = useState(1);
+  const active = pressed || focused || hovered;
+  return <View style={{ padding: compact ? 0 : 4 }}>
+    <View onLayout={event => setExtent(Math.max(1, event.nativeEvent.layout.width, event.nativeEvent.layout.height))}
+      style={{ borderRadius: radius.card, backgroundColor: active ? colors.surfaceSecondary : undefined,
+        transform: [{ scale: active && !reducedMotion ? Math.min(1.01, 1 + 6 / extent) : 1 }] }}>
+      <CourseFeedbackContext.Provider value={{ active, onPressIn: () => setPressed(true), onPressOut: () => setPressed(false),
+        onFocus: () => setFocused(true), onBlur: () => { setFocused(false); setPressed(false); setHovered(false); },
+        onHoverIn: () => setHovered(true), onHoverOut: () => { setHovered(false); setPressed(false); } }}>
+        {children}
+      </CourseFeedbackContext.Provider>
+    </View>
+    <View style={{ marginTop: 4 }}>{options}</View>
+  </View>;
 }
 
 /** Pin and Hide stay reachable to screen readers as named actions. */
@@ -56,6 +84,7 @@ export function CourseCard({
   children,
   testID,
   pinned = false,
+  navigationFeedback = false,
   accessibilityActions,
   onAccessibilityAction,
 }: {
@@ -65,6 +94,7 @@ export function CourseCard({
   children?: ReactNode;
   testID?: string;
   pinned?: boolean;
+  navigationFeedback?: boolean;
 } & ItemAccessibilityActions) {
   const { colors } = useTheme();
   const press = usePressScale();
@@ -77,8 +107,7 @@ export function CourseCard({
         onAccessibilityAction={onAccessibilityAction}
         testID={testID}
         onPress={onPress}
-        onPressIn={press.onPressIn}
-        onPressOut={press.onPressOut}
+        {...press.handlers}
         style={({ pressed }) => ({
           minHeight: hitTarget.min + 20,
           flexDirection: "row",
@@ -88,9 +117,9 @@ export function CourseCard({
           paddingLeft: spacing[3],
           paddingRight: spacing[2],
           borderRadius: radius.card,
-          backgroundColor: pressed ? colors.surfaceSecondary : colors.surfacePrimary,
+          backgroundColor: pressed || press.active ? colors.surfaceSecondary : colors.surfacePrimary,
           borderWidth: 1,
-          borderColor: colors.separator,
+          borderColor: press.active ? colors.accent : colors.separator,
         })}
       >
         <CourseMark identity={identity} />
@@ -100,7 +129,7 @@ export function CourseCard({
           {children ? <View style={{ marginTop: 4 }}>{children}</View> : null}
         </View>
         {pinned ? <PinnedMark /> : null}
-        <ChevronRight size={16} color={colors.textMuted} />
+        {navigationFeedback ? null : <ChevronRight size={16} color={colors.textMuted} />}
       </Pressable>
     </Animated.View>
   );
@@ -138,16 +167,15 @@ export function CourseTile({
         accessibilityActions={accessibilityActions ? [...accessibilityActions] : undefined}
         onAccessibilityAction={onAccessibilityAction}
         onPress={onPress}
-        onPressIn={press.onPressIn}
-        onPressOut={press.onPressOut}
+        {...press.handlers}
         style={({ pressed }) => ({
           width,
           height,
           padding: density.cardPadding + 2,
           borderRadius: radius.card,
-          backgroundColor: pressed ? colors.surfaceSecondary : colors.surfacePrimary,
+          backgroundColor: pressed || press.active ? colors.surfaceSecondary : colors.surfacePrimary,
           borderWidth: 1,
-          borderColor: colors.separator,
+          borderColor: press.active ? colors.accent : colors.separator,
           gap: spacing[2],
         })}
       >

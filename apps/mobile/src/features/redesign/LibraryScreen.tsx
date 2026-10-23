@@ -16,7 +16,8 @@ import { Action, Copy, Notice, Page, RowLink, SegmentedControl, Surface, Content
 import { useAuth } from "../../auth";
 import { courseIdentity } from "../../design/courseIdentity";
 import { haptic } from "../../design/haptics";
-import { CourseMark, CourseTile } from "../../design/CourseViews";
+import { CourseFeedback, CourseMark, CourseTile } from "../../design/CourseViews";
+import { CourseOptions } from "../../design/CourseOptions";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { radius, spacing } from "../../design/tokens";
 import { useTheme } from "../../design/theme";
@@ -211,7 +212,7 @@ export function LibraryScreen() {
     const pinned = prefs.pinned.course.includes(group.key);
     const leading = pinAction(pinned, () => change(() => pin("course", group.key, !pinned)));
     return (
-      <SwipeRow key={group.key} compact leading={leading} style={{ width: tileWidth }}>
+      <View key={group.key} style={{ width: tileWidth }}><CourseFeedback compact options={<CourseOptions courseKey={group.key} title={identity.title} actions={leading} pinned={pinned} />}><SwipeRow compact leading={leading}>
         <CourseTile
           identity={identity}
           width={tileWidth}
@@ -221,7 +222,7 @@ export function LibraryScreen() {
           accessibilityLabel={`${identity.title}, ${footnote}`}
           onPress={() => router.push({ pathname: "/library/[courseKey]", params: { courseKey: group.key } })}
         />
-      </SwipeRow>
+      </SwipeRow></CourseFeedback></View>
     );
   }
   // Saved work renders from the device; the skeleton appears only when nothing

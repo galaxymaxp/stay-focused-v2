@@ -19,7 +19,8 @@ import { Pressable, View } from "react-native";
 
 import { useAuth } from "../../auth";
 import { courseIdentity } from "../../design/courseIdentity";
-import { CourseCard, CourseMark } from "../../design/CourseViews";
+import { CourseCard, CourseFeedback, CourseMark } from "../../design/CourseViews";
+import { CourseOptions } from "../../design/CourseOptions";
 import { Action, Copy, Notice, Page, SearchField, Surface, ContentIcon, RowLink, SkeletonBlock } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { spacing } from "../../design/tokens";
@@ -173,9 +174,9 @@ export function GenerateScreen() {
           {group.items.map((course) => {
             const swipe = actions(course, false);
             return (
-              <SwipeRow key={course.id} leading={swipe.leading} trailing={swipe.trailing}>
+              <CourseFeedback key={course.id} options={<CourseOptions courseKey={course.id} title={courseIdentity(course).title} actions={[...swipe.leading, ...swipe.trailing]} pinned={swipe.pinned} />}><SwipeRow leading={swipe.leading} trailing={swipe.trailing}>
                 <GenerateCourseCard course={course} pinned={swipe.pinned} swipeActions={[...swipe.leading, ...swipe.trailing]} onPress={() => openCourse(course)} />
-              </SwipeRow>
+              </SwipeRow></CourseFeedback>
             );
           })}
         </View>
@@ -188,9 +189,9 @@ export function GenerateScreen() {
           {showHidden ? arranged.hidden.map((course) => {
             const swipe = actions(course, true);
             return (
-              <SwipeRow key={course.id} trailing={swipe.trailing} style={{ opacity: 0.6 }}>
+              <CourseFeedback key={course.id} options={<CourseOptions courseKey={course.id} title={courseIdentity(course).title} actions={swipe.trailing} />}><SwipeRow trailing={swipe.trailing} style={{ opacity: 0.6 }}>
                 <GenerateCourseCard course={course} swipeActions={swipe.trailing} onPress={() => openCourse(course)} />
-              </SwipeRow>
+              </SwipeRow></CourseFeedback>
             );
           }) : null}
         </View>
@@ -202,7 +203,7 @@ export function GenerateScreen() {
           </Pressable>
           {showPast ? pastCourses.map(course => {
             const swipe = actions(course, false);
-            return <SwipeRow key={course.id} trailing={swipe.trailing}><GenerateCourseCard course={course} swipeActions={swipe.trailing} onPress={() => openCourse(course)} /></SwipeRow>;
+            return <CourseFeedback key={course.id} options={<CourseOptions courseKey={course.id} title={courseIdentity(course).title} actions={swipe.trailing} />}><SwipeRow trailing={swipe.trailing}><GenerateCourseCard course={course} swipeActions={swipe.trailing} onPress={() => openCourse(course)} /></SwipeRow></CourseFeedback>;
           }) : null}
         </View>
       ) : null}
@@ -216,7 +217,7 @@ function GenerateCourseCard({ course, onPress, pinned = false, swipeActions }: {
   const status = generateCourseStatus(course);
   const synced = course.syncState === "synced";
   return (
-    <CourseCard identity={identity} onPress={onPress} pinned={pinned} {...swipeAccessibility(swipeActions)} accessibilityLabel={`${synced ? "Open" : "Sync"} ${identity.title}, ${status}`}>
+    <CourseCard navigationFeedback identity={identity} onPress={onPress} pinned={pinned} {...swipeAccessibility(swipeActions)} accessibilityLabel={`${synced ? "Open" : "Sync"} ${identity.title}, ${status}`}>
       <Copy size="caption" color={synced ? colors.textMuted : colors.accent}>{status}</Copy>
     </CourseCard>
   );

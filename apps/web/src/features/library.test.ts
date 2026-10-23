@@ -80,6 +80,23 @@ it('defaults LS1 storage while preserving pins',async()=>{
   mocks.get.mockReturnValue(JSON.stringify({sort:{library:'opened'},opened:{Alpha:'2026-03-01'}}));
   await mount();expect(trigger().props['aria-label']).toBe('Sort Library: Updated: newest first');expect(courses()).toEqual(['z','a']);
 });
+it('keeps course pin inside its independent menu, retains navigation, and closes on owner change', async () => {
+  await mount();
+  const courseOptions = () => tree!.root.findAllByType('button').filter(node => String(node.props['aria-label']).startsWith('Course options for '));
+  const routes = courses();
+  await act(async () => courseOptions()[0]!.props.onClick());
+  expect(mocks.set).not.toHaveBeenCalled(); expect(mocks.api).not.toHaveBeenCalled();
+  const pin = tree!.root.findByProps({ role: 'menuitemcheckbox' });
+  expect(pin.props.children).toBe('Pin');
+  await act(async () => pin.props.onClick());
+  expect(JSON.parse(mocks.set.mock.lastCall![1]).pinned.course).toEqual([routes[0]]);
+  expect(mocks.set.mock.lastCall![0]).toBe(`sf.list-preferences.v1.${mocks.owner}`);
+  expect(courses()).toContain(routes[0]); expect(mocks.api).not.toHaveBeenCalled();
+  await act(async () => courseOptions()[0]!.props.onClick());
+  mocks.owner += '-other'; await act(async () => tree!.update(createElement(LibraryScreen)));
+  expect(tree!.root.findAllByProps({ role: 'menuitemcheckbox' })).toHaveLength(0);
+  expect(courses().sort()).toEqual(routes.sort());
+});
 it('supports My order, dates, alphabetic directions and complete Canvas order',async()=>{
   mocks.items=[{...mocks.items[0]!,id:'artifact:Zulu'}, {...mocks.items[1]!,id:'artifact:Alpha',course:mocks.items[0]!.course},card('Pinned',mocks.items[0]!.course,'2025-01-01')];
   mocks.get.mockReturnValue(JSON.stringify({pinned:{artifact:['Pinned']},libraryOrder:{z:['artifact:Zulu','artifact:Alpha','Pinned']}}));

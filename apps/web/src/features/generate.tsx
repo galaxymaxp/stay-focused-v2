@@ -98,7 +98,7 @@ function GenerateSyncStatus({ refresh, resource }: {
  * workspace: they wait in their own section with a Sync button.
  */
 export function GenerateScreen() {
-  const { api } = useAuth();
+  const { api, session } = useAuth();
   const courses = useResource<GenerateCourseList>("/api/experience/courses"),
     [search, setSearch] = useState(""),
     [runs, setRuns] = useState<Record<string, CourseSyncRun>>({}),
@@ -144,6 +144,7 @@ export function GenerateScreen() {
   }
 
   const options = (c: GenerateCourseSummary) => <CourseOptions
+    key={`${session?.user.id ?? ""}:${c.id}`}
     title={courseIdentity(c).title}
     past={c.courseState === 'past' || (!c.courseState && c.period === 'previous')}
     disabled={action.busy}
@@ -159,14 +160,13 @@ export function GenerateScreen() {
       c.reviewerCount ? `${c.reviewerCount} ${c.reviewerCount === 1 ? "Reviewer" : "Reviewers"}` : null,
     ].filter(Boolean);
     return (
-      <div key={c.id} className="generate-course-tile"><Link href={generateCourseDestination(c) === 'sync' ? '/canvas' : `/generate/${c.id}`} onClick={event => { if (generateCourseDestination(c) === 'sync') { event.preventDefault(); void syncCourse(c.id); } }} className="course-card" title={c.name}>
+      <div key={c.id} className="generate-course-tile"><Link href={generateCourseDestination(c) === 'sync' ? '/canvas' : `/generate/${c.id}`} onClick={event => { if (generateCourseDestination(c) === 'sync') { event.preventDefault(); void syncCourse(c.id); } }} className="course-card course-navigation" title={c.name}>
         <CourseMark course={c} identity={identity} size={44} />
         <span className="grow">
           <strong>{identity.title}</strong>
           <span className="meta">{[identity.subtitle, ...counts].filter(Boolean).join(" · ")}</span>
           <span className="meta course-sync-line">{generateCourseStatus(c)}</span>
         </span>
-        <Icon name="chevron-right" />
       </Link>{options(c)}</div>
     );
   };

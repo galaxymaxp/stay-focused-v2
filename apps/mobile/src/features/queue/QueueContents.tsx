@@ -43,9 +43,9 @@ export function QueueContents() {
     {error ? <Notice>{error}</Notice> : null}
     {queue.loading ? <SkeletonCards rows={2} label="Loading your generations" /> : null}
     {groups.map(group => <View key={group.key} style={{gap: spacing[2]}}>
-      <View style={{flexDirection:"row",alignItems:"center",justifyContent:"space-between"}}>
-        <Copy size="h2">{group.title}</Copy>
-        {group.key === "attention" ? <Action secondary label="Clear items that need attention" onPress={() => void clearAttention()}>Clear</Action> : null}
+      <View style={{flexDirection:"row",flexWrap:"wrap",alignItems:"center",justifyContent:"space-between",gap:spacing[2]}}>
+        <Copy size="h2" style={{flexShrink:1,minWidth:0}}>{group.title}</Copy>
+        {group.key === "attention" ? <Action secondary style={{minWidth:48}} label="Clear items that need attention" onPress={() => void clearAttention()}>Clear</Action> : null}
         {group.key === "completed" ? <Action secondary label={`Clear ${group.jobs.length} completed Queue entries`} onPress={() => group.jobs.forEach(job => hide("queue",job.id,true))}>Clear Completed</Action> : null}
       </View>
       {group.key === "attention" ? visiblePending.map(item => <Surface key={item.key}>

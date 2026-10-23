@@ -1,4 +1,4 @@
-import { createElement, type ReactElement } from "react";
+import { createElement, type ReactElement, type ReactNode } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -83,6 +83,7 @@ const graceNavigation = {
   },
 };
 vi.mock("expo-router", () => ({
+  usePathname: () => "/courses",
   router: { push: mocks.push, navigate: mocks.navigate, back: mocks.back, replace: mocks.replace, canGoBack: () => true },
   useLocalSearchParams: () => mocks.params,
 }));
@@ -127,6 +128,7 @@ vi.mock("../../design/primitives", () => ({
   SkeletonCards: "SkeletonCards",
 }));
 vi.mock("../../design/CourseViews", () => ({
+  CourseFeedback: ({ children, options }: { children: ReactNode; options: ReactNode }) => createElement("CourseFeedback", null, children, options),
   CourseCard: "CourseCard",
   CourseMark: "CourseMark",
   CourseTile: "CourseTile",
@@ -211,6 +213,7 @@ vi.mock("react-native-svg", () => ({
   Text: "SvgText",
 }));
 vi.mock("lucide-react-native", () => ({
+  MoreHorizontal: "MoreHorizontal",
   ArrowDownWideNarrow: "ArrowDownWideNarrow",
   Ellipsis: "Ellipsis",
   FileText: "FileText",

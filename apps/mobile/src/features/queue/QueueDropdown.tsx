@@ -56,12 +56,13 @@ export function QueueDropdown() {
           <View
             style={{
               flexDirection: "row",
+              flexWrap: "wrap",
+              gap: spacing[2],
               alignItems: "center",
               justifyContent: "space-between",
             }}
           >
-            <Copy size="h2">Queue</Copy>
-            <View style={{ flex: 1 }} />
+            <Copy size="h2" style={{ flexGrow: 1, flexShrink: 1, minWidth: 0 }}>Queue</Copy>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Refresh queue"
@@ -72,7 +73,7 @@ export function QueueDropdown() {
             >
               {refreshing ? <ActivityIndicator color={colors.accent} /> : <RefreshCw size={density.utilityIcon} color={colors.accent} />}
             </Pressable>
-            <Action secondary onPress={queue.close}>
+            <Action secondary style={{ minWidth: hitTarget.min }} onPress={queue.close}>
               Close
             </Action>
           </View>

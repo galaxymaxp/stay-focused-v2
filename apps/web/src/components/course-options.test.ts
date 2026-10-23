@@ -43,3 +43,16 @@ it('closes on Escape, outside pointer press, and focus leaving the disclosure', 
     expect(trigger().props['aria-expanded']).toBe(false);
   }
 });
+it('exposes only Library Pin/Unpin with selected state and guards disabled activation', async () => {
+  const pin = vi.fn();
+  await act(async () => { tree = create(createElement(CourseOptions, { title: 'Personal & other', pinned: true, onPin: pin })); });
+  await act(async () => trigger().props.onClick());
+  const item = tree.root.findByProps({ role: 'menuitemcheckbox' });
+  expect(item.props).toMatchObject({ 'aria-checked': true, 'aria-label': 'Unpin Personal & other', children: 'Unpin' });
+  expect(pin).not.toHaveBeenCalled();
+  await act(async () => item.props.onClick()); expect(pin).toHaveBeenCalledOnce();
+  await act(async () => tree.update(createElement(CourseOptions, { title: 'Personal & other', pinned: false, onPin: pin, disabled: true })));
+  await act(async () => trigger().props.onClick());
+  await act(async () => tree.root.findByProps({ role: 'menuitemcheckbox' }).props.onClick());
+  expect(pin).toHaveBeenCalledOnce(); expect(trigger().props['aria-expanded']).toBe(true);
+});

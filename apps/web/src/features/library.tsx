@@ -30,6 +30,7 @@ import {
 import { arrangeList } from "../app-model/listPreferences";
 import { available } from "../app-model/presentation";
 import { CourseMark } from "../components/course";
+import { CourseOptions } from "../components/course-options";
 import { PageCrumb } from "../components/crumbs";
 import { useAuth } from "../components/providers";
 import { ReviewerReader } from "./reviewer/reviewer-reader";
@@ -134,7 +135,7 @@ function LibraryCard({
 /** Level 1: courses that have saved study work, as in the app. */
 export function LibraryScreen() {
   const library = useSavedLibrary();
-  const { prefs, pin, sortLibrary } = useListPreferences();
+  const { ownerId, prefs, pin, sortLibrary } = useListPreferences();
   const [search, setSearch] = useState("");
   const groups = useStableSnapshotGroups(groupLibraryByCourse(library.items));
   const sort = prefs.librarySort?.[LIBRARY_GRID_SORT_KEY] ?? "updated_desc";
@@ -193,24 +194,16 @@ export function LibraryScreen() {
               const pinned = prefs.pinned.course.includes(group.key);
               return (
                 <div key={group.key} className="library-course">
-                  <Link href={`/library/course/${encodeURIComponent(group.key)}`} className="course-card">
+                  <Link href={`/library/course/${encodeURIComponent(group.key)}`} className="course-card course-navigation">
                     <CourseMark course={group.course ?? { id: PERSONAL_LIBRARY_KEY, name: "Personal & other" }} identity={identity} size={44} />
                     <span className="grow">
                       <strong title={group.course?.name ?? identity.title}>{identity.title}</strong>
                       {identity.subtitle && <span className="meta">{identity.subtitle}</span>}
                       <span className="meta library-counts">{describeLibraryCounts(group.counts)}</span>
                     </span>
-                    <Icon name="chevron-right" />
                   </Link>
-                  <button
-                    className={`icon-button subtle course-pin${pinned ? " on" : ""}`}
-                    aria-pressed={pinned}
-                    aria-label={pinned ? `Unpin ${identity.title}` : `Pin ${identity.title}`}
-                    title={pinned ? "Unpin" : "Pin to top"}
-                    onClick={() => pin("course", group.key, !pinned)}
-                  >
-                    <Icon name="pin" />
-                  </button>
+                  {pinned ? <span className="course-pinned" aria-label="Pinned"><Icon name="pin" /></span> : null}
+                  <CourseOptions key={`${ownerId}:${group.key}`} title={identity.title} pinned={pinned} onPin={() => pin("course", group.key, !pinned)} />
                 </div>
               );
             })}
