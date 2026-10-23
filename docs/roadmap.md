@@ -1,3 +1,26 @@
+<!-- WEB-A1 stopped checkpoint begin -->
+## WEB-A1 source preflight: STOPPED (2026-10-24)
+
+The unattended website audit stopped in STEP 0 before design/roadmap comparison.
+The explicitly required Claude project directory exists but has no Git checkout,
+package.json or apps/web at its root; git -C there cannot resolve branch/HEAD.
+This workspace is overnight/2026-10-15_feedback at 84584288, with committed
+PBR-UX2 LOCAL PASS. It is not silently substituted for the specified source.
+[Source evidence, frozen acceptance and owner question](ai/acceptance/web-a1-website-roadmap-design-audit.md).
+
+Required application tests/builds/typecheck/lint and responsive/accessibility
+audits: NOT RUN due to the source STOP. Only scoped documentation/diff hygiene
+is verified here; no website acceptance or release-readiness claim. PBR-UX2 PASS,
+historical FAILED/STOPPED records, dependencies, owner holds and unrelated files
+remain unchanged. WEB-A1 and its dependents remain held pending source resolution.
+
+Owner steps remaining: resolve the authoritative checkout/HEAD, then resume
+STEP 0 and freeze the approved design and requested-change inventory there.
+Rollout and Device checks NOT RUN, skipped entirely; live/physical state remains
+UNVERIFIED (owner to confirm). No service calls, push, deploy, migration or
+environment-file changes.
+<!-- WEB-A1 stopped checkpoint end -->
+
 <!-- PBR-UX2 completion begin -->
 ## PBR-UX2 current LOCAL checkpoint: PASS
 
