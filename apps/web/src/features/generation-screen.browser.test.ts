@@ -113,8 +113,11 @@ afterAll(async () => {
   if (out) rmSync(out, { recursive: true, force: true });
 });
 
-async function open(width: number, height: number, reducedMotion: "reduce" | "no-preference" = "no-preference", state = "generating") {
+async function open(width: number, height: number, reducedMotion: "reduce" | "no-preference" = "no-preference", state = "generating", controlledClock = false) {
   const page = await browser.newPage({ viewport: { width, height }, reducedMotion });
+  // Install before application timers/RAF are created; only gesture timing
+  // opts in. All other viewport/renderer scenarios keep their real clock.
+  if (controlledClock) await page.clock.install();
   await page.route("**/*", (route) => (route.request().url().startsWith(origin) ? route.continue() : route.abort()));
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(String(error)));
@@ -123,6 +126,7 @@ async function open(width: number, height: number, reducedMotion: "reduce" | "no
   await page.waitForSelector(".generation-orb canvas", { timeout: 15_000 }).catch((cause: unknown) => {
     throw new Error([String(cause), ...errors].join(" | "));
   });
+  if (controlledClock) await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
   return page;
 }
 const segmentAnimation = (page: Page) =>
@@ -243,18 +247,31 @@ describe("GV1 measured generation viewport", () => {
     } finally { await page.close(); }
   }, 60_000);
   it("keeps tap waves, hold rotation and momentum working in the fitted viewport", async () => {
-    const page = await open(390, 844);
+    const page = await open(390, 844, "no-preference", "generating", true);
     try {
       const box = await page.locator('[data-testid="orb-touch"]').boundingBox();
       const x = box!.x + box!.width / 2, y = box!.y + box!.height / 2;
-      for (let i = 0; i < 5; i++) { await page.mouse.click(x, y); await page.waitForTimeout(150); }
-      const waves = await page.evaluate(() => (window as unknown as { __interaction: { state: { current: { impulses: unknown[] } } } }).__interaction.state.current.impulses.length);
-      expect(waves).toBe(5);
+      // Protocol/GPU delays must not age 1800ms waves or turn a tap into a
+      // 250ms hold. Dispatch real pointers with explicit browser-time gaps.
+      for (let i = 0; i < 5; i++) { await page.mouse.click(x, y); await page.clock.runFor(150); }
+      const waves = await page.evaluate(() => {
+        const state = (window as unknown as { __interaction: { state: { current: { impulses: { at: number }[] } } } }).__interaction.state.current;
+        return state.impulses.map(impulse => Date.now() - impulse.at);
+      });
+      expect(waves).toEqual([750, 600, 450, 300, 150]);
       const palette = await page.evaluate(() => localStorage.getItem("sf.orb.colorKey"));
-      await page.mouse.move(x, y); await page.mouse.down(); await page.waitForTimeout(450);
-      await page.mouse.move(x + 26, y - 18, { steps: 4 }); await page.mouse.up();
+      expect(palette).toBe("pearl");
+      await page.mouse.move(x, y); await page.mouse.down(); await page.clock.runFor(450);
+      await page.mouse.move(x + 26, y - 18, { steps: 4 });
+      expect(await page.evaluate(() => (window as unknown as { __interaction: { state: { current: { gesture: { rotating: boolean } } } } }).__interaction.state.current.gesture.rotating)).toBe(true);
+      await page.mouse.up();
       const spin = await page.evaluate(() => (window as unknown as { __interaction: { state: { current: { spin: { velocityX: number; velocityY: number } } } } }).__interaction.state.current.spin);
       expect(Math.abs(spin.velocityX) + Math.abs(spin.velocityY)).toBeGreaterThan(0);
+      await page.clock.runFor(100);
+      const coast = await page.evaluate(() => (window as unknown as { __interaction: { state: { current: { spin: { x: number; y: number; velocityX: number; velocityY: number }; gesture: unknown } } } }).__interaction.state.current);
+      expect(coast.gesture).toBeNull();
+      expect(Math.abs(coast.spin.velocityX) + Math.abs(coast.spin.velocityY)).toBeGreaterThan(0);
+      expect(Math.abs(coast.spin.velocityX) + Math.abs(coast.spin.velocityY)).toBeLessThan(Math.abs(spin.velocityX) + Math.abs(spin.velocityY));
       expect(await page.evaluate(() => localStorage.getItem("sf.orb.colorKey"))).toBe(palette);
       await bounds(page);
     } finally { await page.close(); }
