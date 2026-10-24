@@ -1,5 +1,44 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff — FULLSEND (20261024-1357)
+
+FULLSEND 20261024-1357: **PASS for publication; 6/6 bounded device checks PASS; broader matrices NOT RUN.**
+
+Source pin `5f6acd275207541bad9a41f314df96e71856a043`; previous main `f626aa8159ed3875d5e1ff39d4bc6f610102811f`.
+Fresh application gates and release CI pass at `6fe6af8b9c449a19459c2e610afb69e30cdee9c6`;
+native version commit/main `80a6b4df3327683e9ae0733a54092f5e8d832d23` (version CI 40071906102: FRESH SUCCESS).
+Ships Library read coalescing, opt-in privacy-safe measurements, reviewer key reuse,
+Queue/course menus, bounded card feedback and light-theme muted-text contrast.
+PBR-LP1/AS1 are measurement/no-change reports; no APK-size or physical speedup claim.
+RT1/EV1 original statuses remain historical; the pixel correction is evidence repair,
+not a claimed native resume-text fix. Saved TC2/TP1 and unrelated holds are unchanged.
+
+FRESH source workspace suites **5,769 passed / 0 failed / 3 existing live skips**;
+provider 20/20, capture verifier 5/5 and APK publisher 27/27. Forced root
+typecheck/lint/serial build each 8/8 tasks, 0 cached; six existing lint warnings.
+No migrations. Worker `generation-worker-00034-x2f` Ready/100%, startup errors 0.
+API dpl_4KJctNQURVt4LsHbur3eSWsZfqYW; website dpl_HBDxPr6VrjKHE9V9LgoWSa5L482h READY.
+APK build 76bda74e-ddd9-4f2f-ba09-c327c6bb9d57: 2.4.0/code8/runtime 2.4.0-sdk57; adb install -r SUCCESS on connected Realme RMX3151; existing signed-in account and saved Library/course/reviewer data retained.
+Public release: https://github.com/galaxymaxp/stay-focused-releases/releases/tag/v2.4.0%2B8. No OTA; the Doctor-required notifications
+patch changed a native dependency, so a new runtime/APK was required.
+
+Desktop production UI: NOT RUN (no connected browser surface); HTTP and proxy
+checks PASS. Device outcomes, failed first Doctor/CLI attempts, exact commits,
+readiness JSON and remaining limits are in the release acceptance report.
+
+Pending: none for publication.
+
+What changed: Library/read/render, Queue/course menus, card feedback and contrast; native dependency/runtime alignment.
+Verification (exact counts): FRESH 5,769 workspace passes +3 existing live skips, provider20/20, verifier5/5, publisher27/27; forced root gates8/8 each,0 cached.
+Deployments (IDs, SHAs): dpl_4KJctNQURVt4LsHbur3eSWsZfqYW, dpl_HBDxPr6VrjKHE9V9LgoWSa5L482h, generation-worker-00034-x2f, EAS76bda74e-ddd9-4f2f-ba09-c327c6bb9d57; application main 80a6b4df3327683e9ae0733a54092f5e8d832d23.
+Live checks: 6/6 bounded device checks PASS; broader matrices NOT RUN; individual results and limits in acceptance.
+Next steps: Owner may run broader font-scale, assistive-technology, populated Queue and full performance/physical matrices; desktop production UI remains NOT RUN.
+Blockers: none for publication.
+Risks: bounded physical proof, no performance/complete historical acceptance claim.
+
+[Full acceptance](acceptance/fullsend-20261024-1357.md).
+
+
 ## Handoff — FULLSEND (20261022-1719)
 
 What changed:
