@@ -322,3 +322,8 @@ then verify all three modes on the website and Realme. Applied migration,
 served revision, production/database/Scheduler/provider state, authenticated
 and native behavior remain UNVERIFIED (owner to confirm). Old-client and
 offline-only reads closed before reconnect still do not populate open history.
+
+TP1b final status-validator attempt: the first read-only check rejected the
+existing UTF-8 BOM before FAILED in historical TP1.status. Corrected the reader
+to ignore the BOM in memory; the original file is untouched. This was a helper
+assertion failure, not an application or diff-gate failure.

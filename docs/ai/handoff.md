@@ -11334,3 +11334,8 @@ Expected owner artifacts, tmp and historical OX2/OX1/release holds preserved.
   env-file change, push, OTA/EAS/native build/install or device action occurred.
   Vercel CLI is absent; strongly recommend `npm i -g vercel` for future
   separately authorized env/deploy/log tooling. Installation NOT RUN.
+
+TP1b final status-validator attempt: the first read-only check rejected the
+existing UTF-8 BOM before FAILED in historical TP1.status. Corrected the reader
+to ignore the BOM in memory; the original file is untouched. This was a helper
+assertion failure, not an application or diff-gate failure.
