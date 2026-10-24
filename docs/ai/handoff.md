@@ -11210,3 +11210,51 @@ in Git/LM1.status). Author galaxymaxp <omgraythekid@gmail.com>. No tmp staged.
   build/install/device action occurred. No TC2/TP1 work or old-record rewrites.
 - Vercel CLI absent; strongly recommend npm i -g vercel for separately authorized
   future env/deploy/log tooling. Installation NOT RUN.
+
+
+## TC2 quiet Today clock: LOCAL PASS (2026-10-24)
+
+Status: **PASS** (local). Resumed after an interruption; committed freeze work
+was not redone. Web and mobile clock gestures stay local while held, save once
+on release and run only the planner preview after 400ms of quiet (latest wins,
+stale previews dropped). Saving no longer changes the Today request key, so no
+Today refetch or "Syncing..." follows a gesture. Focus/visibility/poll reloads
+and rollover wait while held; explicit refresh, reconnect, activation, rollover
+and Canvas sync completion are unchanged. Mobile accessibility steps no longer
+save twice. No API/data/auth/schema/provider change.
+
+Before -> after (real clock entry points, synthetic local): 3 quick commits
+3 -> 1 previews; web keyboard + typed overnight 4 -> 1 previews, 1 -> 0 Today
+reads; mobile screen-reader steps + typed 7 -> 4 saves, 4 -> 1 previews, 2 -> 1
+Today keys; web focus/visibility/61s poll while held 2 -> 0 reads; sync 0.
+
+Gates (FRESH): shared 756/756 (76 files), mobile 1,693/1,693 (177), web
+641/641 serial (81): **3,090 passed / 0 failed / 0 skipped**. Forced typecheck,
+lint (6 existing warnings) and serial root build each 8/8, 0 cached; API/web
+builds and offline Android JS/assets export exit 0; git diff --check and
+git diff --cached --check PASS. Failed first attempts retained in the
+acceptance: orb-load browser request-order flake under parallel load (alone
+7/7), stale useTodayClockWindow mocks in both announcement-read tests (updated
+to the new hook contract), two unrelated web browser tests under parallel load
+(serial 25/25), and the pre-interruption typecheck/test iterations.
+
+[Acceptance](acceptance/tc2-clock-interaction.md). Commits: 3972501d freeze;
+dd3276f3 implementation; completion docs "docs(today): close TC2 local clock
+verification" (final hash in Git/TC2.status). Author galaxymaxp
+<omgraythekid@gmail.com>. No tmp staged, no push.
+
+UNVERIFIED (owner to confirm): website and Realme drag smoothness and absence
+of "Syncing...", native screen-reader behavior, authenticated visuals, served
+FS10 revision, production database/Scheduler/provider state.
+
+**Owner steps remaining**:
+
+- Device checks NOT RUN: drag one handle and the whole range on the website and
+  the Realme; confirm no "Syncing..." and smooth movement, and that the plan
+  preview appears once after release.
+- Rollout NOT RUN: ships with the next separately authorized "fullsend". No
+  deploy, service call, remote SQL/migration, Scheduler/email, env-file change,
+  push, OTA/EAS/native build or device action occurred.
+- TP1 (Plan-with choice) is the next saved successor; not started.
+- Vercel CLI absent; recommend npm i -g vercel for separately authorized
+  future env/deploy/log tooling. Installation NOT RUN.

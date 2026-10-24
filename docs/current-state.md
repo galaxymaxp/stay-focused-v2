@@ -1,3 +1,34 @@
+<!-- TC2 completion begin -->
+## TC2 quiet Today clock: LOCAL PASS (2026-10-24)
+
+Implementation dd3276f3, acceptance freeze 3972501d. On web and mobile, clock
+drags (one handle or whole range), taps, keyboard/screen-reader steps and typed
+entry stay local until release, then save the range once and run only the
+planner preview after 400ms of quiet; the latest commit wins and stale previews
+are dropped. Saving no longer changes the Today request key, so overnight
+commits stop refetching Today (the "Syncing..." seen). Focus/visibility/poll
+reloads and rollover wait while a drag is held; explicit refresh, reconnect,
+activation, rollover and Canvas sync completion are unchanged. Mobile's
+accessibility step no longer saves twice. No API/data/auth/schema change.
+
+Measured with real clock entry points, before -> after: 3 quick commits sent
+3 -> 1 previews; keyboard + typed overnight 4 -> 1 previews and 1 -> 0 Today
+reads (web); mobile screen-reader steps 7 -> 4 saves, 4 -> 1 previews, 2 -> 1
+Today keys; focus/visibility/poll while held 2 -> 0 reads. Sync calls 0.
+
+FRESH suites **3,090 passed / 0 failed / 0 skipped**: shared 756/76 files,
+mobile 1,693/177, web 641/81 (serial). Forced typecheck/lint/serial root build
+each 8/8, 0 cached; API/web builds and offline Android export PASS; six existing
+lint warnings; both diff gates PASS. An orb-load browser order flake under
+parallel load and two stale hook mocks are recorded in the acceptance report.
+
+[Acceptance, counts, attempts and limits](ai/acceptance/tc2-clock-interaction.md).
+Endpoint TC2 only. TP1 and the next fullsend remain outside this run.
+Rollout/Device checks NOT RUN; website/Realme drag smoothness, served FS10,
+production/database/Scheduler state and native assistive technology remain
+UNVERIFIED (owner to confirm). All prior records and unrelated owner paths remain.
+<!-- TC2 completion end -->
+
 <!-- LM1 completion begin -->
 ## LM1 mobile course options: LOCAL PASS (2026-10-24)
 
