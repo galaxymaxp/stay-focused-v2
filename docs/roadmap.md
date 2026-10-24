@@ -26,8 +26,15 @@ First failures and collector limitations are retained in the acceptance report.
 release, then verify all three modes on the website and Realme. Rollout/Device
 checks NOT RUN; production/authenticated/native state remains UNVERIFIED.
 Offline-only or old-client reviewer reads do not populate server open history.
-Endpoint TP1 only. Hand back the committed evidence through the supervisor
-boundary for TP1b closure; no successor feature or release is started here.
+TP1b closure is **PASS** (2026-10-25): both direct commits are ancestors, all
+54 owned source hashes match and the source-only diff is empty. All ten gate
+logs and the 24-case synthetic receipt match the pinned acceptance evidence.
+These are CACHED in TP1b (verified existing FRESH direct-run results); no
+application suite or build was rerun. Fresh bookkeeping diff checks PASS.
+Implementation `3948a5fe`, completion docs `8e5c7d53`; the TP1b closure commit
+is recorded in Git and `tmp/overnight/TP1b.status`. Original TP1 FAILED stays
+unchanged. The finite local scope is closed for Autopilot; no successor or
+release is authorized by this closure.
 Unrelated owner paths and the historical OX2/OX1 hold remain.
 <!-- TP1 completion end -->
 

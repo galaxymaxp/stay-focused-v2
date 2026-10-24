@@ -11291,3 +11291,46 @@ boundary for TP1b closure; no successor feature or release is started here.
 Unrelated owner paths and the historical OX2/OX1 hold remain.
 
 Final gate receipts and all first failures: `tmp/overnight/TP1/direct-verification-receipt.json`, committed acceptance report. Implementation committed under the existing owner identity; completion documentation follows as a scoped docs commit.
+
+## TP1b unchanged-source closure - PASS (2026-10-25 Manila)
+
+Status: **PASS** for the finite local closure, explicitly authorized by the
+owner's direct recovery request. Implementation `3948a5fe` and completed docs
+`8e5c7d53` are ancestors; all 54 raw source hashes and normalized Git blobs
+match the pinned manifests and implementation tree. Source-only diff is empty.
+Mandatory LOCAL acceptance rows were reviewed against code/tests, including
+the actual PGlite migration contract, API persistence/owner isolation, both
+menus and preference sync, stale identities and task-independent completion.
+[Acceptance and closure receipt](acceptance/tp1-planning-content.md).
+
+CACHED in TP1b: verified existing FRESH direct-run results, no suites rerun.
+All ten gate logs hash-match the committed report and successful command
+ledger: shared 772/77 files, API 2,508/218, mobile 1,703/180, web 648/82;
+**5,631 passed / 0 failed / 3 existing live skips**. Typecheck/lint/serial root
+build each 8/8, 0 cached; direct API/web builds and offline Android JS/assets
+export exit 0. Seven lint warnings and earlier failed attempts remain recorded.
+Pinned synthetic browser receipt: 24 cases, zero recorded page errors/outbound
+requests; RNW/fixture limits retained. No new browser run or physical proof.
+FRESH working-tree/staged diff checks PASS for closure documentation.
+
+Commits: `3948a5fe feat(today): complete reviewer and task planning modes`;
+`8e5c7d53 docs(today): record TP1 recovery and Autopilot handoff`;
+closure documentation commit `docs(today): close TP1b evidence verification`
+(exact hash in Git and `tmp/overnight/TP1b.status`). Author galaxymaxp
+<omgraythekid@gmail.com>. Original TP1 FAILED remains unchanged. Planning files
+reconciled; no controller/queue setting changed and no successor work started.
+Expected owner artifacts, tmp and historical OX2/OX1/release holds preserved.
+
+**Owner steps remaining**:
+
+- Rollout and Device checks NOT RUN, skipped entirely. Apply the forward
+  migration `20261024000100_today_plan_content.sql` in the next separately
+  authorized release; verify all three modes on the website and Realme.
+- Applied migration, served revision, production/database/Scheduler/provider
+  state and authenticated/native behavior are UNVERIFIED (owner to confirm).
+  Offline-only reads closed before reconnect and old-client opens do not
+  populate server open history; synthetic/RNW results do not replace devices.
+- No deployment, remote SQL/migration, provider/service call, Scheduler/email,
+  env-file change, push, OTA/EAS/native build/install or device action occurred.
+  Vercel CLI is absent; strongly recommend `npm i -g vercel` for future
+  separately authorized env/deploy/log tooling. Installation NOT RUN.

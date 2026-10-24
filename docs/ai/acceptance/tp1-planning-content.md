@@ -281,3 +281,44 @@ Source custody distinguishes working-tree SHA-256 values (which preserve local C
 Compatibility detail: omitted-mode planning keeps task-only allocation and the legacy preview shape. Study-session read/apply responses add optional kind metadata for task rows; those responses are additive rather than byte-identical. Existing clients consume typed data without a strict unknown-key rejection. The older-client reviewer-block limitation recorded above remains explicit.
 
 Build hygiene: restored only the two Next-generated next-env.d.ts files to their verified pre-build Git contents after the checks. Their generated route-reference/comment changes are excluded from the feature commit.
+
+## TP1b custody and closure receipt (2026-10-25 Manila)
+
+**PASS for the unchanged-source local scope.** Implementation
+`3948a5fec54066f81acb9fccba3c92438e2cd13f` and completion documentation
+`8e5c7d536895d567951fefe04299fd55058e30bf` are ancestors of the closure.
+All 54 working-file SHA-256 values match both local freeze/receipt manifests;
+all 54 normalized Git blobs and their SHA-256 values match the implementation.
+The source-only diff from that commit is empty. Its tree is
+`5184fb0d20be017a62b842afce5c2851431fbf1d`. The initial-to-final tree difference
+is only the recorded mobile mock-type comparison, with its assertion retained.
+
+CACHED in TP1b (verified existing FRESH direct-run evidence): all ten gate-log
+SHA-256 values match the committed table above and their successful exits in
+`tmp/overnight/TP1/commands.jsonl`. Actual logs show shared 772/77 files,
+API 2,508/218 (3 live skips), mobile 1,703/180, web 648/82: **5,631 passed,
+0 failed, 3 skipped**. Typecheck, lint and serial root build each show 8/8,
+0 cached; direct API/web builds and offline Android JS/assets export exited 0.
+The seven lint warnings and all recorded failed attempts remain documented.
+No application tests, builds or browser fixture were rerun by TP1b.
+
+Mandatory LOCAL rows were reviewed against implementation and tests: planner
+contract/selection/allocation, actual local PostgreSQL migration execution via
+PGlite, persistence/reload and owner/old-schema behavior, both menu/sync/preview
+and session surfaces, stale identities and same-title separation. The pinned
+browser receipt hash matches: 20 menu cases plus four empty-mode cases, with
+zero recorded page errors/outbound requests. Two retained narrow screenshots
+were inspected again. Synthetic/RNW evidence establishes no native,
+authenticated or production acceptance; all earlier limitations remain.
+
+FRESH bookkeeping checks: `git diff --check` and
+`git diff --cached --check` PASS. Original `TP1.status` remains FAILED;
+`TP1b.status` records the new PASS and closure commit. Planning documents are
+reconciled; no supervisor/queue setting was changed. This closes TP1 only.
+
+**Owner steps remaining:** rollout and Device checks NOT RUN. Apply
+`20261024000100_today_plan_content.sql` with a separately authorized release,
+then verify all three modes on the website and Realme. Applied migration,
+served revision, production/database/Scheduler/provider state, authenticated
+and native behavior remain UNVERIFIED (owner to confirm). Old-client and
+offline-only reads closed before reconnect still do not populate open history.
