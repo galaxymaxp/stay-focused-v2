@@ -11388,3 +11388,20 @@ generation and task-sync PASS; focused 18/18; new test fails 2/3 unfixed.
 UNVERIFIED: production website, real browsers and screen readers.
 Owner steps remaining: Rollout and Device checks skipped; ships with the next
 FULLSEND. Mobile `ReviewerGenerateScreen.tsx:145` has the same D2 text.
+
+
+## Handoff — WEB-A4 website release readiness (2026-10-25)
+
+Status: **PASS** (local). The website sequence WEB-A1 (via WEB-A1b) to WEB-A4
+is complete and ready for FULLSEND.
+
+What changed: `docs/ai/acceptance/web-a4-release-readiness.md` (preflight,
+production checklist, FULLSEND handoff) and planning entries. No code.
+
+Gate counts: readiness validator exit 0 / ready true (FRESH); merge simulation
+docs-only conflicts (FRESH); diff checks (FRESH). Application gates CACHED from
+WEB-A3 on byte-identical `apps`/`packages`/`scripts` trees: typecheck/lint/root
+build 8/8 0 cached, web 651/651, API/web/Android export builds, harness PASS.
+
+UNVERIFIED: production website until the post-FULLSEND checklist is run.
+Owner steps remaining: press FULLSEND; then run the seven-item checklist.

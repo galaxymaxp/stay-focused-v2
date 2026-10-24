@@ -1,3 +1,19 @@
+<!-- WEB-A4 completion begin -->
+## WEB-A4 website release readiness: LOCAL PASS (2026-10-25)
+
+Ready for the next FULLSEND. Mandatory readiness validator `ready: true`
+(baseline FS11, no blockers). The branch is 6 commits ahead of main with
+website-only changes (WEB-A2 harness, WEB-A3 D1/D2 repairs, docs); merging
+main conflicts only in the three planning-document top entries (keep both).
+No migrations, worker, API or mobile change; the website needs the clean-main
+CLI production deployment. Application gates CACHED from WEB-A3 on
+byte-identical trees (typecheck/lint/root build 8/8, web 651/651, builds,
+harness PASS); FULLSEND STEP 1 reruns them fresh.
+[Readiness, production checklist and FULLSEND handoff](acceptance/web-a4-release-readiness.md).
+The WEB-A1 to WEB-A4 website sequence is complete. Rollout/Device checks NOT
+RUN; production acceptance follows the checklist after FULLSEND.
+<!-- WEB-A4 completion end -->
+
 <!-- WEB-A3 completion begin -->
 ## WEB-A3 website repairs: LOCAL PASS (2026-10-25)
 
