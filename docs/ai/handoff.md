@@ -11369,3 +11369,22 @@ recorded in the acceptance report.
 UNVERIFIED: real browsers other than Chromium, real phone browsers, screen
 readers, production website state.
 Owner steps remaining: Rollout and Device checks skipped; WEB-A3 next.
+
+
+## Handoff — WEB-A3 website repairs (2026-10-25)
+
+Status: **PASS** (local). Commits: acceptance freeze 628e29f0, implementation
+and documentation follow in Git and `tmp/overnight/WEB-A3.status`.
+
+What changed: `apps/web/src/features/library.tsx` DraftEditor adopts a newer
+unedited server revision and refreshes after save (D1); `own-material.tsx`
+and `reviewer/topic-assist.tsx` copy restored (D2); new
+`apps/web/src/features/draft-editor.test.ts`.
+
+Gate counts (FRESH): typecheck/lint/root build 8/8, 0 cached; web 651/651
+serial; API/web/Android export PASS; 7 existing lint warnings. Harness default,
+generation and task-sync PASS; focused 18/18; new test fails 2/3 unfixed.
+
+UNVERIFIED: production website, real browsers and screen readers.
+Owner steps remaining: Rollout and Device checks skipped; ships with the next
+FULLSEND. Mobile `ReviewerGenerateScreen.tsx:145` has the same D2 text.

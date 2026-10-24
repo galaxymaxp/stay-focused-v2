@@ -1,3 +1,22 @@
+<!-- WEB-A3 completion begin -->
+## WEB-A3 website repairs: LOCAL PASS (2026-10-25)
+
+Repairs exactly the two WEB-A2 defects. D1: a saved activity draft now shows
+its saved text after reload; the editor adopts a newer server revision unless
+there are unsaved edits (which, with their base revision, are never replaced),
+and refreshes the saved screen after saving. D2: five website strings show
+their intended ellipsis or middle dot again. New draft-editor test 3/3 (2 fail
+without the fix); browser harness default, generation and task-sync modes PASS
+with the unmodified D1 assertion.
+
+FRESH gates: forced typecheck/lint/serial root build 8/8 each, 0 cached; web
+651/651 (83 files, serial); API, web (23/23) and offline Android export PASS;
+7 existing lint warnings. No API/data/schema/mobile change.
+[Acceptance](acceptance/web-a3-website-repairs.md). Mobile copy of D2
+(`ReviewerGenerateScreen.tsx:145`) left for a mobile task. Rollout/Device
+checks NOT RUN; production state UNVERIFIED. Next: WEB-A4 release readiness.
+<!-- WEB-A3 completion end -->
+
 <!-- WEB-A2 completion begin -->
 ## WEB-A2 website browser verification: LOCAL PASS (2026-10-25)
 
