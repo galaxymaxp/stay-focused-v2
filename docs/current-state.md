@@ -1,3 +1,30 @@
+<!-- FS11 release begin -->
+## FULLSEND 20261025-0127 publication (2026-10-25)
+
+FULLSEND 20261025-0127: **PASS for publication; Realme OTA fetch PASS; on-device
+and signed-in UI checks NOT RUN (phone locked, no signed-in browser).**
+
+Source pin `d2a45bb2d0137dfe1ff8f7b4def473ad7fb67d57`; previous main
+`c3985bf1d874a87d38859463f180a41d7d45f3a5`; main `30f378bd7af6cf6a21eab52434714cacc9956e20`
+(release CI 40118380043 SUCCESS). Ships QN1 Queue failure cards, LM1 mobile
+long-press course options, TC2 quiet Today clock and TP1 Today "Plan with"
+Reviewers / Tasks / Reviewers & tasks.
+
+Fresh release gates: shared 394, canvas 75, ocr 27, engine eval exit 0,
+API 2,508 + 3 existing live skips, mobile 1,703, web 648 (one first-run
+study-export timeout, then full rerun clean), provider 20/20, Doctor 21/21;
+forced typecheck/lint/build 8/8 each, 0 cached; 7 existing lint warnings.
+Migration `20261024000100_today_plan_content.sql` applied; 100 matched, 0 pending;
+catalog grants/RLS/constraints verified. Worker `generation-worker-00035-glg`
+(worker:30f378b) 100%. API dpl_2mZw71F6SWRXrNDycmmM5uqvdoGx and website
+dpl_9TXVQsj277oXEgeG4NPBirMhrrQ2 READY, health at 30f378bd, no runtime errors.
+OTA group 59a1fd2e-9ddd-4b6e-b4bb-bd9744d203af (Android 01a16f1b, runtime 2.4.0-sdk57)
+downloaded and launched on the Realme.
+
+Pending owner checks: the three plan modes on the Realme and signed-in website.
+[Release evidence](acceptance/fullsend-20261025-0127.md).
+<!-- FS11 release end -->
+
 <!-- TP1 completion begin -->
 ## TP1 planning content: LOCAL PASS (2026-10-25)
 

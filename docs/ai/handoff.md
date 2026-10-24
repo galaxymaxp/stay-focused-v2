@@ -1,5 +1,38 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff — FULLSEND (20261025-0127)
+
+FULLSEND 20261025-0127: **PASS for publication; Realme OTA fetch PASS; on-device
+and signed-in UI checks NOT RUN (phone locked, no signed-in browser).**
+
+Source pin `d2a45bb2d0137dfe1ff8f7b4def473ad7fb67d57`; previous main
+`c3985bf1d874a87d38859463f180a41d7d45f3a5`; main `30f378bd7af6cf6a21eab52434714cacc9956e20`
+(release CI 40118380043 SUCCESS). Ships QN1 Queue failure cards, LM1 mobile
+long-press course options, TC2 quiet Today clock and TP1 Today "Plan with"
+Reviewers / Tasks / Reviewers & tasks.
+
+Fresh release gates: shared 394, canvas 75, ocr 27, engine eval exit 0,
+API 2,508 + 3 existing live skips, mobile 1,703, web 648 (one first-run
+study-export timeout, then full rerun clean), provider 20/20, Doctor 21/21;
+forced typecheck/lint/build 8/8 each, 0 cached; 7 existing lint warnings.
+Migration `20261024000100_today_plan_content.sql` applied; 100 matched, 0 pending;
+catalog grants/RLS/constraints verified. Worker `generation-worker-00035-glg`
+(worker:30f378b) 100%. API dpl_2mZw71F6SWRXrNDycmmM5uqvdoGx and website
+dpl_9TXVQsj277oXEgeG4NPBirMhrrQ2 READY, health at 30f378bd, no runtime errors.
+OTA group 59a1fd2e-9ddd-4b6e-b4bb-bd9744d203af (Android 01a16f1b, runtime 2.4.0-sdk57)
+downloaded and launched on the Realme.
+
+Pending owner checks: the three plan modes on the Realme and signed-in website.
+[Release evidence](acceptance/fullsend-20261025-0127.md).
+
+What changed: QN1, LM1, TC2 and TP1 shipped; TP1 migration applied.
+Verification (exact counts): shared 394, canvas 75, ocr 27, engine exit 0, API 2,508 + 3 skips, mobile 1,703, web 648 (rerun after one timeout), provider 20/20, Doctor 21/21; typecheck/lint/build 8/8, 0 cached; CI 40118380043 SUCCESS.
+Deployments (IDs, SHAs): main 30f378bd; worker generation-worker-00035-glg (worker:30f378b, build aa20e1a5); API dpl_2mZw71F6SWRXrNDycmmM5uqvdoGx; website dpl_9TXVQsj277oXEgeG4NPBirMhrrQ2; OTA group 59a1fd2e-9ddd-4b6e-b4bb-bd9744d203af / Android 01a16f1b-a797-75c4-bc08-f1f655e9c54e.
+Live checks: API/website health PASS; planner-preferences safe 401 PASS; Realme OTA fetch+launch PASS; Realme and signed-in website plan modes NOT RUN.
+Next steps: owner checks three plan modes on Realme and website; WEB-A2 to WEB-A4 website verification.
+Blockers: none for publication.
+Risks: web study-export test timed out once under full-suite load.
+
 ## Handoff — FULLSEND (20261024-1357)
 
 FULLSEND 20261024-1357: **PASS for publication; 6/6 bounded device checks PASS; broader matrices NOT RUN.**
