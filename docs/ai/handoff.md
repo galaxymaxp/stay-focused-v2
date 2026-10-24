@@ -11168,3 +11168,45 @@ No tmp staged or push. Failed first attempts are retained in the acceptance.
   file change, push, native build/install or physical device action.
 - Vercel CLI absent; recommend npm i -g vercel for future separately authorized
   env/deploy/log tooling. Installation NOT RUN.
+
+
+## LM1 mobile course options: LOCAL PASS (2026-10-24)
+
+Implementation 2305e847, acceptance freeze 51a8e326. Mobile Library and all
+Generate course groups use 400ms long-press plus the Options accessibility action
+to open their existing sheet. The visible dots row/gap is removed. Tap navigation,
+pin indicator/swipe controls, full action factories/confirmations/permissions,
+owner/route closure and reduced-motion feedback remain. Web keeps its trigger
+inside the card at 320/768/1280 and now shows Generate dots on desktop without
+requiring hover. No API/data/auth/schema/provider change.
+
+FRESH affected suites **2,294 passed / 0 failed / 0 skipped**: mobile 1,674/176
+files; web 620/79 files. Focused mobile 190/15, web 113/11; options 7/2 PASS.
+Forced typecheck/lint/serial root build each 8/8, 0 cached; standalone API/web
+builds and offline Android JS/assets export PASS. Six existing lint warnings.
+32 synthetic browser cases PASS, 0 page errors/outbound requests; required themed
+Library and three-width web screenshots retained. Both diff gates PASS. First
+test/helper/collector failures and RNW modal release limitation are preserved in
+the acceptance report; no native/authenticated PASS is inferred.
+
+[Acceptance, exact commands, attempts and limits](acceptance/lm1-mobile-card-options.md).
+Endpoint LM1 only. TC2/TP1 and the next fullsend remain outside this run.
+Rollout/Device checks NOT RUN; served FS10/production/database/Scheduler/provider
+state, native release/haptics/assistive technology and physical behavior remain
+UNVERIFIED (owner to confirm). All prior records and unrelated owner paths remain.
+
+Commits: 51a8e326 freeze; 2305e847 implementation; completion documentation
+subject "docs(mobile): close LM1 local options verification" (exact final hash
+in Git/LM1.status). Author galaxymaxp <omgraythekid@gmail.com>. No tmp staged.
+
+**Owner steps remaining**:
+
+- Rollout and Device checks NOT RUN, skipped entirely. Realme Library/Generate
+  long-press/release/tap/Options/haptics, native assistive technology/fontScale,
+  authenticated screenshots and served FS10 revision UNVERIFIED (owner to confirm).
+- Live database/applied migrations/Scheduler/provider state UNVERIFIED. Owner
+  handles the next separately authorized fullsend. No deploy, service call,
+  remote SQL/migration, Scheduler/email, env-file change, push, OTA/EAS/native
+  build/install/device action occurred. No TC2/TP1 work or old-record rewrites.
+- Vercel CLI absent; strongly recommend npm i -g vercel for separately authorized
+  future env/deploy/log tooling. Installation NOT RUN.
