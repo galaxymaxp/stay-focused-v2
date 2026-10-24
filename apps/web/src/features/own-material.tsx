@@ -87,20 +87,20 @@ export function OwnMaterialScreen() {
         <button disabled={busy} aria-pressed={mode === "file"} onClick={() => setMode("file")}><Icon name="file-text" />Upload a file</button>
       </div>
       {mode === "paste" ? <label>Your notes or reading
-        <textarea className="source-text" aria-label="Your notes or reading" placeholder="Paste instructional material: lecture notes, a chapter, slides as text?"
+        <textarea className="source-text" aria-label="Your notes or reading" placeholder="Paste instructional material: lecture notes, a chapter, slides as text…"
           value={text} onChange={e => { setText(e.target.value); keys.current = {}; }} />
         <span className="meta count-up">{text.trim().length.toLocaleString()} characters</span>
       </label> : <div className="stack">
         <label className={`drop-zone${dragging ? " dragging" : ""}`} onDragOver={e => { e.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
           <Icon name="file-text" /><strong>{file?.name ?? "Drop a PDF, photo, DOCX or PPTX here"}</strong>
-          <span className="meta">or click to choose ? Documents up to 10 MiB, photos up to 5 MiB</span>
+          <span className="meta">or click to choose · Documents up to 10 MiB, photos up to 5 MiB</span>
           <input type="file" accept={MANUAL_UPLOAD_ACCEPT} disabled={busy || !generationEnabled} className="sr-only" aria-label="Choose a PDF, photo, DOCX or PPTX"
             onChange={e => choose(e.target.files?.[0] ?? null)} />
         </label>
         <p className="meta">{LEGACY_OFFICE_MESSAGE}</p>
         <p className="meta">Picking a file starts reading and creates your Reviewer automatically. Once accepted, follow its progress in Queue.</p>
         {progress !== null && <div className="stack" role="status">
-          <span>Uploading source? {Math.round(progress * 100)}%</span><progress max={1} value={progress} aria-label="Upload progress" />
+          <span>Uploading source… {Math.round(progress * 100)}%</span><progress max={1} value={progress} aria-label="Upload progress" />
           <span className="meta">Keep this page open until the server accepts the job.</span>
         </div>}
         {error && pick.current && <button className="button retry-button" disabled={busy} onClick={() => void readFile(pick.current!)}>Try again</button>}
@@ -111,7 +111,7 @@ export function OwnMaterialScreen() {
       {mode === "paste" ? <>
         <label>Title<input value={title} placeholder="My notes" onChange={e => { setTitle(e.target.value); keys.current = {}; }} /></label>
         <ul className="own-steps"><li className={text.trim() ? "done" : ""}>Paste your material</li><li>Check the text</li><li>Create your Reviewer; it?s saved to your Library</li></ul>
-        <button className="primary" disabled={!text.trim() || busy || !generationEnabled} onClick={() => void createReviewer()}>{busy ? "Starting?" : "Create Reviewer"}</button>
+        <button className="primary" disabled={!text.trim() || busy || !generationEnabled} onClick={() => void createReviewer()}>{busy ? "Starting…" : "Create Reviewer"}</button>
       </> : <p>Your file is read and turned into a Reviewer in one process. It?s saved to your Library.</p>}
       {!generationEnabled && <p className="meta">Generation is unavailable in this environment. Your saved materials are in Library.</p>}
       <p className="meta">Prefer course files? <Link href="/generate">Choose from your Canvas courses</Link>.</p>

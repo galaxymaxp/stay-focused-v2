@@ -80,7 +80,7 @@ function TopicAssistContent({ reviewer, sectionId, owner, client, online, childr
   const renderEntry = (entry: Entry | undefined, retry: () => void) => entry?.status === 'ready' && entry.result
     ? <div className="stack"><p className="meta">{STUDY_GROUNDING_LABELS[entry.result.grounding]}</p><StudyText text={entry.result.text} /></div>
     : entry?.status === 'error' ? <div role="alert"><p>{entry.error}</p><button disabled={!online} onClick={retry}>Retry</button></div>
-    : <p role="status">Creating your explanation?</p>;
+    : <p role="status">Creating your explanation…</p>;
   return <div className="stack topic-assist">
     <div className="topic-level-row no-select">
       <div className="segmented">

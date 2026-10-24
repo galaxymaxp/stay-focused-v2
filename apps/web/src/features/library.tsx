@@ -517,7 +517,7 @@ export function ArtifactScreen({ id }: { id: string }) {
           Open Quiz
         </Link>
       )}
-      {data?.draft && <DraftEditor key={data.draft.id} draft={data.draft} artifact={data.artifact} />}
+      {data?.draft && <DraftEditor key={data.draft.id} draft={data.draft} artifact={data.artifact} onSaved={artifact.refresh} />}
     </>
   );
 }
@@ -551,7 +551,7 @@ function DraftTextarea(props: ComponentPropsWithoutRef<"textarea">) {
   }} />;
 }
 
-function DraftEditor({ draft, artifact }: { draft: ActivityDraft; artifact: LibraryArtifactSummary }) {
+function DraftEditor({ draft, artifact, onSaved }: { draft: ActivityDraft; artifact: LibraryArtifactSummary; onSaved: () => void }) {
   const { api } = useAuth(),
     [content, setContent] = useState<ActivityDraftContent>({
       title: draft.title,
@@ -562,6 +562,14 @@ function DraftEditor({ draft, artifact }: { draft: ActivityDraft; artifact: Libr
     [revision, setRevision] = useState(draft.revision),
     [dirty, setDirty] = useState(false),
     action = useAction();
+  // A saved screen can show an older revision until the server copy arrives.
+  // Adopt a newer revision unless the student has unsaved edits.
+  useEffect(() => {
+    if (dirty || draft.revision <= revision) return;
+    setContent({ title: draft.title, sections: draft.sections, slides: draft.slides });
+    setSavedDraft(draft);
+    setRevision(draft.revision);
+  }, [draft, dirty, revision]);
   useEffect(() => {
     if (!dirty) return;
     const leave = (e: BeforeUnloadEvent) => {
@@ -675,6 +683,7 @@ function DraftEditor({ draft, artifact }: { draft: ActivityDraft; artifact: Libr
               setRevision(updated.revision);
               setDirty(false);
               action.setMessage("Draft saved.");
+              onSaved();
             })
           }
         >
