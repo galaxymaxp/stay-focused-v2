@@ -85,7 +85,9 @@ test("CLI is dry by default, accepts empty named APK and exits nonzero with plai
   await fs.writeFile(apk, "");
   const result = await execFileAsync(process.execPath, [SCRIPT, ...args], { cwd: options.cwd });
   assert.match(result.stdout, /Dry run/);
-  assert.equal(JSON.parse(result.stdout.split(/\r?\n/)[1])[3], "v2.2.0+6");
+  // The spawned CLI resolves defaults beside SCRIPT, independently of its cwd.
+  const { expo } = JSON.parse(await fs.readFile(new URL("../apps/mobile/app.json", import.meta.url), "utf8"));
+  assert.equal(JSON.parse(result.stdout.split(/\r?\n/)[1])[3], `v${expo.version}+${expo.android.versionCode}`);
   // Node 22.13 can emit its type-stripping ExperimentalWarning; Node 24 is quiet.
   assert.doesNotMatch(result.stderr, /(?:^|\n)(?:Error:|.*SyntaxError:|.*TypeError:)/);
   await assert.rejects(execFileAsync(process.execPath, [SCRIPT, "--apk", apk]), (error) => {
