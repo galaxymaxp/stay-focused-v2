@@ -26,8 +26,10 @@ export function StudySessionScreen({ id }: { id: string }) {
   );
   const action = useAction();
   const session = sessions.data?.sessions.find((item) => item.id === id);
-  const activity = session ? (activities.data?.items.find((item) => item.taskId === session.taskId) ?? null) : null;
-  const title = activity?.title ?? session?.task?.title ?? "Planned work";
+  // A reviewer block has no task: it opens its saved reviewer and its status is its own.
+  const reviewer = session?.kind === "reviewer" ? session.reviewer ?? null : null;
+  const activity = session?.taskId ? (activities.data?.items.find((item) => item.taskId === session.taskId) ?? null) : null;
+  const title = reviewer?.title ?? activity?.title ?? session?.task?.title ?? "Planned work";
   const update = (status: "completed" | "skipped" | "planned") =>
     void action.run(async () => {
       await api(`/api/study-sessions/${encodeURIComponent(id)}`, { method: "PATCH", body: { status } });
@@ -37,7 +39,7 @@ export function StudySessionScreen({ id }: { id: string }) {
   return (
     <>
       <Heading
-        title="Work session"
+        title={session?.kind === "reviewer" ? "Review session" : "Work session"}
         crumb={title}
         subtitle={activity?.course?.code ?? activity?.course?.name ?? undefined}
         back="/schedule"
@@ -59,7 +61,11 @@ export function StudySessionScreen({ id }: { id: string }) {
             </div>
           </div>
           <div className="row wrap">
-            {activity ? (
+            {reviewer ? (
+              <Link className="button primary" href={`/library/${encodeURIComponent(reviewer.id)}`}>
+                Open reviewer
+              </Link>
+            ) : activity ? (
               <Link className="button primary" href={`/tasks/${encodeURIComponent(activity.id)}`}>
                 Open activity
               </Link>

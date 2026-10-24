@@ -5,7 +5,7 @@ import type { DeterministicStudyPlan } from '@stay-focused/shared/task-planning'
 import { localMinuteIso } from '@stay-focused/shared';
 import { PlanPreview } from './PlanPreview';
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('../../design/primitives', () => ({ Action: 'Action', Copy: 'Copy', Surface: 'Surface' }));
+vi.mock('../../design/primitives', () => ({ Action: 'Action', ContentIcon: 'ContentIcon', Copy: 'Copy', Surface: 'Surface' }));
 vi.mock('../../design/theme', async () => { const { palettes } = await import('../../design/themeTokens'); return { useTheme: () => ({ colors: palettes.light }) }; });
 vi.mock('./DayRingClock', () => ({ formatFreeTime: (minutes: number) => String(minutes) }));
 it('places an after-midnight session inside the proportional preview with a positive width', async () => {

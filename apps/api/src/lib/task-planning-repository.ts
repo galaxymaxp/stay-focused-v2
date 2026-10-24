@@ -9,21 +9,27 @@ import type {
 } from "@stay-focused/db";
 import type {
   DeterministicStudyPlan,
+  PlannerReviewer,
   PlannerTask,
+  PlanningRange,
+  ReviewerCandidateSource,
   StudySessionTaskSummary,
   StudySessionView,
   TaskStatus,
   TaskView,
 } from "@stay-focused/shared/task-planning";
+import { isReviewerProposal, selectReviewerCandidates } from "@stay-focused/shared/task-planning";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { experienceRepository } from "@/lib/experience/repository";
+import { isPastStoredCourse } from "@/lib/course-state";
+import { experienceRepository, readOwnedReviewerTargets, type ReviewerTarget } from "@/lib/experience/repository";
 import { readActivityContext } from "@/lib/experience/task-state";
 
 const TASK_COLUMNS =
   "id,user_id,title,notes,status,priority,due_at,estimated_minutes,estimate_source,estimate_note,source_type,canvas_connection_id,canvas_course_id,canvas_assignment_id,canvas_assignment_row_id,created_at,updated_at,completed_at";
-const SESSION_COLUMNS =
+const SESSION_BASE_COLUMNS =
   "id,user_id,study_plan_id,task_id,starts_at,ends_at,status,created_at,updated_at";
+const SESSION_COLUMNS = `${SESSION_BASE_COLUMNS},block_kind,reviewer_artifact_id`;
 const SESSION_TASK_SUMMARY_COLUMNS =
   "id,title,status,priority,due_at,canvas_course_id,source_type,canvas_assignment_row_id";
 
@@ -32,8 +38,8 @@ const SESSION_TASK_SUMMARY_COLUMNS =
 // `Database` is maintained by hand and carries no relationship metadata, so the
 // literal-type select parser cannot describe this shape; the widened `string`
 // keeps the call compiling and the result is narrowed explicitly below.
-const SESSION_WITH_TASK_COLUMNS: string =
-  `${SESSION_COLUMNS},task:tasks!study_sessions_task_owner_fkey(${SESSION_TASK_SUMMARY_COLUMNS})`;
+const withTaskEmbed = (columns: string): string =>
+  `${columns},task:tasks!study_sessions_task_owner_fkey(${SESSION_TASK_SUMMARY_COLUMNS})`;
 
 type StudySessionTaskSummaryRow = Pick<
   TaskRow,
@@ -42,6 +48,30 @@ type StudySessionTaskSummaryRow = Pick<
 
 export interface StudySessionWithTaskRow extends StudySessionRow {
   readonly task: StudySessionTaskSummaryRow | null;
+  readonly reviewer?: ReviewerTarget | null;
+}
+
+/**
+ * The TP1 block columns arrive with a migration the owner applies during
+ * rollout. Until then PostgreSQL reports the columns missing; reads fall back
+ * to the task-only columns once per instance instead of failing Schedule.
+ */
+let sessionBlockColumnsSupported = true;
+
+// Undefined column/table/function in PostgreSQL or PostgREST's schema cache.
+// Codes only: an unresolved embed (PGRST200) also mentions the schema cache.
+const MISSING_SCHEMA_CODES = new Set(["42703", "42P01", "42883", "PGRST202", "PGRST204", "PGRST205"]);
+function isMissingSchemaError(error: { readonly code?: string } | null): boolean {
+  return MISSING_SCHEMA_CODES.has(error?.code ?? "");
+}
+
+async function withSessionColumns<T extends { readonly error: { readonly code?: string } | null }>(
+  run: (columns: string) => PromiseLike<T>,
+): Promise<T> {
+  const result = await run(sessionBlockColumnsSupported ? SESSION_COLUMNS : SESSION_BASE_COLUMNS);
+  if (!sessionBlockColumnsSupported || !isMissingSchemaError(result.error)) return result;
+  sessionBlockColumnsSupported = false;
+  return run(SESSION_BASE_COLUMNS);
 }
 
 /**
@@ -222,6 +252,112 @@ export async function loadOwnedPlannerTasks(
     .map(row => ({ id: row.id, title: eligible.get(row.id)!.title, dueAt: eligible.get(row.id)!.dueAt, estimatedMinutes: row.estimated_minutes, priority: row.priority, createdAt: row.created_at }));
 }
 
+const LIBRARY_PAGE = 200;
+const MAX_LIBRARY_ROWS = 10_000;
+
+/**
+ * Saved reviewers the Today plan may schedule, filtered and ordered by the
+ * shared selector: successfully generated (latest version present), not
+ * superseded, from current courses, not opened in the last 24 hours and not
+ * already holding a kept block inside this planning range (the local day).
+ */
+export async function loadOwnedReviewerCandidates(
+  client: SupabaseClient<Database>,
+  userId: string,
+  range: PlanningRange,
+  now: number,
+): Promise<readonly PlannerReviewer[]> {
+  const repository = experienceRepository(client);
+  const [library, courses, context, opens, kept] = await Promise.all([
+    readOwnedLibraryReviewers(client, userId),
+    repository.rows("canvas_courses", userId),
+    readActivityContext(repository, userId, now, now + 86_400_000),
+    readOwnedReviewerOpens(client, userId),
+    readKeptReviewerBlocks(client, userId, range),
+  ]);
+  const nextDueByCourse = new Map<string, number>();
+  for (const activity of context.activities) {
+    if (activity.status === "submitted" || activity.status === "completed" || !activity.course || !activity.dueAt) continue;
+    const due = Date.parse(activity.dueAt);
+    if (!(due > now)) continue;
+    nextDueByCourse.set(activity.course.id, Math.min(due, nextDueByCourse.get(activity.course.id) ?? Number.POSITIVE_INFINITY));
+  }
+  return selectReviewerCandidates({
+    reviewers: library.map((summary) => ({ ...summary, lastOpenedAt: opens.get(summary.id) ?? null })),
+    currentCourseIds: new Set(courses.filter((course) => course.user_id === userId && !isPastStoredCourse(course, now)).map((course) => course.id)),
+    nextDueByCourse,
+    excludedIds: kept,
+    now,
+  });
+}
+
+async function readOwnedLibraryReviewers(
+  client: SupabaseClient<Database>,
+  userId: string,
+): Promise<readonly Omit<ReviewerCandidateSource, "lastOpenedAt">[]> {
+  const reviewers: Omit<ReviewerCandidateSource, "lastOpenedAt">[] = [];
+  for (let offset = 0; offset < MAX_LIBRARY_ROWS; offset += LIBRARY_PAGE) {
+    const { data, error } = await client.from("experience_library_v1").select("id,user_id,summary")
+      .eq("user_id", userId).eq("artifact_type", "reviewer").eq("superseded", false)
+      .order("updated_at", { ascending: false }).order("id").range(offset, offset + LIBRARY_PAGE - 1);
+    if (error || !data) throw storageFailure("Saved reviewers could not be loaded.");
+    for (const row of data) {
+      if (row.user_id !== userId || !row.id.startsWith("artifact:")) continue;
+      const summary = readRecord(row.summary);
+      const course = readRecord(summary.course);
+      const minutes = summary.reviewMinutes;
+      reviewers.push({
+        id: row.id.slice("artifact:".length),
+        title: typeof summary.title === "string" ? summary.title : "",
+        courseId: typeof course.id === "string" ? course.id : null,
+        createdAt: typeof summary.createdAt === "string" ? summary.createdAt : "",
+        reviewMinutes: typeof minutes === "number" && Number.isFinite(minutes) && minutes > 0 ? minutes : null,
+      });
+    }
+    if (data.length < LIBRARY_PAGE) return reviewers.filter((reviewer) => reviewer.title.trim());
+  }
+  throw storageFailure("Saved reviewers could not be loaded.");
+}
+
+/** Missing until the TP1 migration is applied: then nothing counts as opened. */
+async function readOwnedReviewerOpens(client: SupabaseClient<Database>, userId: string): Promise<ReadonlyMap<string, string>> {
+  const opens = new Map<string, string>();
+  for (let offset = 0; offset < MAX_LIBRARY_ROWS; offset += LIBRARY_PAGE) {
+    const { data, error } = await client.from("reviewer_opens").select("user_id,artifact_id,last_opened_at")
+      .eq("user_id", userId).order("artifact_id").range(offset, offset + LIBRARY_PAGE - 1);
+    if (error && isMissingSchemaError(error)) return opens;
+    if (error || !data) throw storageFailure("Reviewer history could not be loaded.");
+    for (const row of data) if (row.user_id === userId) opens.set(row.artifact_id, row.last_opened_at);
+    if (data.length < LIBRARY_PAGE) return opens;
+  }
+  throw storageFailure("Reviewer history could not be loaded.");
+}
+
+/** Reviewers whose block in this range survives a replan (done or skipped). */
+async function readKeptReviewerBlocks(client: SupabaseClient<Database>, userId: string, range: PlanningRange): Promise<ReadonlySet<string>> {
+  const { data, error } = await client.from("study_sessions").select("user_id,reviewer_artifact_id,status")
+    .eq("user_id", userId).eq("block_kind", "reviewer").neq("status", "planned")
+    .lt("starts_at", range.endsAt).gt("ends_at", range.startsAt).limit(1000);
+  if (error && isMissingSchemaError(error)) return new Set();
+  if (error || !data) throw storageFailure("Study sessions could not be loaded.");
+  return new Set(data.flatMap((row) => row.user_id === userId && row.reviewer_artifact_id ? [row.reviewer_artifact_id] : []));
+}
+
+/** Records that the owner opened one of their saved reviewers. False when it is not theirs. */
+export async function recordOwnedReviewerOpen(
+  client: SupabaseClient<Database>,
+  userId: string,
+  artifactId: string,
+): Promise<boolean> {
+  const { data, error } = await client.rpc("record_reviewer_open_v1", { p_user_id: userId, p_artifact_id: artifactId });
+  if (error) throw storageFailure("Reviewer history could not be saved.");
+  return data === true;
+}
+
+function readRecord(value: unknown): Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
 export async function persistOwnedStudyPlan(
   client: SupabaseClient<Database>,
   userId: string,
@@ -231,12 +367,18 @@ export async function persistOwnedStudyPlan(
   readonly studyPlanId: string;
   readonly sessions: readonly StudySessionWithTaskRow[];
 }> {
-  const sessionPayload: Json = plan.sessions.map((session) => ({
-    task_id: session.taskId,
-    starts_at: session.startsAt,
-    ends_at: session.endsAt,
-  }));
-  const { data, error } = await client.rpc("apply_study_plan_v1", {
+  // Task-only plans keep the original RPC, so they never depend on the TP1
+  // migration. Reviewer blocks need the typed v2 RPC and its ownership checks.
+  const typed = plan.sessions.some(isReviewerProposal);
+  const sessionPayload: Json = plan.sessions.map((session) => isReviewerProposal(session)
+    ? { kind: "reviewer", reviewer_artifact_id: session.reviewerId, starts_at: session.startsAt, ends_at: session.endsAt }
+    : {
+      ...(typed ? { kind: "task" } : {}),
+      task_id: session.taskId,
+      starts_at: session.startsAt,
+      ends_at: session.endsAt,
+    });
+  const { data, error } = await client.rpc(typed ? "apply_study_plan_v2" : "apply_study_plan_v1", {
     p_user_id: userId,
     p_planning_starts_at: plan.planningRange.startsAt,
     p_planning_ends_at: plan.planningRange.endsAt,
@@ -268,15 +410,23 @@ export async function listOwnedStudySessions(
   userId: string,
   options: StudySessionListOptions,
 ): Promise<readonly StudySessionWithTaskRow[]> {
+  return attachOwnedReviewerTargets(client, userId, await reconcileCanvasSessions(client, userId, await readOwnedStudySessions(client, userId, options)));
+}
+
+async function readOwnedStudySessions(
+  client: SupabaseClient<Database>,
+  userId: string,
+  options: StudySessionListOptions,
+): Promise<readonly StudySessionWithTaskRow[]> {
   if (sessionTaskEmbedSupported) {
-    const embedded = await selectOwnedStudySessions(
+    const embedded = await withSessionColumns((columns) => selectOwnedStudySessions(
       client,
       userId,
       options,
-      SESSION_WITH_TASK_COLUMNS,
-    );
+      withTaskEmbed(columns),
+    ));
     if (!embedded.error) {
-      return reconcileCanvasSessions(client, userId, (embedded.data ?? []) as unknown as StudySessionWithTaskRow[]);
+      return (embedded.data ?? []) as unknown as StudySessionWithTaskRow[];
     }
     if (!isUnresolvedEmbedError(embedded.error)) {
       throw storageFailure("Study sessions could not be loaded.");
@@ -284,11 +434,30 @@ export async function listOwnedStudySessions(
     sessionTaskEmbedSupported = false;
   }
 
-  const plain = await selectOwnedStudySessions(client, userId, options, SESSION_COLUMNS);
+  const plain = await withSessionColumns((columns) => selectOwnedStudySessions(client, userId, options, columns));
   if (plain.error || !plain.data) {
     throw storageFailure("Study sessions could not be loaded.");
   }
-  return reconcileCanvasSessions(client, userId, await attachOwnedTaskSummaries(client, userId, plain.data as unknown as StudySessionRow[]));
+  return attachOwnedTaskSummaries(client, userId, plain.data as unknown as StudySessionRow[]);
+}
+
+/**
+ * Reviewer blocks carry the saved reviewer they open. A block whose reviewer
+ * was deleted has nothing left to open, so it is no longer shown.
+ */
+async function attachOwnedReviewerTargets(
+  client: SupabaseClient<Database>,
+  userId: string,
+  sessions: readonly StudySessionWithTaskRow[],
+): Promise<readonly StudySessionWithTaskRow[]> {
+  const ids = sessions.flatMap((session) => session.block_kind === "reviewer" && session.reviewer_artifact_id ? [session.reviewer_artifact_id] : []);
+  if (ids.length === 0) return sessions;
+  const targets = await readOwnedReviewerTargets(client, userId, ids);
+  return sessions.flatMap((session) => {
+    if (session.block_kind !== "reviewer") return [session];
+    const reviewer = session.reviewer_artifact_id ? targets.get(session.reviewer_artifact_id) : undefined;
+    return reviewer ? [{ ...session, task: null, reviewer }] : [];
+  });
 }
 
 /** Reconcile the display without overwriting the student's saved task/session state. */
@@ -299,7 +468,7 @@ async function reconcileCanvasSessions(client: SupabaseClient<Database>, userId:
   const byTask = new Map(activities.filter(activity => activity.taskId).map(activity => [activity.taskId, activity]));
   return sessions.flatMap(session => {
     if (session.task?.source_type !== "canvas" && !session.task?.canvas_assignment_row_id) return [session];
-    const activity = byTask.get(session.task_id);
+    const activity = session.task_id ? byTask.get(session.task_id) : undefined;
     if (!activity) return [];
     const done = activity.status === "submitted" || activity.status === "completed";
     return [{ ...session, status: session.status === "planned" && done ? "completed" as const : session.status,
@@ -336,8 +505,8 @@ async function attachOwnedTaskSummaries(
   userId: string,
   sessions: readonly StudySessionRow[],
 ): Promise<readonly StudySessionWithTaskRow[]> {
-  const taskIds = [...new Set(sessions.map((session) => session.task_id))];
-  if (taskIds.length === 0) return [];
+  const taskIds = [...new Set(sessions.flatMap((session) => session.task_id ? [session.task_id] : []))];
+  if (taskIds.length === 0) return sessions.map((session) => ({ ...session, task: null }));
   const { data, error } = await client
     .from("tasks")
     .select(SESSION_TASK_SUMMARY_COLUMNS)
@@ -349,7 +518,7 @@ async function attachOwnedTaskSummaries(
   );
   return sessions.map((session) => ({
     ...session,
-    task: summaries.get(session.task_id) ?? null,
+    task: session.task_id ? summaries.get(session.task_id) ?? null : null,
   }));
 }
 
@@ -358,14 +527,14 @@ export async function findOwnedStudySession(
   userId: string,
   sessionId: string,
 ): Promise<StudySessionRow | null> {
-  const { data, error } = await client
+  const { data, error } = await withSessionColumns((columns) => client
     .from("study_sessions")
-    .select(SESSION_COLUMNS)
+    .select(columns)
     .eq("user_id", userId)
     .eq("id", sessionId)
-    .maybeSingle();
+    .maybeSingle());
   if (error) throw storageFailure("Study session could not be loaded.");
-  return data as StudySessionRow | null;
+  return data as unknown as StudySessionRow | null;
 }
 
 export async function updateOwnedStudySession(
@@ -374,20 +543,23 @@ export async function updateOwnedStudySession(
   sessionId: string,
   update: StudySessionUpdate,
 ): Promise<StudySessionWithTaskRow | null> {
-  const { data, error } = await client
+  // A failed RETURNING list fails the whole statement, so the column fallback
+  // retry never applies the update twice.
+  const { data, error } = await withSessionColumns((columns) => client
     .from("study_sessions")
     .update(update)
     .eq("user_id", userId)
     .eq("id", sessionId)
-    .select(SESSION_COLUMNS)
-    .maybeSingle();
+    .select(columns)
+    .maybeSingle());
   if (error) throw storageFailure("Study session could not be updated.");
-  const row = data as StudySessionRow | null;
+  const row = data as unknown as StudySessionRow | null;
   if (!row) return null;
-  // One decorated row: the shared lookup keeps the moved block's response
+  // One decorated row: the shared lookups keep the moved block's response
   // identical in shape to the list contract without a second embed path.
   const [decorated] = await attachOwnedTaskSummaries(client, userId, [row]);
-  return decorated ?? { ...row, task: null };
+  const [withReviewer] = await attachOwnedReviewerTargets(client, userId, [decorated ?? { ...row, task: null }]);
+  return withReviewer ?? { ...row, task: null, reviewer: null };
 }
 
 export async function deleteOwnedStudySession(
@@ -428,10 +600,29 @@ export function toTaskView(row: TaskRow): TaskView {
 }
 
 export function toStudySessionView(row: StudySessionWithTaskRow): StudySessionView {
+  if (row.block_kind === "reviewer") {
+    // A reviewer block's status is its own: it never reads or completes a task.
+    return {
+      id: row.id,
+      studyPlanId: row.study_plan_id,
+      taskId: null,
+      kind: "reviewer",
+      reviewer: row.reviewer
+        ? { id: row.reviewer.id, title: row.reviewer.title, courseId: row.reviewer.course?.id ?? null }
+        : null,
+      startsAt: row.starts_at,
+      endsAt: row.ends_at,
+      status: row.status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      task: null,
+    };
+  }
   return {
     id: row.id,
     studyPlanId: row.study_plan_id,
     taskId: row.task_id,
+    kind: "task",
     startsAt: row.starts_at,
     endsAt: row.ends_at,
     status: row.status === "planned" && row.task?.status === "completed" ? "completed" : row.status,

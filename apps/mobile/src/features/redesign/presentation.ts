@@ -7,7 +7,7 @@ import type {
   LearningMaterial,
   TodayItem,
 } from "@stay-focused/shared";
-import type { StudyPlanningRequest } from "@stay-focused/shared/task-planning";
+import type { PlanMode, StudyPlanningRequest } from "@stay-focused/shared/task-planning";
 
 import type { CoreState } from "../generation-core/coreModel";
 
@@ -195,8 +195,10 @@ export function planningRequest(
   date: string,
   start: number,
   end: number,
+  mode?: PlanMode,
 ): StudyPlanningRequest {
-  return freeTimePlanningRange(date, start, end);
+  const request = freeTimePlanningRange(date, start, end);
+  return mode ? { ...request, mode } : request;
 }
 
 /**
@@ -358,7 +360,8 @@ export function todaySchedule(items: readonly TodayItem[]): TodayItem[] {
 }
 
 /** The activity an item is about, so a work session and its activity dedupe. */
-export function workKey(item: { readonly title: string; readonly course: { readonly id: string } | null }): string {
+export function workKey(item: { readonly title: string; readonly course: { readonly id: string } | null; readonly reviewer?: TodayItem["reviewer"] }): string {
+  if (item.reviewer) return `reviewer:${item.reviewer.id}`;
   return `${item.course?.id ?? ""}|${item.title.trim().toLocaleLowerCase()}`;
 }
 
@@ -383,9 +386,11 @@ export function urgencyOf(item: Pick<TodayItem, "dueAt" | "status">, now = Date.
 
 /** Finds the activity behind a Today item (a planned work session carries only its title and course). */
 export function activityFor<T extends { readonly id: string; readonly title: string; readonly course: { readonly id: string } | null }>(
-  item: Pick<TodayItem, "title" | "course" | "deepLinkTarget">,
+  item: Pick<TodayItem, "title" | "course" | "deepLinkTarget" | "reviewer">,
   activities: readonly T[],
 ): T | null {
+  // Reviewer blocks are review time, never a task: no title match may complete one.
+  if (item.reviewer) return null;
   if (item.deepLinkTarget.surface === "activity") return activities.find((activity) => activity.id === item.deepLinkTarget.id) ?? null;
   const key = workKey(item);
   return activities.find((activity) => workKey(activity) === key) ?? null;

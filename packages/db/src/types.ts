@@ -93,6 +93,8 @@ export type TaskDatabaseStatus = "pending" | "completed";
 export type TaskDatabasePriority = "low" | "medium" | "high";
 export type TaskDatabaseSourceType = "manual" | "canvas";
 export type StudySessionDatabaseStatus = "planned" | "completed" | "skipped";
+export type StudyBlockDatabaseKind = "task" | "reviewer";
+export type PlanModeDatabaseValue = "reviewers" | "tasks" | "reviewers_tasks";
 
 export type ReviewerRow = Database["public"]["Tables"]["reviewers"]["Row"];
 export type ReviewerInsert =
@@ -611,9 +613,15 @@ export interface Database {
   public: {
     Tables: {
       user_profiles: {
-        Row: { user_id: string; avatar_path: string | null; avatar_updated_at: string | null; avatar_cleanup_paths: string[]; orb_color: "pearl" | "gold" | "green" | "violet" | "orange" | null; orb_color_updated_at: string | null };
-        Insert: { user_id: string; avatar_path?: string | null; avatar_updated_at?: string | null; avatar_cleanup_paths?: string[]; orb_color?: "pearl" | "gold" | "green" | "violet" | "orange" | null; orb_color_updated_at?: string | null };
-        Update: { avatar_path?: string | null; avatar_updated_at?: string | null; avatar_cleanup_paths?: string[]; orb_color?: "pearl" | "gold" | "green" | "violet" | "orange" | null; orb_color_updated_at?: string | null };
+        Row: { user_id: string; avatar_path: string | null; avatar_updated_at: string | null; avatar_cleanup_paths: string[]; orb_color: "pearl" | "gold" | "green" | "violet" | "orange" | null; orb_color_updated_at: string | null; plan_mode?: PlanModeDatabaseValue | null };
+        Insert: { user_id: string; avatar_path?: string | null; avatar_updated_at?: string | null; avatar_cleanup_paths?: string[]; orb_color?: "pearl" | "gold" | "green" | "violet" | "orange" | null; orb_color_updated_at?: string | null; plan_mode?: PlanModeDatabaseValue | null };
+        Update: { avatar_path?: string | null; avatar_updated_at?: string | null; avatar_cleanup_paths?: string[]; orb_color?: "pearl" | "gold" | "green" | "violet" | "orange" | null; orb_color_updated_at?: string | null; plan_mode?: PlanModeDatabaseValue | null };
+        Relationships: [];
+      };
+      reviewer_opens: {
+        Row: { user_id: string; artifact_id: string; last_opened_at: string };
+        Insert: { user_id: string; artifact_id: string; last_opened_at?: string };
+        Update: { last_opened_at?: string };
         Relationships: [];
       };
       material_descriptions: {
@@ -822,7 +830,11 @@ export interface Database {
           id: string;
           user_id: string;
           study_plan_id: string | null;
-          task_id: string;
+          /** Null only for reviewer blocks (TP1). */
+          task_id: string | null;
+          /** Null = task block. Absent until the TP1 migration is applied. */
+          block_kind?: StudyBlockDatabaseKind | null;
+          reviewer_artifact_id?: string | null;
           starts_at: string;
           ends_at: string;
           status: StudySessionDatabaseStatus;
@@ -833,7 +845,9 @@ export interface Database {
           id?: string;
           user_id: string;
           study_plan_id?: string | null;
-          task_id: string;
+          task_id?: string | null;
+          block_kind?: StudyBlockDatabaseKind | null;
+          reviewer_artifact_id?: string | null;
           starts_at: string;
           ends_at: string;
           status?: StudySessionDatabaseStatus;
@@ -844,7 +858,9 @@ export interface Database {
           id?: string;
           user_id?: string;
           study_plan_id?: string | null;
-          task_id?: string;
+          task_id?: string | null;
+          block_kind?: StudyBlockDatabaseKind | null;
+          reviewer_artifact_id?: string | null;
           starts_at?: string;
           ends_at?: string;
           status?: StudySessionDatabaseStatus;
@@ -4476,6 +4492,24 @@ export interface Database {
           p_assignment_ids: string[];
         };
         Returns: TaskRow[];
+      };
+      apply_study_plan_v2: {
+        Args: {
+          p_user_id: string;
+          p_planning_starts_at: string;
+          p_planning_ends_at: string;
+          p_algorithm_version: "deterministic-v1";
+          p_input_hash: string;
+          p_sessions: Json;
+        };
+        Returns: Array<{
+          study_plan_id: string;
+          session_count: number;
+        }>;
+      };
+      record_reviewer_open_v1: {
+        Args: { p_user_id: string; p_artifact_id: string };
+        Returns: boolean;
       };
       apply_study_plan_v1: {
         Args: {

@@ -99,6 +99,17 @@ export async function POST(request: Request, context: Context): Promise<Response
       const { mutateCourseRequest } = await import('@/lib/course-batch/service');
       return experienceJson(await mutateCourseRequest(createCanvasServiceClient(), userId, requireId(path[1]!), path[2] as 'cancel' | 'retry'));
     }
+    if (path.length === 3 && path[0] === 'library' && path[2] === 'opened') {
+      // The reader reports an open explicitly; detail reads also serve caches.
+      if (!/^artifact:/.test(path[1]!)) throw new ExperienceFailure(404, 'not_found');
+      const artifactId = requireId(path[1]!.slice('artifact:'.length));
+      const { recordOwnedReviewerOpen } = await import('@/lib/task-planning-repository');
+      let recorded: boolean;
+      try { recorded = await recordOwnedReviewerOpen(createCanvasServiceClient(), userId, artifactId); }
+      catch { throw new ExperienceFailure(503, 'unavailable'); }
+      if (!recorded) throw new ExperienceFailure(404, 'not_found');
+      return experienceJson({ opened: true });
+    }
     if (path.length === 3 && path[0] === 'courses' && path[2] === 'batch') {
       const value = record(await readBoundedExperienceJson(request, 512 * 1024));
       if (Object.keys(value).some(key => key !== 'materialIds') || (value.materialIds !== 'all' &&

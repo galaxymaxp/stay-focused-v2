@@ -165,6 +165,8 @@ export interface TodayItem {
   readonly status: ActivitySummary['status'] | StudySessionStatus;
   readonly source: 'canvas' | 'local';
   readonly deepLinkTarget: { readonly surface: 'activity' | 'study_session'; readonly id: string };
+  /** Present on a planned reviewer block: the saved reviewer (Library artifact ID) it opens. */
+  readonly reviewer?: { readonly id: string };
 }
 /** Additive Today contract; optional fields also allow pre-SP2b saved agendas. */
 export interface TodayScreenData extends TodayOverview {

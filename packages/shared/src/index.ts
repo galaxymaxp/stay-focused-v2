@@ -264,6 +264,7 @@ export * from './app-release';
 export * from './legal';
 export * from './profile-preferences';
 export * from './orb-preference-sync';
+export * from './plan-mode-store';
 export * from './clock-glyphs';
 
 export * from './orb-appearance';

@@ -1,4 +1,5 @@
 import { FREE_TIME_ERROR, validFreeTime } from "@stay-focused/shared";
+import { PLAN_MODES, PLAN_MODE_LABELS, type PlanMode } from "@stay-focused/shared/task-planning";
 import { Ellipsis } from "lucide-react-native";
 import { useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, Switch, TextInput, View, useWindowDimensions } from "react-native";
@@ -19,9 +20,10 @@ export function clockTimeMinutes(value: ClockTimeFields, hour12: boolean) {
   return (hour12 ? hour % 12 + (value.pm ? 12 : 0) : hour) * 60 + minute;
 }
 /** Measured native Modal, matching ReviewerActions and the existing safe-area bounds. */
-export function ClockOptions({ start, end, locked, onToggleLock, onCommit, disabled }: {
+export function ClockOptions({ start, end, locked, onToggleLock, onCommit, disabled, planMode, onPlanModeChange }: {
   start: number; end: number; locked: boolean; onToggleLock: () => void;
   onCommit: (start: number, end: number) => void; disabled: boolean;
+  planMode?: PlanMode; onPlanModeChange?: (mode: PlanMode) => void;
 }) {
   const { colors } = useTheme();
   const { width, height } = useWindowDimensions();
@@ -69,6 +71,17 @@ export function ClockOptions({ start, end, locked, onToggleLock, onCommit, disab
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
               <Copy>Lock clock</Copy><Switch accessibilityLabel="Lock clock" value={locked} onValueChange={onToggleLock} />
             </View>
+            {planMode && onPlanModeChange ? <View accessibilityRole="radiogroup" accessibilityLabel="Plan with" style={{ gap: spacing[1] }}>
+              <Copy size="h3">Plan with</Copy>
+              {PLAN_MODES.map(mode => <Pressable key={mode} accessibilityRole="radio" accessibilityLabel={PLAN_MODE_LABELS[mode]}
+                accessibilityState={{ checked: planMode === mode, disabled }} disabled={disabled} onPress={() => onPlanModeChange(mode)}
+                style={({ pressed }) => ({ minHeight: 44, flexDirection: "row", alignItems: "center", gap: spacing[2], opacity: disabled ? 0.5 : pressed ? 0.6 : 1 })}>
+                <View style={{ width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: colors.accent, alignItems: "center", justifyContent: "center" }}>
+                  {planMode === mode ? <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent }} /> : null}
+                </View>
+                <Copy>{PLAN_MODE_LABELS[mode]}</Copy>
+              </Pressable>)}
+            </View> : null}
             <Copy size="h3">Free time</Copy>
             {fields("Free time starts", from, setFrom)}
             {fields("Free time ends", to, setTo)}

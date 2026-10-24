@@ -40,6 +40,48 @@ export interface ExperienceRepository {
   materialReviewers?(userId: string, courseId: string, materialIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
   materialDescriptions?(userId: string, courseId: string, materialIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
   exactRows?<T extends ExperienceTable>(table: T, userId: string, key: keyof ExperienceRow<T> & string, value: string): Promise<readonly ExperienceRow<T>[]>;
+  /** Saved reviewers that Today reviewer blocks open, keyed by artifact UUID. */
+  reviewerTargets?(userId: string, artifactIds: readonly string[]): Promise<ReadonlyMap<string, ReviewerTarget>>;
+}
+
+/** The saved reviewer a reviewer block points at, as the Library shows it. */
+export interface ReviewerTarget {
+  /** Library artifact ID (`artifact:<uuid>`). */
+  readonly id: string;
+  readonly title: string;
+  readonly course: { readonly id: string; readonly code: string | null; readonly name: string } | null;
+}
+
+/** Owner-scoped Library summaries for reviewer blocks; deleted reviewers are absent. */
+export async function readOwnedReviewerTargets(
+  client: SupabaseClient<Database>,
+  userId: string,
+  artifactIds: readonly string[],
+): Promise<ReadonlyMap<string, ReviewerTarget>> {
+  const targets = new Map<string, ReviewerTarget>();
+  const ids = [...new Set(artifactIds)];
+  for (let start = 0; start < ids.length; start += 100) {
+    const { data, error } = await client.from("experience_library_v1").select("id,user_id,summary")
+      .eq("user_id", userId).in("id", ids.slice(start, start + 100).map((id) => `artifact:${id}`));
+    if (error || !data) throw new ExperienceFailure(503, "unavailable");
+    for (const row of data) {
+      if (row.user_id !== userId || !row.id.startsWith("artifact:")) continue;
+      const summary = record(row.summary);
+      const course = record(summary.course);
+      targets.set(row.id.slice("artifact:".length), {
+        id: row.id,
+        title: typeof summary.title === "string" && summary.title.trim() ? summary.title : "Saved reviewer",
+        course: typeof course.id === "string" && typeof course.name === "string"
+          ? { id: course.id, code: typeof course.code === "string" ? course.code : null, name: course.name } : null,
+      });
+    }
+  }
+  return targets;
+}
+
+
+function record(value: unknown): Readonly<Record<string, unknown>> {
+  return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
 
 /**
@@ -59,6 +101,7 @@ export function trustedExperienceReadRepository(
     materialReviewers: (_userId, courseId, materialIds) => repository.materialReviewers!(authenticatedUserId, courseId, materialIds),
     materialDescriptions: (_userId, courseId, materialIds) => repository.materialDescriptions!(authenticatedUserId, courseId, materialIds),
     exactRows: (table, _userId, key, value) => repository.exactRows!(table, authenticatedUserId, key, value),
+    reviewerTargets: (_userId, artifactIds) => repository.reviewerTargets!(authenticatedUserId, artifactIds),
     rows<T extends ExperienceTable>(table: T): Promise<readonly ExperienceRow<T>[]> {
       return repository.rows(table, authenticatedUserId);
     },
@@ -78,6 +121,7 @@ export function experienceRepository(client: SupabaseClient<Database>): Experien
     return query;
   }
   return {
+    reviewerTargets: (userId, artifactIds) => readOwnedReviewerTargets(client, userId, artifactIds),
     async materialDescriptions(userId, courseId, materialIds) {
       const ids = [...new Set(materialIds)];
       if (!ids.length) return new Map();

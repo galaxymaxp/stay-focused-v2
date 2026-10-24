@@ -4,7 +4,7 @@ import type { Quiz } from '@stay-focused/shared';
 import { estimateReviewerMinutes } from '@stay-focused/shared';
 import type { CanvasAssignmentRow } from '@stay-focused/db';
 import { quizView } from '../quiz/read-model';
-import type { ActivityDetail, ActivitySummary, AnnouncementAttachment, AnnouncementLink, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerateCourseList, GenerationView, LibraryArtifactDetail, LibraryArtifactSummary,LibraryArtifactType, LibraryOverview, ReviewerReaderModel, StudentAnnouncement, StudentAnnouncementList, TodayOverview } from '@stay-focused/shared';
+import type { TodayItem, ActivityDetail, ActivitySummary, AnnouncementAttachment, AnnouncementLink, CourseLearningWorkspace, CourseMaterials, CourseSummary, GenerateCourseList, GenerationView, LibraryArtifactDetail, LibraryArtifactSummary,LibraryArtifactType, LibraryOverview, ReviewerReaderModel, StudentAnnouncement, StudentAnnouncementList, TodayOverview } from '@stay-focused/shared';
 import type { CanvasReviewerSourceList, CanvasReviewerSourceResult } from '@/lib/canvas-reviewer-sources';
 import type { CanvasCourseInventory, CanvasCourseSelectionResult } from '@/lib/canvas-course-selection';
 import { normalizeCanvasHtmlToText } from '@/lib/canvas-content-normalization';
@@ -160,7 +160,17 @@ export class ExperienceService {
   async getTodayOverview(userId: string, date: string, offset = 0, window?: TodayWindowOverride): Promise<TodayOverview> {
     dayWindow(date, offset, window);
     const [context, sessions, plans] = await Promise.all([this.activityContext(userId, date, offset, false, window), this.rows('study_sessions', userId), this.rows('study_plans', userId)]);
-    return composeToday({ userId, date, offset, window, now: context.now, activities: context.activities, tasks: context.tasks, sessions, plans });
+    const reviewers = await this.reviewerTargets(userId, sessions.flatMap(s => s.block_kind === 'reviewer' && s.reviewer_artifact_id ? [s.reviewer_artifact_id] : []));
+    return composeToday({ userId, date, offset, window, now: context.now, activities: context.activities, tasks: context.tasks, sessions, plans, reviewers });
+  }
+  /** Production reads the Library projection; legacy adapters fall back to owned artifact titles. */
+  private async reviewerTargets(userId: string, ids: readonly string[]): Promise<ReadonlyMap<string, { id: string; title: string; course: TodayItem['course'] }>> {
+    if (!ids.length) return new Map();
+    if (this.dependencies.repository.reviewerTargets) return this.dependencies.repository.reviewerTargets(userId, ids);
+    const wanted = new Set(ids);
+    const artifacts = await this.rows('generated_artifacts', userId);
+    return new Map(artifacts.filter(a => wanted.has(a.id) && a.artifact_type === 'reviewer' && !a.deleted_at && a.latest_version_id)
+      .map(a => [a.id, { id: `artifact:${a.id}`, title: a.safe_title, course: null }]));
   }
   async getTodayScreen(userId: string, date: string, offset = 0, window?: TodayWindowOverride): Promise<TodayScreenData> {
     dayWindow(date, offset, window);

@@ -41,6 +41,7 @@ import { generationEnabled, generationKey } from "../lib/generation";
 import { useAction, useResource } from "../lib/hooks";
 import { useListPreferences } from "../lib/list-preferences";
 import { useSavedLibrary } from '../lib/use-saved-library';
+import { useReviewerOpened } from '../lib/reviewer-opened';
 import { DraftInstructions } from './draft-instructions';
 import { StudyExportControl } from './study-export-control';
 type Artifact = {
@@ -500,6 +501,7 @@ export function ArtifactScreen({ id }: { id: string }) {
     `/api/experience/library/${encodeURIComponent(id)}`, 0, "data", true,
   );
   const data = artifact.data;
+  useReviewerOpened(data?.reviewer ? data.artifact.id : null);
   if (data?.reviewer)
     return <ReviewerReader artifact={data.artifact} reviewer={data.reviewer} snapshotStatus={<SnapshotStatus {...artifact} hideFreshLabel />} />;
   return (

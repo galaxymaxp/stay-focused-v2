@@ -4,6 +4,7 @@ import { OrbPointerLayer, useOrbInteraction } from '../knowledge-core/orbInterac
 import { ClockOptions } from "./clock-options";
 import { clockTimeLabel, freeTimeDuration, freeTimeEnd, containsMinute } from "@stay-focused/shared";
 import type { TodayItem } from "@stay-focused/shared";
+import type { PlanMode } from "@stay-focused/shared/task-planning";
 import {
   useCallback,
   useEffect,
@@ -162,6 +163,8 @@ export function DayRingClock({
   onSegmentPress,
   locked = false,
   onToggleLock,
+  planMode,
+  onPlanModeChange,
 }: {
   orbReady?: boolean;
   date: string;
@@ -178,6 +181,9 @@ export function DayRingClock({
   /** Locked, the free time cannot be dragged (blocks can still be opened). */
   locked?: boolean;
   onToggleLock?: () => void;
+  /** The "Plan with" choice, offered inside Clock options (never beside the clock). */
+  planMode?: PlanMode;
+  onPlanModeChange?: (mode: PlanMode) => void;
 }) {
   const reducedMotion = useReducedMotion();
   const box = useRef<HTMLDivElement>(null);
@@ -604,7 +610,8 @@ export function DayRingClock({
           />
         );
       })}
-      {onToggleLock && <ClockOptions start={start} end={end} locked={locked} onToggleLock={onToggleLock} onCommit={onCommit} disabled={disabled} />}
+      {onToggleLock && <ClockOptions start={start} end={end} locked={locked} onToggleLock={onToggleLock} onCommit={onCommit} disabled={disabled}
+        {...(planMode && onPlanModeChange ? { planMode, onPlanModeChange } : {})} />}
     </div>
   );
 }

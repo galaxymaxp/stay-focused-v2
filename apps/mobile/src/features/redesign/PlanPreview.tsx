@@ -1,8 +1,8 @@
 import { freeTimeEnd, minuteInWindow, clockTimeLabel } from "@stay-focused/shared";
-import type { DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
+import { isReviewerProposal, planEmptyMessage, proposalTargetKey, proposalTitle, type DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
 import { View } from "react-native";
 
-import { Action, Copy, Surface } from "../../design/primitives";
+import { Action, ContentIcon, Copy, Surface } from "../../design/primitives";
 import { useTheme, type ThemeColors } from "../../design/theme";
 import { radius, spacing } from "../../design/tokens";
 import { formatFreeTime } from "./DayRingClock";
@@ -16,7 +16,7 @@ export function planToneFor(taskIds: readonly string[], taskId: string): (typeof
 }
 
 export function planTaskIds(plan: Pick<DeterministicStudyPlan, "sessions">): string[] {
-  return [...new Set(plan.sessions.map((session) => session.taskId))];
+  return [...new Set(plan.sessions.map(proposalTargetKey))];
 }
 
 function minuteOfDay(iso: string) {
@@ -61,11 +61,12 @@ export function PlanPreview({
         <Copy size="h3">Proposed plan</Copy>
         <Copy muted size="caption" style={{ fontVariant: ["tabular-nums"] }}>{formatFreeTime(planned)} planned</Copy>
       </View>
+      {plan.sessions.length === 0 && planEmptyMessage(plan) ? <Copy muted>{planEmptyMessage(plan)}</Copy> : null}
       <View
         accessible
         accessibilityLabel={
           plan.sessions.length
-            ? `Proposed plan: ${plan.sessions.map((session) => `${session.taskTitle} at ${hourLabel(minuteOfDay(session.startsAt))} for ${session.durationMinutes} minutes`).join("; ")}`
+            ? `Proposed plan: ${plan.sessions.map((session) => `${isReviewerProposal(session) ? "Review" : "Task"}: ${proposalTitle(session)} at ${hourLabel(minuteOfDay(session.startsAt))} for ${session.durationMinutes} minutes`).join("; ")}`
             : "No sessions fit this window"
         }
         style={{ height: 58, borderRadius: radius.control, backgroundColor: colors.surfaceSecondary, overflow: "hidden" }}
@@ -75,7 +76,7 @@ export function PlanPreview({
         ))}
         {plan.sessions.map((session) => {
           const start = minuteInWindow(minuteOfDay(session.startsAt), from);
-          const tone = planToneFor(taskIds, session.taskId);
+          const tone = planToneFor(taskIds, proposalTargetKey(session));
           const late = session.scheduledAfterDeadline;
           return (
             <View
@@ -94,7 +95,10 @@ export function PlanPreview({
                 borderColor: colors.danger,
               }}
             >
-              <Copy size="caption" numberOfLines={1} color={colors[tone]} style={{ fontWeight: "700", fontSize: 11 }}>{session.taskTitle}</Copy>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                <ContentIcon kind={isReviewerProposal(session) ? "reviewer" : "task"} small />
+                <Copy size="caption" numberOfLines={1} color={colors[tone]} style={{ fontWeight: "700", fontSize: 11, flex: 1 }}>{proposalTitle(session)}</Copy>
+              </View>
               <Copy size="caption" numberOfLines={1} color={colors[tone]} style={{ fontSize: 10, opacity: 0.85, fontVariant: ["tabular-nums"] }}>
                 {late ? "after due · " : ""}{session.durationMinutes}m
               </Copy>

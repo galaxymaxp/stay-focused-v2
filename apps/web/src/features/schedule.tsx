@@ -1,10 +1,11 @@
 "use client";
 import { validFreeTime, FREE_TIME_ERROR } from "@stay-focused/shared";
 import type { ActivitySummary } from "@stay-focused/shared";
-import type {
-  StudySessionView,
-  DeterministicStudyPlan,
-  StudyPlanningRequest,
+import {
+  proposalTitle,
+  type StudySessionView,
+  type DeterministicStudyPlan,
+  type StudyPlanningRequest,
 } from "@stay-focused/shared/task-planning";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -214,13 +215,19 @@ export function ScheduleScreen() {
                         </div>
                       ))}
                       {rows.map((s) => {
-                        const title = s.task?.title ?? "Study session";
+                        // A reviewer block opens its saved reviewer directly.
+                        const reviewer = s.kind === "reviewer" ? s.reviewer ?? null : null;
+                        const title = reviewer?.title ?? s.task?.title ?? "Study session";
                         return (
                           <div className={`session ${s.status}`} key={s.id}>
                             <Link
                               className="session-open"
-                              href={`/schedule/session/${encodeURIComponent(s.id)}?date=${localDate(day)}`}
+                              href={reviewer
+                                ? `/library/${encodeURIComponent(reviewer.id)}`
+                                : `/schedule/session/${encodeURIComponent(s.id)}?date=${localDate(day)}`}
+                              aria-label={reviewer ? `Review: ${title}` : undefined}
                             >
+                              {reviewer && <Icon name="book-open" />}
                               {title}
                             </Link>
                             <span className="meta">
@@ -330,7 +337,7 @@ export function ScheduleScreen() {
             <div className="stack plan-proposal">
               {preview.plan.sessions.map((s) => (
                 <p key={s.proposalId} className="proposal-row">
-                  <strong>{s.taskTitle}</strong>
+                  <strong>{proposalTitle(s)}</strong>
                   <span className="meta">
                     {dateLabel(s.startsAt)} – {timeLabel(s.endsAt)}
                     {s.scheduledAfterDeadline ? " · After deadline" : ""}

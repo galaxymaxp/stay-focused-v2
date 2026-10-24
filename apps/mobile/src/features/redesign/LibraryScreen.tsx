@@ -43,6 +43,7 @@ import {
   type LibraryFilter,
 } from "./libraryPresentation";
 import { useLocalArtifact, useLocalLibrary } from "./useLocalLibrary";
+import { useReviewerOpened } from "./useReviewerOpened";
 import { arrangeList } from "./listPreferences";
 import { useListPreferences } from "./useListPreferences";
 import { ReviewerReaderScreen } from "../reviewer/ReviewerReader";
@@ -437,6 +438,7 @@ export function ArtifactScreen() {
   const { id, quiz } = useLocalSearchParams<{ id: string; quiz?: string }>();
   const result = useLocalArtifact(id ?? null);
   const detail = result.data;
+  useReviewerOpened(detail && "reviewer" in detail ? detail.artifact.id : null);
   const [exportOpen, setExportOpen] = useState(false);
   const saveConfirmedDraft = (draft: ActivityDraft) => {
     if (detail && 'draft' in detail) result.storeConfirmed({

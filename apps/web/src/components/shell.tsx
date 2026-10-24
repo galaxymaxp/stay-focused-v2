@@ -10,6 +10,7 @@ import { QueueButton } from "./queue-button";
 import { Icon, Notice } from "./ui";
 import { Avatar } from './avatar';
 import { OrbPreferencesSync } from './orb-preferences-sync';
+import { PlanModePreferencesSync } from './plan-mode-sync';
 import { ProfileAvatarProvider, useProfileAvatar } from './profile-avatar';
 const tabs = [
   { href: "/today", label: "Today", icon: "clock" },
@@ -25,7 +26,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const { recoveryRequired } = useAuth();
   // Do not mount private screen readers while the recovery password is pending.
   if (recoveryRequired) return <main className="auth-page"><BookLoader label="Opening password reset" /></main>;
-  return <ProfileAvatarProvider><OrbPreferencesSync /><QueueReadProvider><ShellContent>{children}</ShellContent></QueueReadProvider></ProfileAvatarProvider>;
+  return <ProfileAvatarProvider><OrbPreferencesSync /><PlanModePreferencesSync /><QueueReadProvider><ShellContent>{children}</ShellContent></QueueReadProvider></ProfileAvatarProvider>;
 }
 function ShellContent({ children }: { children: ReactNode }) {
   const { session, loading, error } = useAuth(),

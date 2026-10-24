@@ -1,6 +1,7 @@
 import type { Database } from "@stay-focused/db";
 import type { GenerationProvider } from "@stay-focused/engine";
 import {
+  generateContentStudyPlan,
   generateDeterministicStudyPlan,
   type DeterministicStudyPlan,
   type StudyPlanningRequest,
@@ -13,6 +14,7 @@ import { refreshCanvasTaskEstimates, TASK_ESTIMATE_TIMEOUT_MS } from "@/lib/task
 import {
   importSchedulableCanvasAssignments,
   loadOwnedPlannerTasks,
+  loadOwnedReviewerCandidates,
   persistOwnedStudyPlan,
   toStudySessionView,
 } from "@/lib/task-planning-repository";
@@ -34,21 +36,35 @@ export async function previewOwnedStudyPlan(
   now = Date.now(),
   provider?: GenerationProvider | null,
 ): Promise<DeterministicStudyPlan> {
+  // An omitted mode is the original tasks-only plan. Reviewers mode never
+  // touches task work, so it skips the Canvas import and estimate refresh.
+  const { mode } = request;
+  const plansTasks = mode !== "reviewers";
   // Planning the student's whole day includes their synced Canvas work
   // automatically. An explicit task selection plans exactly those tasks.
-  if (!request.taskIds) {
+  if (plansTasks && !request.taskIds) {
     await importSchedulableCanvasAssignments(client, userId, now);
     await refreshCanvasTaskEstimates(client, userId, provider === undefined ? estimateProvider() : provider, now);
   }
-  const tasks = await loadOwnedPlannerTasks(client, userId, request.taskIds);
-  if (request.taskIds && tasks.length !== request.taskIds.length) {
+  const tasks = plansTasks ? await loadOwnedPlannerTasks(client, userId, request.taskIds) : [];
+  if (plansTasks && request.taskIds && tasks.length !== request.taskIds.length) {
     throw new OwnedPlanningError(
       "task_not_found",
       "One or more pending tasks were not found.",
     );
   }
-  return generateDeterministicStudyPlan({
+  if (!mode) {
+    return generateDeterministicStudyPlan({
+      tasks,
+      planningRange: request.planningRange,
+      availability: request.availability,
+    });
+  }
+  const reviewers = mode === "tasks" ? [] : await loadOwnedReviewerCandidates(client, userId, request.planningRange, now);
+  return generateContentStudyPlan({
+    mode,
     tasks,
+    reviewers,
     planningRange: request.planningRange,
     availability: request.availability,
   });
@@ -81,6 +97,7 @@ export async function applyOwnedStudyPlan(
     planningRange: plan.planningRange,
     sessions: persisted.sessions.map(toStudySessionView),
     unscheduledWork: plan.unscheduledWork,
+    ...(plan.mode ? { mode: plan.mode } : {}),
   } as const;
 }
 

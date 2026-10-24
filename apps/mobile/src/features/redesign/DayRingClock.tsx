@@ -4,6 +4,7 @@ import { clockTimeLabel, freeTimeDuration, containsMinute, type TodayItem } from
 import { useIsFocused } from "expo-router/react-navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ClockOptions } from "./ClockOptions";
+import type { PlanMode } from "@stay-focused/shared/task-planning";
 import { Animated, PanResponder, Text, View, useWindowDimensions, type GestureResponderEvent } from "react-native";
 import { useClockFonts } from './clockFonts';
 
@@ -132,7 +133,11 @@ export function DayRingClock({
   onSegmentPress,
   locked = false,
   onToggleLock,
+  planMode,
+  onPlanModeChange,
 }: {
+  planMode?: PlanMode;
+  onPlanModeChange?: (mode: PlanMode) => void;
   /** A scheduled block on the inner lane was tapped. */
   onSegmentPress?: (id: string) => void;
   /** Locked, the free time cannot be dragged (blocks can still be tapped). */
@@ -474,7 +479,7 @@ export function DayRingClock({
         <OrbTouchLayer interaction={orbInteraction} size={CLOCK.glass * 2 * scale}
           left={(CLOCK.center - CLOCK.glass) * scale} top={(CLOCK.center - CLOCK.glass) * scale}
           reducedMotion={reducedMotion} delegate={responder.panHandlers} />
-        {onToggleLock ? <ClockOptions start={start} end={end} locked={locked} onToggleLock={onToggleLock} onCommit={onCommit} disabled={disabled} /> : null}
+        {onToggleLock ? <ClockOptions start={start} end={end} locked={locked} onToggleLock={onToggleLock} onCommit={onCommit} disabled={disabled} planMode={planMode} onPlanModeChange={onPlanModeChange} /> : null}
       </View>
     </View>
   );

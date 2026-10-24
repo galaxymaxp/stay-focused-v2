@@ -1,6 +1,14 @@
 "use client";
 import { freeTimeEnd, minuteInWindow, clockTimeLabel } from "@stay-focused/shared";
-import type { DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
+import {
+  isReviewerProposal,
+  PLAN_MODE_LABELS,
+  planEmptyMessage,
+  proposalTargetKey,
+  proposalTitle,
+  type DeterministicStudyPlan,
+} from "@stay-focused/shared/task-planning";
+import { Icon } from "../../components/ui";
 import {
   formatFreeTime,
   planTaskIds,
@@ -17,8 +25,8 @@ const hourLabel = clockTimeLabel;
 
 /**
  * The planner's proposal drawn to scale across the free window: one block per
- * session, colored per task (matching the clock ring), empty space left empty.
- * Nothing changes until Save to schedule.
+ * session, colored per task or reviewer (matching the clock ring) with a small
+ * kind icon, empty space left empty. Nothing changes until Save to schedule.
  */
 export function PlanPreview({
   plan,
@@ -38,6 +46,8 @@ export function PlanPreview({
   const until = freeTimeEnd(from, to);
   const span = Math.max(15, until - from);
   const taskIds = planTaskIds(plan);
+  const empty = plan.sessions.length === 0 ? planEmptyMessage(plan) : null;
+  const kind = (session: DeterministicStudyPlan["sessions"][number]) => isReviewerProposal(session) ? "Review" : "Task";
   const planned = plan.sessions.reduce((t, s) => t + s.durationMinutes, 0);
   const unscheduled = plan.unscheduledWork.reduce(
     (t, item) => t + item.unscheduledMinutes,
@@ -53,7 +63,10 @@ export function PlanPreview({
         <h3>Proposed plan</h3>
         <span className="meta count-up">{formatFreeTime(planned)} planned</span>
       </div>
-      <p className="meta">Not saved yet — save it to add these blocks to Schedule.</p>
+      <p className="meta">
+        {plan.mode ? `Plan with ${PLAN_MODE_LABELS[plan.mode]} · ` : ""}Not saved yet — save it to add these blocks to Schedule.
+      </p>
+      {empty && <p className="meta plan-empty" role="status">{empty}</p>}
       <div className="row wrap">
         <button className="primary" disabled={busy || plan.sessions.length === 0} onClick={onApply}>
           Save to schedule
@@ -70,7 +83,7 @@ export function PlanPreview({
             ? `Proposed plan: ${plan.sessions
                 .map(
                   (s) =>
-                    `${s.taskTitle} at ${hourLabel(minuteOfDay(s.startsAt))} for ${s.durationMinutes} minutes`,
+                    `${kind(s)}: ${proposalTitle(s)} at ${hourLabel(minuteOfDay(s.startsAt))} for ${s.durationMinutes} minutes`,
                 )
                 .join("; ")}`
             : "No sessions fit this window"
@@ -85,13 +98,13 @@ export function PlanPreview({
         ))}
         {plan.sessions.map((session, index) => {
           const start = minuteInWindow(minuteOfDay(session.startsAt), from);
-          const tone = planToneFor(taskIds, session.taskId);
+          const tone = planToneFor(taskIds, proposalTargetKey(session));
           const late = session.scheduledAfterDeadline;
           return (
             <span
               key={session.proposalId}
               className={`plan-block${late ? " late" : ""}`}
-              title={`${session.taskTitle} · ${session.durationMinutes} min`}
+              title={`${kind(session)}: ${proposalTitle(session)} · ${session.durationMinutes} min`}
               style={{
                 left: `${(Math.max(0, start - from) / span) * 100}%`,
                 width: `${(Math.min(session.durationMinutes, until - start) / span) * 100}%`,
@@ -100,7 +113,10 @@ export function PlanPreview({
                 animationDelay: `${index * 45}ms`,
               }}
             >
-              <strong>{session.taskTitle}</strong>
+              <strong>
+                <Icon name={isReviewerProposal(session) ? "book-open" : "clipboard-list"} />
+                {proposalTitle(session)}
+              </strong>
               <span>
                 {late ? "after due · " : ""}
                 {session.durationMinutes}m

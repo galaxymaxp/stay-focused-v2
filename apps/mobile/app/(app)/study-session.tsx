@@ -25,8 +25,9 @@ export default function StudySession() {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null);
   const session = result.data?.sessions.find((item) => item.id === id);
-  const activity = session ? activities.data?.items.find((item) => item.taskId === session.taskId) ?? null : null;
-  const title = activity?.title ?? session?.task?.title ?? "Planned work";
+  const reviewer = session?.kind === "reviewer" ? session.reviewer ?? null : null;
+  const activity = session?.taskId ? activities.data?.items.find((item) => item.taskId === session.taskId) ?? null : null;
+  const title = reviewer?.title ?? activity?.title ?? session?.task?.title ?? "Planned work";
   const update = (status: "completed" | "skipped" | "planned") => {
     setBusy(true);
     void experienceRequest(client, `/api/study-sessions/${encodeURIComponent(id)}`, { method: "PATCH", body: { status } })
@@ -35,7 +36,7 @@ export default function StudySession() {
       .finally(() => setBusy(false));
   };
   return (
-    <Page title="Work session" back subtitle={activity?.course?.code ?? activity?.course?.name ?? undefined}>
+    <Page title={session?.kind === "reviewer" ? "Review session" : "Work session"} back subtitle={activity?.course?.code ?? activity?.course?.name ?? undefined}>
       {result.error && <Notice>{result.error}</Notice>}
       {result.loading && !result.data ? <SkeletonCards rows={2} label="Loading session" /> : null}
       {result.data && !session && <Notice>This session is no longer available. Return to Today to refresh your schedule.</Notice>}
@@ -45,7 +46,9 @@ export default function StudySession() {
           <Copy muted>
             {timeLabel(session.startsAt)} – {timeLabel(session.endsAt)} · {session.status === "planned" ? "Planned" : session.status === "completed" ? "Done" : "Skipped"}
           </Copy>
-          {activity ? (
+          {reviewer ? (
+            <Action onPress={() => router.push({ pathname: "/artifact", params: { id: reviewer.id } })}>Open reviewer</Action>
+          ) : activity ? (
             <Action onPress={() => router.push({ pathname: "/activity", params: { id: activity.id } })}>Open activity</Action>
           ) : session.task ? (
             <Action onPress={() => router.push({ pathname: "/task", params: { taskId: session.task!.id } })}>Open task</Action>

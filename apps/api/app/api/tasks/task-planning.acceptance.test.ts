@@ -605,7 +605,7 @@ function toStudySessionView(row: StudySessionRow & { task?: TaskRow | null }) {
 
 /** Mirrors the repository decorating sessions with their owned task. */
 function withOwnedTask(row: StudySessionRow): StudySessionRow & { task: TaskRow | null } {
-  const task = mocks.taskRows.get(row.task_id);
+  const task = row.task_id ? mocks.taskRows.get(row.task_id) : undefined;
   return { ...row, task: task?.user_id === row.user_id ? task : null };
 }
 

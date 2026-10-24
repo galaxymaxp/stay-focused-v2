@@ -1,7 +1,7 @@
 import { clockTimeLabel } from "@stay-focused/shared";
 import { freeTimePlanningRange, freeTimeEnd, wrapMinute } from "@stay-focused/shared";
 import type { TodayItem } from "@stay-focused/shared";
-import type { StudyPlanningRequest } from "@stay-focused/shared/task-planning";
+import { proposalTargetKey, type PlanMode, type ProposedStudySession, type StudyPlanningRequest } from "@stay-focused/shared/task-planning";
 
 // Mirrors the Today helpers in apps/mobile/src/features/redesign/presentation.ts.
 
@@ -51,8 +51,9 @@ export function planningRequest(
   date: string,
   start: number,
   end: number,
+  mode?: PlanMode,
 ): StudyPlanningRequest {
-  return freeTimePlanningRange(date, start, end);
+  return { ...freeTimePlanningRange(date, start, end), ...(mode ? { mode } : {}) };
 }
 
 /** "2 h 15 min", "45 min", "3 h". */
@@ -68,13 +69,13 @@ export const clockLabel = clockTimeLabel;
 
 export const PLAN_TONES = ["blue", "violet", "green", "orange"] as const;
 export type PlanTone = (typeof PLAN_TONES)[number];
-/** One stable color per task, shared by the preview bar and the clock ring. */
-export function planToneFor(taskIds: readonly string[], taskId: string): PlanTone {
-  const index = taskIds.indexOf(taskId);
+/** One stable color per planned task or reviewer, shared by the preview bar and the clock ring. */
+export function planToneFor(targetKeys: readonly string[], targetKey: string): PlanTone {
+  const index = targetKeys.indexOf(targetKey);
   return PLAN_TONES[(index < 0 ? 0 : index) % PLAN_TONES.length]!;
 }
 export function planTaskIds(plan: {
-  readonly sessions: readonly { readonly taskId: string }[];
+  readonly sessions: readonly ProposedStudySession[];
 }): string[] {
-  return [...new Set(plan.sessions.map((session) => session.taskId))];
+  return [...new Set(plan.sessions.map(proposalTargetKey))];
 }

@@ -135,18 +135,29 @@ export function isActionableCanvasAssignment(assignment: Pick<CanvasAssignmentRo
 export function composeToday(input: {
   userId: string; date: string; offset: number; now: number; activities: readonly ActivitySummary[];
   tasks: readonly TaskRow[]; sessions: readonly StudySessionRow[]; plans: readonly StudyPlanRow[]; window?: TodayWindowOverride;
+  /** Saved reviewers for reviewer blocks, keyed by artifact UUID; a missing entry was deleted. */
+  reviewers?: ReadonlyMap<string, { readonly id: string; readonly title: string; readonly course: TodayItem['course'] }>;
 }): TodayOverview {
   const { start, end } = dayWindow(input.date, input.offset, input.window);
   const asOf = input.now;
   const tasks = input.tasks.filter(t => t.user_id === input.userId);
   const byTask = new Map(input.activities.filter(a => a.taskId).map(a => [a.taskId!, a]));
   const activityItems: TodayItem[] = input.activities.map(a => ({ id: a.id, kind: a.source === 'canvas' ? 'canvas_activity' : 'personal_task', title: a.title, course: a.course, startAt: null, endAt: null, dueAt: a.dueAt, estimatedMinutes: a.estimatedMinutes, estimateSource: a.estimateSource, priority: a.priority, status: a.status, source: a.source, deepLinkTarget: { surface: 'activity', id: a.id } }));
-  const timeline: TodayItem[] = input.sessions.filter(s => s.user_id === input.userId && Date.parse(s.starts_at) < end && Date.parse(s.ends_at) > start && !(tasks.some(t => t.id === s.task_id && (t.source_type === 'canvas' || t.canvas_assignment_row_id)) && !byTask.has(s.task_id))).map((s): TodayItem => {
+  const inDay = input.sessions.filter(s => s.user_id === input.userId && Date.parse(s.starts_at) < end && Date.parse(s.ends_at) > start);
+  // A reviewer block is its own work: its status never reads or completes a task.
+  const reviewerItems: TodayItem[] = inDay.flatMap((s): TodayItem[] => {
+    const reviewer = s.block_kind === 'reviewer' && s.reviewer_artifact_id ? input.reviewers?.get(s.reviewer_artifact_id) : undefined;
+    if (!reviewer) return [];
+    return [{ id: `session:${s.id}`, kind: 'study_session', title: reviewer.title, course: reviewer.course, startAt: s.starts_at, endAt: s.ends_at, dueAt: null,
+      estimatedMinutes: Math.round((Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60_000), estimateSource: null, priority: 'medium', status: s.status, source: 'local',
+      deepLinkTarget: { surface: 'study_session', id: s.id }, reviewer: { id: reviewer.id } }];
+  });
+  const timeline: TodayItem[] = inDay.filter(s => s.block_kind !== 'reviewer' && s.task_id).filter(s => !(tasks.some(t => t.id === s.task_id && (t.source_type === 'canvas' || t.canvas_assignment_row_id)) && !byTask.has(s.task_id!))).map((s): TodayItem => {
     const task = tasks.find(t => t.id === s.task_id);
-    const activity = byTask.get(s.task_id);
+    const activity = byTask.get(s.task_id!);
     return { id: `session:${s.id}`, kind: 'study_session', title: activity?.title ?? task?.title ?? 'Study session', course: activity?.course ?? null, startAt: s.starts_at, endAt: s.ends_at, dueAt: activity?.dueAt ?? task?.due_at ?? null,
       estimatedMinutes: Math.round((Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60_000), estimateSource: task?.estimate_source ?? null, priority: task?.priority ?? 'medium', status: s.status === 'planned' && (activity?.status === 'submitted' || activity?.status === 'completed' || task?.status === 'completed') ? activity?.status === 'submitted' ? 'submitted' : 'completed' : s.status, source: activity?.source ?? 'local', deepLinkTarget: { surface: 'study_session', id: s.id } };
-  }).sort((a, b) => Date.parse(a.startAt!) - Date.parse(b.startAt!) || a.id.localeCompare(b.id));
+  }).concat(reviewerItems).sort((a, b) => Date.parse(a.startAt!) - Date.parse(b.startAt!) || a.id.localeCompare(b.id));
   const active = (item: TodayItem) => !['completed', 'submitted', 'skipped'].includes(item.status);
   const todayTasks = activityItems.filter(i => i.dueAt && Date.parse(i.dueAt) >= start && Date.parse(i.dueAt) < end);
   const urgent = activityItems.filter((i, n) => active(i) && input.activities[n]!.urgency === 'now');

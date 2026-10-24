@@ -5575,6 +5575,14 @@ mark.find-active {
 .clock-options-menu label { display: flex; flex-direction: column; gap: 4px; color: var(--secondary); }
 .clock-options-menu input { min-height: 44px; width: 100%; }
 .clock-options-menu > button { min-height: 44px; display: flex; justify-content: space-between; }
+/* "Plan with": native radios in the clock menu (no control beside the clock). */
+.clock-plan-mode { display: grid; gap: 0; margin: 0; padding: 0; border: 0; min-width: 0; }
+.clock-plan-mode legend { padding: 0; margin-bottom: 4px; font-weight: 700; }
+.clock-options-menu .clock-plan-mode label { flex-direction: row; align-items: center; gap: 10px; min-height: 44px; color: inherit; cursor: pointer; }
+.clock-options-menu .clock-plan-mode input { width: 18px; height: 18px; min-height: 18px; margin: 0; flex: none; accent-color: var(--accent); }
+/* Small kind icons on plan and schedule blocks. */
+.plan-block strong .icon { width: 12px; height: 12px; margin-right: 3px; vertical-align: -2px; }
+.schedule-row strong .icon, .session-open .icon { width: 14px; height: 14px; margin-right: 4px; vertical-align: -2px; }
 
 /* Static and failed-GL orbs diffuse their own displayed color field. */
 .orb-static-source { position: relative; isolation: isolate; }

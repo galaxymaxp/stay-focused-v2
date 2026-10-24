@@ -7,7 +7,8 @@ import type {
   TodayItem,
   TodayScreenData,
 } from "@stay-focused/shared";
-import type { DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
+import { proposalTargetKey, type DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
+import { planModeStore, usePlanMode } from "./planMode";
 import { router } from "expo-router";
 import { EyeOff, Pin, PinOff } from "lucide-react-native";
 import { useIsFocused } from "expo-router/react-navigation";
@@ -82,8 +83,9 @@ export function TodayScreen() {
   const activities = { ...today, data: today.data?.activities ?? null };
   const focused = useIsFocused();
   const client = useExperienceClient();
+  const planMode = usePlanMode();
   const { preview, previewRequest, previewing, previewNote, queuePreview, clearPreview } = useQuietPlanner(
-    `${session?.user.id ?? ""}:${date}`, request => experienceRequest<DeterministicStudyPlan>(client, "/api/experience/planner/preview", { method: "POST", body: request }),
+    `${session?.user.id ?? ""}:${date}:${planMode}`, request => experienceRequest<DeterministicStudyPlan>(client, "/api/experience/planner/preview", { method: "POST", body: request }),
   );
 
   // No pull-to-refresh on Today: coming back to it is the refresh.
@@ -117,6 +119,7 @@ export function TodayScreen() {
     void Promise.resolve(sessionStore.setItem(CLOCK_LOCK_KEY, next ? "1" : "0")).catch(() => {});
   };
   const openItem = (item: TodayItem) => {
+    if (item.reviewer) { router.push({ pathname: "/artifact", params: { id: item.reviewer.id } }); return; }
     const activity = activityFor(item, activities.data?.items ?? []);
     if (activity) router.push({ pathname: "/activity", params: { id: activity.id } });
     else if (item.deepLinkTarget.surface === "activity") router.push({ pathname: "/activity", params: { id: item.deepLinkTarget.id } });
@@ -221,6 +224,7 @@ export function TodayScreen() {
       setWindowKnown(true);
     }
   }, [date, planned, windowKnown, adjusting]);
+  const planWanted = useRef(false), modeChosen = useRef(false), previewedMode = useRef(planMode);
   const change = (from: number, to: number) => {
     if (!validFreeTime({ start: from, end: to })) return;
     setStart(from);
@@ -233,8 +237,18 @@ export function TodayScreen() {
   function plan(from: number, to: number) {
     if (!validFreeTime({ start: from, end: to }) || !available(capabilities.data?.planner)) return;
     setNote(null);
-    queuePreview(planningRequest(date, from, to));
+    planWanted.current = true;
+    queuePreview(planningRequest(date, from, to, planMode));
   }
+  const replan = useRef(() => {});
+  replan.current = () => plan(start, end);
+  useEffect(() => {
+    if (previewedMode.current === planMode) return;
+    previewedMode.current = planMode;
+    const rerun = modeChosen.current || planWanted.current;
+    modeChosen.current = false;
+    if (rerun && !adjusting.current) replan.current();
+  }, [planMode, adjusting]);
   async function apply() {
     if (!previewRequest || requestBusy.current) return;
     requestBusy.current = true;
@@ -244,6 +258,7 @@ export function TodayScreen() {
         method: "POST",
         body: previewRequest,
       });
+      planWanted.current = false;
       clearPreview();
       haptic.success();
       clockWindow.reconcile();
@@ -291,13 +306,15 @@ export function TodayScreen() {
         end={end}
         onChange={() => { /* The clock owns its draft; commit saves and previews. */ }}
         onCommit={change}
+        planMode={planMode}
+        onPlanModeChange={mode => { modeChosen.current = true; planModeStore.choose(mode); }}
         disabled={busy || !available(capabilities.data?.planner)}
         proposed={
           preview
             ? preview.sessions.map((session) => {
                 const at = new Date(session.startsAt);
                 const from = (at.getTime() - new Date(`${date}T00:00:00`).getTime()) / 60000;
-                return { id: session.proposalId, from, to: from + session.durationMinutes, color: colors[planToneFor(planTaskIds(preview), session.taskId)] };
+                return { id: session.proposalId, from, to: from + session.durationMinutes, color: colors[planToneFor(planTaskIds(preview), proposalTargetKey(session))] };
               })
             : []
         }
@@ -312,6 +329,7 @@ export function TodayScreen() {
           busy={busy}
           onApply={() => void apply()}
           onDiscard={() => {
+            planWanted.current = false;
             clearPreview();
           }}
         />
@@ -497,9 +515,10 @@ function TodayTimeline({ items, onOpen }: { items: readonly TodayItem[]; onOpen:
         const label = state === "overdue" ? "Overdue" : state === "current" ? "Now" : state === "completed" ? "Done" : item.startAt ? timeLabel(item.startAt) : item.dueAt ? timeLabel(item.dueAt) : "Anytime";
         return <View key={item.id}>
           {showNow ? <Copy size="caption" color={colors.success} style={{ textAlign: "center", fontWeight: "700", paddingVertical: 8 }}>──── NOW ────</Copy> : null}
-          <Pressable accessibilityRole="button" accessibilityLabel={`${label}, ${item.course?.code ?? item.course?.name ?? "Personal"}, ${item.title}`} onPress={() => onOpen(item)} style={({ pressed }) => ({ flexDirection: "row", minHeight: 64, gap: 10, alignItems: "center", paddingVertical: 9, opacity: pressed ? 0.6 : state === "completed" ? 0.6 : 1, borderBottomWidth: index === items.length - 1 ? 0 : 1, borderColor: colors.separator })}>
+          <Pressable accessibilityRole="button" accessibilityLabel={`${item.reviewer ? "Review" : "Task"}: ${label}, ${item.course?.code ?? item.course?.name ?? "Personal"}, ${item.title}`} onPress={() => onOpen(item)} style={({ pressed }) => ({ flexDirection: "row", minHeight: 64, gap: 10, alignItems: "center", paddingVertical: 9, opacity: pressed ? 0.6 : state === "completed" ? 0.6 : 1, borderBottomWidth: index === items.length - 1 ? 0 : 1, borderColor: colors.separator })}>
             <Copy size="caption" color={tint} style={{ width: 70, fontWeight: "700", fontVariant: ["tabular-nums"] }}>{label}</Copy>
             <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: tint }} />
+            <ContentIcon kind={item.reviewer ? "reviewer" : "task"} small />
             <View style={{ flex: 1, gap: 2 }}>
               <Copy muted size="caption" numberOfLines={1}>{item.course?.code ?? item.course?.name ?? "Personal"}</Copy>
               <Copy size="bodySmall" numberOfLines={2} style={{ fontWeight: state === "current" ? "700" : "500" }}>{item.title}</Copy>
@@ -538,12 +557,12 @@ function TodayRow({
   // activity's work, never as a separate "study" item.
   const session = item.kind === "study_session";
   const courseName = item.course?.code ?? item.course?.name ?? (session ? null : "Personal");
-  const course = session ? [courseName, "Work session"].filter(Boolean).join(" · ") : courseName!;
+  const course = session ? [courseName, item.reviewer ? "Review session" : "Work session"].filter(Boolean).join(" · ") : courseName!;
   const row = (
     <RowLink
       inset={dominant}
-      icon={<ContentIcon kind="task" small={!dominant} />}
-      label={`${pinned ? "Pinned" : dominant ? "Open next item" : "Open"}: ${item.title}`}
+      icon={<ContentIcon kind={item.reviewer ? "reviewer" : "task"} small={!dominant} />}
+      label={`${pinned ? "Pinned" : dominant ? "Open next item" : "Open"}: ${item.reviewer ? "Review: " : ""}${item.title}`}
       {...(swipeActions.length ? swipeAccessibility(swipeActions) : {})}
       onPress={onOpen}
     >

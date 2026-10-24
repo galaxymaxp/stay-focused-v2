@@ -16,7 +16,40 @@ export const DEFAULT_TASK_PRIORITY: TaskPriority = "medium";
 export const MAX_TASK_ESTIMATE_MINUTES = 24 * 60;
 export const MAX_STUDY_SESSION_MINUTES = 90;
 export const MAX_PLANNING_TASKS = 200;
+export const MAX_PLANNING_REVIEWERS = 200;
 export const MAX_AVAILABILITY_WINDOWS = 100;
+
+/** What the Today plan schedules. Requests that omit it plan tasks only. */
+export const PLAN_MODES = ["reviewers", "tasks", "reviewers_tasks"] as const;
+export type PlanMode = (typeof PLAN_MODES)[number];
+/** The saved choice for users who never picked one. */
+export const DEFAULT_PLAN_MODE: PlanMode = "reviewers_tasks";
+export const PLAN_MODE_LABELS: Readonly<Record<PlanMode, string>> = {
+  reviewers: "Reviewers",
+  tasks: "Tasks",
+  reviewers_tasks: "Reviewers & tasks",
+};
+export const PLAN_EMPTY_COPY: Readonly<Record<PlanMode, string>> = {
+  reviewers: "No saved reviewers to plan yet.",
+  tasks: "No open tasks to plan.",
+  reviewers_tasks: "No open tasks or saved reviewers to plan.",
+};
+export const REVIEWER_BLOCK_MIN_MINUTES = 10;
+export const REVIEWER_BLOCK_MAX_MINUTES = 45;
+export const REVIEWER_BLOCK_DEFAULT_MINUTES = 20;
+/** Combined plans give tasks at most this share of the free time first. */
+export const TASK_BUDGET_SHARE = 0.6;
+export const REVIEWER_REOPEN_AFTER_MS = 24 * 60 * 60_000;
+
+export function isPlanMode(value: unknown): value is PlanMode {
+  return PLAN_MODES.some((mode) => mode === value);
+}
+
+/** The saved study-time estimate clamped to 10–45 minutes, or 20 without one. */
+export function reviewerBlockMinutes(estimate: number | null): number {
+  if (estimate === null || !Number.isFinite(estimate)) return REVIEWER_BLOCK_DEFAULT_MINUTES;
+  return Math.min(REVIEWER_BLOCK_MAX_MINUTES, Math.max(REVIEWER_BLOCK_MIN_MINUTES, Math.round(estimate)));
+}
 
 const MAX_TASK_TITLE_LENGTH = 200;
 const MAX_TASK_NOTES_LENGTH = 5_000;
@@ -105,10 +138,24 @@ export interface StudySessionTaskSummary {
   readonly canvasCourseId: string | null;
 }
 
+export type StudyBlockKind = "task" | "reviewer";
+
+/** The saved reviewer a reviewer block opens. `id` is the Library artifact ID. */
+export interface StudySessionReviewerSummary {
+  readonly id: string;
+  readonly title: string;
+  readonly courseId: string | null;
+}
+
 export interface StudySessionView {
   readonly id: string;
   readonly studyPlanId: string | null;
-  readonly taskId: string;
+  /** Null for reviewer blocks, which never reference (or complete) a task. */
+  readonly taskId: string | null;
+  /** Absent from pre-TP1 servers, which only stored task blocks. */
+  readonly kind?: StudyBlockKind;
+  /** Present for reviewer blocks; null when the reviewer is no longer saved. */
+  readonly reviewer?: StudySessionReviewerSummary | null;
   readonly startsAt: string;
   readonly endsAt: string;
   readonly status: StudySessionStatus;
@@ -137,6 +184,8 @@ export interface StudyPlanningRequest {
   readonly planningRange: PlanningRange;
   readonly availability: readonly AvailabilityWindow[];
   readonly taskIds?: readonly string[];
+  /** Omitted keeps the original tasks-only plan and response shape. */
+  readonly mode?: PlanMode;
 }
 
 export interface PlannerTask {
@@ -148,14 +197,49 @@ export interface PlannerTask {
   readonly createdAt: string;
 }
 
-export interface ProposedStudySession {
+/** An eligible saved reviewer, already filtered and ordered by the selector. */
+export interface PlannerReviewer {
+  /** generated_artifacts.id (UUID). */
+  readonly id: string;
+  readonly title: string;
+  readonly courseId: string | null;
+  readonly estimatedMinutes: number | null;
+}
+
+interface ProposedSessionTiming {
   readonly proposalId: string;
-  readonly taskId: string;
-  readonly taskTitle: string;
   readonly startsAt: string;
   readonly endsAt: string;
   readonly durationMinutes: number;
+}
+
+export interface ProposedTaskSession extends ProposedSessionTiming {
+  /** Omitted in tasks-only responses, which keep their original shape. */
+  readonly kind?: "task";
+  readonly taskId: string;
+  readonly taskTitle: string;
   readonly scheduledAfterDeadline: boolean;
+}
+
+export interface ProposedReviewerSession extends ProposedSessionTiming {
+  readonly kind: "reviewer";
+  readonly reviewerId: string;
+  readonly reviewerTitle: string;
+  readonly courseId: string | null;
+  readonly scheduledAfterDeadline: false;
+}
+
+export type ProposedStudySession = ProposedTaskSession | ProposedReviewerSession;
+
+export function isReviewerProposal(session: ProposedStudySession): session is ProposedReviewerSession {
+  return session.kind === "reviewer";
+}
+export function proposalTitle(session: ProposedStudySession): string {
+  return isReviewerProposal(session) ? session.reviewerTitle : session.taskTitle;
+}
+/** One stable key per planned target, for colors and grouping. */
+export function proposalTargetKey(session: ProposedStudySession): string {
+  return isReviewerProposal(session) ? `reviewer:${session.reviewerId}` : session.taskId;
 }
 
 export interface UnscheduledTaskWork {
@@ -167,12 +251,25 @@ export interface UnscheduledTaskWork {
   readonly reason: "insufficient_availability";
 }
 
-export interface DeterministicStudyPlan {
+export interface DeterministicStudyPlan<S extends ProposedStudySession = ProposedStudySession> {
   readonly algorithmVersion: "deterministic-v1";
   readonly planningRange: PlanningRange;
   readonly availability: readonly AvailabilityWindow[];
-  readonly sessions: readonly ProposedStudySession[];
+  readonly sessions: readonly S[];
   readonly unscheduledWork: readonly UnscheduledTaskWork[];
+  /** Present only when the request chose a mode. */
+  readonly mode?: PlanMode;
+  /** Eligible candidates considered for each kind, for empty-state copy. */
+  readonly candidates?: { readonly tasks: number; readonly reviewers: number };
+}
+
+/** The decided empty-state copy when the chosen kind has nothing to plan. */
+export function planEmptyMessage(plan: Pick<DeterministicStudyPlan, "mode" | "candidates">): string | null {
+  if (!plan.mode || !plan.candidates) return null;
+  const { tasks, reviewers } = plan.candidates;
+  if (plan.mode === "reviewers") return reviewers === 0 ? PLAN_EMPTY_COPY.reviewers : null;
+  if (plan.mode === "tasks") return tasks === 0 ? PLAN_EMPTY_COPY.tasks : null;
+  return tasks === 0 && reviewers === 0 ? PLAN_EMPTY_COPY.reviewers_tasks : null;
 }
 
 export type ValidationResult<T> =
@@ -298,10 +395,14 @@ export function validateStudyPlanningRequest(
   if (!isRecord(value)) {
     return invalid("Request body must be a JSON object.");
   }
-  const allowed = new Set(["planningRange", "availability", "taskIds"]);
+  const allowed = new Set(["planningRange", "availability", "taskIds", "mode"]);
   if (Object.keys(value).some((key) => !allowed.has(key))) {
     return invalid("Request body contains unsupported planning fields.");
   }
+  if ("mode" in value && !isPlanMode(value.mode)) {
+    return invalid("mode must be reviewers, tasks, or reviewers_tasks.");
+  }
+  const mode = isPlanMode(value.mode) ? value.mode : undefined;
   if (!isRecord(value.planningRange)) {
     return invalid("planningRange is required.");
   }
@@ -343,6 +444,7 @@ export function validateStudyPlanningRequest(
       planningRange: range.value,
       availability: normalized,
       ...(taskIds ? { taskIds } : {}),
+      ...(mode ? { mode } : {}),
     },
   };
 }
@@ -355,7 +457,168 @@ export function generateDeterministicStudyPlan({
   readonly tasks: readonly PlannerTask[];
   readonly planningRange: PlanningRange;
   readonly availability: readonly AvailabilityWindow[];
+}): DeterministicStudyPlan<ProposedTaskSession> {
+  const prepared = preparePlan(tasks, planningRange, availability);
+  for (const task of prepared.tasks) {
+    fillTask(prepared.state, task, task.estimatedMinutes, Number.POSITIVE_INFINITY);
+  }
+  // Without reviewers every session is a task session.
+  return finishPlan(prepared, prepared.tasks.map((task) => [task, task.estimatedMinutes - scheduledFor(prepared.state, task.id)])) as DeterministicStudyPlan<ProposedTaskSession>;
+}
+
+/**
+ * The Today plan for a chosen content mode. Tasks mode is the deterministic
+ * task plan. Reviewer blocks are one contiguous block per reviewer (never
+ * split, never repeated) in the selector's order. Combined plans give tasks at
+ * most 60% of the free time first, then reviewers, then any time left to tasks
+ * that still have work. Windows are consumed from a single cursor each, so
+ * blocks never overlap and never exceed the free time.
+ */
+export function generateContentStudyPlan({
+  mode,
+  tasks,
+  reviewers,
+  planningRange,
+  availability,
+}: {
+  readonly mode: PlanMode;
+  readonly tasks: readonly PlannerTask[];
+  readonly reviewers: readonly PlannerReviewer[];
+  readonly planningRange: PlanningRange;
+  readonly availability: readonly AvailabilityWindow[];
 }): DeterministicStudyPlan {
+  if (!isPlanMode(mode)) throw new PlanningValidationError("Unsupported plan mode.");
+  const plannedTasks = mode === "reviewers" ? [] : tasks;
+  const plannedReviewers = mode === "tasks" ? [] : reviewers.map(normalizePlannerReviewer);
+  if (plannedReviewers.length > MAX_PLANNING_REVIEWERS) {
+    throw new PlanningValidationError(`At most ${MAX_PLANNING_REVIEWERS} reviewers may be planned at once.`);
+  }
+  if (new Set(plannedReviewers.map((reviewer) => reviewer.id)).size !== plannedReviewers.length) {
+    throw new PlanningValidationError("Planner reviewer IDs must be unique.");
+  }
+  const candidates = { tasks: plannedTasks.length, reviewers: plannedReviewers.length };
+  if (mode === "tasks") {
+    return { ...generateDeterministicStudyPlan({ tasks: plannedTasks, planningRange, availability }), mode, candidates };
+  }
+  const prepared = preparePlan(plannedTasks, planningRange, availability);
+  const { state } = prepared;
+  const budget = state.windows.reduce((sum, window) => sum + Math.floor((window.end - window.cursor) / 60_000), 0);
+  const remaining = new Map(prepared.tasks.map((task) => [task.id, task.estimatedMinutes]));
+  let taskCap = Math.floor(budget * TASK_BUDGET_SHARE);
+  for (const task of prepared.tasks) {
+    if (taskCap <= 0) break;
+    const used = fillTask(state, task, remaining.get(task.id)!, taskCap);
+    remaining.set(task.id, remaining.get(task.id)! - used);
+    taskCap -= used;
+  }
+  for (const reviewer of plannedReviewers) {
+    const minutes = reviewerBlockMinutes(reviewer.estimatedMinutes);
+    const window = state.windows.find((candidate) => candidate.end - candidate.cursor >= minutes * 60_000);
+    if (!window) continue;
+    const startsAtMs = window.cursor, endsAtMs = startsAtMs + minutes * 60_000;
+    state.sessions.push({
+      kind: "reviewer",
+      proposalId: "",
+      reviewerId: reviewer.id,
+      reviewerTitle: reviewer.title,
+      courseId: reviewer.courseId,
+      startsAt: new Date(startsAtMs).toISOString(),
+      endsAt: new Date(endsAtMs).toISOString(),
+      durationMinutes: minutes,
+      scheduledAfterDeadline: false,
+    });
+    window.cursor = endsAtMs;
+  }
+  for (const task of prepared.tasks) {
+    const left = remaining.get(task.id)!;
+    if (left > 0) remaining.set(task.id, left - fillTask(state, task, left, Number.POSITIVE_INFINITY, true));
+  }
+  state.sessions.sort((left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt));
+  state.sessions.forEach((session, index) => {
+    state.sessions[index] = { ...session, proposalId: proposalId(index + 1) };
+  });
+  return {
+    ...finishPlan(prepared, prepared.tasks.map((task) => [task, remaining.get(task.id)!])),
+    mode,
+    candidates,
+  };
+}
+
+export interface ReviewerCandidateSource {
+  readonly id: string;
+  readonly title: string;
+  readonly courseId: string | null;
+  readonly createdAt: string;
+  readonly reviewMinutes: number | null;
+  readonly lastOpenedAt: string | null;
+}
+
+/**
+ * Saved reviewers from current courses, skipping any opened in the last 24
+ * hours or already holding a kept block in this plan's day. Ordered by the
+ * course with the nearest upcoming incomplete task, then least recently opened
+ * (never opened first), then newest.
+ */
+export function selectReviewerCandidates({
+  reviewers,
+  currentCourseIds,
+  nextDueByCourse,
+  excludedIds,
+  now,
+}: {
+  readonly reviewers: readonly ReviewerCandidateSource[];
+  readonly currentCourseIds: ReadonlySet<string>;
+  readonly nextDueByCourse: ReadonlyMap<string, number>;
+  readonly excludedIds: ReadonlySet<string>;
+  readonly now: number;
+}): PlannerReviewer[] {
+  const seen = new Set<string>();
+  const eligible = reviewers.filter((reviewer) => {
+    if (seen.has(reviewer.id) || !reviewer.courseId || !currentCourseIds.has(reviewer.courseId)) return false;
+    if (excludedIds.has(reviewer.id) || !isUuid(reviewer.id)) return false;
+    seen.add(reviewer.id);
+    const opened = reviewer.lastOpenedAt ? Date.parse(reviewer.lastOpenedAt) : Number.NaN;
+    return !Number.isFinite(opened) || now - opened >= REVIEWER_REOPEN_AFTER_MS;
+  });
+  const due = (reviewer: ReviewerCandidateSource) =>
+    nextDueByCourse.get(reviewer.courseId!) ?? Number.POSITIVE_INFINITY;
+  const opened = (reviewer: ReviewerCandidateSource) => {
+    const value = reviewer.lastOpenedAt ? Date.parse(reviewer.lastOpenedAt) : Number.NaN;
+    return Number.isFinite(value) ? value : Number.NEGATIVE_INFINITY;
+  };
+  return eligible
+    .sort((left, right) =>
+      compareNumbers(due(left), due(right)) ||
+      compareNumbers(opened(left), opened(right)) ||
+      compareNumbers(Date.parse(right.createdAt) || 0, Date.parse(left.createdAt) || 0) ||
+      left.id.localeCompare(right.id))
+    .slice(0, MAX_PLANNING_REVIEWERS)
+    .map((reviewer) => ({
+      id: reviewer.id,
+      title: reviewer.title,
+      courseId: reviewer.courseId,
+      estimatedMinutes: reviewer.reviewMinutes,
+    }));
+}
+
+function compareNumbers(left: number, right: number): number {
+  return left === right ? 0 : left < right ? -1 : 1;
+}
+
+interface PlanState {
+  readonly windows: { cursor: number; readonly end: number }[];
+  readonly sessions: ProposedStudySession[];
+}
+
+function proposalId(sequence: number): string {
+  return `session-${String(sequence).padStart(3, "0")}`;
+}
+
+function preparePlan(
+  tasks: readonly PlannerTask[],
+  planningRange: PlanningRange,
+  availability: readonly AvailabilityWindow[],
+) {
   const normalizedRange = requireRange(planningRange, "planning range");
   if (tasks.length > MAX_PLANNING_TASKS) {
     throw new PlanningValidationError(
@@ -373,69 +636,118 @@ export function generateDeterministicStudyPlan({
   if (new Set(normalizedTasks.map((task) => task.id)).size !== normalizedTasks.length) {
     throw new PlanningValidationError("Planner task IDs must be unique.");
   }
-  const orderedTasks = [...normalizedTasks].sort(comparePlannerTasks);
-  const workingWindows = normalizedWindows.map((window) => ({
-    cursor: Date.parse(window.startsAt),
-    end: Date.parse(window.endsAt),
-  }));
-  const sessions: ProposedStudySession[] = [];
-  const unscheduledWork: UnscheduledTaskWork[] = [];
-  let proposalSequence = 1;
+  const state: PlanState = {
+    windows: normalizedWindows.map((window) => ({
+      cursor: Date.parse(window.startsAt),
+      end: Date.parse(window.endsAt),
+    })),
+    sessions: [],
+  };
+  return {
+    planningRange: normalizedRange,
+    availability: normalizedWindows,
+    tasks: [...normalizedTasks].sort(comparePlannerTasks),
+    state,
+  };
+}
 
-  for (const task of orderedTasks) {
-    let remaining = task.estimatedMinutes;
-    const dueTime = task.dueAt ? Date.parse(task.dueAt) : null;
-    for (const window of workingWindows) {
-      while (remaining > 0) {
-        const availableMinutes = Math.floor((window.end - window.cursor) / 60_000);
-        if (availableMinutes <= 0) break;
-        let duration = Math.min(
-          remaining,
-          availableMinutes,
-          MAX_STUDY_SESSION_MINUTES,
-        );
-        if (dueTime !== null && window.cursor < dueTime) {
-          const beforeDeadline = Math.floor((dueTime - window.cursor) / 60_000);
-          if (beforeDeadline > 0 && beforeDeadline < duration) {
-            duration = beforeDeadline;
-          }
+/**
+ * Schedules up to `cap` minutes of one task's `remaining` work into the
+ * earliest free time, in ≤90 minute sessions split at the deadline. With
+ * `extend`, a session continuing directly after the same task's earlier
+ * session joins it (within the session limit) instead of adding a new block.
+ * Returns the minutes scheduled.
+ */
+function fillTask(state: PlanState, task: PlannerTask, remaining: number, cap: number, extend = false): number {
+  let scheduled = 0;
+  const dueTime = task.dueAt ? Date.parse(task.dueAt) : null;
+  for (const window of state.windows) {
+    while (remaining - scheduled > 0 && cap - scheduled > 0) {
+      const availableMinutes = Math.floor((window.end - window.cursor) / 60_000);
+      if (availableMinutes <= 0) break;
+      let duration = Math.min(
+        remaining - scheduled,
+        availableMinutes,
+        MAX_STUDY_SESSION_MINUTES,
+        cap - scheduled,
+      );
+      if (dueTime !== null && window.cursor < dueTime) {
+        const beforeDeadline = Math.floor((dueTime - window.cursor) / 60_000);
+        if (beforeDeadline > 0 && beforeDeadline < duration) {
+          duration = beforeDeadline;
         }
-        if (duration <= 0) break;
-        const startsAtMs = window.cursor;
-        const endsAtMs = startsAtMs + duration * 60_000;
-        sessions.push({
-          proposalId: `session-${String(proposalSequence).padStart(3, "0")}`,
+      }
+      if (duration <= 0) break;
+      const startsAtMs = window.cursor;
+      const endsAtMs = startsAtMs + duration * 60_000;
+      const late = dueTime !== null && endsAtMs > dueTime;
+      const previousIndex = extend ? state.sessions.findIndex((session) =>
+        !isReviewerProposal(session) && session.taskId === task.id &&
+        Date.parse(session.endsAt) === startsAtMs && session.scheduledAfterDeadline === late &&
+        session.durationMinutes + duration <= MAX_STUDY_SESSION_MINUTES) : -1;
+      const previous = previousIndex >= 0 ? state.sessions[previousIndex] : undefined;
+      if (previous) {
+        state.sessions[previousIndex] = {
+          ...previous,
+          endsAt: new Date(endsAtMs).toISOString(),
+          durationMinutes: previous.durationMinutes + duration,
+        };
+      } else {
+        state.sessions.push({
+          proposalId: proposalId(state.sessions.length + 1),
           taskId: task.id,
           taskTitle: task.title,
           startsAt: new Date(startsAtMs).toISOString(),
           endsAt: new Date(endsAtMs).toISOString(),
           durationMinutes: duration,
-          scheduledAfterDeadline: dueTime !== null && endsAtMs > dueTime,
+          scheduledAfterDeadline: late,
         });
-        proposalSequence += 1;
-        window.cursor = endsAtMs;
-        remaining -= duration;
       }
-      if (remaining === 0) break;
+      window.cursor = endsAtMs;
+      scheduled += duration;
     }
-    if (remaining > 0) {
-      unscheduledWork.push({
-        taskId: task.id,
-        taskTitle: task.title,
-        estimatedMinutes: task.estimatedMinutes,
-        scheduledMinutes: task.estimatedMinutes - remaining,
-        unscheduledMinutes: remaining,
-        reason: "insufficient_availability",
-      });
-    }
+    if (remaining - scheduled === 0 || cap - scheduled === 0) break;
   }
+  return scheduled;
+}
 
+function scheduledFor(state: PlanState, taskId: string): number {
+  return state.sessions.reduce((sum, session) =>
+    !isReviewerProposal(session) && session.taskId === taskId ? sum + session.durationMinutes : sum, 0);
+}
+
+function finishPlan(
+  prepared: ReturnType<typeof preparePlan>,
+  left: readonly (readonly [PlannerTask, number])[],
+): DeterministicStudyPlan {
   return {
     algorithmVersion: "deterministic-v1",
-    planningRange: normalizedRange,
-    availability: normalizedWindows,
-    sessions,
-    unscheduledWork,
+    planningRange: prepared.planningRange,
+    availability: prepared.availability,
+    sessions: prepared.state.sessions,
+    unscheduledWork: left.filter(([, remaining]) => remaining > 0).map(([task, remaining]) => ({
+      taskId: task.id,
+      taskTitle: task.title,
+      estimatedMinutes: task.estimatedMinutes,
+      scheduledMinutes: task.estimatedMinutes - remaining,
+      unscheduledMinutes: remaining,
+      reason: "insufficient_availability" as const,
+    })),
+  };
+}
+
+function normalizePlannerReviewer(reviewer: PlannerReviewer): PlannerReviewer {
+  if (!isUuid(reviewer.id)) throw new PlanningValidationError("Planner reviewer IDs must be UUIDs.");
+  const title = readTitle(reviewer.title);
+  if (!title.ok) throw new PlanningValidationError(title.message);
+  if (reviewer.estimatedMinutes !== null && !(Number.isFinite(reviewer.estimatedMinutes) && reviewer.estimatedMinutes > 0)) {
+    throw new PlanningValidationError("Reviewer estimates must be positive minutes or null.");
+  }
+  return {
+    id: reviewer.id.trim(),
+    title: title.value,
+    courseId: reviewer.courseId,
+    estimatedMinutes: reviewer.estimatedMinutes,
   };
 }
 

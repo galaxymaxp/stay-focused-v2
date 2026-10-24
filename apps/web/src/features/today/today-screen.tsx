@@ -9,9 +9,11 @@ import type {
   TodayItem,
   TodayScreenData,
 } from "@stay-focused/shared";
-import type {
-  DeterministicStudyPlan,
+import {
+  proposalTargetKey,
+  type DeterministicStudyPlan,
 } from "@stay-focused/shared/task-planning";
+import { planModeStore, usePlanMode } from "../../lib/plan-mode";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -84,8 +86,11 @@ export function TodayScreen() {
     "data", false, undefined, adjusting,
   );
 
+  // The "Plan with" choice scopes previews: changing it drops any older
+  // preview, and a late response for an older mode, range or date never lands.
+  const planMode = usePlanMode();
   const { preview, previewRequest, previewing, previewNote, queuePreview, clearPreview } = useQuietPlanner(
-    `${session?.user.id ?? ""}:${date}`, request => api<DeterministicStudyPlan>("/api/experience/planner/preview", { method: "POST", body: request }),
+    `${session?.user.id ?? ""}:${date}:${planMode}`, request => api<DeterministicStudyPlan>("/api/experience/planner/preview", { method: "POST", body: request }),
   );
   const capabilities = { ...today, data: today.data?.capabilities ?? null };
   const announcements = { ...today, data: today.data?.announcements ?? null };
@@ -134,6 +139,7 @@ export function TodayScreen() {
   const busyRef = useRef(false);
   const plannerReady = available(capabilities.data?.planner);
 
+  const planWanted = useRef(false), modeChosen = useRef(false), previewedMode = useRef(planMode);
   const change = (from: number, to: number) => {
     if (!validFreeTime({ start: from, end: to })) return;
     setStart(from);
@@ -146,14 +152,27 @@ export function TodayScreen() {
   function plan(from: number, to: number) {
     if (!validFreeTime({ start: from, end: to }) || !plannerReady) return;
     setNote(null);
-    queuePreview(planningRequest(date, from, to));
+    planWanted.current = true;
+    queuePreview(planningRequest(date, from, to, planMode));
   }
+  // A preview the student is looking at (or asked for) follows the mode: a
+  // menu choice always re-runs it; a synced change only replaces a live one.
+  const replan = useRef(() => {});
+  replan.current = () => plan(start, end);
+  useEffect(() => {
+    if (previewedMode.current === planMode) return;
+    previewedMode.current = planMode;
+    const rerun = modeChosen.current || planWanted.current;
+    modeChosen.current = false;
+    if (rerun && !adjusting.current) replan.current();
+  }, [planMode, adjusting]);
   async function apply() {
     if (!previewRequest || busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
     try {
       await api("/api/experience/planner/replan", { method: "POST", body: previewRequest });
+      planWanted.current = false;
       clearPreview();
       setNote("Saved. These blocks are on your Schedule.");
       clockWindow.reconcile();
@@ -189,6 +208,8 @@ export function TodayScreen() {
   }
 
   const openItem = (item: TodayItem) => {
+    // A reviewer block opens its saved reviewer; it is never matched to a task.
+    if (item.reviewer) { router.push(`/library/${encodeURIComponent(item.reviewer.id)}`); return; }
     const activity = activityFor(item, activities.data?.items ?? []);
     if (activity) router.push(`/tasks/${encodeURIComponent(activity.id)}`);
     else if (item.deepLinkTarget.surface === "activity")
@@ -244,7 +265,7 @@ export function TodayScreen() {
           id: session.proposalId,
           from,
           to: from + session.durationMinutes,
-          tone: planToneFor(planTaskIds(preview), session.taskId),
+          tone: planToneFor(planTaskIds(preview), proposalTargetKey(session)),
         };
       })
     : [];
@@ -286,6 +307,8 @@ export function TodayScreen() {
               }}
               onCommit={change}
               onAdjustingChange={(active) => { clockWindow.setAdjusting(active); if (active) clearPreview(); }}
+              planMode={planMode}
+              onPlanModeChange={(mode) => { modeChosen.current = true; planModeStore.choose(mode); }}
               disabled={busy || !plannerReady}
               proposed={proposed}
             />
@@ -317,6 +340,7 @@ export function TodayScreen() {
               busy={busy}
               onApply={() => void apply()}
               onDiscard={() => {
+                planWanted.current = false;
                 clearPreview();
               }}
             />
@@ -496,14 +520,14 @@ function TodayTimeline({ items, onOpen }: { items: readonly TodayItem[]; onOpen:
               {showNow && <div className="now-rule">Now</div>}
               <button
                 className={`schedule-row ${state}`}
-                aria-label={`${label}, ${item.course?.code ?? item.course?.name ?? "Personal"}, ${item.title}`}
+                aria-label={`${label}, ${item.course?.code ?? item.course?.name ?? "Personal"}, ${item.reviewer ? "Review: " : ""}${item.title}`}
                 onClick={() => onOpen(item)}
               >
                 <span className="schedule-time">{label}</span>
                 {item.course && state === "upcoming" ? <CourseDot course={item.course} /> : <span className={`state-dot ${state}`} />}
                 <span className="grow">
                   <span className="meta">{item.course?.code ?? item.course?.name ?? "Personal"}</span>
-                  <strong>{item.title}</strong>
+                  <strong>{item.reviewer && <Icon name="book-open" />}{item.title}</strong>
                 </span>
               </button>
             </div>
@@ -537,11 +561,13 @@ function TodayRow({
   // A planner session is time set aside for an activity: show it as that work.
   const session = item.kind === "study_session";
   const courseName = item.course?.code ?? item.course?.name ?? (session ? null : "Personal");
-  const course = session ? [courseName, "Work session"].filter(Boolean).join(" · ") : courseName!;
+  const course = session ? [courseName, item.reviewer ? "Review session" : "Work session"].filter(Boolean).join(" · ") : courseName!;
   return (
     <div className={`today-row${dominant ? " dominant item-row" : ""}`}>
       <button className="today-row-open" onClick={onOpen} aria-label={`${pinned ? "Pinned" : dominant ? "Open next item" : "Open"}: ${item.title}`}>
-        {session ? (
+        {item.reviewer ? (
+          <ContentIcon kind="reviewer" />
+        ) : session ? (
           <span className="content-icon">
             <Icon name="clock" />
           </span>
