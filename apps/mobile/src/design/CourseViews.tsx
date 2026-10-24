@@ -3,6 +3,8 @@ import { useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Animated, Pressable, View, type AccessibilityActionEvent, type AccessibilityActionInfo } from "react-native";
 
 import { courseAccent, type CourseIdentity } from "./courseIdentity";
+import { useCourseOptions } from "./CourseOptions";
+import { haptic } from "./haptics";
 import { Copy } from "./primitives";
 import { NavigationFeedbackContext } from "./navigationFeedback";
 import { motion, useTheme } from "./theme";
@@ -22,7 +24,7 @@ function usePressScale() {
 }
 
 /** Outside SwipeRow's clip. Four reserved points bound even unusually tall cards. */
-export function CourseFeedback({ children, options, compact = false }: { children?: ReactNode; options?: ReactNode; compact?: boolean }) {
+export function CourseFeedback({ children, compact = false }: { children?: ReactNode; compact?: boolean }) {
   const { reducedMotion, colors } = useTheme();
   const [pressed, setPressed] = useState(false), [focused, setFocused] = useState(false), [hovered, setHovered] = useState(false);
   const [extent, setExtent] = useState(1);
@@ -45,7 +47,6 @@ export function CourseFeedback({ children, options, compact = false }: { childre
         {children}
       </NavigationFeedbackContext.Provider>
     </Animated.View>
-    {options ? <View style={{ marginTop: 4 }}>{options}</View> : null}
   </View>;
 }
 
@@ -53,6 +54,33 @@ export function CourseFeedback({ children, options, compact = false }: { childre
 interface ItemAccessibilityActions {
   accessibilityActions?: readonly AccessibilityActionInfo[];
   onAccessibilityAction?: (event: AccessibilityActionEvent) => void;
+}
+
+/** Native Pressability cancels tap after long press; also guard direct/accessibility dispatch. */
+function useCoursePress(onPress: () => void, accessibility: ItemAccessibilityActions) {
+  const options = useCourseOptions();
+  const feedback = useContext(NavigationFeedbackContext);
+  const press = usePressScale();
+  const held = useRef(false);
+  const open = () => {
+    held.current = true;
+    press.scale.stopAnimation();
+    press.scale.setValue(1);
+    feedback?.onBlur();
+    options?.open();
+  };
+  return { press, props: {
+    ref: options?.trigger,
+    ...press.handlers,
+    onPressIn: () => { held.current = false; press.handlers.onPressIn(); },
+    onPress: options ? () => { if (!held.current) onPress(); } : onPress,
+    ...(options ? { delayLongPress: 400, onLongPress: () => { haptic.tap(); open(); } } : {}),
+    accessibilityActions: [ ...(accessibility.accessibilityActions ?? []), ...(options ? [{ name: "options", label: "Options" }] : []) ],
+    onAccessibilityAction: (event: AccessibilityActionEvent) => {
+      if (options && event.nativeEvent.actionName === "options") open();
+      else accessibility.onAccessibilityAction?.(event);
+    },
+  } };
 }
 
 /** A quiet mark, not a badge: pinned items are also grouped first. */
@@ -100,17 +128,14 @@ export function CourseCard({
   navigationFeedback?: boolean;
 } & ItemAccessibilityActions) {
   const { colors } = useTheme();
-  const press = usePressScale();
+  const { press, props } = useCoursePress(onPress, { accessibilityActions, onAccessibilityAction });
   return (
     <Animated.View style={{ transform: [{ scale: press.scale }] }}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${accessibilityLabel ?? identity.title}${pinned ? ", pinned" : ""}`}
-        accessibilityActions={accessibilityActions ? [...accessibilityActions] : undefined}
-        onAccessibilityAction={onAccessibilityAction}
         testID={testID}
-        onPress={onPress}
-        {...press.handlers}
+        {...props}
         style={({ pressed }) => ({
           minHeight: hitTarget.min + 20,
           flexDirection: "row",
@@ -160,17 +185,14 @@ export function CourseTile({
   pinned?: boolean;
 } & ItemAccessibilityActions) {
   const { colors } = useTheme();
-  const press = usePressScale();
+  const { press, props } = useCoursePress(onPress, { accessibilityActions, onAccessibilityAction });
   const height = courseTileHeight(width);
   return (
     <Animated.View style={{ width, height, transform: [{ scale: press.scale }] }}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${accessibilityLabel ?? identity.title}${pinned ? ", pinned" : ""}`}
-        accessibilityActions={accessibilityActions ? [...accessibilityActions] : undefined}
-        onAccessibilityAction={onAccessibilityAction}
-        onPress={onPress}
-        {...press.handlers}
+        {...props}
         style={({ pressed }) => ({
           width,
           height,

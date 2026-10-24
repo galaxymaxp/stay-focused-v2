@@ -174,9 +174,9 @@ export function GenerateScreen() {
           {group.items.map((course) => {
             const swipe = actions(course, false);
             return (
-              <CourseFeedback key={course.id} options={<CourseOptions courseKey={course.id} title={courseIdentity(course).title} actions={[...swipe.leading, ...swipe.trailing]} pinned={swipe.pinned} />}><SwipeRow leading={swipe.leading} trailing={swipe.trailing}>
+              <CourseOptions key={course.id} courseKey={course.id} title={courseIdentity(course).title} actions={[...swipe.leading, ...swipe.trailing]} pinned={swipe.pinned}><CourseFeedback><SwipeRow leading={swipe.leading} trailing={swipe.trailing}>
                 <GenerateCourseCard course={course} pinned={swipe.pinned} swipeActions={[...swipe.leading, ...swipe.trailing]} onPress={() => openCourse(course)} />
-              </SwipeRow></CourseFeedback>
+              </SwipeRow></CourseFeedback></CourseOptions>
             );
           })}
         </View>
@@ -189,9 +189,9 @@ export function GenerateScreen() {
           {showHidden ? arranged.hidden.map((course) => {
             const swipe = actions(course, true);
             return (
-              <CourseFeedback key={course.id} options={<CourseOptions courseKey={course.id} title={courseIdentity(course).title} actions={swipe.trailing} />}><SwipeRow trailing={swipe.trailing} style={{ opacity: 0.6 }}>
+              <CourseOptions key={course.id} courseKey={course.id} title={courseIdentity(course).title} actions={swipe.trailing}><CourseFeedback><SwipeRow trailing={swipe.trailing} style={{ opacity: 0.6 }}>
                 <GenerateCourseCard course={course} swipeActions={swipe.trailing} onPress={() => openCourse(course)} />
-              </SwipeRow></CourseFeedback>
+              </SwipeRow></CourseFeedback></CourseOptions>
             );
           }) : null}
         </View>
@@ -203,7 +203,7 @@ export function GenerateScreen() {
           </Pressable>
           {showPast ? pastCourses.map(course => {
             const swipe = actions(course, false);
-            return <CourseFeedback key={course.id} options={<CourseOptions courseKey={course.id} title={courseIdentity(course).title} actions={swipe.trailing} />}><SwipeRow trailing={swipe.trailing}><GenerateCourseCard course={course} swipeActions={swipe.trailing} onPress={() => openCourse(course)} /></SwipeRow></CourseFeedback>;
+            return <CourseOptions key={course.id} courseKey={course.id} title={courseIdentity(course).title} actions={swipe.trailing}><CourseFeedback><SwipeRow trailing={swipe.trailing}><GenerateCourseCard course={course} swipeActions={swipe.trailing} onPress={() => openCourse(course)} /></SwipeRow></CourseFeedback></CourseOptions>;
           }) : null}
         </View>
       ) : null}

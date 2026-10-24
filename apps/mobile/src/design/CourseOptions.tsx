@@ -1,12 +1,14 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { AccessibilityInfo, findNodeHandle, Platform, Pressable, View } from "react-native";
 import { usePathname } from "expo-router";
-import { MoreHorizontal } from "lucide-react-native";
 import { useAuth } from "../auth";
 import { Copy, Sheet } from "./primitives";
 import { useTheme } from "./theme";
 import { hitTarget, spacing } from "./tokens";
 import type { SwipeAction } from "./SwipeRow";
+
+const CourseOptionsContext = createContext<{ open: () => void; trigger: RefObject<View | null> } | null>(null);
+export const useCourseOptions = () => useContext(CourseOptionsContext);
 
 function focus(node: View | null) {
   node?.focus();
@@ -17,19 +19,20 @@ function focus(node: View | null) {
 }
 
 /** The existing callbacks, exposed without requiring a swipe. Never a navigation child. */
-export function CourseOptions({ title, courseKey, actions, pinned = false }: {
+export function CourseOptions({ title, courseKey, actions, pinned = false, children }: {
   title: string;
   courseKey: string;
   actions: readonly SwipeAction[];
   pinned?: boolean;
+  children?: ReactNode;
 }) {
   const { session } = useAuth();
   const pathname = usePathname();
   // Remount the disclosure on owner/route changes, dropping any captured actions.
-  return <CourseMenu key={`${session?.user.id ?? ""}:${pathname}:${courseKey}`} title={title} actions={actions} pinned={pinned} />;
+  return <CourseMenu key={`${session?.user.id ?? ""}:${pathname}:${courseKey}`} title={title} actions={actions} pinned={pinned}>{children}</CourseMenu>;
 }
 
-function CourseMenu({ title, actions, pinned }: { title: string; actions: readonly SwipeAction[]; pinned: boolean }) {
+function CourseMenu({ title, actions, pinned, children }: { title: string; actions: readonly SwipeAction[]; pinned: boolean; children: ReactNode }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState(false);
   const id = useId();
@@ -49,13 +52,8 @@ function CourseMenu({ title, actions, pinned }: { title: string; actions: readon
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
   }, [open]);
-  return <View style={{ alignItems: "flex-end" }}>
-    <Pressable ref={trigger} accessibilityRole="button" accessibilityLabel={`Course options for ${title}`}
-      accessibilityState={{ expanded: open }} aria-controls={open ? id : undefined}
-      onPress={event => { event.stopPropagation(); setOpen(value => !value); }}
-      style={{ minWidth: hitTarget.min, minHeight: hitTarget.min, alignItems: "center", justifyContent: "center" }}>
-      <MoreHorizontal size={20} color={colors.textSecondary} />
-    </Pressable>
+  return <CourseOptionsContext.Provider value={{ open: () => setOpen(true), trigger }}>
+    {children}
     {open ? <Sheet title="Course options" onClose={close}>
       <View nativeID={id} style={{ gap: spacing[2] }}>
         <Copy size="h3">{title}</Copy>
@@ -68,5 +66,5 @@ function CourseMenu({ title, actions, pinned }: { title: string; actions: readon
         </Pressable>)}
       </View>
     </Sheet> : null}
-  </View>;
+  </CourseOptionsContext.Provider>;
 }

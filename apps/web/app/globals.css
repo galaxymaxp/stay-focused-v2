@@ -5516,11 +5516,6 @@ mark.find-active {
 .course-options-icon > button { width: 44px; min-height: 44px; padding: 10px; }
 .course-options-icon > button .icon { width: 20px; height: 20px; }
 .course-options-icon .course-options-popover { left: auto; right: 0; }
-@media (min-width: 1024px) and (hover: hover) {
-  .generate-course-tile > .course-options-icon { opacity: 0; pointer-events: none; }
-  .generate-course-tile:hover > .course-options-icon,
-  .generate-course-tile:focus-within > .course-options-icon { opacity: 1; pointer-events: auto; }
-}
 .course-options-popover {
   position: absolute; top: calc(100% + 4px); left: 0; z-index: 6;
   width: max-content; max-width: min(260px, calc(100vw - 40px));

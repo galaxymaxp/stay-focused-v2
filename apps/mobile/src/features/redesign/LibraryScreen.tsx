@@ -212,7 +212,7 @@ export function LibraryScreen() {
     const pinned = prefs.pinned.course.includes(group.key);
     const leading = pinAction(pinned, () => change(() => pin("course", group.key, !pinned)));
     return (
-      <View key={group.key} style={{ width: tileWidth }}><CourseFeedback compact options={<CourseOptions courseKey={group.key} title={identity.title} actions={leading} pinned={pinned} />}><SwipeRow compact leading={leading}>
+      <View key={group.key} style={{ width: tileWidth }}><CourseOptions courseKey={group.key} title={identity.title} actions={leading} pinned={pinned}><CourseFeedback compact><SwipeRow compact leading={leading}>
         <CourseTile
           identity={identity}
           width={tileWidth}
@@ -222,7 +222,7 @@ export function LibraryScreen() {
           accessibilityLabel={`${identity.title}, ${footnote}`}
           onPress={() => router.push({ pathname: "/library/[courseKey]", params: { courseKey: group.key } })}
         />
-      </SwipeRow></CourseFeedback></View>
+      </SwipeRow></CourseFeedback></CourseOptions></View>
     );
   }
   // Saved work renders from the device; the skeleton appears only when nothing
