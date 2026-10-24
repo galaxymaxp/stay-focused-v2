@@ -1,3 +1,5 @@
+import { validFreeTime } from "@stay-focused/shared";
+import { useQuietPlanner } from "./useQuietPlanner";
 import { useTodayClockWindow } from "./useTodayClockWindow";
 import { AppUpdateBanner } from './AppUpdateNotice';
 import { SnapshotStatus } from "./SnapshotStatus";
@@ -69,22 +71,26 @@ export function TodayScreen() {
   const firstName = displayName?.trim().split(/\s+/)[0];
   const clockWindow = useTodayClockWindow();
   const date = clockWindow.date;
-  const activeDate = useRef(date);
-  activeDate.current = date;
+  const { adjusting } = clockWindow;
   const today = useExperience<TodayScreenData>(
     clockWindow.path,
     60000,
+    undefined, undefined, Infinity, adjusting,
   );
   const capabilities = { ...today, data: today.data?.capabilities ?? null };
   const announcements = { ...today, data: today.data?.announcements ?? null };
   const activities = { ...today, data: today.data?.activities ?? null };
   const focused = useIsFocused();
   const client = useExperienceClient();
+  const { preview, previewRequest, previewing, previewNote, queuePreview, clearPreview } = useQuietPlanner(
+    `${session?.user.id ?? ""}:${date}`, request => experienceRequest<DeterministicStudyPlan>(client, "/api/experience/planner/preview", { method: "POST", body: request }),
+  );
+
   // No pull-to-refresh on Today: coming back to it is the refresh.
   const refreshers = useRef({ today, announcements, activities });
   refreshers.current = { today, announcements, activities };
   useEffect(() => {
-    if (!focused) return;
+    if (!focused || adjusting.current) return;
     const now = Date.now();
     if (now - lastResync < RESYNC_MS) return;
     const first = lastResync === 0;
@@ -94,7 +100,7 @@ export function TodayScreen() {
     if (!first) {
       current.today.refresh();
     }
-  }, [focused]);
+  }, [focused, adjusting]);
   const [locked, setLocked] = useState(false);
   useEffect(() => {
     let live = true;
@@ -189,29 +195,24 @@ export function TodayScreen() {
     ),
   );
   const [end, setEnd] = useState(() => Math.min(1440, start + 120));
-  const [preview, setPreview] = useState<DeterministicStudyPlan | null>(null);
   const [busy, setBusy] = useState(false),
     [note, setNote] = useState<string | null>(null),
     [expanded, setExpanded] = useState(false);
-  const [previewRequest, setPreviewRequest] = useState<ReturnType<
-    typeof planningRequest
-  > | null>(null);
   // The free time is remembered per day, so the planned blocks it holds and
   // the window you set stay together across launches.
   const [windowKnown, setWindowKnown] = useState(false);
   const savedWindow = clockWindow.window;
   useEffect(() => {
+    if (adjusting.current) return;
     setWindowKnown(!!savedWindow);
-    setPreview(null);
-    setPreviewRequest(null);
     const fallback = Math.min(1410, Math.ceil((new Date().getHours() * 60 + new Date().getMinutes()) / 15) * 15);
     setStart(savedWindow?.start ?? fallback);
     setEnd(savedWindow?.end ?? Math.min(1440, fallback + 120));
-  }, [date, savedWindow]);
+  }, [date, savedWindow, adjusting]);
   // Nothing saved yet: wrap the free time around today's planned blocks.
   const planned = today.data?.timeline;
   useEffect(() => {
-    if (windowKnown || !planned) return;
+    if (adjusting.current || windowKnown || !planned) return;
     const now = new Date();
     const around = freeTimeAround(timelineSegments(planned.filter((item) => item.status === "planned"), date), (now.getTime() - new Date(`${date}T00:00:00`).getTime()) / 60000);
     if (around) {
@@ -219,41 +220,20 @@ export function TodayScreen() {
       setEnd(around.end);
       setWindowKnown(true);
     }
-  }, [date, planned, windowKnown]);
+  }, [date, planned, windowKnown, adjusting]);
   const change = (from: number, to: number) => {
+    if (!validFreeTime({ start: from, end: to })) return;
     setStart(from);
     setEnd(to);
-    setPreview(null);
-    setPreviewRequest(null);
+    clearPreview();
     setWindowKnown(true);
     clockWindow.save({ start: from, end: to });
+    plan(from, to);
   };
-  async function plan(from: number, to: number) {
-    if (requestBusy.current || !available(capabilities.data?.planner)) return;
-    requestBusy.current = true;
-    setBusy(true);
+  function plan(from: number, to: number) {
+    if (!validFreeTime({ start: from, end: to }) || !available(capabilities.data?.planner)) return;
     setNote(null);
-    setPreview(null);
-    setPreviewRequest(null);
-    try {
-      const requestDate = date;
-      const request = planningRequest(requestDate, from, to);
-      const result = await experienceRequest<DeterministicStudyPlan>(
-        client,
-        "/api/experience/planner/preview",
-        { method: "POST", body: request },
-      );
-      if (activeDate.current !== requestDate) return;
-      setPreview(result);
-      setPreviewRequest(request);
-    } catch (error) {
-      setNote(
-        error instanceof Error ? error.message : "Could not preview your plan.",
-      );
-    } finally {
-      requestBusy.current = false;
-      setBusy(false);
-    }
+    queuePreview(planningRequest(date, from, to));
   }
   async function apply() {
     if (!previewRequest || requestBusy.current) return;
@@ -264,9 +244,9 @@ export function TodayScreen() {
         method: "POST",
         body: previewRequest,
       });
-      setPreview(null);
-      setPreviewRequest(null);
+      clearPreview();
       haptic.success();
+      clockWindow.reconcile();
       today.refresh();
     } catch (error) {
       setNote(
@@ -304,16 +284,13 @@ export function TodayScreen() {
           const item = today.data?.timeline.find((entry) => entry.id === id);
           if (item) openItem(item);
         }}
-        onAdjustingChange={setRingActive}
+        onAdjustingChange={(active) => { clockWindow.setAdjusting(active); setRingActive(active); if (active) clearPreview(); }}
         date={date}
         timeline={today.data?.timeline ?? []}
         start={start}
         end={end}
-        onChange={change}
-        onCommit={(from, to) => {
-          change(from, to);
-          void plan(from, to);
-        }}
+        onChange={() => { /* The clock owns its draft; commit saves and previews. */ }}
+        onCommit={change}
         disabled={busy || !available(capabilities.data?.planner)}
         proposed={
           preview
@@ -325,8 +302,8 @@ export function TodayScreen() {
             : []
         }
       />
-      {busy && !preview ? <PlanPreviewLoading /> : null}
-      {note && <Notice>{note}</Notice>}
+      {(busy || previewing) && !preview ? <PlanPreviewLoading /> : null}
+      {(note || previewNote) && <Notice>{note || previewNote}</Notice>}
       {preview && (
         <PlanPreview
           plan={preview}
@@ -335,8 +312,7 @@ export function TodayScreen() {
           busy={busy}
           onApply={() => void apply()}
           onDiscard={() => {
-            setPreview(null);
-            setPreviewRequest(null);
+            clearPreview();
           }}
         />
       )}

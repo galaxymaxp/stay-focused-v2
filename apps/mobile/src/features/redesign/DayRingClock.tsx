@@ -257,16 +257,15 @@ export function DayRingClock({
         Animated.spring(lift, { toValue: 0, ...motion.spring, useNativeDriver: true }).start();
       } else lift.setValue(0);
       if (!wasHeld || !mode) return;
-      latest.current.onAdjustingChange?.(false);
+
       state.pending = null;
       const released = commit ? state.value : state.base;
       const target = commit ? snapRange(released.start, released.end, mode) : state.base;
+      if (commit) { haptic.tap(); latest.current.onCommit(target.start, target.end); }
+      latest.current.onAdjustingChange?.(false);
       const done = () => {
         state.stopSnap = null;
-        if (commit) {
-          haptic.tap();
-          latest.current.onCommit(target.start, target.end);
-        } else setDraft(null);
+        setDraft(null);
       };
       if (latest.current.reducedMotion) {
         setDraft(target);

@@ -26,8 +26,10 @@ vi.mock("../lib/canvas-refresh", () => ({ useCanvasRefresh: () => ({}), CanvasRe
 vi.mock("./day-clock/DayRingClock", () => ({ DayRingClock: () => null }));
 vi.mock("./today/plan-preview", () => ({ PlanPreview: () => null }));
 vi.mock("./today/today-calendar", () => ({ TodayCalendar: () => null }));
+const clockAdjusting = vi.hoisted(() => ({ current: false }));
 vi.mock("./day-clock/use-today-clock-window", () => ({ useTodayClockWindow: () => ({
   date: "2026-10-19", path: "/api/today", window: null, save: vi.fn(),
+  adjusting: clockAdjusting, setAdjusting: vi.fn(), reconcile: vi.fn(),
 }) }));
 vi.mock("../lib/hooks", () => ({ useResource: (path: string) => ({
   data: path === "/api/today" ? {

@@ -13,6 +13,7 @@ export function useResource<T>(
   envelope: RequestOptions["envelope"] = "data",
   holdReviewer = false,
   loader?: (signal: AbortSignal, publish: ResourcePublisher<T>) => Promise<T>,
+  paused?: { readonly current: boolean },
 ) {
   const { api, session } = useAuth();
   const identity = `${session?.user.id ?? ""}:${path}:${envelope}`;
@@ -37,7 +38,7 @@ export function useResource<T>(
     let inFlight = false;
     const controller = new AbortController();
     const load = async () => {
-      if (document.visibilityState === "hidden" || inFlight) return;
+      if (paused?.current || document.visibilityState === "hidden" || inFlight) return;
       inFlight = true;
       setState((old) => ({
         identity,
@@ -112,7 +113,7 @@ export function useResource<T>(
       document.removeEventListener("visibilitychange", focus);
       window.removeEventListener("sf:task-state-changed", taskStateChanged);
     };
-  }, [api, session?.user.id, path, poll, envelope, revision, identity, holdReviewer, loader]);
+  }, [api, session?.user.id, path, poll, envelope, revision, identity, holdReviewer, loader, paused]);
   return {
     ...(state.identity === identity
       ? state

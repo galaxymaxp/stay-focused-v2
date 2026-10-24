@@ -1,5 +1,7 @@
 "use client";
-import { freeTimeDuration } from "@stay-focused/shared";
+import { freeTimeDuration, validFreeTime } from "@stay-focused/shared";
+import { useQuietPlanner } from "../day-clock/use-quiet-planner";
+
 import { useTodayClockWindow } from "../day-clock/use-today-clock-window";
 import { SnapshotStatus } from "../../components/snapshot-status";
 import { CanvasRefreshStatus, useCanvasRefresh } from "../../lib/canvas-refresh";
@@ -9,7 +11,6 @@ import type {
 } from "@stay-focused/shared";
 import type {
   DeterministicStudyPlan,
-  StudyPlanningRequest,
 } from "@stay-focused/shared/task-planning";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -76,11 +77,15 @@ export function TodayScreen() {
     router = useRouter();
   const clockWindow = useTodayClockWindow();
   const date = clockWindow.date;
-  const activeDate = useRef(date);
-  activeDate.current = date;
+  const { adjusting } = clockWindow;
   const today = useResource<TodayScreenData>(
     clockWindow.path,
     60000,
+    "data", false, undefined, adjusting,
+  );
+
+  const { preview, previewRequest, previewing, previewNote, queuePreview, clearPreview } = useQuietPlanner(
+    `${session?.user.id ?? ""}:${date}`, request => api<DeterministicStudyPlan>("/api/experience/planner/preview", { method: "POST", body: request }),
   );
   const capabilities = { ...today, data: today.data?.capabilities ?? null };
   const announcements = { ...today, data: today.data?.announcements ?? null };
@@ -103,15 +108,15 @@ export function TodayScreen() {
   useEffect(() => {
     setLocked(store.get(CLOCK_LOCK_KEY) === "1");
     const saved = clockWindow.window;
+    if (adjusting.current) return;
     setWindowKnown(!!saved);
     const fallback = Math.min(1410, Math.ceil((new Date().getHours() * 60 + new Date().getMinutes()) / 15) * 15);
     setStart(saved?.start ?? fallback);
     setEnd(saved?.end ?? Math.min(1440, fallback + 120));
-    setPreview(null); setPreviewRequest(null);
-  }, [date, clockWindow.window]);
+  }, [date, clockWindow.window, adjusting]);
   const planned = today.data?.timeline;
   useEffect(() => {
-    if (windowKnown || !planned) return;
+    if (adjusting.current || windowKnown || !planned) return;
     const now = new Date();
     const around = freeTimeAround(
       timelineSegments(planned.filter((item) => item.status === "planned"), date),
@@ -122,46 +127,26 @@ export function TodayScreen() {
       setEnd(around.end);
       setWindowKnown(true);
     }
-  }, [date, planned, windowKnown]);
+  }, [date, planned, windowKnown, adjusting]);
 
-  const [preview, setPreview] = useState<DeterministicStudyPlan | null>(null);
-  const [previewRequest, setPreviewRequest] = useState<StudyPlanningRequest | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const busyRef = useRef(false);
   const plannerReady = available(capabilities.data?.planner);
 
   const change = (from: number, to: number) => {
+    if (!validFreeTime({ start: from, end: to })) return;
     setStart(from);
     setEnd(to);
-    setPreview(null);
-    setPreviewRequest(null);
+    clearPreview();
     setWindowKnown(true);
     clockWindow.save({ start: from, end: to });
+    plan(from, to);
   };
-  async function plan(from: number, to: number) {
-    if (busyRef.current || !plannerReady) return;
-    busyRef.current = true;
-    setBusy(true);
+  function plan(from: number, to: number) {
+    if (!validFreeTime({ start: from, end: to }) || !plannerReady) return;
     setNote(null);
-    setPreview(null);
-    setPreviewRequest(null);
-    try {
-      const requestDate = date;
-      const request = planningRequest(requestDate, from, to);
-      const result = await api<DeterministicStudyPlan>("/api/experience/planner/preview", {
-          method: "POST",
-          body: request,
-        });
-      if (activeDate.current !== requestDate) return;
-      setPreview(result);
-      setPreviewRequest(request);
-    } catch (error) {
-      setNote(error instanceof Error ? error.message : "Could not preview your plan.");
-    } finally {
-      busyRef.current = false;
-      setBusy(false);
-    }
+    queuePreview(planningRequest(date, from, to));
   }
   async function apply() {
     if (!previewRequest || busyRef.current) return;
@@ -169,9 +154,9 @@ export function TodayScreen() {
     setBusy(true);
     try {
       await api("/api/experience/planner/replan", { method: "POST", body: previewRequest });
-      setPreview(null);
-      setPreviewRequest(null);
+      clearPreview();
       setNote("Saved. These blocks are on your Schedule.");
+      clockWindow.reconcile();
       today.refresh();
     } catch (error) {
       setNote(error instanceof Error ? error.message : "Could not update your schedule.");
@@ -192,8 +177,7 @@ export function TodayScreen() {
     setBusy(true);
     try {
       await setWorkDone(api, activity, true);
-      setPreview(null);
-      setPreviewRequest(null);
+      clearPreview();
       today.refresh();
       setNote(`“${item.title}” is marked done.`);
     } catch (error) {
@@ -300,10 +284,8 @@ export function TodayScreen() {
                 const item = today.data?.timeline.find((entry) => entry.id === id);
                 if (item) openItem(item);
               }}
-              onCommit={(from, to) => {
-                change(from, to);
-                void plan(from, to);
-              }}
+              onCommit={change}
+              onAdjustingChange={(active) => { clockWindow.setAdjusting(active); if (active) clearPreview(); }}
               disabled={busy || !plannerReady}
               proposed={proposed}
             />
@@ -320,13 +302,13 @@ export function TodayScreen() {
               <p className="meta center">Planning is not available right now.</p>
             )}
           </section>
-          {busy && !preview && (
+          {(busy || previewing) && !preview && (
             <section className="surface plan-loading" aria-label="Planning">
               <span className="plan-loading-bar short" />
               <span className="plan-loading-bar" />
             </section>
           )}
-          {note && <Notice>{note}</Notice>}
+          {(note || previewNote) && <Notice>{note || previewNote}</Notice>}
           {preview && (
             <PlanPreview
               plan={preview}
@@ -335,8 +317,7 @@ export function TodayScreen() {
               busy={busy}
               onApply={() => void apply()}
               onDiscard={() => {
-                setPreview(null);
-                setPreviewRequest(null);
+                clearPreview();
               }}
             />
           )}

@@ -271,3 +271,5 @@ export * from './orb-load';
 export * from './queue-failures';
 
 export { ORB_AMBIENT_PROFILES, type OrbVariant } from './orb-ambient';
+
+export { createQuietPreview } from "./quiet-preview";

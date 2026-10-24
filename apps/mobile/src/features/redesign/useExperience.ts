@@ -29,6 +29,7 @@ export function useExperience<T>(
     write(ownerUserId: string, data: T): Promise<void>;
   },
   maxPolls = Number.POSITIVE_INFINITY,
+  paused?: { readonly current: boolean },
 ) {
   const { session } = useAuth();
   const ownerUserId = session?.user.id ?? null;
@@ -65,6 +66,7 @@ export function useExperience<T>(
     let timer: ReturnType<typeof setTimeout> | undefined;
     let polls = 0;
     async function load() {
+      if (paused?.current) { if (live && pollMs) timer = setTimeout(() => void load(), pollMs); return; }
       polls += 1;
       if (live) setState(old => ({ ...(old.identity === identity ? old : { identity, data: null, savedAt: null, error: null, errorCode: null }), loading: !((old.identity === identity) && old.data !== null), refreshing: true, error: null, errorCode: null }));
       try {
@@ -116,6 +118,6 @@ export function useExperience<T>(
       controller.abort();
       clearTimeout(timer);
     };
-  }, [client, ownerUserId, path, focused, active, version, dataVersion, pollMs, maxPolls, identity]);
+  }, [client, ownerUserId, path, focused, active, version, dataVersion, pollMs, maxPolls, identity, paused]);
   return { ...(state.identity === identity ? state : { data: null, savedAt: null, refreshing: false, error: null, errorCode: null, loading: !!path }), refresh };
 }

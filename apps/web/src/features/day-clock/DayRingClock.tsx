@@ -156,6 +156,7 @@ export function DayRingClock({
   start,
   end,
   onCommit,
+  onAdjustingChange,
   disabled = false,
   proposed = [],
   onSegmentPress,
@@ -168,6 +169,7 @@ export function DayRingClock({
   start: number;
   end: number;
   onCommit: (start: number, end: number) => void;
+  onAdjustingChange?: (active: boolean) => void;
   disabled?: boolean;
   /** A plan preview drawn as dashed arcs on the schedule lane until applied. */
   proposed?: readonly ProposedArc[];
@@ -210,8 +212,8 @@ export function DayRingClock({
     useMemo(() => timelineSegments(timeline, date), [timeline, date]),
     reducedMotion,
   );
-  const latest = useRef({ start, end, disabled, locked, segments, onCommit, onSegmentPress, reducedMotion });
-  latest.current = { start, end, disabled, locked, segments, onCommit, onSegmentPress, reducedMotion };
+  const latest = useRef({ start, end, disabled, locked, segments, onCommit, onAdjustingChange, onSegmentPress, reducedMotion });
+  latest.current = { start, end, disabled, locked, segments, onCommit, onAdjustingChange, onSegmentPress, reducedMotion };
   const gesture = useRef({
     mode: null as Mode | null,
     held: false,
@@ -256,6 +258,7 @@ export function DayRingClock({
     orbInteraction.state.current = { ...orbInteraction.state.current, inputAt: Date.now() };
     orbInteraction.wake.current?.();
     setAdjusting(state.mode);
+    latest.current.onAdjustingChange?.(true);
   };
   const finish = (commit: boolean) => {
     const state = gesture.current;
@@ -269,14 +272,16 @@ export function DayRingClock({
     state.mode = null;
     setAdjusting(null);
     if (!wasHeld || !mode) return;
+
     const released = commit ? state.value : state.base;
     const target = commit
       ? snapRange(released.start, released.end, mode)
       : state.base;
+    if (commit) latest.current.onCommit(target.start, target.end);
+    latest.current.onAdjustingChange?.(false);
     const done = () => {
       state.stopSnap = null;
-      if (commit) latest.current.onCommit(target.start, target.end);
-      else setDraft(null);
+      setDraft(null);
     };
     if (latest.current.reducedMotion) {
       setDraft(target);

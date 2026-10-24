@@ -11,13 +11,13 @@ import { useSavedMaterialPages } from "./useSavedMaterialPages";
 import type { CourseMaterials, LearningMaterial } from "@stay-focused/shared";
 import { openedMaterialOffsets } from "../../services/courseScreenMemory";
 
-const mocks = vi.hoisted(() => ({ owner: "a", token: "token", request: vi.fn(), store: null as LocalArtifactStore | null }));
+const mocks = vi.hoisted(() => ({ owner: "a", token: "token", active: true, focused: true, request: vi.fn(), store: null as LocalArtifactStore | null }));
 vi.mock("../../auth", () => ({ useAuth: () => ({ session: { user: { id: mocks.owner }, accessToken: mocks.token } }) }));
 vi.mock("../../config/apiBaseUrl", () => ({ getApiBaseUrl: () => "https://unused.invalid" }));
-vi.mock("../../design/theme", () => ({ useTheme: () => ({ active: true }) }));
+vi.mock("../../design/theme", () => ({ useTheme: () => ({ active: mocks.active }) }));
 vi.mock("../../design/primitives", () => ({ Copy: "copy" }));
 vi.mock("react-native", () => ({ Pressable: "pressable" }));
-vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => true }));
+vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => mocks.focused }));
 vi.mock("../sync/CanvasSyncProvider", () => ({ useCanvasSync: () => ({ dataVersion: 0 }) }));
 vi.mock("../../services/localLibrary/localArtifactDatabase", () => ({ getLocalArtifactStore: async () => mocks.store }));
 vi.mock("../../services/experienceApi", () => ({ experienceRequest: mocks.request, ExperienceApiError: class extends Error {} }));
@@ -32,9 +32,31 @@ beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const handle = openNodeSqlite(); close = handle.close;
   await migrateLocalLibrary(handle.db); mocks.store = createLocalArtifactStore(handle.db);
-  mocks.owner = "a"; mocks.token = "token"; mocks.request.mockReset();
+  mocks.owner = "a"; mocks.token = "token"; mocks.active = true; mocks.focused = true; mocks.request.mockReset();
 });
-afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; close(); });
+afterEach(async () => { if (rendered) await act(async () => rendered!.unmount()); rendered = undefined; close(); vi.useRealTimers(); });
+
+it('TC2 skips Today polling and focus reads during a drag, then preserves lifecycle and explicit refresh', async () => {
+  vi.useFakeTimers(); const paused = { current: false };
+  function ClockProbe() { result = useExperience<Data>(path, 1000, undefined, undefined, Infinity, paused); return null; }
+  mocks.request.mockResolvedValue({ items: [] });
+  await act(async () => { rendered = create(createElement(ClockProbe)); }); await flush();
+  expect(mocks.request).toHaveBeenCalledTimes(1); mocks.request.mockClear();
+  paused.current = true;
+  mocks.focused = false;
+  await act(async () => rendered!.update(createElement(ClockProbe)));
+  mocks.focused = true;
+  await act(async () => rendered!.update(createElement(ClockProbe))); await flush();
+  await act(async () => { vi.advanceTimersByTime(1000); }); await flush();
+  expect(mocks.request).not.toHaveBeenCalled(); expect(result.data).toEqual({ items: [] });
+  paused.current = false;
+  await act(async () => { vi.advanceTimersByTime(1000); }); await flush();
+  expect(mocks.request).toHaveBeenCalledTimes(1);
+  await act(async () => result.refresh()); await flush(); expect(mocks.request).toHaveBeenCalledTimes(2);
+  mocks.active = false; await act(async () => rendered!.update(createElement(ClockProbe)));
+  mocks.active = true; await act(async () => rendered!.update(createElement(ClockProbe))); await flush();
+  expect(mocks.request).toHaveBeenCalledTimes(3);
+});
 describe("saved-first mobile screens", () => {
   it("restores later material pages with exact owner/offset and retains a newly loaded page during background refresh", async () => {
     const material = (id: string): LearningMaterial => ({ id, courseId: "course", title: id, kind: "pdf", readiness: "ready", count: null,

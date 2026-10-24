@@ -36,3 +36,35 @@ it('loads the previous entry when an open clock crosses calendar midnight', asyn
  await act(async () => { vi.advanceTimersByTime(60_000); });
  expect(value.date).toBe('2026-10-17'); expect(value.window).toEqual({ start: 1320, end: 240 });
 });
+
+it('keeps the Today read identity stable for saved gesture commits', async () => {
+ vi.setSystemTime(new Date(2026, 9, 18, 12)); await mount();
+ const path = value.path;
+ await act(async () => { value.save({ start: 1320, end: 240 }); });
+ expect(value.path).toBe(path);
+ await act(async () => { value.save({ start: 1320, end: 180 }); });
+ expect(value.path).toBe(path);
+ await act(async () => { value.save({ start: 540, end: 660 }); });
+ expect(value.path).toBe(path);
+});
+
+it('defers calendar rollover while held and keeps the latest committed overnight tail', async () => {
+ vi.setSystemTime(new Date(2026, 9, 18, 23, 59)); await mount();
+ const path = value.path;
+ await act(async () => value.setAdjusting(true));
+ await act(async () => { vi.advanceTimersByTime(60_000); });
+ expect(value.path).toBe(path); expect(value.date).toBe('2026-10-18');
+ await act(async () => { value.save({ start: 1320, end: 180 }); value.setAdjusting(false); });
+ expect(value.date).toBe('2026-10-18'); expect(value.window).toEqual({ start: 1320, end: 180 });
+ expect(value.path).toContain('endsAt=');
+ await act(async () => { vi.advanceTimersByTime(180 * 60_000); });
+ expect(value.date).toBe('2026-10-19');
+});
+
+it('explicit reconciliation sees saved bounds without another persistence', async () => {
+ vi.setSystemTime(new Date(2026, 9, 18, 12)); await mount();
+ const path = value.path;
+ await act(async () => value.save({ start: 1320, end: 240 })); expect(value.path).toBe(path);
+ await act(async () => value.reconcile()); expect(value.path).not.toBe(path);
+ expect(value.window).toEqual({ start: 1320, end: 240 });
+});

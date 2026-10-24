@@ -47,8 +47,9 @@ vi.mock("../redesign/TodayCalendar", () => ({ TodayCalendar: () => null }));
 vi.mock("../redesign/SnapshotStatus", () => ({ SnapshotStatus: () => null }));
 vi.mock("../redesign/AppUpdateNotice", () => ({ AppUpdateBanner: () => null }));
 vi.mock("../../services/experienceApi", () => ({ experienceRequest: mocks.request }));
+const clockAdjusting = vi.hoisted(() => ({ current: false }));
 vi.mock("../redesign/useTodayClockWindow", () => ({
-  useTodayClockWindow: () => ({ date: "2026-10-19", path: "/api/today", window: null, save: vi.fn() }),
+  useTodayClockWindow: () => ({ date: "2026-10-19", path: "/api/today", window: null, save: vi.fn(), adjusting: clockAdjusting, setAdjusting: vi.fn(), reconcile: vi.fn() }),
 }));
 vi.mock("../redesign/useExperience", () => ({
   useExperienceClient: () => ({}),

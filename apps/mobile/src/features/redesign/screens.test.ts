@@ -1154,6 +1154,7 @@ describe("B25 screen interactions", () => {
     expect(overlay.props.onShouldBlockNativeResponder()).toBe(false);
   });
   it("sends a planner preview when the ring is committed, never applying silently", async () => {
+    vi.useFakeTimers();
     mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = todayFixture();
     mocks.data[
       `/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`
@@ -1169,6 +1170,8 @@ describe("B25 screen interactions", () => {
     await act(async () =>
       root.findByType(DayRingClock).props.onCommit(600, 720),
     );
+    expect(mocks.request).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(400); });
     expect(mocks.request).toHaveBeenCalledWith(
       expect.anything(),
       "/api/experience/planner/preview",
@@ -1724,6 +1727,7 @@ describe('organizing saved items inside a course', () => {
 });
 
 it('keeps the lock storage key and sends typed free time through the drag planning path', async () => {
+  vi.useFakeTimers();
   const path = `/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`;
   mocks.data[path] = todayFixture();
   mocks.request.mockResolvedValue({ algorithmVersion: 'deterministic-v1', planningRange: { startsAt: '', endsAt: '' }, availability: [], sessions: [], unscheduledWork: [] });
@@ -1734,6 +1738,7 @@ it('keeps the lock storage key and sends typed free time through the drag planni
   expect(options().props.locked).toBe(true);
   await act(async () => options().props.onCommit(1320, 240));
   expect(mocks.storageWrite).toHaveBeenCalledWith(`sf.today.free-time.${localDate()}`, JSON.stringify({ start: 1320, end: 240 }));
+  await act(async () => { vi.advanceTimersByTime(400); });
   const request = mocks.request.mock.calls.find(call => call[1] === '/api/experience/planner/preview');
   expect(request?.[2].body).toEqual(planningRequest(localDate(), 1320, 240));
 });
@@ -1743,3 +1748,58 @@ vi.mock('../../services/useAppUpdate', () => ({
   appUpdateStore: { check: vi.fn(), dismiss: vi.fn() },
   downloadAppUpdate: vi.fn(),
 }));
+
+describe('TC2 real mobile clock gesture counters', () => {
+  const writes = () => mocks.storageWrite.mock.calls.filter(([key]) => key.startsWith('sf.today.free-time.'));
+  const setup = async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 9, 24, 12));
+    mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = todayFixture();
+    mocks.request.mockResolvedValue({ sessions: [], unscheduledWork: [] });
+    const root = await render(createElement(TodayScreen));
+    await act(async () => root.findByType(ClockOptions).props.onCommit(600, 720));
+    await act(async () => { vi.advanceTimersByTime(400); });
+    mocks.storageWrite.mockClear(); mocks.request.mockClear(); mocks.refresh.mockClear(); mocks.paths.length = 0;
+    return root;
+  };
+  it.each([['start', 600, 1], ['end', 720, 1], ['end', 720, 100], ['move', 660, 100]] as const)('%s drag at %i (%i ms/move): no IO, one save, one quiet preview', async (_kind, at, delay) => {
+    const root = await setup(); const instance = root.findByType(DayRingClock);
+    const origin = ringAt(at), target = ringAt(at + 60);
+    await act(async () => ringTouch(root).props.onPanResponderGrant(touchAt(origin.x, origin.y)));
+    if (_kind === 'move') await act(async () => { vi.advanceTimersByTime(240); });
+    for (let i = 1; i <= 20; i++) {
+      await act(async () => ringTouch(root).props.onPanResponderMove({}, { dx: (target.x-origin.x)*i/20, dy: (target.y-origin.y)*i/20 }));
+      await act(async () => { vi.advanceTimersByTime(delay); });
+    }
+    expect(writes()).toHaveLength(0); expect(mocks.request).not.toHaveBeenCalled(); expect(mocks.sync).not.toHaveBeenCalled();
+    await act(async () => ringTouch(root).props.onPanResponderRelease());
+    expect(writes()).toHaveLength(1); expect(mocks.request).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(399); }); expect(mocks.request).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(1); });
+    expect(mocks.request).toHaveBeenCalledTimes(1); expect(mocks.request.mock.calls[0]![1]).toBe('/api/experience/planner/preview');
+    expect(new Set(mocks.paths).size).toBe(1); expect(mocks.refresh).not.toHaveBeenCalled(); expect(mocks.sync).not.toHaveBeenCalled();
+    expect(root.findByType(DayRingClock)).toBe(instance); expect(instance.props.disabled).toBe(false);
+  });
+  it('cancel rolls back without a save, preview, sync or read invalidation', async () => {
+    const root = await setup(); const origin = ringAt(720), target = ringAt(840);
+    await act(async () => ringTouch(root).props.onPanResponderGrant(touchAt(origin.x, origin.y)));
+    await act(async () => ringTouch(root).props.onPanResponderMove({}, { dx: target.x-origin.x, dy: target.y-origin.y }));
+    await act(async () => ringTouch(root).props.onPanResponderTerminate());
+    await act(async () => { vi.advanceTimersByTime(1000); });
+    expect(writes()).toHaveLength(0); expect(mocks.request).not.toHaveBeenCalled(); expect(mocks.sync).not.toHaveBeenCalled(); expect(mocks.refresh).not.toHaveBeenCalled();
+    expect(root.findByType(DayRingClock).props.end).toBe(720);
+  });
+  it('accessibility steps save once each and coalesce with typed overnight entry', async () => {
+    const root = await setup();
+    for (let i=0; i<3; i++) {
+      const control = root.findAll(node => node.props.accessibilityRole === 'adjustable' && node.props.accessibilityLabel === 'Availability end')[0]!;
+      await act(async () => control.props.onAccessibilityAction({ nativeEvent: { actionName: 'increment' } }));
+      await act(async () => { vi.advanceTimersByTime(100); });
+    }
+    await act(async () => root.findByType(ClockOptions).props.onCommit(1320, 240));
+    expect(writes()).toHaveLength(4); expect(mocks.request).not.toHaveBeenCalled();
+    await act(async () => { vi.advanceTimersByTime(400); });
+    expect(mocks.request).toHaveBeenCalledTimes(1);
+    expect(mocks.request.mock.calls[0]![2].body).toEqual(planningRequest(localDate(), 1320, 240));
+    expect(new Set(mocks.paths).size).toBe(1); expect(mocks.sync).not.toHaveBeenCalled(); expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+});
