@@ -1,7 +1,8 @@
 <!-- FS8 direct repair begin -->
-## FS8 direct readiness repair: acceptance complete (2026-10-24)
+## FS8 direct readiness repair: readiness PASS (2026-10-24)
 
-All four original blockers now have completed supersession evidence prepared.
+All four original blockers have VERIFIED_SUPERSESSION evidence accepted by the
+unchanged mandatory validator: ready=true, zero blockers.
 PBR-UX1 uses unchanged UX1b repair/acceptance and eleven pinned historical gates.
 WEB-A1 uses the confirmed runner checkout, completed source/roadmap gap audit,
 one bounded contrast correction and fresh verification. RT1/EV1's asserted
@@ -18,7 +19,8 @@ No candidate/live/full-OTA acceptance or ten-of-ten phone PASS claim.
 [Repair and readiness receipt](ai/acceptance/fs8-readiness-repair.md),
 [website audit](ai/acceptance/web-a1b-website-audit.md),
 [original-pixel correction](ai/acceptance/fs8-resume-evidence-correction.md).
-Final unchanged mandatory validator runs after committed evidence publication.
+FRESH mandatory readiness PASS at 05017922. Final documentation receipt
+is followed by the same CLI on final HEAD; see the repair report.
 No FULLSEND, push, deployment, migration, APK install or old-status rewrite.
 
 <!-- FS8 direct repair end -->

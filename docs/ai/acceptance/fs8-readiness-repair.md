@@ -29,7 +29,7 @@ started or replaced. Historical terminal statuses remain unchanged.
 | WEB-A1 | Resolve actual checkout, audit current website against existing approved references, record gaps, fresh local/browser gates and committed successor evidence | Complete; see final acceptance |
 | PBR-RT1 | Validate asserted defect against actual captured pixels and bounded phone observations | Complete: archived missing-text assertion disproved; no speculative native fix |
 | PBR-EV1 | Recover original captures and resolve their alleged pixel contradiction | Complete: original declared regions are identical and populated; erroneous descriptions superseded |
-| Final readiness | Run original readiness.js unchanged, retain exact JSON and reconcile current planning | Pending |
+| Final readiness | Run original readiness.js unchanged, retain exact JSON and reconcile current planning | FRESH PASS: ready=true, 0 blockers, 4 verified supersessions |
 
 No validation rule is relaxed. A historical STOP/FAIL is not overwritten with
 PASS. Physical results on installed update prefix 01a16304 do not certify the
@@ -94,3 +94,25 @@ All phase logs/artifacts remain ignored and local. Final mandatory readiness
 receipt follows the committed acceptance; no release action is performed.
 
 Final readiness JSON will be recorded after the digest-pinned resolutions are published.
+
+## Mandatory readiness receipt (2026-10-24)
+
+**FRESH PASS: exit 0, ready=true, blockers=[]** at committed acceptance
+05017922c21f1cad2b83ca571b611b7ac54fab96. Fourteen scoped items: ten PASS and four
+VERIFIED_SUPERSESSION (PBR-RT1, PBR-EV1, PBR-UX1, WEB-A1). The existing
+readiness.js implementation is unchanged. The manifest pins implementation,
+completion/acceptance commits, original terminal records, passing logs and raw
+evidence digests. Historical statuses are not overwritten or silently ignored.
+
+The final documentation receipt is committed separately and the literal
+mandatory CLI is rerun on that final HEAD; its complete JSON is
+`tmp/overnight/FS8-REPAIR/readiness-final.json`. Ordinary release gates and
+post-rollout physical checks remain required. This work performs no release.
+
+Final diff hygiene: both working-tree and staged checks PASS after correction.
+The first closure check found one added blank line at the handoff EOF; the
+PowerShell command sequence continued to a documentation commit. That whitespace
+was corrected in this receipt, then both checks were rerun and recorded as
+separate passing gates. The initial failure is retained here rather than
+counted as a pass. Unrelated owner files and original acceptance/status records
+remain preserved. No application tests/builds are repeated for this receipt.
