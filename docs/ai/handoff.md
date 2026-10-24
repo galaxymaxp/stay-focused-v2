@@ -11085,3 +11085,27 @@ FRESH final custody: **2,135/2,135 PASS**, zero failures; eight prerequisite
 statuses, original UX1 FAILED, 23 owner artifacts and full prior planning/handoff
 text retained. Code index matched all 11 tested files with CRLF/LF normalization
 only. LF-to-CRLF Git warnings are recorded; both diff checks have no errors.
+
+
+## FS8 direct readiness repair: acceptance complete (2026-10-24)
+
+All four original blockers now have completed supersession evidence prepared.
+PBR-UX1 uses unchanged UX1b repair/acceptance and eleven pinned historical gates.
+WEB-A1 uses the confirmed runner checkout, completed source/roadmap gap audit,
+one bounded contrast correction and fresh verification. RT1/EV1's asserted
+captured-text failure is disproved by the original PNG bytes: four regions are
+identical and visibly populated in both archived frames. Their old reports and
+terminal records are preserved; this corrects evidence, not a claimed native fix.
+
+Fresh web 583/77 files, verifier 5/5, forced typecheck/lint/build 8/8 each with
+0 cached; API/web builds and offline Android export PASS. Responsive fixture
+144 cases, menus 4, keyboard 6, action checks 57 and contrast 14/14 PASS. Nine
+phone cycles fully sampled, one interrupted; owner reported text stays visible.
+No candidate/live/full-OTA acceptance or ten-of-ten phone PASS claim.
+
+[Repair and readiness receipt](acceptance/fs8-readiness-repair.md),
+[website audit](acceptance/web-a1b-website-audit.md),
+[original-pixel correction](acceptance/fs8-resume-evidence-correction.md).
+Final unchanged mandatory validator runs after committed evidence publication.
+No FULLSEND, push, deployment, migration, APK install or old-status rewrite.
+

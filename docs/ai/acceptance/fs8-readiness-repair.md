@@ -26,9 +26,9 @@ started or replaced. Historical terminal statuses remain unchanged.
 | Item | Required work | Result |
 | --- | --- | --- |
 | PBR-UX1 | Verify UX1b ancestry, unchanged repair, committed acceptance and original passing gates; add digest-pinned resolution | VERIFIED_SUPERSESSION by unchanged mandatory validator; 11 passing historical gates, no claim they are fresh |
-| WEB-A1 | Resolve actual checkout, audit current website against existing approved references, record gaps, fresh local/browser gates and committed successor evidence | In progress |
-| PBR-RT1 | Observe current installed phone, bounded resume checks, retain pixels/tree separately; fix only a substantiated defect | In progress; cannot infer tested FS8 candidate from installed older OTA |
-| PBR-EV1 | Preserve archive contradiction and inspect fresh ordered observations; distinguish archive reconciliation from fresh results | In progress; original chronology cannot be reconstructed from filenames |
+| WEB-A1 | Resolve actual checkout, audit current website against existing approved references, record gaps, fresh local/browser gates and committed successor evidence | Complete; see final acceptance |
+| PBR-RT1 | Validate asserted defect against actual captured pixels and bounded phone observations | Complete: archived missing-text assertion disproved; no speculative native fix |
+| PBR-EV1 | Recover original captures and resolve their alleged pixel contradiction | Complete: original declared regions are identical and populated; erroneous descriptions superseded |
 | Final readiness | Run original readiness.js unchanged, retain exact JSON and reconcile current planning | Pending |
 
 No validation rule is relaxed. A historical STOP/FAIL is not overwritten with
@@ -47,3 +47,50 @@ styles; the gate index was normalized, digests refreshed, and the original
 validator then verified supersession. Neither original logs nor old status
 files were changed. The PowerShell-produced gate-index BOM was removed before
 JSON parsing. These preparation failures are retained, not counted as passes.
+
+## Final fresh local verification
+
+**PASS for this finite local audit/evidence correction.** Full web suite after
+CSS correction: **583 passed / 0 failed / 0 skipped, 77 files**. The initial
+pre-CSS full web run also passed 583/77 and is retained separately. Root forced
+typecheck/lint/serial build each complete 8/8 tasks, 0 cached; six existing lint
+warnings, zero errors. API build 37/37 static pages, website 23/23 and Android
+offline JS/assets export PASS. This is not an APK build or device installation.
+Post-build generated Next declarations were inspected and restored to tracked
+baseline, then final typecheck and lint ran again successfully.
+
+Current-body fixture checks: 144 responsive/theme/text/motion cases, four smooth
+transition traces, twelve touch/cancel cases, four menu flows and six keyboard
+navigations PASS; 57/57 action checks and 3/3 offline guard probes PASS; no
+browser exception/outbound request. Those fixture runs preceded only the
+CSS-token contrast correction; owning component bodies/layout are unchanged.
+Post-correction base text/control token contrast **14/14 PASS**, light muted
+canvas 4.769:1 (previously 4.498:1). This is sampled/token accessibility evidence,
+not a complete WCAG or real screen-reader certification.
+
+Evidence verifier **5/5 tests PASS** including lost/empty/mismatched captures.
+Original archived pair **4/4 byte-identical populated regions PASS**; current
+Generation **28/28** and Today **2/2** declared sampled regions PASS. Nine resume
+cycles have full early/late samples; one was interrupted. No continuous display,
+full OTA identity or candidate post-rollout physical acceptance is inferred.
+
+| Exact command | Fresh result / evidence |
+| --- | --- |
+| `npm run typecheck -- --force` | exit 0; 35.964 s; `tmp/overnight/FS8-REPAIR/typecheck-1792820483683.log` |
+| `npm run lint -- --force` | exit 0; 62.046 s; `tmp/overnight/FS8-REPAIR/lint-1792820519710.log` |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1` | exit 0; 308.553 s; `tmp/overnight/FS8-REPAIR/web-serial-1792820065128.log` |
+| `npm run build --workspace @stay-focused/api` | exit 0; 101.017 s; `tmp/overnight/FS8-REPAIR/api-build-1792819850226.log` |
+| `npm run build --workspace @stay-focused/mobile -- --platform android` | exit 0; 117.45 s; `tmp/overnight/FS8-REPAIR/android-build-1792819951309.log` |
+| `npm run build --workspace @stay-focused/web` | exit 0; 62.766 s; `tmp/overnight/FS8-REPAIR/web-build-1792820068819.log` |
+| `npm run build -- --force --concurrency=1 --env-mode=loose` | exit 0; 334.974 s; `tmp/overnight/FS8-REPAIR/root-build-1792820131637.log` |
+| `node --test scripts/verify-resume-text-captures.test.mjs` | exit 0; 0.513 s; `tmp/overnight/FS8-REPAIR/evidence-tests-1792820329441.log` |
+| `node tmp/overnight/FS8-REPAIR/phone-evidence.cjs` | exit 0; 1.151 s; `tmp/overnight/FS8-REPAIR/phone-pixels-1792820355164.log` |
+| `node tmp/overnight/FS8-REPAIR/contrast.cjs` | exit 0; 0.105 s; `tmp/overnight/FS8-REPAIR/contrast-1792820356373.log` |
+| `node tmp/overnight/FS8-REPAIR/archive-proof.cjs` | exit 0; 0.356 s; `tmp/overnight/FS8-REPAIR/archive-pixels-1792820421087.log` |
+
+Both final diff checks are required at the scoped commit boundary. Exact
+implementation identities: web contrast d30afbb3; pixel verifier 5adcafc8.
+All phase logs/artifacts remain ignored and local. Final mandatory readiness
+receipt follows the committed acceptance; no release action is performed.
+
+Final readiness JSON will be recorded after the digest-pinned resolutions are published.
