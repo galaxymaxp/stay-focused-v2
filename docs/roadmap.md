@@ -1,3 +1,31 @@
+<!-- WEB-A2 completion begin -->
+## WEB-A2 website browser verification: LOCAL PASS (2026-10-25)
+
+Owner-directed run after FULLSEND 20261025-0127 (FS11). The authenticated
+website was driven end to end in Chromium against localhost fictional
+Auth/Storage/API fixtures (`scripts/web-browser-check.mjs`): sign-in, session
+reload, protected routes, tasks/schedule, Generate/Canvas, Queue, Reviewer,
+Study Assist, Quiz, grades, Settings and Today Plan with; 11 screens in light
+and dark at 390, 768 and 1440 px with no horizontal overflow; Reduced Motion,
+skip link and clock slider keyboard steps; zero browser exceptions and zero
+production/provider requests. Eight harness steps that encoded superseded UI
+and three fixture contract drifts were brought up to the current intended
+behaviour, each traced to its source change; tablet and Plan with checks added.
+
+Reproducible defects for WEB-A3: **D1** a saved activity draft shows its
+pre-save text after reload (`DraftEditor` ignores the fresher revision);
+**D2** corrupted `?` for an ellipsis or middle dot in five website strings
+(plus one mobile string, noted).
+
+FRESH gates: forced typecheck/lint/serial root build 8/8 each, 0 cached; web
+648/648 (82 files, serial); API, web (23/23) and offline Android export PASS;
+7 existing lint warnings. Test tooling only, no application change.
+[Acceptance and defects](acceptance/web-a2-browser-verification.md).
+WEB-A1 STOPPED preserved (wrong controller path); its audit scope is WEB-A1b.
+Rollout/Device checks NOT RUN; real browsers, screen readers and production
+state UNVERIFIED (owner to confirm). Next: WEB-A3 repairs D1 and D2.
+<!-- WEB-A2 completion end -->
+
 <!-- TP1 completion begin -->
 ## TP1 planning content: LOCAL PASS (2026-10-25)
 

@@ -11339,3 +11339,33 @@ TP1b final status-validator attempt: the first read-only check rejected the
 existing UTF-8 BOM before FAILED in historical TP1.status. Corrected the reader
 to ignore the BOM in memory; the original file is untouched. This was a helper
 assertion failure, not an application or diff-gate failure.
+
+
+## Handoff — WEB-A2 website browser verification (2026-10-25)
+
+Status: **PASS** (local verification; defects recorded for WEB-A3).
+Owner-directed from Claude Code after FS11 shipped; WEB-A1's STOPPED status
+(prompt named the controller folder as the repository) is preserved and its
+audit scope is the committed WEB-A1b report.
+
+What changed: `scripts/web-browser-check.mjs` and
+`scripts/fixtures/web-api-fixture.mjs` updated to current intended website
+behaviour (saved-first retry, automatic visuals, Reviewer actions export,
+freshness label, Past courses, clock sliders, generation redirect, direct
+upload-to-Reviewer) and API contracts (Today capabilities, job detail,
+upload accept); tablet 768 px and Today Plan with checks added.
+
+Defects: D1 saved activity draft shows pre-save text after reload
+(`apps/web/src/features/library.tsx` DraftEditor); D2 corrupted `?` in five
+website strings (`own-material.tsx` 90/96/103/114, `reviewer/topic-assist.tsx`
+83) and mobile `ReviewerGenerateScreen.tsx` 145.
+
+Gate counts (FRESH): typecheck/lint/root build 8/8, 0 cached; web 648/648
+serial; API/web/Android export PASS; 7 existing lint warnings. Harness:
+default fails only at D1 by design; probe past D1 and generation mode PASS;
+task-sync PASS. One unintended parallel web run (644/4, load timeouts) is
+recorded in the acceptance report.
+
+UNVERIFIED: real browsers other than Chromium, real phone browsers, screen
+readers, production website state.
+Owner steps remaining: Rollout and Device checks skipped; WEB-A3 next.
