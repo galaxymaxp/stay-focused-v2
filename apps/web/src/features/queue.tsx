@@ -3,6 +3,8 @@ import { useJobRead } from "./queue-items";
 import {
   isProcessingJobRetryDenied,
   processingJobStoppedMessage,
+  queueFailureReason,
+  queueFailureTitle,
 } from "@stay-focused/shared";
 import type {
   GenerationView,
@@ -61,10 +63,12 @@ export function QueueCard({
   job,
   onRefresh,
   onOpen,
+  failureCount = 1,
 }: {
   job: ProcessingJobStatusView;
   onRefresh: () => void;
   onOpen: () => void;
+  failureCount?: number;
 }) {
   const { api, session } = useAuth(),
     router = useRouter(),
@@ -74,6 +78,8 @@ export function QueueCard({
   const canRetry =
     job.retryable && ["failed", "expired"].includes(job.status) && !retryDenied;
   const title = job.source.displayName || type;
+  const failed = job.status === 'failed' || job.status === 'expired';
+  const displayTitle = queueFailureTitle(title);
   const stalled = stalledInQueue({
     status: job.status,
     since: job.updatedAt ?? job.createdAt,
@@ -119,7 +125,7 @@ export function QueueCard({
     });
   }
   return (
-    <div className="queue-card">
+    <div className={`queue-card${failed ? ' queue-failure-card' : ''}`}>
       <button
         className="queue-open"
         disabled={action.busy}
@@ -141,10 +147,13 @@ export function QueueCard({
                   : "reviewer"
           }
         />
-        <span className="grow">
+        <span className="grow queue-card-copy">
           <span className="meta">{type}</span>
-          <strong>{title}</strong>
-          <span className={`meta queue-status ${tone}`}>{status}</span>
+          {failed ? <strong className="queue-failure-title" title={title} aria-label={title}>
+            <span>{displayTitle.start}</span>{displayTitle.end ? <span>{displayTitle.end}</span> : null}
+          </strong> : <strong>{title}</strong>}
+          <span className={`meta queue-status ${tone}`}>{failed ? `Couldn't finish · ${queueFailureReason(job.jobType, job.stage)}` : status}</span>
+          {failed && failureCount > 1 ? <span className="meta">Failed {failureCount} times</span> : null}
           {job.status === "running" || job.status === "queued" ? (
             <span className="meta">{queueProgress(job)}</span>
           ) : null}
@@ -152,7 +161,7 @@ export function QueueCard({
             <span className="meta">Open</span>
           ) : null}
         </span>
-        <span className={`queue-state ${tone}`} aria-hidden="true" />
+        {!failed ? <span className={`queue-state ${tone}`} aria-hidden="true" /> : null}
       </button>
       {(stalled || canRetry) && (
         <div className="row queue-card-actions">
@@ -174,7 +183,7 @@ export function QueueCard({
           )}
           {canRetry && (
             <button
-              className="button subtle retry-button"
+              className={`button retry-button${failed ? ' queue-retry-pill' : ' subtle'}`}
               disabled={!generationEnabled || action.busy}
               onClick={() =>
                 void action.run(async () => {
@@ -202,12 +211,9 @@ export function QueueCard({
           )}
         </div>
       )}
-      {job.status === "failed" ? (
-        <p className="meta">
-          {processingJobStoppedMessage(job.stage)}
-          {canRetry ? ". Your material is safe." : ""}
-        </p>
-      ) : null}
+      {failed ? <button className="queue-failure-circle" disabled={action.busy} onClick={open} aria-label={`View generation: ${title}`}>
+        <span className={`queue-state ${tone}`} aria-hidden="true" />
+      </button> : null}
       {action.message && <Notice error>{action.message}</Notice>}
     </div>
   );

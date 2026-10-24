@@ -28,6 +28,7 @@ import {palettes} from ${imports("src/design/themeTokens.ts")};
 const useTheme=()=>({colors:palettes.light,mode:'light',reducedMotion:true}),motion={spring:{}},haptic={tap(){}};
 ${functions("src/design/primitives.tsx", ["Copy", "usePressMotion", "Action"])}
 const queueIsIdle=()=>false,CourseBatchQueue=()=>null,QueueCard=()=>null;
+const queueFailureCards=jobs=>jobs.map(job=>({job,failureCount:0}));
 const useQueueItems=()=>({data:{},loading:false});window.hiddenIDs=[];
 const useQueueGroups=()=>({sections:[{key:'completed',title:'Completed',jobs:[{id:'synthetic-output'}]}],visiblePending:[],hide:(...args)=>window.hiddenIDs.push(args),jobs:[]});
 ${functions("src/features/queue/QueueContents.tsx", ["QueueContents"])}

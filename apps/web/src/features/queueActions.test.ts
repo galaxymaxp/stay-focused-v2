@@ -49,6 +49,24 @@ async function render(j = job()) {
   return rendered!.root;
 }
 describe("web Queue actions", () => {
+  it('keeps the reason and full-labelled middle-truncated title inside one card with a secondary retry button', async () => {
+    const title = 'Synthetic material '.repeat(12) + '.pdf';
+    const root = await render(job({ status: 'failed', retryable: true, jobType: 'quiz_generation', source: { ...job().source, displayName: title } }));
+    const card = root.findByProps({ className: 'queue-card queue-failure-card' });
+    const reason = card.findAllByType('span').find(node => node.props.children === "Couldn't finish · Stopped while building questions. Your material is safe.");
+    expect(reason).toBeDefined();
+    expect(card.findByProps({ title }).props['aria-label']).toBe(title);
+    const retry = card.findAllByType('button').find(node => node.props.children === 'Try again')!;
+    expect(retry.props.className).toContain('queue-retry-pill');
+    expect(root.findAllByType('p')).toHaveLength(0);
+  });
+  it('renders the count and exact unknown-stage fallback, including expired jobs', async () => {
+    await act(async () => { rendered = create(createElement(QueueCard, {job: job({status:'expired', stage:'future' as never}), failureCount:3, onRefresh:refresh, onOpen:close})); });
+    const output = JSON.stringify(rendered!.toJSON());
+    expect(output).toContain("Couldn't finish · Stopped before finishing. Your material is safe.");
+    expect(output).toContain('Failed');
+    expect(output).toContain('times');
+  });
   it.each(['processing_job_not_retryable', 'quiz_source_capacity_exceeded'])('removes Try again after %s', async code => {
     mocks.api.mockRejectedValueOnce(Object.assign(new Error('Safe rejection.'), { code }));
     const root = await render(job({ status: 'failed', retryable: true, stage: 'generating_sections' }));

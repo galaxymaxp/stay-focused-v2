@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
   key: vi.fn(() => "stable-retry-key"),
 }));
 vi.mock("expo-router", () => ({ router: { push: mocks.push } }));
-vi.mock("react-native", () => ({ View: "View" }));
+vi.mock("react-native", () => ({ View: "View", Pressable: "Pressable" }));
 vi.mock("lucide-react-native", () => ({
   CheckCircle2: "Icon",
   CircleDashed: "Icon",
@@ -118,6 +118,22 @@ async function render() {
   return rendered!.root;
 }
 describe("mobile Queue dropdown actions", () => {
+  it('renders only the latest failure per kind/material with count, quiz reason and pill retry', async () => {
+    const title='Very long synthetic source '.repeat(8)+'.pdf';
+    mocks.jobs=[job({id:'old',status:'failed',retryable:true,failedAt:'2026-10-23'}),job({id:'latest',status:'failed',retryable:true,origin:'automatic',failedAt:'2026-10-24'}),job({id:'quiz',jobType:'quiz_generation',status:'failed',retryable:true,source:{...job().source,displayName:title}})];
+    const root=await render();
+    expect(root.findAllByType('Surface' as never)).toHaveLength(2);
+    expect(copyText()).toContain('Failed 2 times');
+    expect(copyText()).toContain('Auto');
+    expect(copyText()).toContain("Couldn't finish · Stopped while building questions. Your material is safe.");
+    expect(root.findAllByType('RowLink' as never).some(node=>node.props.label.startsWith(`View generation: ${title}`))).toBe(true);
+    const retry=root.findAllByType('Action' as never).find(node=>node.props.children==='Try again')!;
+    expect(retry.props).toMatchObject({secondary:true,pill:true});
+    mocks.request.mockResolvedValueOnce({id:'accepted'});
+    await act(async()=>retry.props.onPress());
+    expect(mocks.request.mock.calls[0]![1]).toBe('/api/jobs/latest/retry');
+    expect(mocks.jobs).toHaveLength(3);
+  });
   it('uses a fresh key after an accepted retry even when the original card remains mounted', async () => {
     mocks.jobs = [job({ status: 'failed', retryable: true })];
     mocks.key.mockReturnValueOnce('attempt-one').mockReturnValueOnce('attempt-two');

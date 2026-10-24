@@ -1,5 +1,5 @@
 "use client";
-import { queueIsIdle } from '@stay-focused/shared';
+import { queueIsIdle, queueFailureCards } from '@stay-focused/shared';
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QueueCard } from "../features/queue";
@@ -170,11 +170,12 @@ export function QueueButton() {
                   </button>
                 ) : null}
               </div>
-              <div className="list-card">
-                {group.jobs.map((job) => (
+              <div className={group.key === 'attention' ? 'queue-failure-list' : 'list-card'}>
+                {queueFailureCards(group.jobs).map(({ job, failureCount }) => (
                   <QueueCard
                     key={job.id}
                     job={job}
+                    failureCount={failureCount}
                     onRefresh={queue.refresh}
                     onOpen={close}
                   />

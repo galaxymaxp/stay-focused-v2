@@ -3,9 +3,9 @@ import type {
   ProcessingJobStatusView,
 } from "@stay-focused/shared";
 import { router } from "expo-router";
-import { queueIsIdle, isProcessingJobRetryDenied, processingJobStoppedMessage } from "@stay-focused/shared";
+import { queueIsIdle, isProcessingJobRetryDenied, queueFailureCards, queueFailureReason, queueFailureTitle } from "@stay-focused/shared";
 import { useRef, useState } from "react";
-import { View } from "react-native";
+import { Pressable, View } from "react-native";
 import {
   CheckCircle2,
   CircleDashed,
@@ -27,7 +27,7 @@ import { experienceRequest, newRequestKey } from "../../services/experienceApi";
 import { stalledInQueue } from "../redesign/presentation";
 import { useExperienceClient } from "../redesign/useExperience";
 import { automaticQueueLabel } from "../redesign/automationPresentation";
-import { radius, spacing } from "../../design/tokens";
+import { hitTarget, radius, spacing } from "../../design/tokens";
 import { useQueueItems, useQueueGroups } from "./useQueueItems";
 import { queueProgress } from "./queuePresentation";
 import { CourseBatchQueue } from './CourseBatchQueue';
@@ -53,7 +53,7 @@ export function QueueContents() {
           <Copy size="h3">{item.title}</Copy><Copy muted size="caption">Not started</Copy>
         </RowLink>
       </Surface>) : null}
-      {group.jobs.map(job => <QueueCard key={job.id} job={job} onRefresh={queue.refresh}/>)}
+      {queueFailureCards(group.jobs).map(({job, failureCount}) => <QueueCard key={job.id} job={job} failureCount={failureCount} onRefresh={queue.refresh}/>)}
     </View>)}
     {queue.data && !queue.loading && !queue.error && !error && queueIsIdle({ jobs, pending: visiblePending, courseBatches: queue.data.courseBatches }) ? <Surface><Copy size="h3">Nothing generating right now.</Copy><Copy muted size="bodySmall">Reviewers and quizzes you generate appear here while they are made, then stay in Library.</Copy></Surface> : null}
   </View>;
@@ -61,9 +61,11 @@ export function QueueContents() {
 function QueueCard({
   job,
   onRefresh,
+  failureCount = 1,
 }: {
   job: ProcessingJobStatusView;
   onRefresh: () => void;
+  failureCount?: number;
 }) {
   const client = useExperienceClient();
   const { colors } = useTheme();
@@ -174,6 +176,37 @@ function QueueCard({
       setBusy(false);
     }
   }
+  if (job.status === 'failed' || job.status === 'expired') {
+    const title = job.source.displayName || type;
+    const displayTitle = queueFailureTitle(title);
+    return <Surface style={{ backgroundColor: colors.surfaceElevated, padding: spacing[2] }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing[2] }}>
+        <View style={{ flexGrow: 1, flexShrink: 1, flexBasis: 160, minWidth: 0 }}>
+          <RowLink disabled={busy} label={`View generation: ${title}. Couldn't finish · ${queueFailureReason(job.jobType, job.stage)}${failureCount > 1 ? ` Failed ${failureCount} times.` : ''}`} onPress={() => void open()} trailing={<></>}
+            icon={<ContentIcon kind={job.jobType === 'quiz_generation' ? 'quiz' : job.jobType === 'activity_generation' ? 'activity_output' : job.jobType === 'document_extraction' ? 'pdf' : 'reviewer'} />}>
+            <Copy muted size="caption">{type}</Copy>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-end', minWidth: 0 }}>
+              <Copy size="h3" numberOfLines={2} style={{ flexShrink: 1, minWidth: 0 }}>{displayTitle.start}</Copy>
+              {displayTitle.end ? <Copy size="h3" numberOfLines={1} style={{ flexShrink: 0 }}>{displayTitle.end}</Copy> : null}
+            </View>
+            <Copy muted size="caption">{`Couldn't finish · ${queueFailureReason(job.jobType, job.stage)}`}</Copy>
+            {failureCount > 1 ? <Copy muted size="caption">{`Failed ${failureCount} times`}</Copy> : null}
+            {automaticQueueLabel(job) ? <View style={{ alignSelf: 'flex-start', backgroundColor: colors.blueSoft, borderRadius: radius.pill, paddingHorizontal: spacing[2], paddingVertical: spacing[1] }}>
+              <Copy size="caption" color={colors.textPrimary}>{automaticQueueLabel(job)}</Copy>
+            </View> : null}
+          </RowLink>
+        </View>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', marginLeft: 'auto', gap: spacing[1], maxWidth: '100%' }}>
+          {job.retryable && !retryDenied ? <Action secondary pill disabled={busy} style={{ minWidth: hitTarget.min, flexShrink: 1, borderWidth: 1, borderColor: colors.separator, borderRadius: radius.pill }} onPress={() => void retry()}>Try again</Action> : null}
+          <Pressable accessibilityRole="button" accessibilityLabel={`View generation: ${title}`} disabled={busy}
+            onPress={() => void open()} style={{ minWidth: hitTarget.min, minHeight: hitTarget.min, alignItems: 'center', justifyContent: 'center' }}>
+            <AlertCircle size={19} color={colors.warning} />
+          </Pressable>
+        </View>
+      </View>
+      {error ? <Notice>{error}</Notice> : null}
+    </Surface>;
+  }
   return (
     <Surface>
       <RowLink
@@ -237,9 +270,7 @@ function QueueCard({
               : "Completed"
             : job.status === "running"
               ? "Generating"
-              : job.status === "failed" || job.status === "expired"
-                ? "Couldn’t finish"
-                : job.status === "cancellation_requested"
+              : job.status === "cancellation_requested"
                   ? "Stopping"
                   : job.status === "queued"
                     ? stalled
@@ -251,12 +282,6 @@ function QueueCard({
       {stalled && (
         <Action secondary disabled={busy} onPress={() => void cancel()}>
           Cancel
-        </Action>
-      )}
-      {job.status === "failed" ? <Copy muted size="caption">{processingJobStoppedMessage(job.stage)}{job.retryable && !retryDenied ? ". Your material is safe." : ""}</Copy> : null}
-      {job.retryable && !retryDenied && ["failed", "expired"].includes(job.status) && (
-        <Action secondary disabled={busy} onPress={() => void retry()}>
-          Try again
         </Action>
       )}
       {error && <Notice>{error}</Notice>}

@@ -268,5 +268,6 @@ export * from './clock-glyphs';
 
 export * from './orb-appearance';
 export * from './orb-load';
+export * from './queue-failures';
 
 export { ORB_AMBIENT_PROFILES, type OrbVariant } from './orb-ambient';
