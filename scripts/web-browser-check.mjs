@@ -223,12 +223,16 @@ try {
     }),
   );
   await page.reload();
-  await page.getByRole("alert").waitFor();
+  // Saved-first screens keep the owner's saved Today and offer retry in place.
+  const retry = page.getByRole("button", { name: /^Couldn't refresh · Retry/ });
+  await retry.waitFor();
   assert(
     !(await page.locator("body").innerText()).includes("PRIVATE_DIAGNOSTIC"),
   );
+  await page.getByRole("heading", { name: "Up Next", exact: true }).waitFor();
   await page.unroute("**/api/today?**");
-  await page.getByRole("button", { name: "Try again", exact: true }).click();
+  await retry.click();
+  await retry.waitFor({ state: "detached" });
   await page.getByRole("heading", { name: "Up Next", exact: true }).waitFor();
   await page.goto(`${origin}/tasks`);
   await page.getByRole("button", { name: "Add task", exact: true }).click();
@@ -351,9 +355,8 @@ try {
       .waitFor();
     await captureExperience("generation-progress");
     domain.finishAdmitted();
-    await page
-      .getByRole("link", { name: "Open saved output", exact: true })
-      .waitFor();
+    // A finished generation opens its saved output in the Library.
+    await page.waitForURL(`**/library/artifact%3A${ids.reviewer}`, { timeout: 15000 });
     await page.goto(
       `${origin}/generate/${ids.course}/${encodeURIComponent(ids.material)}`,
     );
@@ -370,9 +373,7 @@ try {
       .click();
     await page.waitForURL("**/generation/**");
     domain.finishAdmitted();
-    await page
-      .getByRole("link", { name: "Open saved output", exact: true })
-      .waitFor();
+    await page.waitForURL(`**/library/quiz%3A${ids.quiz}`, { timeout: 15000 });
     console.log(
       "PASS fixture-only Reviewer retry identity and Quiz admission settings",
     );
@@ -400,11 +401,17 @@ try {
     beforeRead,
     "Reopening a Reviewer submitted generation",
   );
-  await page.getByRole("button", { name: "Find a visual", exact: true }).click();
-  await page.getByText("No reliable visual found", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Find another", exact: true }).click();
-  await page.getByRole("button", { name: "Find another", exact: true }).waitFor({ state: "hidden" });
-  console.log("PASS explicit external visual no-result and two-attempt limit");
+  // Section visuals load automatically from the reader's figures request; no result stays quiet.
+  const visualRequest = page.waitForRequest((request) =>
+    new URL(request.url()).pathname === `/api/reviewers/${ids.reviewer}/figures`,
+  );
+  await page.reload();
+  await visualRequest;
+  await page.waitForLoadState("networkidle");
+  assert.equal(await page.getByText("No reliable visual found", { exact: true }).count(), 0);
+  assert.equal(await page.getByRole("button", { name: "Show a different one", exact: true }).count(), 0);
+  assert.equal(domain.counts.generationCalls, beforeRead, "Automatic visual lookup submitted generation");
+  console.log("PASS automatic external visual request with quiet no-result");
   await page
     .getByLabel("Search topics, terms, definitions", { exact: true })
     .fill("nonexistent topic");
@@ -412,9 +419,12 @@ try {
   await page
     .getByLabel("Search topics, terms, definitions", { exact: true })
     .fill("");
-  const downloaded = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Save to file", exact: true }).click();
-  await downloaded;
+  for (const [item, extension] of [["Text (.txt)", ".txt"], ["Export PDF", ".pdf"]]) {
+    const downloaded = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Reviewer actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: item, exact: true }).click();
+    assert((await downloaded).suggestedFilename().endsWith(extension), `${item} saved the wrong file type`);
+  }
   // Study Assist: a whole-concept quick assist, then Smart Selection on chosen words.
   await page
     .getByText("Choose a time to study, then review your understanding.", { exact: true })
@@ -510,18 +520,16 @@ try {
       .waitFor();
     await page.goto(`${origin}/generate/new`);
     await page.getByRole("button", { name: "Upload a file", exact: true }).click();
-    await page.getByLabel("Choose a PDF or photo", { exact: true }).setInputFiles({
+    const uploadsBefore = domain.counts.generationCalls;
+    await page.getByLabel("Choose a PDF, photo, DOCX or PPTX", { exact: true }).setInputFiles({
       name: "notes.pdf",
       mimeType: "application/pdf",
       buffer: Buffer.from("%PDF-1.4 fictional"),
     });
-    await page.getByRole("button", { name: "Read this file", exact: true }).click();
-    const read = page.getByLabel("Check the text we read", { exact: true });
-    await read.waitFor();
-    assert((await read.inputValue()).includes("Fictional text read from your file."));
-    await page.getByRole("button", { name: "Create Reviewer", exact: true }).click();
+    // Picking a file uploads it and creates the Reviewer directly.
     await page.waitForURL("**/generation/**");
-    assert(domain.counts.sourceWrites >= 2, "Sources were not saved before generation");
+    assert.equal(domain.counts.generationCalls, uploadsBefore + 1, "The upload was not accepted once");
+    assert(domain.counts.sourceWrites >= 1, "Pasted notes were not saved before generation");
     console.log("PASS own material: pasted text and an uploaded file into Reviewer generation");
   }
   await page.goto(`${origin}/quiz/${ids.quiz}`);
@@ -673,8 +681,12 @@ try {
   // Opening (or reloading) Generate asks Canvas for the latest, once per load.
   const canvasWritesBeforeRefresh = domain.counts.canvasWrites;
   await page.goto(`${origin}/generate`);
-  await page.getByText("Up to date with Canvas", { exact: true }).waitFor({ timeout: 20000 });
+  // Saved courses show their freshness label; without a snapshot it reads "Up to date".
+  await page.getByText(/^(Up to date with Canvas|Updated just now)$/).waitFor({ timeout: 20000 });
+  for (let i = 0; i < 40 && domain.counts.canvasWrites === canvasWritesBeforeRefresh; i++)
+    await page.waitForTimeout(500);
   assert(domain.counts.canvasWrites > canvasWritesBeforeRefresh, "Generate did not refresh Canvas on load");
+  await page.waitForLoadState("networkidle");
   const canvasWritesAfterRefresh = domain.counts.canvasWrites;
   await page.getByRole("link", { name: /Study foundations/ }).click();
   await page.getByRole("heading", { name: "Study foundations", exact: true }).waitFor();
@@ -682,8 +694,11 @@ try {
   await page.goto(`${origin}/generate`);
   await page.getByRole("heading", { name: "Current courses", exact: true }).waitFor();
   assert.equal(await page.getByRole("link", { name: /Elective archive/ }).count(), 0, "An unsynced course opened like a synced one");
-  await page.getByRole("button", { name: /Not synced · 1 course/ }).click();
-  await page.getByRole("button", { name: "Sync Elective archive", exact: true }).waitFor();
+  // The previous-term unsynced course is grouped under Past courses; tapping it syncs.
+  await page.getByRole("button", { name: "Past courses (1)", exact: true }).click();
+  const archive = page.getByRole("link", { name: /Elective archive/ });
+  await archive.getByText("Not synced · Tap to sync", { exact: true }).waitFor();
+  assert.equal(await archive.getAttribute("href"), "/canvas", "An unsynced course opened like a synced one");
   console.log("PASS Generate refreshes Canvas once per page load");
   const screens = [
     ["today", "Up Next"],
@@ -709,6 +724,7 @@ try {
       .click();
     for (const [name, width, height] of [
       ["mobile", 390, 844],
+      ["tablet", 768, 1024],
       ["desktop", 1440, 1000],
     ]) {
       await page.setViewportSize({ width, height });
@@ -743,12 +759,15 @@ try {
   );
   await page.keyboard.press("Enter");
   assert.equal(await page.evaluate(() => document.activeElement?.id), "main");
-  await page.getByText("Adjust available time", { exact: true }).click();
-  const available = page.getByLabel("Available from", { exact: true });
-  const before = Number(await available.inputValue());
+  // The clock's keyboard alternative: each handle is an ARIA slider in 15-minute steps.
+  const available = page.getByRole("slider", { name: "Free time starts", exact: true });
+  const before = Number(await available.getAttribute("aria-valuenow"));
   await available.focus();
   await page.keyboard.press("ArrowRight");
-  assert.equal(Number(await available.inputValue()), before + 15);
+  await page.waitForFunction(
+    (expected) => Number(document.querySelector('[role="slider"][aria-label="Free time starts"]')?.getAttribute("aria-valuenow")) === expected,
+    (before + 15) % 1440,
+  );
   await page.setViewportSize({ width: 720, height: 1000 });
   assert(
     await page.evaluate(
@@ -759,6 +778,28 @@ try {
   console.log(
     "PASS keyboard skip navigation, available-time alternative and 720px reflow",
   );
+  // Today "Plan with": three labelled choices, default both, synced per owner.
+  const planWith = async () => {
+    await page.getByRole("button", { name: "Clock options", exact: true }).click();
+    const menu = page.getByRole("dialog", { name: "Clock options" });
+    await menu.getByRole("group", { name: "Plan with" }).waitFor();
+    return menu;
+  };
+  let menu = await planWith();
+  for (const label of ["Reviewers", "Tasks", "Reviewers & tasks"])
+    await menu.getByRole("radio", { name: label, exact: true }).waitFor();
+  assert(await menu.getByRole("radio", { name: "Reviewers & tasks", exact: true }).isChecked(), "Plan with did not default to both");
+  const planWritesBefore = domain.counts.planModeWrites;
+  await menu.getByRole("radio", { name: "Tasks", exact: true }).check();
+  for (let i = 0; i < 40 && domain.counts.planModeWrites === planWritesBefore; i++)
+    await page.waitForTimeout(250);
+  assert.equal(domain.counts.planModeWrites, planWritesBefore + 1, "Plan with choice was not synced");
+  await page.reload();
+  menu = await planWith();
+  assert(await menu.getByRole("radio", { name: "Tasks", exact: true }).isChecked(), "Plan with choice did not persist");
+  await menu.getByRole("radio", { name: "Reviewers & tasks", exact: true }).check();
+  await page.keyboard.press("Escape");
+  console.log("PASS Today Plan with menu: three modes, default both, synced and persisted");
   await page.goto(`${origin}/settings`);
   const automaticToggle = page.getByLabel("Create reviewers automatically", { exact: true });
   await automaticToggle.uncheck();
@@ -795,12 +836,12 @@ try {
   assert.equal(
     domain.counts.generationCalls,
     // Reviewer retry pair + material Quiz + custom-title Reviewer Quiz,
-    // own material (one file read and two Reviewers), then a task's Create Draft.
-    generationFixture ? 8 : 0,
+    // own material (pasted notes and an uploaded file), then a task's Create Draft.
+    generationFixture ? 7 : 0,
     "Unexpected generation admission",
   );
   console.log(
-    "PASS ten major screens in both themes at phone/desktop sizes, and sign-out protection",
+    "PASS ten major screens in both themes at phone/tablet/desktop sizes, and sign-out protection",
   );
   assert.equal(counts.paid, 0);
   assert.deepEqual(errors, []);
@@ -828,11 +869,12 @@ try {
       "final per-question breakdown and accepted answer text",
       "completion guard, confirmation, score/history/reopen",
       "Canvas connect/disconnect, token privacy and accepted sync",
-      "ten major screens, two themes, two viewport sizes",
+      "ten major screens, two themes, three viewport sizes",
+      "Today Plan with menu modes, default and persisted sync",
       "keyboard skip link, time adjustment and 720px reflow",
       "sign out and protected route denial",
       "light/dark",
-      "390/1440px responsive overflow",
+      "390/768/1440px responsive overflow",
       "zero browser exceptions",
       "zero production/provider requests",
     ],

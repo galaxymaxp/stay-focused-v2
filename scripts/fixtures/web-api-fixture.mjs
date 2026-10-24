@@ -11,6 +11,8 @@ export const ids = {
 export function createFixture() {
   let notificationPreferences = { email_enabled: true, announcement_email: true, new_assignment_email: true, due_date_change_email: true, deadline_7_day: true, deadline_3_day: true, deadline_due_today: true, reminder_time: "08:00", timezone: "Asia/Manila" };
   let autoReviewerEnabled = true;
+  // Never chosen plans both kinds, as in the API.
+  let planMode = "reviewers_tasks";
   const course = { id: ids.course, code: "TEST101", name: "Study foundations" };
   const capability = { status: "available" };
   const material = {
@@ -112,6 +114,7 @@ export function createFixture() {
       generationCalls: 0,
       assistCalls: 0,
       sourceWrites: 0,
+      planModeWrites: 0,
     };
   const now = () => new Date().toISOString();
   const quiz = () => ({
@@ -261,6 +264,10 @@ export function createFixture() {
       if (method === "PATCH") notificationPreferences = { ...notificationPreferences, ...body };
       send({ preferences: notificationPreferences }); return;
     }
+    if (path === "/api/profile/planner-preferences") {
+      if (method === "PATCH") { planMode = body.planMode; counts.planModeWrites++; }
+      send({ planMode }); return;
+    }
     if (path === "/api/auto-reviewer-preferences") {
       if (method === "PATCH") autoReviewerEnabled = body.enabled;
       send({ enabled: autoReviewerEnabled }); return;
@@ -296,13 +303,16 @@ export function createFixture() {
       return;
     }
     if (path.startsWith("/api/job-uploads/") && path.endsWith("/accept")) {
+      // Manual uploads become a Reviewer job directly, as the API accepts them.
+      if (!req.headers["idempotency-key"] || body.jobType !== "reviewer_generation")
+        return fail("invalid_request", 400);
       counts.generationCalls++;
       const id = crypto.randomUUID();
       admittedJobs.set(id, {
         ...job,
         id,
-        jobType: "document_extraction",
-        status: "succeeded",
+        jobType: "reviewer_generation",
+        status: "running",
         source: { displayName: "notes.pdf", sourceKind: "pdf", mimeType: "application/pdf" },
       });
       send(admittedJobs.get(id));
@@ -398,9 +408,12 @@ export function createFixture() {
       path.startsWith("/api/experience/generations/") &&
       admittedJobs.has(path.split("/").at(-1))
     ) {
-      const id = path.split("/").at(-1);
+      send(admittedGeneration(path.split("/").at(-1)));
+      return;
+    }
+    function admittedGeneration(id) {
       const done = admittedJobs.get(id).status === "succeeded";
-      send({
+      return {
         id,
         state: done ? "completed" : "generating",
         updatedAt: now(),
@@ -413,8 +426,7 @@ export function createFixture() {
               : `artifact:${ids.reviewer}`
           : null,
         error: null,
-      });
-      return;
+      };
     }
     if (path === "/api/today") {
       const items = [...tasks.values()].map((t) => ({
@@ -440,6 +452,14 @@ export function createFixture() {
           status: "not_planned",
           lastPlannedAt: null,
           needsTaskImport: false,
+        },
+        // The API's Today screen carries capabilities; the clock is planner-gated.
+        capabilities: {
+          reviewerGeneration: capability,
+          quizGeneration: capability,
+          activityMaker: capability,
+          planner: capability,
+          calendar: capability,
         },
       });
       return;
@@ -874,7 +894,13 @@ export function createFixture() {
       return;
     }
     if (path === "/api/jobs") {
-      send({ jobs: [job], nextCursor: null });
+      // The Queue page carries one job's detail when asked, as the API does.
+      const detailId = url.searchParams.get("detailId");
+      const admitted = detailId && typeof admittedJobs.get(detailId) === "object";
+      const detail = admitted
+        ? { job: admittedJobs.get(detailId), generation: admittedGeneration(detailId) }
+        : detailId === ids.job ? { job, generation: completedGeneration() } : null;
+      send({ jobs: [job], nextCursor: null, ...(detailId ? { detailId, detail } : {}) });
       return;
     }
     if (path === `/api/jobs/${ids.job}`) {
@@ -882,15 +908,18 @@ export function createFixture() {
       return;
     }
     if (path === `/api/experience/generations/${ids.job}`) {
-      send({
+      send(completedGeneration());
+      return;
+    }
+    function completedGeneration() {
+      return {
         id: ids.job,
         state: "completed",
         updatedAt: now(),
         progress: { completed: 3, total: 3, unit: "sections" },
         artifactId: `artifact:${ids.reviewer}`,
         error: null,
-      });
-      return;
+      };
     }
     if (path === "/api/canvas/connection") {
       if (method === "DELETE") {
