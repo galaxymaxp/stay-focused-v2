@@ -11130,3 +11130,41 @@ was corrected in this receipt, then both checks were rerun and recorded as
 separate passing gates. The initial failure is retained here rather than
 counted as a pass. Unrelated owner files and original acceptance/status records
 remain preserved. No application tests/builds are repeated for this receipt.
+
+
+## QN1 Queue failure cards: LOCAL PASS (2026-10-24)
+
+Implementation 05102204, acceptance freeze 394d4fa6. Failed/expired entries
+now keep kind/title/reason/count and retry/circle controls inside an opaque card
+on web and mobile. Latest failure per proven kind/material identity is shown;
+history, Clear and retry semantics remain intact. Quiz and unknown-stage reasons
+are safe and kind-aware. Full labels and filename extensions survive truncation.
+
+FRESH full suites: **5474 passed / 0 failed / 3 existing API live skips**.
+Mobile 1666, web 617, shared 736, API 2455.
+Forced typecheck/lint/serial root build 8/8 each, 0 cached; standalone API/web
+builds and offline Android JS/assets export PASS. Six existing lint warnings.
+32 responsive theme/text cases plus initial/scrolled screenshots PASS; earlier
+fixture/collector failures and exact commands are retained in the acceptance.
+Both diff checks PASS; unrelated owner artifacts and historical docs preserved.
+
+[Acceptance and limits](acceptance/qn1-queue-failure-cards.md). Endpoint QN1 only; no LM1/TC2/TP1 or release started.
+Rollout/Device checks NOT RUN. Served FS10 revisions, authenticated/native/device
+and live production state UNVERIFIED (owner to confirm). Owner handles Realme
+reviewer+quiz Queue checks and the next separately authorized rollout.
+
+Commits: 394d4fa6 freeze; 05102204 implementation; final documentation
+commit follows in Git/QN1.status. Author galaxymaxp <omgraythekid@gmail.com>.
+No tmp staged or push. Failed first attempts are retained in the acceptance.
+
+**Owner steps remaining**:
+
+- Rollout and Device checks NOT RUN, skipped entirely. Realme failed reviewer
+  and quiz, native assistive technology/fontScale/targets and served FS10 revision
+  are UNVERIFIED (owner to confirm). Live database/Scheduler/provider state also
+  UNVERIFIED; no external service check was performed.
+- Next fullsend and other roadmap items remain separate owner work. No deploy,
+  service/provider call, remote SQL/migration, Scheduler/email/OTA/EAS, environment
+  file change, push, native build/install or physical device action.
+- Vercel CLI absent; recommend npm i -g vercel for future separately authorized
+  env/deploy/log tooling. Installation NOT RUN.

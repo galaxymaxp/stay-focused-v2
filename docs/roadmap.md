@@ -1,3 +1,26 @@
+<!-- QN1 completion begin -->
+## QN1 Queue failure cards: LOCAL PASS (2026-10-24)
+
+Implementation 05102204, acceptance freeze 394d4fa6. Failed/expired entries
+now keep kind/title/reason/count and retry/circle controls inside an opaque card
+on web and mobile. Latest failure per proven kind/material identity is shown;
+history, Clear and retry semantics remain intact. Quiz and unknown-stage reasons
+are safe and kind-aware. Full labels and filename extensions survive truncation.
+
+FRESH full suites: **5474 passed / 0 failed / 3 existing API live skips**.
+Mobile 1666, web 617, shared 736, API 2455.
+Forced typecheck/lint/serial root build 8/8 each, 0 cached; standalone API/web
+builds and offline Android JS/assets export PASS. Six existing lint warnings.
+32 responsive theme/text cases plus initial/scrolled screenshots PASS; earlier
+fixture/collector failures and exact commands are retained in the acceptance.
+Both diff checks PASS; unrelated owner artifacts and historical docs preserved.
+
+[Acceptance and limits](ai/acceptance/qn1-queue-failure-cards.md). Endpoint QN1 only; no LM1/TC2/TP1 or release started.
+Rollout/Device checks NOT RUN. Served FS10 revisions, authenticated/native/device
+and live production state UNVERIFIED (owner to confirm). Owner handles Realme
+reviewer+quiz Queue checks and the next separately authorized rollout.
+<!-- QN1 completion end -->
+
 <!-- FS8 direct repair begin -->
 ## FS8 direct readiness repair: readiness PASS (2026-10-24)
 
