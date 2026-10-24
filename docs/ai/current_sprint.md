@@ -1,3 +1,36 @@
+<!-- TP1 completion begin -->
+## TP1 planning content: LOCAL PASS (2026-10-25)
+
+TP1 is **LOCAL PASS**: the Today clock menu now chooses Reviewers, Tasks or
+Reviewers & tasks on web and mobile. The default is both, synced per owner with
+durable offline preference writes; API callers omitting mode retain tasks-only
+planning. Reviewer candidates follow the current-course/24-hour/order/estimate
+rules and the mixed 60% first task budget. Typed reviewer blocks persist,
+reopen their saved reviewer and never complete a task. Same-title task/reviewer
+identities stay separate. No new reviewer generation or automatic module scheduling.
+
+Implementation `3948a5fec54066f81acb9fccba3c92438e2cd13f` (tree `5184fb0d20be017a62b842afce5c2851431fbf1d`) completes
+the interrupted TP1 work frozen at 6c4de7e5. Original runner TP1 FAILED remains
+historical; no terminal status was rewritten. [Acceptance](acceptance/tp1-planning-content.md).
+
+FRESH final suites: **5,631 passed / 0 failed / 3 existing live skips**:
+shared 772/77 files, API 2508/218,
+mobile 1703/180, web 648/82.
+Forced typecheck/lint/serial root build each 8/8, 0 cached (7 warnings, 0 errors: six existing warnings and one unused parameter in the TP1 synthetic API fixture); direct API/web builds
+and offline Android JS/assets export PASS. Twenty viewport/theme/motion menu
+fixtures plus four empty-mode cases PASS (24), zero page errors/outbound calls.
+First failures and collector limitations are retained in the acceptance report.
+
+**Owner steps remaining:** apply the forward migration
+`20261024000100_today_plan_content.sql` with the next separately authorized
+release, then verify all three modes on the website and Realme. Rollout/Device
+checks NOT RUN; production/authenticated/native state remains UNVERIFIED.
+Offline-only or old-client reviewer reads do not populate server open history.
+Endpoint TP1 only. Hand back the committed evidence through the supervisor
+boundary for TP1b closure; no successor feature or release is started here.
+Unrelated owner paths and the historical OX2/OX1 hold remain.
+<!-- TP1 completion end -->
+
 <!-- TC2 completion begin -->
 ## TC2 quiet Today clock: LOCAL PASS (2026-10-24)
 
