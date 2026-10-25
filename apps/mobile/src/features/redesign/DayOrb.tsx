@@ -7,8 +7,9 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, AppState, View } from "react-native";
 import { OrbPoster } from '../generation-core/OrbPoster';
 import * as THREE from "three";
-import { configureOrbRenderer, createOrbStage } from '@stay-focused/shared/orb-scene';
+import { configureOrbRenderer, createOrbStage, DAY_ORB_FILL } from '@stay-focused/shared/orb-scene';
 import { createClockGlass } from '@stay-focused/shared/clock-glass-renderer';
+import { loadGlassAtlas } from './glassAtlas';
 import clockMetrics from '../../../assets/clock/clock-atlas.json';
 
 import { coreLevelsExtra, createCoreLevels, stepCoreLevels, type CoreLevels, type CoreState } from "../generation-core/coreModel";
@@ -20,7 +21,6 @@ import { dayOrbTones, type DayOrbTones } from "./dayClock";
 
 /** Share of the canvas the ball's diameter fills at this camera. */
 export { DAY_ORB_FILL } from '@stay-focused/shared/orb-scene';
-import { DAY_ORB_FILL } from '@stay-focused/shared/orb-scene';
 const SPIN_AXIS = new THREE.Vector3(0.18, 1, -0.12).normalize();
 /**
  * The Today orb moves slowly, so ~12 fps reads as smooth. Every frame costs
@@ -344,24 +344,4 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   };
 }
 
-async function loadClockAtlas(): Promise<THREE.Texture> {
-  const { Asset } = await import('expo-asset');
-  const { Platform } = await import('react-native');
-  const asset = Asset.fromModule(require('../../../assets/clock/clock-atlas.png'));
-  await asset.downloadAsync();
-  let texture: THREE.Texture;
-  if (Platform.OS === 'web') {
-    texture = await new THREE.TextureLoader().loadAsync(asset.uri);
-  } else {
-    if (!asset.localUri) throw new Error('clock_atlas_unavailable');
-    texture = new THREE.Texture();
-    // Expo GL's tex(Sub)Image2D explicitly accepts {localUri} in the pixels slot.
-    // This uses native PNG decoding, not runtime atlas generation or another GL view.
-    Object.assign(texture, { isDataTexture: true, unpackAlignment: 1,
-      image: { data: { localUri: asset.localUri }, width: clockMetrics.width, height: clockMetrics.height } });
-  }
-  texture.flipY = false; texture.generateMipmaps = false;
-  texture.minFilter = THREE.LinearFilter; texture.magFilter = THREE.LinearFilter;
-  texture.colorSpace = THREE.NoColorSpace; texture.needsUpdate = true;
-  return texture;
-}
+function loadClockAtlas() { return loadGlassAtlas(require('../../../assets/clock/clock-atlas.png'), clockMetrics); }

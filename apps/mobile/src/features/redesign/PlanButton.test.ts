@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { PlanButton } from './PlanButton';
+import { PlanButtonFallback as PlanButton } from './PlanButtonFallback';
 const mocks = vi.hoisted(() => ({ reduced: false, active: true, focused: true, timing: vi.fn(), loop: vi.fn(), stop: vi.fn(), start: vi.fn() }));
 vi.mock('expo-router/react-navigation', () => ({ useIsFocused: () => mocks.focused }));
 vi.mock('./clockFonts', () => ({ useClockFonts: () => true }));
