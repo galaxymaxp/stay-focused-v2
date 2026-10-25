@@ -1,3 +1,14 @@
+<!-- TP2 completion begin -->
+## TP2 Today Plan button and planning sheet: LOCAL PASS (2026-10-25)
+
+TP2 is complete locally: a fixed liquid-glass Plan action opens the planning sheet on web/mobile; All/Both/Smart defaults support the two-tap build. Owned selections support course/kind filtering, recent-reviewer opt-in, exact manual order across busy gaps, not-fit totals, device/date memory and latest-wins clock re-preview. UI mode sync/menu radios are removed; legacy mode/omission API behavior and persistence remain. Variable-width block marks are measured before rendering; existing 6px rings remain color-only.
+
+FRESH: shared 821/80 files; API 2517/218 files (3 existing live skips); mobile 1715/182 files; web 661/84 files. **5714 passed / 0 failed / 3 existing live skips**.
+Forced typecheck/lint/root serial build each 8/8, 0 cached; API/web builds and offline Android export PASS. Seven existing lint warnings; all first failures and safe rendering equivalents are recorded in the acceptance. Eight web planning browser tests and eight mobile layout cases pass.
+
+Implementation 4a04eda1; [TP2 acceptance](ai/acceptance/tp2-plan-button-sheet.md). No new migration, deployment, remote service/database action, env-file edit or push. Rollout/Device checks NOT RUN; production/native state UNVERIFIED. Owner handles the next separately authorized FULLSEND, including any pending TP1 migration. Endpoint TP2 only; no next backlog work is started.
+<!-- TP2 completion end -->
+
 <!-- WEB-A4 completion begin -->
 ## WEB-A4 website release readiness: LOCAL PASS (2026-10-25)
 

@@ -11405,3 +11405,32 @@ build 8/8 0 cached, web 651/651, API/web/Android export builds, harness PASS.
 
 UNVERIFIED: production website until the post-FULLSEND checklist is run.
 Owner steps remaining: press FULLSEND; then run the seven-item checklist.
+
+
+## TP2 Today Plan control and sheet: LOCAL PASS (2026-10-25)
+
+Status: **PASS** for TP2 local code, gates, docs and scoped commits. Owner roadmaps and unattended exclusions governed the run. Plan button/sheet parity, owned selections and recent-reviewer opt-in, manual/smart planning, chronological ordering across gaps, latest-wins active selection, mode-menu/sync cleanup and measured block marks are complete. The specialized time atlas required the documented layered-glass/font equivalent; ring lanes already contain no marks and remain color-only. No TP2 migration was needed.
+
+FRESH: shared 821/80 files; API 2517/218 files (3 existing live skips); mobile 1715/182 files; web 661/84 files. **5714 passed / 0 failed / 3 existing live skips**.
+FRESH forced typecheck/lint/root serial build each **8/8, 0 cached**; direct API/web builds and offline Android JS/assets export exit 0. Seven existing lint warnings. Working/staged diff checks PASS. Eight real web planning browser tests and eight native-layout cases PASS. First failures (type props, fixture timezone, guard/collector setup, Sheet default compatibility and announcement harness boundary) and their reruns are preserved in [acceptance](acceptance/tp2-plan-button-sheet.md); no assertion was weakened. Headless clock cadence: paused 83.3ms median; flowing 83.4ms median (24/24 warmed frames). Native/GPU frame rate remains UNVERIFIED.
+
+Commits (author galaxymaxp <omgraythekid@gmail.com>):
+
+```text
+630bb223 docs(today): freeze TP2 implementation acceptance
+705013b5 feat(planner): add owned selections and planning candidates
+ac428fed fix(planner): preserve selected work and chronological order
+4a04eda1 feat(today): add Plan sheet and size-aware block marks
+```
+
+Completion docs commit: "docs(today): close TP2 local planning verification" (exact hash in Git/TP2.status). Progress and terminal status: tmp/overnight/TP2.progress and TP2.status. Unrelated UI/, apps/mobile/.gitignore, supabase/.temp/ and all tmp/ paths are preserved and unstaged. No push.
+
+UNVERIFIED (owner to confirm): live served revision (prompt FS10 versus newer FS11 history), applied TP1 migration, production/database/Scheduler/provider state, authenticated/native visuals, physical frame rate, native drag/haptics and real assistive technology. Synthetic layout/semantic checks do not establish device acceptance.
+
+**Owner steps remaining**:
+
+- Rollout NOT RUN: release with the next separately authorized FULLSEND; include any pending forward TP1 migration packages/db/migrations/20261024000100_today_plan_content.sql. No deployment, remote SQL/migration, provider/service call, Scheduler/email, env-file edit, push, OTA/EAS/native build/install or device action occurred in this run.
+- Device checks NOT RUN: website and Realme button look/slosh, defaults/two-tap build, Select courses, each Include mode, over-budget warning, manual reorder/Reset, small blocks without partial marks, native accessibility and smoothness.
+- Vercel CLI is absent. Strongly recommend npm i -g vercel for future separately authorized env/deploy/log tooling; installation NOT RUN.
+
+Endpoint TP2 only. No other backlog item, release or FULLSEND started.
