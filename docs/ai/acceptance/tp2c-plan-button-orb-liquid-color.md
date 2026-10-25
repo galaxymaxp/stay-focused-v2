@@ -84,3 +84,37 @@ The local documentation commit is titled `docs(today): record TP2c baseline
 contradiction stop`; its exact hash is recorded in Git and
 `tmp/overnight/TP2c.status`. Endpoint is the unattended STOP, with no successor
 task or release started.
+
+## TP2d corrected rerun (2026-10-25)
+
+Status: IN PROGRESS. Initial HEAD adc8b3e3, expected branch
+`overnight/2026-10-15_feedback`, prerequisite 30687268 ancestry PASS (FRESH).
+TP2c's stop remains historical; the owner explicitly corrects the floor to
+`0.35 + 0.65` and authorizes replacing fixed-accent/slosh assertions.
+Untracked UI/, apps/mobile/.gitignore and supabase/.temp/ are preserved.
+
+STEP 0 inventory: both DayOrb implementations use createOrbBody, orb-scene,
+createOrbInteractionSampler/sampleOrbInteraction and orbIdleColor. Palette
+source is ORB_COLOR_KEY (`sf.orb.colorKey`), with pearl #E6EAF1 default;
+web local preferences and native sessionStore feed useOrbInteraction.
+OrbPreferencesSync on each platform applies per-user profile preferences
+through applySyncedOrbColor. Tap release calls endOrbGesture then
+rememberOrbColor; orbIdleColor applies the shared 600ms smoothstep fade.
+Impulse model: OrbImpulse -> sampleOrbInteraction -> uWaves, bounded by
+ORB_MAX_IMPULSES=8, ORB_RIPPLE_MS=1800, orbWaveGain, amplitude .045/cap .10.
+Plan will use that packet inside the fragment only, with a static vertex
+program, preserving shell geometry. DayOrb flow .35 and spin .12 about
+normalized (.18,1,-.12), life .22/stir 0 and ambient capture are reusable.
+Both Plan adapters currently feed fixed yellow, a .25 flow rate, identity
+spin and uSlosh; these are the paths being replaced. TP2b acceptance and
+full prompt, AGENTS.md, AUTOPILOT.md, newest planning/handoff entries read.
+
+Acceptance: exact shared liquid sheet and unchanged orb fragment; shared
+palette/fade including tap and cross-platform sync; liquid-only waves and
+Reduce Motion opacity; actual Chromium GL at 390/768/1280, both modes and
+pearl/gold/green, rest/wave; surface/hue metrics and 30 fixed outline masks;
+fresh focused/full affected suites and serial mandatory gates.
+Evidence goes under tmp/overnight/TP2d/. Live production, database, Scheduler,
+native GL and physical performance are UNVERIFIED (owner to confirm).
+Owner steps remaining: Rollout and Device checks NOT RUN; next FULLSEND,
+then website/Realme appearance, synchronized fade, fixed shell and wave.
