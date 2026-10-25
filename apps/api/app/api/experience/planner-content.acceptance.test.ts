@@ -209,6 +209,44 @@ beforeEach(() => {
 });
 
 describe("TP1 plan content end to end", () => {
+  it("TP2 reads grouped owned candidates without writes and defaults match TP1", async () => {
+    const candidates = await data<import('@stay-focused/shared/task-planning').PlanningCandidates>(await post('planner/candidates', A, plan('reviewers_tasks')));
+    expect(candidates.courses.map(course => course.id)).toEqual([C1]);
+    expect(candidates.courses[0]!.items.find(item => item.id === R3)).toMatchObject({ openedWithin24h: true, estimateMinutes: 45 });
+    expect(candidates.personalItems.map(item => item.id)).toEqual([T1, T2]);
+    expect(candidates.freeWindowMinutes).toBe(240);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    const { defaultPlanningDraft, builtPlanningSelection } = await import('@stay-focused/shared');
+    const selection = builtPlanningSelection(candidates, defaultPlanningDraft(candidates));
+    const legacy = await data<Plan>(await post('planner/preview', A, plan('reviewers_tasks')));
+    const selected = await data<Plan & { notFit: unknown[] }>(await post('planner/preview', A, { ...plan('reviewers_tasks'), selection }));
+    const { notFit, ...original } = selected;
+    expect(original).toEqual(legacy);
+    expect(notFit).toEqual([]);
+  });
+  it("TP2 opts in recent reviewers and uses identical selection on preview and apply", async () => {
+    const request = { ...plan('reviewers_tasks'), selection: { order: 'manual', courseIds: [C1], items: [{ kind: 'reviewer', id: R3 }, { kind: 'reviewer', id: R1 }] } };
+    const preview = await data<Plan>(await post('planner/preview', A, request));
+    expect(titles(preview)).toEqual(['Recently opened reviewer', 'Cell biology reviewer']);
+    expect(preview.sessions.map(item => item.durationMinutes)).toEqual([45, 30]);
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    const applied = await post('planner/apply', A, request);
+    expect(applied.status).toBe(200);
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(['apply_study_plan_v2']);
+    const stored = mocks.rpc.mock.calls[0]![1].p_sessions as { reviewer_artifact_id: string }[];
+    expect(stored.map(item => item.reviewer_artifact_id)).toEqual([R3, R1]);
+  });
+  it.each([
+    { order: 'smart', courseIds: [CB] }, { order: 'smart', items: [{ kind: 'task', id: TB }] },
+    { order: 'smart', items: [{ kind: 'reviewer', id: RB }] }, { order: 'smart', items: [{ kind: 'reviewer', id: R4 }] },
+    { order: 'smart', items: [{ kind: 'reviewer', id: QUIZ }] },
+    { order: 'manual', courseIds: [C1], items: [{ kind: 'task', id: T1 }] },
+  ])('TP2 safely rejects unowned/out-of-scope selection %j', async selection => {
+    for (const endpoint of ['planner/preview', 'planner/apply']) {
+      expect((await post(endpoint, A, { ...plan('reviewers_tasks'), selection })).status).toBe(404);
+    }
+    expect(mocks.rpc).not.toHaveBeenCalled();
+  });
   it("keeps an omitted mode tasks-only with the original response shape", async () => {
     const response = await post("planner/preview", A, plan(undefined));
     expect(response.status).toBe(200);

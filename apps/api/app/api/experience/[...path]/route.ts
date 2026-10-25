@@ -119,7 +119,7 @@ export async function POST(request: Request, context: Context): Promise<Response
       const { createCourseBatch } = await import('@/lib/course-batch/service');
       return experienceJson(await createCourseBatch(createCanvasServiceClient(), userId, requireId(path[1]!), value.materialIds as 'all' | string[]), 202);
     }
-    if (!['generations', 'materials/prepare', 'planner/preview', 'planner/apply', 'planner/replan'].includes(route)) throw new ExperienceFailure(404, 'not_found');
+    if (!['generations', 'materials/prepare', 'planner/candidates', 'planner/preview', 'planner/apply', 'planner/replan'].includes(route)) throw new ExperienceFailure(404, 'not_found');
     const boundedBody = await readBoundedText(request, 64 * 1024);
     if (!boundedBody.ok) throw new ExperienceFailure(400, 'invalid_request');
     const raw = boundedBody.text;
@@ -129,6 +129,13 @@ export async function POST(request: Request, context: Context): Promise<Response
     if (route.startsWith('planner/')) {
       const validation = validateStudyPlanningRequest(value);
       if (!validation.ok) throw new ExperienceFailure(400, 'invalid_request');
+      if (route === 'planner/candidates') {
+        const { loadOwnedPlanningCandidates } = await import('@/lib/task-planning-repository');
+        const candidates = await loadOwnedPlanningCandidates(createCanvasServiceClient(), userId, validation.value, Date.now());
+        const mode = validation.value.mode ?? 'reviewers_tasks';
+        const include = (item: { kind: string }) => mode === 'reviewers_tasks' || (mode === 'reviewers' ? item.kind === 'reviewer' : item.kind === 'task');
+        return experienceJson({ ...candidates, courses: candidates.courses.map(course => ({ ...course, items: course.items.filter(include) })), personalItems: candidates.personalItems.filter(include) });
+      }
       try {
         const { previewOwnedStudyPlan, applyOwnedStudyPlan } = await import('@/lib/task-planning-service');
         const run = route === 'planner/preview' ? previewOwnedStudyPlan : applyOwnedStudyPlan;

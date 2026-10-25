@@ -186,9 +186,42 @@ export interface StudyPlanningRequest {
   readonly taskIds?: readonly string[];
   /** Omitted keeps the original tasks-only plan and response shape. */
   readonly mode?: PlanMode;
+  readonly selection?: PlanSelection;
+}
+
+export interface PlanSelection {
+  readonly courseIds?: readonly string[];
+  readonly items?: readonly { readonly kind: StudyBlockKind; readonly id: string }[];
+  readonly order: "smart" | "manual";
+}
+
+export interface PlanningCandidate {
+  readonly smartRank?: number;
+  readonly kind: StudyBlockKind;
+  readonly id: string;
+  readonly title: string;
+  readonly courseId: string | null;
+  readonly estimateMinutes: number;
+  readonly openedWithin24h: boolean;
+  readonly dueAt: string | null;
+  readonly priority: TaskPriority;
+  readonly createdAt: string;
+}
+export interface PlanningCandidates {
+  readonly courses: readonly { readonly id: string; readonly name: string; readonly items: readonly PlanningCandidate[] }[];
+  readonly personalItems: readonly PlanningCandidate[];
+  readonly freeWindowMinutes: number;
+  readonly planningRange: PlanningRange;
+  readonly availability: readonly AvailabilityWindow[];
+}
+export interface PlanNotFit {
+  readonly kind: StudyBlockKind;
+  readonly id: string;
+  readonly minutes: number;
 }
 
 export interface PlannerTask {
+  readonly courseId?: string | null;
   readonly id: string;
   readonly title: string;
   readonly dueAt: string | null;
@@ -261,6 +294,8 @@ export interface DeterministicStudyPlan<S extends ProposedStudySession = Propose
   readonly mode?: PlanMode;
   /** Eligible candidates considered for each kind, for empty-state copy. */
   readonly candidates?: { readonly tasks: number; readonly reviewers: number };
+  /** Only selection requests extend the legacy response. */
+  readonly notFit?: readonly PlanNotFit[];
 }
 
 /** The decided empty-state copy when the chosen kind has nothing to plan. */
@@ -395,7 +430,7 @@ export function validateStudyPlanningRequest(
   if (!isRecord(value)) {
     return invalid("Request body must be a JSON object.");
   }
-  const allowed = new Set(["planningRange", "availability", "taskIds", "mode"]);
+  const allowed = new Set(["planningRange", "availability", "taskIds", "mode", "selection"]);
   if (Object.keys(value).some((key) => !allowed.has(key))) {
     return invalid("Request body contains unsupported planning fields.");
   }
@@ -403,6 +438,9 @@ export function validateStudyPlanningRequest(
     return invalid("mode must be reviewers, tasks, or reviewers_tasks.");
   }
   const mode = isPlanMode(value.mode) ? value.mode : undefined;
+  const selection = value.selection === undefined ? undefined : validatePlanSelection(value.selection);
+  if (selection && !selection.ok) return selection;
+  if (selection && value.taskIds !== undefined) return invalid("Use selection or taskIds, not both.");
   if (!isRecord(value.planningRange)) {
     return invalid("planningRange is required.");
   }
@@ -445,8 +483,34 @@ export function validateStudyPlanningRequest(
       availability: normalized,
       ...(taskIds ? { taskIds } : {}),
       ...(mode ? { mode } : {}),
+      ...(selection?.ok ? { selection: selection.value } : {}),
     },
   };
+}
+
+export function validatePlanSelection(value: unknown): ValidationResult<PlanSelection> {
+  if (!isRecord(value) || Object.keys(value).some(key => !["courseIds", "items", "order"].includes(key)) ||
+    (value.order !== "smart" && value.order !== "manual")) return invalid("Invalid plan selection.");
+  let courseIds: string[] | undefined;
+  if (value.courseIds !== undefined) {
+    if (!Array.isArray(value.courseIds) || value.courseIds.length > 1000 ||
+      value.courseIds.some(id => typeof id !== "string" || !isUuid(id))) return invalid("Invalid selected courses.");
+    courseIds = value.courseIds.map(id => (id as string).trim().toLowerCase());
+    if (new Set(courseIds).size !== courseIds.length) return invalid("Duplicate selected courses.");
+  }
+  let items: { kind: StudyBlockKind; id: string }[] | undefined;
+  if (value.items !== undefined) {
+    if (!Array.isArray(value.items) || value.items.length > MAX_PLANNING_TASKS + MAX_PLANNING_REVIEWERS) return invalid("Invalid selected items.");
+    items = [];
+    for (const item of value.items) {
+      if (!isRecord(item) || Object.keys(item).some(key => key !== "kind" && key !== "id") ||
+        (item.kind !== "task" && item.kind !== "reviewer") || typeof item.id !== "string" || !isUuid(item.id)) return invalid("Invalid selected item.");
+      items.push({ kind: item.kind, id: item.id.trim().toLowerCase() });
+    }
+    if (new Set(items.map(item => `${item.kind}:${item.id}`)).size !== items.length) return invalid("Duplicate selected items.");
+  }
+  if (value.order === "manual" && !items) return invalid("Manual order requires items.");
+  return { ok: true, value: { order: value.order, ...(courseIds ? { courseIds } : {}), ...(items ? { items } : {}) } };
 }
 
 export function generateDeterministicStudyPlan({
@@ -480,14 +544,17 @@ export function generateContentStudyPlan({
   reviewers,
   planningRange,
   availability,
+  selection,
 }: {
   readonly mode: PlanMode;
   readonly tasks: readonly PlannerTask[];
   readonly reviewers: readonly PlannerReviewer[];
   readonly planningRange: PlanningRange;
   readonly availability: readonly AvailabilityWindow[];
+  readonly selection?: PlanSelection;
 }): DeterministicStudyPlan {
   if (!isPlanMode(mode)) throw new PlanningValidationError("Unsupported plan mode.");
+  if (selection) return generateSelectedStudyPlan({ mode, tasks, reviewers, planningRange, availability, selection });
   const plannedTasks = mode === "reviewers" ? [] : tasks;
   const plannedReviewers = mode === "tasks" ? [] : reviewers.map(normalizePlannerReviewer);
   if (plannedReviewers.length > MAX_PLANNING_REVIEWERS) {
@@ -544,6 +611,56 @@ export function generateContentStudyPlan({
   };
 }
 
+function generateSelectedStudyPlan(input: {
+  mode: PlanMode; tasks: readonly PlannerTask[]; reviewers: readonly PlannerReviewer[];
+  planningRange: PlanningRange; availability: readonly AvailabilityWindow[]; selection: PlanSelection;
+}): DeterministicStudyPlan {
+  const parsed = validatePlanSelection(input.selection);
+  if (!parsed.ok) throw new PlanningValidationError(parsed.message);
+  const selection = parsed.value;
+  const courses = selection.courseIds ? new Set(selection.courseIds) : null;
+  const selected = selection.items ? new Set(selection.items.map(item => `${item.kind}:${item.id}`)) : null;
+  const eligible = (kind: StudyBlockKind, item: { id: string; courseId?: string | null }) =>
+    (!courses || (!!item.courseId && courses.has(item.courseId))) && (!selected || selected.has(`${kind}:${item.id}`));
+  const tasks = input.mode === "reviewers" ? [] : input.tasks.filter(item => eligible("task", item));
+  const reviewers = input.mode === "tasks" ? [] : input.reviewers.filter(item => eligible("reviewer", item));
+  let plan: DeterministicStudyPlan;
+  if (selection.order === "smart") {
+    plan = generateContentStudyPlan({ ...input, tasks, reviewers, selection: undefined });
+  } else {
+    const prepared = preparePlan(tasks, input.planningRange, input.availability);
+    const taskMap = new Map(prepared.tasks.map(item => [item.id, item]));
+    const reviewerMap = new Map(reviewers.map(item => [item.id, normalizePlannerReviewer(item)]));
+    let exhausted = false;
+    for (const item of selection.items ?? []) {
+      if (exhausted) break;
+      if (item.kind === "task") {
+        const task = taskMap.get(item.id);
+        if (!task) continue;
+        exhausted = fillTask(prepared.state, task, task.estimatedMinutes, Infinity) < task.estimatedMinutes;
+      } else {
+        const reviewer = reviewerMap.get(item.id);
+        if (!reviewer) continue;
+        const minutes = reviewerBlockMinutes(reviewer.estimatedMinutes);
+        const window = prepared.state.windows.find(window => window.end - window.cursor >= minutes * 60_000);
+        if (!window) { exhausted = true; continue; }
+        prepared.state.sessions.push({ kind: "reviewer", proposalId: proposalId(prepared.state.sessions.length + 1),
+          reviewerId: reviewer.id, reviewerTitle: reviewer.title, courseId: reviewer.courseId,
+          startsAt: new Date(window.cursor).toISOString(), endsAt: new Date(window.cursor + minutes * 60_000).toISOString(),
+          durationMinutes: minutes, scheduledAfterDeadline: false });
+        window.cursor += minutes * 60_000;
+      }
+    }
+    plan = { ...finishPlan(prepared, prepared.tasks.map(task => [task, task.estimatedMinutes - scheduledFor(prepared.state, task.id)])),
+      mode: input.mode, candidates: { tasks: tasks.length, reviewers: reviewers.length } };
+  }
+  const scheduledReviewers = new Set(plan.sessions.filter(isReviewerProposal).map(item => item.reviewerId));
+  return { ...plan, notFit: [
+    ...plan.unscheduledWork.map(item => ({ kind: "task" as const, id: item.taskId, minutes: item.unscheduledMinutes })),
+    ...reviewers.filter(item => !scheduledReviewers.has(item.id)).map(item => ({ kind: "reviewer" as const, id: item.id, minutes: reviewerBlockMinutes(item.estimatedMinutes) })),
+  ] };
+}
+
 export interface ReviewerCandidateSource {
   readonly id: string;
   readonly title: string;
@@ -565,12 +682,14 @@ export function selectReviewerCandidates({
   nextDueByCourse,
   excludedIds,
   now,
+  explicitlySelectedIds,
 }: {
   readonly reviewers: readonly ReviewerCandidateSource[];
   readonly currentCourseIds: ReadonlySet<string>;
   readonly nextDueByCourse: ReadonlyMap<string, number>;
   readonly excludedIds: ReadonlySet<string>;
   readonly now: number;
+  readonly explicitlySelectedIds?: ReadonlySet<string>;
 }): PlannerReviewer[] {
   const seen = new Set<string>();
   const eligible = reviewers.filter((reviewer) => {
@@ -578,7 +697,7 @@ export function selectReviewerCandidates({
     if (excludedIds.has(reviewer.id) || !isUuid(reviewer.id)) return false;
     seen.add(reviewer.id);
     const opened = reviewer.lastOpenedAt ? Date.parse(reviewer.lastOpenedAt) : Number.NaN;
-    return !Number.isFinite(opened) || now - opened >= REVIEWER_REOPEN_AFTER_MS;
+    return explicitlySelectedIds?.has(reviewer.id) || !Number.isFinite(opened) || now - opened >= REVIEWER_REOPEN_AFTER_MS;
   });
   const due = (reviewer: ReviewerCandidateSource) =>
     nextDueByCourse.get(reviewer.courseId!) ?? Number.POSITIVE_INFINITY;
@@ -769,6 +888,7 @@ function normalizePlannerTask(task: PlannerTask): PlannerTask {
   if (!createdAt.ok) throw new PlanningValidationError(createdAt.message);
   return {
     id: task.id.trim(),
+    ...(task.courseId !== undefined ? { courseId: task.courseId } : {}),
     title: title.value,
     estimatedMinutes: estimate.value,
     priority: priority.value,

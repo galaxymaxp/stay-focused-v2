@@ -11,6 +11,8 @@ import type {
   DeterministicStudyPlan,
   PlannerReviewer,
   PlannerTask,
+  PlanningCandidates,
+  PlanningCandidate,
   PlanningRange,
   ReviewerCandidateSource,
   StudySessionTaskSummary,
@@ -18,7 +20,7 @@ import type {
   TaskStatus,
   TaskView,
 } from "@stay-focused/shared/task-planning";
-import { isReviewerProposal, selectReviewerCandidates } from "@stay-focused/shared/task-planning";
+import { isReviewerProposal, selectReviewerCandidates, reviewerBlockMinutes, REVIEWER_REOPEN_AFTER_MS } from "@stay-focused/shared/task-planning";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isPastStoredCourse } from "@/lib/course-state";
@@ -266,6 +268,7 @@ export async function loadOwnedReviewerCandidates(
   userId: string,
   range: PlanningRange,
   now: number,
+  explicitlySelectedIds?: ReadonlySet<string>,
 ): Promise<readonly PlannerReviewer[]> {
   const repository = experienceRepository(client);
   const [library, courses, context, opens, kept] = await Promise.all([
@@ -288,7 +291,48 @@ export async function loadOwnedReviewerCandidates(
     nextDueByCourse,
     excludedIds: kept,
     now,
+    explicitlySelectedIds,
   });
+}
+
+/** Stored owner-scoped evidence only: no provider, sync, estimate refresh or Library endpoint. */
+export async function loadOwnedPlanningCandidates(
+  client: SupabaseClient<Database>, userId: string,
+  request: { planningRange: PlanningRange; availability: readonly PlanningRange[] }, now: number,
+): Promise<PlanningCandidates> {
+  const repository = experienceRepository(client);
+  const [context, library, opens, kept] = await Promise.all([
+    readActivityContext(repository, userId, now, now + 86_400_000),
+    readOwnedLibraryReviewers(client, userId), readOwnedReviewerOpens(client, userId),
+    readKeptReviewerBlocks(client, userId, request.planningRange),
+  ]);
+  const courses = context.courses.filter(course => course.user_id === userId && !isPastStoredCourse(course, now))
+    .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  const courseIds = new Set(courses.map(course => course.id));
+  const eligibleTasks = new Map(context.activities.filter(item => item.status !== "submitted" && item.status !== "completed")
+    .map(item => [item.taskId, item]));
+  const tasks: PlanningCandidate[] = context.tasks.filter(task => task.user_id === userId && task.status === "pending" && eligibleTasks.has(task.id))
+    .map(task => ({ kind: "task", id: task.id, title: eligibleTasks.get(task.id)!.title,
+      courseId: eligibleTasks.get(task.id)!.course?.id ?? null, estimateMinutes: task.estimated_minutes,
+      openedWithin24h: false, dueAt: eligibleTasks.get(task.id)!.dueAt, priority: task.priority, createdAt: task.created_at }));
+  const nextDueByCourse = new Map<string, number>();
+  for (const activity of context.activities) {
+    if (!activity.course || !activity.dueAt || activity.status === "completed" || activity.status === "submitted") continue;
+    const due = Date.parse(activity.dueAt);
+    if (due > now) nextDueByCourse.set(activity.course.id, Math.min(due, nextDueByCourse.get(activity.course.id) ?? Infinity));
+  }
+  const sources = library.map(item => ({ ...item, lastOpenedAt: opens.get(item.id) ?? null }));
+  // Include recent opens in this read; the sheet defaults them off. The same
+  // selector still enforces current courses, successful saved work and kept blocks.
+  const reviewers: PlanningCandidate[] = selectReviewerCandidates({ reviewers: sources, currentCourseIds: courseIds,
+    nextDueByCourse, excludedIds: kept, now, explicitlySelectedIds: new Set(sources.map(item => item.id)) })
+    .map((item, smartRank) => ({ kind: "reviewer", smartRank, id: item.id, title: item.title, courseId: item.courseId,
+      estimateMinutes: reviewerBlockMinutes(item.estimatedMinutes), openedWithin24h: opens.has(item.id) && now - Date.parse(opens.get(item.id)!) < REVIEWER_REOPEN_AFTER_MS,
+      dueAt: null, priority: "medium", createdAt: sources.find(source => source.id === item.id)!.createdAt }));
+  const items = [...tasks, ...reviewers];
+  return { courses: courses.map(course => ({ id: course.id, name: course.name, items: items.filter(item => item.courseId === course.id) })),
+    personalItems: items.filter(item => item.courseId === null), planningRange: request.planningRange, availability: request.availability,
+    freeWindowMinutes: request.availability.reduce((sum, window) => sum + Math.floor((Date.parse(window.endsAt) - Date.parse(window.startsAt)) / 60000), 0) };
 }
 
 async function readOwnedLibraryReviewers(

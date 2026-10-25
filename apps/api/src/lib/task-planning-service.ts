@@ -15,6 +15,7 @@ import {
   importSchedulableCanvasAssignments,
   loadOwnedPlannerTasks,
   loadOwnedReviewerCandidates,
+  loadOwnedPlanningCandidates,
   persistOwnedStudyPlan,
   toStudySessionView,
 } from "@/lib/task-planning-repository";
@@ -36,6 +37,25 @@ export async function previewOwnedStudyPlan(
   now = Date.now(),
   provider?: GenerationProvider | null,
 ): Promise<DeterministicStudyPlan> {
+  if (request.selection) {
+    const candidates = await loadOwnedPlanningCandidates(client, userId, request, now);
+    const selection = request.selection;
+    const all = [...candidates.courses.flatMap(course => course.items), ...candidates.personalItems];
+    const allowedCourses = new Set(candidates.courses.map(course => course.id));
+    const ownedItems = new Map(all.map(item => [`${item.kind}:${item.id}`, item]));
+    if (selection.courseIds?.some(id => !allowedCourses.has(id)) || selection.items?.some(item => {
+      const candidate = ownedItems.get(`${item.kind}:${item.id}`);
+      return !candidate || (selection.courseIds && (!candidate.courseId || !selection.courseIds.includes(candidate.courseId)));
+    })) throw new OwnedPlanningError("task_not_found", "One or more selected items were not found.");
+    const mode = request.mode ?? "tasks";
+    const explicit = new Set(selection.items?.map(item => `${item.kind}:${item.id}`));
+    const reviewers = all.filter(item => item.kind === "reviewer" && (!item.openedWithin24h || explicit.has(`reviewer:${item.id}`)))
+      .sort((a, b) => (a.smartRank ?? 0) - (b.smartRank ?? 0))
+      .map(item => ({ id: item.id, title: item.title, courseId: item.courseId, estimatedMinutes: item.estimateMinutes }));
+    const tasks = all.filter(item => item.kind === "task").map(item => ({ id: item.id, title: item.title, courseId: item.courseId,
+      estimatedMinutes: item.estimateMinutes, dueAt: item.dueAt, priority: item.priority, createdAt: item.createdAt }));
+    return generateContentStudyPlan({ mode, tasks, reviewers, planningRange: request.planningRange, availability: request.availability, selection });
+  }
   // An omitted mode is the original tasks-only plan. Reviewers mode never
   // touches task work, so it skips the Canvas import and estimate refresh.
   const { mode } = request;
@@ -86,6 +106,7 @@ export async function applyOwnedStudyPlan(
         availability: plan.availability,
         sessions: plan.sessions,
         unscheduledWork: plan.unscheduledWork,
+        ...(request.selection ? { selection: request.selection } : {}),
       }),
       "utf8",
     )
@@ -98,6 +119,7 @@ export async function applyOwnedStudyPlan(
     sessions: persisted.sessions.map(toStudySessionView),
     unscheduledWork: plan.unscheduledWork,
     ...(plan.mode ? { mode: plan.mode } : {}),
+    ...(plan.notFit ? { notFit: plan.notFit } : {}),
   } as const;
 }
 
