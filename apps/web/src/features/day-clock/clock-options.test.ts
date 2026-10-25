@@ -50,24 +50,10 @@ it("closes on Escape, restores focus and cleans up outside listeners", async () 
   await act(async () => listeners.get("mousedown")!({ target: {} }));
   expect(trigger().props["aria-expanded"]).toBe(false);
 });
-it("offers Plan with as three native radios inside the menu and reports choices", async () => {
-  const choose = vi.fn();
-  await act(async () => { tree = create(createElement(ClockOptions, { start: 600, end: 720, locked: false, onToggleLock: toggle, onCommit: commit, disabled: false,
-    planMode: "reviewers_tasks", onPlanModeChange: choose }), { createNodeMock: () => ({ focus, contains: () => false, querySelector: () => ({ focus: firstFocus }) }) }); });
-  // Closed: only the trigger exists, so nothing new sits beside the clock.
+it("keeps clock options free of planning controls", async () => {
+  await mount();
   expect(tree!.root.findAllByProps({ type: "radio" })).toHaveLength(0);
-  await act(async () => trigger().props.onClick());
-  const group = tree!.root.findByProps({ className: "clock-plan-mode" });
-  expect(group.type).toBe("fieldset");
-  expect(group.findByType("legend").props.children).toBe("Plan with");
-  const radios = group.findAllByProps({ type: "radio" });
-  expect(radios.map(radio => radio.props.value)).toEqual(["reviewers", "tasks", "reviewers_tasks"]);
-  expect(group.findAllByType("label").map(label => label.props.children[1])).toEqual(["Reviewers", "Tasks", "Reviewers & tasks"]);
-  expect(radios.map(radio => radio.props.checked)).toEqual([false, false, true]);
-  expect(new Set(radios.map(radio => radio.props.name)).size).toBe(1);
-  await act(async () => radios[0]!.props.onChange());
-  expect(choose).toHaveBeenCalledExactlyOnceWith("reviewers");
-  expect(commit).not.toHaveBeenCalled();
+  expect(tree!.root.findAllByProps({ className: "clock-plan-mode" })).toHaveLength(0);
 });
 it("omits the group when no plan mode is wired", async () => {
   await mount();

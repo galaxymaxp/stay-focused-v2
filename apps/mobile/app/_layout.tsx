@@ -7,7 +7,6 @@ import { AppLifecycle } from "../src/app-shell/AppLifecycle";
 import { AuthProvider } from "../src/auth";
 import { ThemeProvider, useTheme } from "../src/design/theme";
 import { OrbPreferencesSync } from '../src/design/OrbPreferencesSync';
-import { PlanModePreferencesSync } from '../src/design/PlanModePreferencesSync';
 import { ProfileAvatarProvider } from '../src/design/ProfileAvatarProvider';
 
 /**
@@ -44,7 +43,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ThemeProvider><NavigationTheme><AuthProvider>
-        <ProfileAvatarProvider><OrbPreferencesSync /><PlanModePreferencesSync /><AppLifecycle /><RootStack /></ProfileAvatarProvider>
+        <ProfileAvatarProvider><OrbPreferencesSync /><AppLifecycle /><RootStack /></ProfileAvatarProvider>
       </AuthProvider></NavigationTheme></ThemeProvider>
     </SafeAreaProvider>
   );

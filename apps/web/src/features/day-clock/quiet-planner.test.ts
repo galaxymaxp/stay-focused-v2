@@ -66,3 +66,14 @@ it("never lets an older slow result replace an already completed latest preview"
   await act(async () => finish(result("old")));
   expect(value.preview?.algorithmVersion).toBe("new"); expect(value.previewRequest).toEqual(request(1410));
 });
+
+it('drops an older selection at the same range and date before the next quiet period', async () => {
+ let finish!: (value: DeterministicStudyPlan) => void;
+ load.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; })).mockResolvedValueOnce(result('new-selection'));
+ const first = { ...request(1320), mode: 'reviewers_tasks' as const, selection: { order: 'smart' as const, items: [{ kind: 'task' as const, id: 'one' }] } };
+ const second = { ...first, selection: { order: 'manual' as const, items: [{ kind: 'reviewer' as const, id: 'two' }] } };
+ await act(async () => value.queuePreview(first)); await tick(400);
+ await act(async () => value.queuePreview(second));
+ await act(async () => finish(result('old-selection'))); expect(value.preview).toBeNull();
+ await tick(400); expect(value.previewRequest).toEqual(second); expect(value.preview?.algorithmVersion).toBe('new-selection');
+});

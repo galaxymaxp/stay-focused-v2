@@ -1,3 +1,4 @@
+import { todayPlanningMemory } from "./planningSession";
 import { createElement, type ReactElement, type ReactNode } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +23,21 @@ import { ClockOptions } from "./ClockOptions";
 import { localDate, planningRequest } from "./presentation";
 import { TASK_COURSE_GRADES_PATHNAME, courseRouteParams } from "../../navigation/appRoutes";
 import { AnnouncementDetailScreen, AnnouncementsScreen } from "../announcements/AnnouncementsScreen";
+beforeEach(() => todayPlanningMemory.reset());
+vi.mock("./PlanningSheet", () => ({ PlanningControl: "PlanningControl" }));
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const mocks = vi.hoisted(() => ({
   artifact: null as LibraryArtifactDetail | null,
@@ -1740,7 +1756,7 @@ it('keeps the lock storage key and sends typed free time through the drag planni
   expect(mocks.storageWrite).toHaveBeenCalledWith(`sf.today.free-time.${localDate()}`, JSON.stringify({ start: 1320, end: 240 }));
   await act(async () => { vi.advanceTimersByTime(400); });
   const request = mocks.request.mock.calls.find(call => call[1] === '/api/experience/planner/preview');
-  expect(request?.[2].body).toEqual(planningRequest(localDate(), 1320, 240, "reviewers_tasks"));
+  expect(request?.[2].body).toEqual({ ...planningRequest(localDate(), 1320, 240, "reviewers_tasks"), selection: { order: "smart" } });
 });
 vi.mock('../../services/useAppUpdate', () => ({
   useAppUpdate: () => ({ banner: false, unsupported: false, status: 'up-to-date', latest: null, lastCheckedAt: null }),
@@ -1799,7 +1815,7 @@ describe('TC2 real mobile clock gesture counters', () => {
     expect(writes()).toHaveLength(4); expect(mocks.request).not.toHaveBeenCalled();
     await act(async () => { vi.advanceTimersByTime(400); });
     expect(mocks.request).toHaveBeenCalledTimes(1);
-    expect(mocks.request.mock.calls[0]![2].body).toEqual(planningRequest(localDate(), 1320, 240, "reviewers_tasks"));
+    expect(mocks.request.mock.calls[0]![2].body).toEqual({ ...planningRequest(localDate(), 1320, 240, "reviewers_tasks"), selection: { order: "smart" } });
     expect(new Set(mocks.paths).size).toBe(1); expect(mocks.sync).not.toHaveBeenCalled(); expect(mocks.refresh).not.toHaveBeenCalled();
   });
 });

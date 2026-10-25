@@ -1,5 +1,6 @@
 "use client";
-import { freeTimeEnd, minuteInWindow, clockTimeLabel } from "@stay-focused/shared";
+import { freeTimeEnd, minuteInWindow, clockTimeLabel, planBlockMarks } from "@stay-focused/shared";
+import { useEffect, useRef, useState } from 'react';
 import {
   isReviewerProposal,
   PLAN_MODE_LABELS,
@@ -44,12 +45,21 @@ export function PlanPreview({
   onDiscard: () => void;
 }) {
   const until = freeTimeEnd(from, to);
+  const bar = useRef<HTMLDivElement>(null);
+  const [barWidth, setBarWidth] = useState(0);
+  useEffect(() => {
+    if (!bar.current) return;
+    const node = bar.current;
+    const observer = new ResizeObserver(() => setBarWidth(node.clientWidth));
+    observer.observe(node); setBarWidth(node.clientWidth);
+    return () => observer.disconnect();
+  }, []);
   const span = Math.max(15, until - from);
   const taskIds = planTaskIds(plan);
   const empty = plan.sessions.length === 0 ? planEmptyMessage(plan) : null;
   const kind = (session: DeterministicStudyPlan["sessions"][number]) => isReviewerProposal(session) ? "Review" : "Task";
   const planned = plan.sessions.reduce((t, s) => t + s.durationMinutes, 0);
-  const unscheduled = plan.unscheduledWork.reduce(
+  const unscheduled = plan.notFit?.reduce((sum, item) => sum + item.minutes, 0) ?? plan.unscheduledWork.reduce(
     (t, item) => t + item.unscheduledMinutes,
     0,
   );
@@ -76,6 +86,7 @@ export function PlanPreview({
         </button>
       </div>
       <div
+        ref={bar}
         className="plan-bar"
         role="img"
         aria-label={
@@ -100,6 +111,7 @@ export function PlanPreview({
           const start = minuteInWindow(minuteOfDay(session.startsAt), from);
           const tone = planToneFor(taskIds, proposalTargetKey(session));
           const late = session.scheduledAfterDeadline;
+          const marks = planBlockMarks({ shape: 'linear', length: Math.min(session.durationMinutes, until - start) / span * barWidth, thickness: 50 }, 0, 16);
           return (
             <span
               key={session.proposalId}
@@ -114,8 +126,8 @@ export function PlanPreview({
               }}
             >
               <strong>
-                <Icon name={isReviewerProposal(session) ? "book-open" : "clipboard-list"} />
-                {proposalTitle(session)}
+                {marks.kind && <Icon name={isReviewerProposal(session) ? "book-open" : "clipboard-list"} />}
+                <span className="plan-block-title">{proposalTitle(session)}</span>
               </strong>
               <span>
                 {late ? "after due · " : ""}

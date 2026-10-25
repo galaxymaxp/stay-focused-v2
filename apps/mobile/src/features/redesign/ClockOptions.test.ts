@@ -14,11 +14,10 @@ vi.mock("../../design/theme", async () => {
 
 let tree: ReactTestRenderer | undefined;
 const commit = vi.fn(), toggle = vi.fn();
-const choose = vi.fn();
 beforeEach(() => { Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); vi.clearAllMocks(); });
 afterEach(async () => { if (tree) await act(async () => tree!.unmount()); tree = undefined; });
-async function mount(locked = true, withMode = false) {
-  await act(async () => { tree = create(createElement(ClockOptions, { start: 1320, end: 240, locked, onToggleLock: toggle, onCommit: commit, disabled: false, ...(withMode ? { planMode: 'reviewers_tasks' as const, onPlanModeChange: choose } : {}) }), {
+async function mount(locked = true) {
+  await act(async () => { tree = create(createElement(ClockOptions, { start: 1320, end: 240, locked, onToggleLock: toggle, onCommit: commit, disabled: false }), {
     createNodeMock: element => element.type === "View" ? { measureInWindow: (callback: (x: number, y: number, w: number, h: number) => void) => callback(300, 100, 44, 44) } : null,
   }); });
   const trigger = tree!.root.find(node => String(node.type) === "Pressable" && node.props.accessibilityLabel === "Clock options");
@@ -33,17 +32,9 @@ it.each([true, false])("converts typed hours and minutes for hour12=%s", hour12 
   expect(clockTimeMinutes({ hour: "25", minute: "00", pm: false }, hour12)).toBeNaN();
   expect(clockTimeMinutes({ hour: "01", minute: "60", pm: false }, hour12)).toBeNaN();
 });
-it("puts the three labelled accessible radio choices inside the clock modal", async () => {
-  await mount(true, true);
-  const group = tree!.root.find(node => node.props.accessibilityRole === "radiogroup");
-  expect(group.props.accessibilityLabel).toBe("Plan with");
-  const radios = group.findAll(node => node.props.accessibilityRole === "radio");
-  expect(radios.map(node => node.props.accessibilityLabel)).toEqual(["Reviewers", "Tasks", "Reviewers & tasks"]);
-  expect(radios.map(node => node.props.accessibilityState.checked)).toEqual([false, false, true]);
-  for (const radio of radios) expect(radio.props.style({ pressed: false }).minHeight).toBeGreaterThanOrEqual(44);
-  await act(async () => radios[0]!.props.onPress());
-  expect(choose).toHaveBeenCalledWith("reviewers"); expect(commit).not.toHaveBeenCalled();
-  expect(tree!.root.findAll(node => String(node.type) === "Modal")).toHaveLength(1);
+it("keeps the clock modal free of planning controls", async () => {
+  await mount();
+  expect(tree!.root.findAll(node => node.props.accessibilityRole === "radio" || node.props.accessibilityRole === "radiogroup")).toHaveLength(0);
 });
 it("keeps typed edits available while locked and uses the supplied commit", async () => {
   await mount();

@@ -1,15 +1,12 @@
 "use client";
 import { FREE_TIME_ERROR, validFreeTime } from "@stay-focused/shared";
-import { PLAN_MODE_LABELS, PLAN_MODES, type PlanMode } from "@stay-focused/shared/task-planning";
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "../../components/ui";
 import { fromTimeInput, toTimeInput } from "./free-time-store";
 
-export function ClockOptions({ start, end, locked, onToggleLock, onCommit, disabled, planMode, onPlanModeChange }: {
+export function ClockOptions({ start, end, locked, onToggleLock, onCommit, disabled }: {
   start: number; end: number; locked: boolean; onToggleLock: () => void;
   onCommit: (start: number, end: number) => void; disabled: boolean;
-  /** What the Today plan schedules; the group appears only when both are given. */
-  planMode?: PlanMode; onPlanModeChange?: (mode: PlanMode) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [from, setFrom] = useState(toTimeInput(start)), [to, setTo] = useState(toTimeInput(end));
@@ -37,14 +34,7 @@ export function ClockOptions({ start, end, locked, onToggleLock, onCommit, disab
       <button type="button" role="switch" aria-label="Lock clock" aria-checked={locked} onClick={onToggleLock}>
         Lock clock <span aria-hidden="true">{locked ? "On" : "Off"}</span>
       </button>
-      {planMode && onPlanModeChange && <fieldset className="clock-plan-mode">
-        <legend>Plan with</legend>
-        {PLAN_MODES.map(mode => <label key={mode}>
-          <input type="radio" name={`${id}-plan-with`} value={mode} checked={planMode === mode} disabled={disabled}
-            onChange={() => onPlanModeChange(mode)} />
-          {PLAN_MODE_LABELS[mode]}
-        </label>)}
-      </fieldset>}
+
       <strong>Free time</strong>
       <label>Free time starts<input aria-label="Free time starts" type="time" value={from} onChange={event => { setFrom(event.target.value); setError(null); }} /></label>
       <label>Free time ends<input aria-label="Free time ends" type="time" value={to} onChange={event => { setTo(event.target.value); setError(null); }} /></label>

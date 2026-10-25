@@ -1,3 +1,4 @@
+import { todayPlanningMemory } from "./planningSession";
 import { createElement } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -6,6 +7,15 @@ import type { DeterministicStudyPlan, PlanMode } from '@stay-focused/shared/task
 import { TodayScreen } from './TodayScreen';
 import { planModeStore } from './planMode';
 import { arrangeToday } from './presentation';
+vi.mock("./PlanningSheet", () => ({ PlanningControl: "PlanningControl" }));
+
+
+
+
+
+
+
+
 
 const mocks = vi.hoisted(() => ({ request: vi.fn(), push: vi.fn(), save: vi.fn(), date: '2026-10-24', data: null as TodayScreenData | null,
   adjusting: { current: false }, client: { baseUrl: 'https://api.test', accessToken: 'token' }, owner: 'owner' }));
@@ -41,7 +51,7 @@ const reviewer: TodayItem = { id: 'session:reviewer', kind: 'study_session', tit
 const activity = { id: 'task:essay', title: 'Same title', course, taskId: 'essay' } as ActivitySummary;
 beforeEach(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 9, 24, 12));
-  planModeStore.reset(); mocks.request.mockReset(); mocks.push.mockReset(); mocks.owner = 'owner'; mocks.date = '2026-10-24';
+  todayPlanningMemory.reset(); planModeStore.reset(); mocks.request.mockReset(); mocks.push.mockReset(); mocks.owner = 'owner'; mocks.date = '2026-10-24';
   mocks.data = { date: mocks.date, capabilities: { planner: { status: 'available' } }, announcements: { items: [] },
     activities: { items: [activity] }, timeline: [reviewer], next: reviewer, later: [], overdue: [], upcomingDeadlines: [] } as unknown as TodayScreenData;
   mocks.request.mockResolvedValue(plan('default'));
@@ -51,10 +61,13 @@ afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined
 const tick = async (ms = 400) => { await act(async () => { vi.advanceTimersByTime(ms); }); };
 const clock = () => tree!.root.findByType('DayRingClock' as never);
 const previews = () => mocks.request.mock.calls.filter(([, path]) => path === '/api/experience/planner/preview');
-const choose = async (mode: PlanMode) => { await act(async () => clock().props.onPlanModeChange(mode)); };
+const control = () => tree!.root.findByType('PlanningControl' as never);
+const choice = (mode: PlanMode) => ({ mode, selection: { order: 'manual', items: [{ kind: mode === 'tasks' ? 'task' : 'reviewer', id: 'selected' }] }, draft: { mode } });
+const choose = async (mode: PlanMode) => { await act(async () => control().props.onBuild(choice(mode))); };
 
 it('defaults to both, previews each mode and applies exactly the preview request', async () => {
-  expect(clock().props.planMode).toBe('reviewers_tasks');
+  expect(clock().props.planMode).toBeUndefined();
+  expect(control().props.active).toBeNull();
   for (const mode of ['reviewers', 'tasks', 'reviewers_tasks'] as const) {
     await choose(mode); await tick(); expect(previews().at(-1)![2].body.mode).toBe(mode);
   }
@@ -85,12 +98,21 @@ it('opens the saved reviewer even when a task has the same title and course', as
   expect(mocks.push).toHaveBeenCalledWith({ pathname: '/artifact', params: { id: 'artifact:reviewer' } });
   expect(tree!.root.findAll(node => String(node.type) === 'ContentIcon' && node.props.kind === 'reviewer').length).toBeGreaterThan(0);
 });
-it('synced changes replace a live preview only, and discard stays discarded', async () => {
+it('ignores stored modes and clock release keeps the active selection', async () => {
   await act(async () => planModeStore.apply('tasks')); await tick(); expect(previews()).toHaveLength(0);
   await choose('reviewers'); await tick();
-  await act(async () => planModeStore.apply('reviewers_tasks')); await tick(); expect(previews()).toHaveLength(2);
-  await act(async () => tree!.root.findByType('PlanPreview' as never).props.onDiscard());
-  await act(async () => planModeStore.apply('tasks')); await tick(); expect(previews()).toHaveLength(2);
+  await act(async () => planModeStore.apply('reviewers_tasks')); await tick(); expect(previews()).toHaveLength(1);
+  await act(async () => clock().props.onCommit(660, 840)); await tick();
+  expect(previews().at(-1)![2].body).toMatchObject({ mode: 'reviewers', selection: choice('reviewers').selection });
+  await act(async () => { mocks.date = '2026-10-25'; tree!.update(createElement(TodayScreen)); });
+  expect(control().props.active).toBeNull();
+});
+it('reload clears the built selection', async () => {
+  await choose('tasks'); await tick();
+  await act(async () => tree!.unmount());
+  todayPlanningMemory.reset(); // a reload creates a fresh JS module instance
+  await act(async () => { tree = create(createElement(TodayScreen)); });
+  expect(control().props.active).toBeNull();
 });
 it('keeps reviewers and same-title tasks distinct in Today sections', () => {
   const task = { ...reviewer, id: 'session:task', reviewer: undefined };

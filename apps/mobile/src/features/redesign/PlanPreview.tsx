@@ -1,4 +1,5 @@
-import { freeTimeEnd, minuteInWindow, clockTimeLabel } from "@stay-focused/shared";
+import { freeTimeEnd, minuteInWindow, clockTimeLabel, planBlockMarks } from "@stay-focused/shared";
+import { useState } from 'react';
 import { isReviewerProposal, planEmptyMessage, proposalTargetKey, proposalTitle, type DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
 import { View } from "react-native";
 
@@ -50,10 +51,11 @@ export function PlanPreview({
 }) {
   const { colors } = useTheme();
   const until = freeTimeEnd(from, to);
+  const [barWidth, setBarWidth] = useState(0);
   const span = Math.max(15, until - from);
   const taskIds = planTaskIds(plan);
   const planned = plan.sessions.reduce((total, session) => total + session.durationMinutes, 0);
-  const unscheduled = plan.unscheduledWork.reduce((total, item) => total + item.unscheduledMinutes, 0);
+  const unscheduled = plan.notFit?.reduce((total, item) => total + item.minutes, 0) ?? plan.unscheduledWork.reduce((total, item) => total + item.unscheduledMinutes, 0);
   const hours = Array.from({ length: Math.floor(until / 60) - Math.ceil(from / 60) + 1 }, (_, index) => (Math.ceil(from / 60) + index) * 60).filter((m) => m > from && m < until);
   return (
     <Surface style={{ gap: spacing[3] }}>
@@ -63,13 +65,14 @@ export function PlanPreview({
       </View>
       {plan.sessions.length === 0 && planEmptyMessage(plan) ? <Copy muted>{planEmptyMessage(plan)}</Copy> : null}
       <View
+        onLayout={event => setBarWidth(event.nativeEvent.layout.width)}
         accessible
         accessibilityLabel={
           plan.sessions.length
             ? `Proposed plan: ${plan.sessions.map((session) => `${isReviewerProposal(session) ? "Review" : "Task"}: ${proposalTitle(session)} at ${hourLabel(minuteOfDay(session.startsAt))} for ${session.durationMinutes} minutes`).join("; ")}`
             : "No sessions fit this window"
         }
-        style={{ height: 58, borderRadius: radius.control, backgroundColor: colors.surfaceSecondary, overflow: "hidden" }}
+        style={{ height: 58, borderRadius: radius.control, backgroundColor: colors.surfaceSecondary }}
       >
         {hours.map((minutes) => (
           <View key={minutes} style={{ position: "absolute", top: 0, bottom: 0, width: 1, left: `${((minutes - from) / span) * 100}%`, backgroundColor: colors.separator }} />
@@ -78,6 +81,7 @@ export function PlanPreview({
           const start = minuteInWindow(minuteOfDay(session.startsAt), from);
           const tone = planToneFor(taskIds, proposalTargetKey(session));
           const late = session.scheduledAfterDeadline;
+          const marks = planBlockMarks({ shape: 'linear', length: Math.min(session.durationMinutes, until - start) / span * barWidth, thickness: 50 }, 0, 34);
           return (
             <View
               key={session.proposalId}
@@ -96,7 +100,7 @@ export function PlanPreview({
               }}
             >
               <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                <ContentIcon kind={isReviewerProposal(session) ? "reviewer" : "task"} small />
+                {marks.kind && <ContentIcon kind={isReviewerProposal(session) ? "reviewer" : "task"} small />}
                 <Copy size="caption" numberOfLines={1} color={colors[tone]} style={{ fontWeight: "700", fontSize: 11, flex: 1 }}>{proposalTitle(session)}</Copy>
               </View>
               <Copy size="caption" numberOfLines={1} color={colors[tone]} style={{ fontSize: 10, opacity: 0.85, fontVariant: ["tabular-nums"] }}>

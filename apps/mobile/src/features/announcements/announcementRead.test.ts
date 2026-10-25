@@ -1,3 +1,4 @@
+import { todayPlanningMemory } from "../redesign/planningSession";
 import { createElement, Fragment } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -5,6 +6,15 @@ import type { StudentAnnouncement } from "@stay-focused/shared";
 import { AnnouncementDetailScreen, AnnouncementsScreen } from "./AnnouncementsScreen";
 import { TodayScreen } from "../redesign/TodayScreen";
 import { useListPreferences } from "../redesign/useListPreferences";
+beforeEach(() => todayPlanningMemory.reset());
+vi.mock("../redesign/PlanningSheet", () => ({ PlanningControl: "PlanningControl" }));
+
+
+
+
+
+
+
 
 const mocks = vi.hoisted(() => ({
   owner: "", id: "", items: null as StudentAnnouncement[] | null,

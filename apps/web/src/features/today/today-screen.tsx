@@ -11,9 +11,10 @@ import type {
 } from "@stay-focused/shared";
 import {
   proposalTargetKey,
-  type DeterministicStudyPlan,
+  type PlanningCandidates, type DeterministicStudyPlan,
 } from "@stay-focused/shared/task-planning";
-import { planModeStore, usePlanMode } from "../../lib/plan-mode";
+import { PlanningControl } from "./planning-sheet";
+import { todayPlanningMemory } from './planning-session';
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -86,11 +87,14 @@ export function TodayScreen() {
     "data", false, undefined, adjusting,
   );
 
-  // The "Plan with" choice scopes previews: changing it drops any older
-  // preview, and a late response for an older mode, range or date never lands.
-  const planMode = usePlanMode();
+  // New builds carry a device-local selection; the preview queue always drops older work.
+  const identity = `${session?.user.id ?? ""}:${date}`;
+  const [, renderBuiltChoice] = useState(0);
+  const remembered = todayPlanningMemory.read(identity);
+  const activePlan = remembered;
+  const planMode = activePlan?.mode ?? "reviewers_tasks";
   const { preview, previewRequest, previewing, previewNote, queuePreview, clearPreview } = useQuietPlanner(
-    `${session?.user.id ?? ""}:${date}:${planMode}`, request => api<DeterministicStudyPlan>("/api/experience/planner/preview", { method: "POST", body: request }),
+    identity, request => api<DeterministicStudyPlan>("/api/experience/planner/preview", { method: "POST", body: request }),
   );
   const capabilities = { ...today, data: today.data?.capabilities ?? null };
   const announcements = { ...today, data: today.data?.announcements ?? null };
@@ -139,7 +143,6 @@ export function TodayScreen() {
   const busyRef = useRef(false);
   const plannerReady = available(capabilities.data?.planner);
 
-  const planWanted = useRef(false), modeChosen = useRef(false), previewedMode = useRef(planMode);
   const change = (from: number, to: number) => {
     if (!validFreeTime({ start: from, end: to })) return;
     setStart(from);
@@ -152,27 +155,14 @@ export function TodayScreen() {
   function plan(from: number, to: number) {
     if (!validFreeTime({ start: from, end: to }) || !plannerReady) return;
     setNote(null);
-    planWanted.current = true;
-    queuePreview(planningRequest(date, from, to, planMode));
+    queuePreview({ ...planningRequest(date, from, to, planMode), selection: activePlan?.selection ?? { order: "smart" } });
   }
-  // A preview the student is looking at (or asked for) follows the mode: a
-  // menu choice always re-runs it; a synced change only replaces a live one.
-  const replan = useRef(() => {});
-  replan.current = () => plan(start, end);
-  useEffect(() => {
-    if (previewedMode.current === planMode) return;
-    previewedMode.current = planMode;
-    const rerun = modeChosen.current || planWanted.current;
-    modeChosen.current = false;
-    if (rerun && !adjusting.current) replan.current();
-  }, [planMode, adjusting]);
   async function apply() {
     if (!previewRequest || busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
     try {
       await api("/api/experience/planner/replan", { method: "POST", body: previewRequest });
-      planWanted.current = false;
       clearPreview();
       setNote("Saved. These blocks are on your Schedule.");
       clockWindow.reconcile();
@@ -307,11 +297,17 @@ export function TodayScreen() {
               }}
               onCommit={change}
               onAdjustingChange={(active) => { clockWindow.setAdjusting(active); if (active) clearPreview(); }}
-              planMode={planMode}
-              onPlanModeChange={(mode) => { modeChosen.current = true; planModeStore.choose(mode); }}
               disabled={busy || !plannerReady}
               proposed={proposed}
             />
+            <PlanningControl key={identity} request={planningRequest(date, start, end, "reviewers_tasks")} active={activePlan}
+              disabled={busy || !plannerReady}
+              load={request => api<PlanningCandidates>("/api/experience/planner/candidates", { method: "POST", body: request })}
+              onBuild={choice => {
+                todayPlanningMemory.build(identity, choice);
+                renderBuiltChoice(revision => revision + 1); setNote(null);
+                queuePreview({ ...planningRequest(date, start, end, choice.mode), selection: choice.selection });
+              }} />
             <p className="free-time-line">
               <span className="free-swatch" aria-hidden="true" />
               {formatFreeTime(freeTimeDuration(start, end))} free · {clockLabel(start)} – {clockLabel(end)}
@@ -340,8 +336,7 @@ export function TodayScreen() {
               busy={busy}
               onApply={() => void apply()}
               onDiscard={() => {
-                planWanted.current = false;
-                clearPreview();
+                          clearPreview();
               }}
             />
           )}

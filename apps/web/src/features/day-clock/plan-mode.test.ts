@@ -1,3 +1,4 @@
+import { todayPlanningMemory } from "../today/planning-session";
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -9,9 +10,20 @@ import { ClockOptions } from "./clock-options";
 import { CLOCK } from "./dayClock";
 import { planModeStore } from "../../lib/plan-mode";
 import { arrangeToday } from "../../app-model/presentation";
+vi.mock("../today/planning-sheet", () => ({ PlanningControl: "PlanningControl" }));
 
-// TP1 on the website: the "Plan with" choice lives in the clock menu, scopes
-// previews (older modes never land), and reviewer blocks open their reviewer.
+
+
+
+
+
+
+
+
+
+
+
+// TP2 Today integration: device selection, stale responses and reviewer navigation.
 const mocks = vi.hoisted(() => ({ api: vi.fn(), push: vi.fn(), entries: new Map<string, string>() }));
 vi.mock("../../components/providers", () => ({ useAuth: () => ({ api: mocks.api, session: { user: { id: "owner" } } }) }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
@@ -52,7 +64,7 @@ let tree: ReactTestRenderer | undefined;
 const noop = { addEventListener() {}, removeEventListener() {} };
 beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 9, 24, 12));
-  mocks.api.mockReset(); mocks.push.mockReset(); mocks.entries.clear(); planModeStore.reset();
+  todayPlanningMemory.reset(); mocks.api.mockReset(); mocks.push.mockReset(); mocks.entries.clear(); planModeStore.reset();
   mocks.entries.set("sf.today.free-time.2026-10-24", JSON.stringify({ start: 600, end: 720 }));
   mocks.api.mockImplementation(async (path: string) => path.startsWith("/api/today") ? fixture() : plan("default"));
   vi.stubGlobal("localStorage", { getItem: (key: string) => mocks.entries.get(key) ?? null, setItem: (key: string, value: string) => { mocks.entries.set(key, value); } });
@@ -66,17 +78,20 @@ beforeEach(async () => {
 });
 afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); planModeStore.reset(); });
 const tick = async (ms: number) => { await act(async () => { vi.advanceTimersByTime(ms); }); };
-const options = () => tree!.root.findByType(ClockOptions).props as { planMode: string; onPlanModeChange: (mode: string) => void; onCommit: (start: number, end: number) => void };
+const options = () => tree!.root.findByType(ClockOptions).props;
+const control = () => tree!.root.findByType("PlanningControl" as never);
+const choice = (mode: "reviewers" | "tasks" | "reviewers_tasks") => ({ mode, selection: { order: "manual", items: [{ kind: mode === "tasks" ? "task" : "reviewer", id: "selected" }] }, draft: { mode } });
 const previews = () => mocks.api.mock.calls.filter(([path]) => path === "/api/experience/planner/preview");
 const shown = () => tree!.root.findAllByType("PlanPreview" as never).map(node => (node.props as { plan: DeterministicStudyPlan }).plan);
 
-it("defaults to Reviewers & tasks in the clock menu and applies exactly the previewed mode", async () => {
-  expect(options().planMode).toBe("reviewers_tasks");
-  expect(tree!.root.findByType(DayRingClock).props.planMode).toBe("reviewers_tasks");
+it("defaults to Both without menu radios and applies exactly the previewed selection", async () => {
+  expect(options().planMode).toBeUndefined();
+  expect(control().props.active).toBeNull();
   await act(async () => options().onCommit(600, 780)); await tick(400);
   expect(previews()).toHaveLength(1);
   const body = previews()[0]![1].body;
   expect(body.mode).toBe("reviewers_tasks");
+  expect(body.selection).toEqual({ order: "smart" });
   await act(async () => { await Promise.resolve(); });
   const preview = tree!.root.findByType("PlanPreview" as never);
   await act(async () => (preview.props as { onApply: () => void }).onApply());
@@ -84,14 +99,14 @@ it("defaults to Reviewers & tasks in the clock menu and applies exactly the prev
   expect(apply[1].body).toEqual(body);
 });
 
-it("re-runs the preview on a menu choice and drops a late response for the older mode", async () => {
+it("builds a new selection and drops a late older-selection preview", async () => {
   let resolveOld!: (value: DeterministicStudyPlan) => void;
   mocks.api.mockImplementationOnce(() => new Promise(done => { resolveOld = done; }));
   await act(async () => options().onCommit(600, 780)); await tick(400);
   expect(previews()[0]![1].body.mode).toBe("reviewers_tasks");
   mocks.api.mockImplementationOnce(async () => plan("reviewers"));
-  await act(async () => options().onPlanModeChange("reviewers"));
-  expect(options().planMode).toBe("reviewers");
+  await act(async () => control().props.onBuild(choice("reviewers")));
+  expect(control().props.active.selection).toEqual(choice("reviewers").selection);
   await tick(399); expect(previews()).toHaveLength(1);
   await tick(1); expect(previews()).toHaveLength(2);
   expect(previews()[1]![1].body).toMatchObject({ mode: "reviewers", availability: previews()[0]![1].body.availability });
@@ -99,18 +114,21 @@ it("re-runs the preview on a menu choice and drops a late response for the older
   expect(shown().map(value => value.planningRange.startsAt)).toEqual(["reviewers"]);
 });
 
-it("a menu choice previews even without a visible plan; a synced change only refreshes a live one", async () => {
+it("ignores stored modes and clock release keeps the built selection", async () => {
   await act(async () => planModeStore.apply("tasks")); await tick(1000);
   expect(previews()).toHaveLength(0);
-  await act(async () => options().onPlanModeChange("reviewers")); await tick(400);
-  expect(previews().map(([, init]) => init.body.mode)).toEqual(["reviewers"]);
-  await act(async () => { await Promise.resolve(); });
+  await act(async () => control().props.onBuild(choice("reviewers"))); await tick(400);
   await act(async () => planModeStore.apply("reviewers_tasks")); await tick(400);
-  expect(previews().map(([, init]) => init.body.mode)).toEqual(["reviewers", "reviewers_tasks"]);
-  await act(async () => { await Promise.resolve(); });
-  await act(async () => (tree!.root.findByType("PlanPreview" as never).props as { onDiscard: () => void }).onDiscard());
-  await act(async () => planModeStore.apply("tasks")); await tick(1000);
-  expect(previews()).toHaveLength(2);
+  expect(previews()).toHaveLength(1);
+  await act(async () => options().onCommit(660, 840)); await tick(400);
+  expect(previews()[1]![1].body).toMatchObject({ mode: "reviewers", selection: choice("reviewers").selection });
+});
+it("reload clears the local selection", async () => {
+  await act(async () => control().props.onBuild(choice("tasks"))); await tick(400);
+  await act(async () => tree!.unmount());
+  todayPlanningMemory.reset(); // a reload creates a fresh JS module instance
+  await act(async () => { tree = create(createElement(TodayScreen)); });
+  expect(control().props.active).toBeNull();
 });
 
 it("opens a reviewer block's saved reviewer and keeps task blocks on their session", async () => {

@@ -42,6 +42,8 @@ export function Copy({
   color,
   style,
   numberOfLines,
+  ellipsizeMode,
+  accessibilityLiveRegion,
 }: {
   children: ReactNode;
   size?: "display" | "h1" | "h2" | "h3" | "body" | "bodySmall" | "caption";
@@ -49,11 +51,15 @@ export function Copy({
   color?: string;
   style?: StyleProp<import("react-native").TextStyle>;
   numberOfLines?: number;
+  ellipsizeMode?: React.ComponentProps<typeof Text>["ellipsizeMode"];
+  accessibilityLiveRegion?: React.ComponentProps<typeof Text>["accessibilityLiveRegion"];
 }) {
   const { colors } = useTheme();
   return (
     <Text
       numberOfLines={numberOfLines}
+      ellipsizeMode={ellipsizeMode}
+      accessibilityLiveRegion={accessibilityLiveRegion}
       style={[
         {
           color: color ?? (muted ? colors.textSecondary : colors.textPrimary),
@@ -521,14 +527,22 @@ export function Sheet({
   children,
   onClose,
   title,
+  titleMeta,
+  closeLabel = "Done",
   footer,
   scrollRef,
   onScrollBeginDrag,
   dismissible = true,
+  maxHeight = "88%",
+  onScroll,
+  scrollEnabled = true,
+  dragEnabled = true,
 }: {
   children: ReactNode;
   onClose: () => void;
   title?: string;
+  titleMeta?: ReactNode;
+  closeLabel?: string;
   /** Pinned below the scroll area, always visible (e.g. a secondary action). */
   footer?: ReactNode;
   /** Lets content bring a focused field into view; the Modal does not resize for the keyboard. */
@@ -536,6 +550,10 @@ export function Sheet({
   onScrollBeginDrag?: React.ComponentProps<typeof ScrollView>["onScrollBeginDrag"];
   /** Required-update sheets release through connectivity state, never a close gesture. */
   dismissible?: boolean;
+  maxHeight?: number | `${number}%`;
+  onScroll?: React.ComponentProps<typeof ScrollView>["onScroll"];
+  scrollEnabled?: boolean;
+  dragEnabled?: boolean;
 }) {
   const { colors, reducedMotion } = useTheme();
   const insets = useSafeAreaInsets();
@@ -585,12 +603,12 @@ export function Sheet({
         </Animated.View>
         <Animated.View
           accessibilityViewIsModal
-          {...(dismissible ? pull.touchHandlers : {})}
+          {...(dismissible && dragEnabled ? pull.touchHandlers : {})}
           onLayout={(event) => {
             panelHeight.current = event.nativeEvent.layout.height;
           }}
           style={{
-            maxHeight: "88%",
+            maxHeight,
             flexShrink: 1,
             marginBottom: -SHEET_OVERSHOOT,
             backgroundColor: colors.surfaceElevated,
@@ -610,15 +628,16 @@ export function Sheet({
             <View style={{ flex: 1, minWidth: 0 }}>
               {title ? <Copy size="h3" style={{ fontWeight: "600" }}>{title}</Copy> : null}
             </View>
-            {dismissible ? <DoneButton onPress={() => dismiss()} /> : null}
+            {titleMeta}
+            {dismissible ? <DoneButton label={closeLabel} onPress={() => dismiss()} /> : null}
           </View>
           <ScrollView
             ref={scrollRef}
             style={{ flexShrink: 1 }}
-            scrollEnabled={!contentFits}
+            scrollEnabled={scrollEnabled && !contentFits}
             onLayout={(event) => setViewport(event.nativeEvent.layout.height)}
             onContentSizeChange={(_width, height) => setContentHeight(height)}
-            onScroll={dismissible ? pull.onScroll : undefined}
+            onScroll={onScroll ? event => { if (dismissible) pull.onScroll(event); onScroll(event); } : dismissible ? pull.onScroll : undefined}
             onScrollBeginDrag={onScrollBeginDrag}
             scrollEventThrottle={16}
             alwaysBounceVertical={false}
