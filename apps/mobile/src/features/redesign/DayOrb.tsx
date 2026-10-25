@@ -7,6 +7,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, AppState, View } from "react-native";
 import { OrbPoster } from '../generation-core/OrbPoster';
 import * as THREE from "three";
+import { configureOrbRenderer, createOrbStage } from '@stay-focused/shared/orb-scene';
 import { createClockGlass } from '@stay-focused/shared/clock-glass-renderer';
 import clockMetrics from '../../../assets/clock/clock-atlas.json';
 
@@ -16,10 +17,10 @@ import { createOrbBody } from "../generation-core/orbBody";
 import { threeContext } from "../generation-core/threeContext";
 import { dayOrbTones, type DayOrbTones } from "./dayClock";
 
-const CAMERA_DISTANCE = 4.55;
-const CAMERA_FOV = 36;
+
 /** Share of the canvas the ball's diameter fills at this camera. */
-export const DAY_ORB_FILL = (0.95 * 2) / (2 * CAMERA_DISTANCE * Math.tan((CAMERA_FOV / 2) * (Math.PI / 180)));
+export { DAY_ORB_FILL } from '@stay-focused/shared/orb-scene';
+import { DAY_ORB_FILL } from '@stay-focused/shared/orb-scene';
 const SPIN_AXIS = new THREE.Vector3(0.18, 1, -0.12).normalize();
 /**
  * The Today orb moves slowly, so ~12 fps reads as smooth. Every frame costs
@@ -204,18 +205,8 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   const renderer = new THREE.WebGLRenderer({ canvas, context: threeContext(gl), alpha: true, antialias: true });
   renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
   renderer.setPixelRatio(1);
-  renderer.setClearColor(0x000000, 0);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.02;
-  if (renderer.debug) renderer.debug.onShaderError = () => { throw new Error('orb_shader_unavailable'); };
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
-  camera.zoom = 1 / ORB_AMBIENT_PROFILES[runtime.current.variant].canvasScale;
-  camera.updateProjectionMatrix();
-  camera.position.set(0, 0.02, CAMERA_DISTANCE);
-  const root = new THREE.Group();
-  scene.add(root);
+  configureOrbRenderer(renderer);
+  const { scene, camera, root } = createOrbStage(runtime.current.variant);
   const body = createOrbBody();
   root.add(body.mesh);
   const aura = createOrbAura(runtime.current.variant);

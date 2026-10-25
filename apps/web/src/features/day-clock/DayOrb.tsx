@@ -1,5 +1,5 @@
 "use client";
-import { ORB_AMBIENT_PROFILES, type OrbVariant, cancelOrbSpin } from '@stay-focused/shared';
+import { type OrbVariant, cancelOrbSpin } from '@stay-focused/shared';
 import { useOrbInteraction, type OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 import { createOrbInteractionSampler } from '../knowledge-core/orbInteractionFrame';
 import { memo, useCallback, useEffect, useRef } from "react";
@@ -7,6 +7,7 @@ import { useOrbLoad } from './useOrbLoad';
 import { OrbLoadPoster, usePosterInteraction } from './OrbLoadPoster';
 import { DAY_ORB_FILL } from './orb-footprint';
 import * as THREE from "three";
+import { configureOrbRenderer, createOrbStage } from '@stay-focused/shared/orb-scene';
 import { createClockGlass } from '@stay-focused/shared/clock-glass-renderer';
 import type { ClockGlassReadout } from '@stay-focused/shared';
 import clockMetrics from '../../../public/clock/clock-atlas.json';
@@ -26,8 +27,7 @@ export { DAY_ORB_FILL } from './orb-footprint';
 // camera, frame rate and tones; expo-gl becomes a canvas, and AppState/screen
 // focus become page visibility.
 
-const CAMERA_DISTANCE = 4.55;
-const CAMERA_FOV = 36;
+
 /** Share of the canvas the ball's diameter fills at this camera. */
 const SPIN_AXIS = new THREE.Vector3(0.18, 1, -0.12).normalize();
 /** The Today orb moves slowly, so ~12 fps reads as smooth and stays cheap. */
@@ -194,18 +194,8 @@ function buildScene(
   });
   // The glass is soft; a modest pixel ratio keeps the shader cheap.
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-  renderer.setClearColor(0x000000, 0);
-  renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.02;
-  if (renderer.debug) renderer.debug.onShaderError = () => { throw new Error('orb_shader_unavailable'); };
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 100);
-  camera.zoom = 1 / ORB_AMBIENT_PROFILES[runtime.current.variant].canvasScale;
-  camera.updateProjectionMatrix();
-  camera.position.set(0, 0.02, CAMERA_DISTANCE);
-  const root = new THREE.Group();
-  scene.add(root);
+  configureOrbRenderer(renderer);
+  const { scene, camera, root } = createOrbStage(runtime.current.variant);
   const body = createOrbBody();
   root.add(body.mesh);
   const aura = createOrbAura(runtime.current.variant);
@@ -350,3 +340,4 @@ function buildScene(
     },
   };
 }
+

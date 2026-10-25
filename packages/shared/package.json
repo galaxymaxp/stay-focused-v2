@@ -10,7 +10,9 @@
     "./task-planning": "./src/task-planning.ts",
     "./notification-preferences": "./src/notification-preferences.ts",
     "./study-export": "./src/study-export/index.ts",
-    "./orb-ambient-renderer": "./src/orb-ambient-renderer.ts"
+    "./orb-ambient-renderer": "./src/orb-ambient-renderer.ts",
+    "./orb-body-renderer": "./src/orb-body-renderer.ts",
+    "./orb-scene": "./src/orb-scene.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

@@ -70,3 +70,18 @@ UNVERIFIED (owner to confirm); no remote inspection is permitted.
 - Device checks NOT RUN: website and Realme material appearance, press slosh,
   fixed accent while the orb changes palette, native GL/performance/accessibility.
 - Confirm live deployed/database/Scheduler state separately.
+
+## STEP 1 receipt
+
+Extracted `createOrbBody` to the GPU-only shared `orb-body-renderer` subpath;
+both old platform paths re-export it. Extracted scene/camera/output setup to
+`createOrbStage` / `configureOrbRenderer` in shared `orb-scene`, used by both
+DayOrb implementations. The sphere shader, geometry and uniforms are unchanged.
+FRESH fixed noon / time 8.4 / pearl / Reduce Motion Chromium SwiftShader captures
+before and after: **0 changed channels out of 396,900 in each theme; maximum
+channel difference 0**. [Light before](../../../tmp/overnight/TP2b/orb-before-light.png),
+[light after](../../../tmp/overnight/TP2b/orb-after-light.png),
+[dark before](../../../tmp/overnight/TP2b/orb-before-dark.png),
+[dark after](../../../tmp/overnight/TP2b/orb-after-dark.png).
+Machine receipt: tmp/overnight/TP2b/orb-diff.json. FRESH extraction-focused web
+regressions: **22/22 tests, 2/2 files** (`extraction-focused.log`).
