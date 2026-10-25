@@ -31,7 +31,7 @@ export interface ClockGlassReadout {
 /** Pure layout: tabular cells, tight tracking, small baseline-aligned AM/PM.
  * Unknown glyphs contribute neither quad nor advance; space contributes a gap.
  */
-export function layoutClockGlyphs(text: string, metrics: ClockGlyphMetrics) {
+export function layoutClockGlyphs(text: string, metrics: ClockGlyphMetrics, label = false) {
   const quads: ClockGlyphQuad[] = [];
   const tabular = Math.max(...'0123456789'.split('').map(char => metrics.glyphs[char]?.advance ?? 0));
   let x = 0;
@@ -39,7 +39,7 @@ export function layoutClockGlyphs(text: string, metrics: ClockGlyphMetrics) {
     const glyph = metrics.glyphs[char];
     if (!glyph) continue;
     if (char === ' ') { x += 0.14; continue; }
-    const scale = /[AMP]/.test(char) ? 0.45 : 1;
+    const scale = !label && /[AMP]/.test(char) ? 0.45 : 1;
     const digit = /[0-9]/.test(char);
     const advance = digit ? tabular : glyph.advance;
     const k = scale / metrics.fontSize;

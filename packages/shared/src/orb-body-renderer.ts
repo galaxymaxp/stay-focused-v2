@@ -133,6 +133,32 @@ void main() {
   gl_FragColor.rgb *= gl_FragColor.a;
 }`;
 
+// Keep the orb program byte-for-byte unchanged. A slab changes only the ray's
+// exit intersection and containment/fill; studio(), liquid(), Fresnel,
+// refraction, caustics, accumulation and output transforms are the same optics.
+const SLAB_FRAGMENT = FRAGMENT
+  .replace('uniform vec3 uCenter;', 'uniform vec3 uCenter;\nuniform vec3 uHalfSize;\nuniform float uCornerRadius;\nuniform float uSlosh;')
+  .replace('float travel = max(-b + sqrt(max(b * b - dot(oc, oc) + uRadius * uRadius, 0.0)), 0.0);', `
+  vec3 exits = (sign(rd) * uHalfSize - oc) / (sign(rd) * max(abs(rd), vec3(0.00001)));
+  float travel = max(0.0, min(exits.x, min(exits.y, exits.z)));`)
+  .replace('(oc + rd * travel * ((float(i) + 0.5) / 5.0)) / uRadius', '(oc + rd * travel * ((float(i) + 0.5) / 5.0)) / uHalfSize')
+  .replace('float held = 1.0 - smoothstep(0.5, 0.7, r2);', `
+    vec2 p = x.xy * uHalfSize.xy;
+    float edge = length(max(abs(p) - (uHalfSize.xy - uCornerRadius), 0.0)) - uCornerRadius;
+    float held = (1.0 - smoothstep(-0.035, 0.0, edge)) * (1.0 - smoothstep(0.85, 1.0, abs(x.z)));`)
+  .replace('float sheet = smoothstep(0.3, 0.9, liquid(uSpin * x)) * held;', `
+    float flow = liquid(uSpin * x);
+    float surface = -0.10 + uSlosh * x.x + 0.045 * flow;
+    float filled = 1.0 - smoothstep(surface - 0.035, surface + 0.035, x.y);
+    float sheet = (0.35 + 0.65 * smoothstep(0.3, 0.9, flow)) * held * filled;`)
+  // The slab's shallow bevel needs a wider key reflection to read at 48px.
+  .replace('48.0) * uLightMode', '24.0)');
+
+export interface OrbSlabVolume {
+  readonly halfSize: THREE.Vector3;
+  readonly cornerRadius: number;
+}
+
 export interface OrbBodyFrame {
   readonly waves?: readonly OrbWave[];
   /** Pass only for idle: generation states retain their authoritative appearance. */
@@ -150,7 +176,7 @@ export interface OrbBodyFrame {
 }
 
 /** A clear glass ball holding luminous liquid, lit from its centre. */
-export function createOrbBody() {
+export function createOrbBody(geometry: THREE.BufferGeometry = new THREE.SphereGeometry(ORB_RADIUS, 96, 64), slab?: OrbSlabVolume) {
   const uniforms = {
     uTime: { value: 0 }, uLife: { value: 0 }, uStir: { value: 0 }, uRadius: { value: ORB_RADIUS },
     uSpin: { value: new THREE.Matrix3() }, uCenter: { value: new THREE.Vector3() },
@@ -161,10 +187,11 @@ export function createOrbBody() {
     uLight: { value: new THREE.Vector3() },
     uWaveCount: { value: 0 }, uWaveGain: { value: 1 },
     uWaves: { value: Array.from({ length: ORB_MAX_IMPULSES }, () => new THREE.Vector4(0, 0, 1, -1)) },
+    uHalfSize: { value: slab?.halfSize.clone() ?? new THREE.Vector3(1, 1, 1) },
+    uCornerRadius: { value: slab?.cornerRadius ?? 0 }, uSlosh: { value: 0 },
   };
-  const geometry = new THREE.SphereGeometry(ORB_RADIUS, 96, 64);
   const material = new THREE.ShaderMaterial({
-    uniforms, vertexShader: VERTEX, fragmentShader: FRAGMENT,
+    uniforms, vertexShader: VERTEX, fragmentShader: slab ? SLAB_FRAGMENT : FRAGMENT,
     transparent: true, depthWrite: false, premultipliedAlpha: true,
   });
   const mesh = new THREE.Mesh(geometry, material);

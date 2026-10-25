@@ -74,7 +74,7 @@ void main() {
 /** Orb target then base + glyph quads in one composite render pass.
  * Text changes only the preallocated vertex buffer, never the atlas texture.
  */
-export function createClockGlass(renderer: THREE.WebGLRenderer, atlas: THREE.Texture, metrics: ClockGlyphMetrics) {
+export function createClockGlass(renderer: THREE.WebGLRenderer, atlas: THREE.Texture, metrics: ClockGlyphMetrics, label = false) {
   if (!renderer.extensions.has('EXT_color_buffer_float')) throw new Error('clock_float_target_unavailable');
   const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false });
   const scene = new THREE.Scene();
@@ -103,23 +103,24 @@ export function createClockGlass(renderer: THREE.WebGLRenderer, atlas: THREE.Tex
   if (renderer.debug) renderer.debug.onShaderError = () => { throw new Error('clock_shader_compile_failed'); };
   let previous = '';
   return {
-    render(orb: THREE.Scene, orbCamera: THREE.Camera, readout: ClockGlassReadout, size: number, light: readonly number[], dark: boolean) {
+    render(orb: THREE.Scene, orbCamera: THREE.Camera, readout: ClockGlassReadout, size: number, light: readonly number[], dark: boolean, height = size) {
       renderer.getDrawingBufferSize(bufferSize);
       if (target.width !== bufferSize.x || target.height !== bufferSize.y) target.setSize(bufferSize.x, bufferSize.y);
       uniforms.uPixel.value.set(1 / bufferSize.x, 1 / bufferSize.y);
       uniforms.uLight.value.set(light[0] ?? 0, light[1] ?? 1);
-      base.uniforms.uScrim!.value = dark ? 0.35 : 0;
+      base.uniforms.uScrim!.value = dark && !label ? 0.35 : 0;
       uniforms.uLightMode.value = dark ? 0 : 1;
-      const key = `${readout.text}/${readout.fontSize}/${size}`;
+      const key = `${readout.text}/${readout.fontSize}/${size}/${height}`;
       if (key !== previous) {
         previous = key;
-        const layout = layoutClockGlyphs(readout.text, metrics);
+        const layout = layoutClockGlyphs(readout.text, metrics, label);
         const unit = readout.fontSize * 2 / size;
+        const unitY = readout.fontSize * 2 / height;
         const centerY = (layout.minY + layout.maxY) / 2;
         let i = 0;
         for (const q of layout.quads.slice(0, 16)) {
           const x0 = (q.x - layout.width / 2) * unit, x1 = x0 + q.width * unit;
-          const y0 = -(q.y - centerY) * unit, y1 = y0 - q.height * unit;
+          const y0 = -(q.y - centerY) * unitY, y1 = y0 - q.height * unitY;
           for (const [x, y, u, v] of [[x0,y0,q.uv[0]!,q.uv[1]!], [x0,y1,q.uv[0]!,q.uv[3]!], [x1,y0,q.uv[2]!,q.uv[1]!],
             [x1,y0,q.uv[2]!,q.uv[1]!], [x0,y1,q.uv[0]!,q.uv[3]!], [x1,y1,q.uv[2]!,q.uv[3]!]]) {
             position.setXYZ(i, x!, y!, 0); uv.setXY(i, u!, v!); i++;
