@@ -195,6 +195,15 @@ beforeEach(() => {
   });
   mocks.client.mockImplementation(fakeClient);
   mocks.rpc.mockImplementation((name: string, args: Row) => {
+    if (name === 'import_canvas_assignments_as_tasks_v1') {
+      const rows = tables.canvas_assignments!.filter(row => row.user_id === args.p_user_id && (args.p_assignment_ids as string[]).includes(row.id as string));
+      for (const assignment of rows) if (!tables.tasks!.some(row => row.canvas_assignment_row_id === assignment.id)) tables.tasks!.push({
+        ...tables.tasks![0], id: uuid(500 + tables.tasks!.length), title: assignment.name, user_id: args.p_user_id,
+        source_type: 'canvas', canvas_assignment_row_id: assignment.id, canvas_assignment_id: assignment.canvas_assignment_id,
+        canvas_connection_id: uuid(99), canvas_course_id: 'BIO101', estimated_minutes: 60, due_at: assignment.due_at,
+      });
+      return { data: tables.tasks!.filter(row => rows.some(assignment => assignment.id === row.canvas_assignment_row_id)), error: null };
+    }
     if (name === "apply_study_plan_v1" || name === "apply_study_plan_v2") return applyPlan(name, args);
     if (name === "record_reviewer_open_v1") {
       const owned = tables.generated_artifacts!.some((artifact) => artifact.id === args.p_artifact_id && artifact.user_id === args.p_user_id &&
@@ -209,6 +218,22 @@ beforeEach(() => {
 });
 
 describe("TP1 plan content end to end", () => {
+  it('TP2 lists synchronized unimported work read-only and keeps its selection alias on release/apply', async () => {
+    const assignmentId = uuid(70);
+    tables.canvas_assignments!.push({ id: assignmentId, user_id: A, course_id: C1, canvas_connection_id: uuid(99), canvas_assignment_id: 'work-70',
+      name: 'Synced work', due_at: at('17:00'), submission_types: ['online_upload'], created_at: ago(1), published: true });
+    tables.canvas_course_sync_preferences!.push({ id: uuid(71), user_id: A, course_id: C1, canvas_connection_id: uuid(99), selected: true });
+    const candidates = await data<import('@stay-focused/shared/task-planning').PlanningCandidates>(await post('planner/candidates', A, plan('tasks')));
+    expect(candidates.courses[0]!.items).toContainEqual(expect.objectContaining({ id: assignmentId, needsTaskImport: true, estimateMinutes: 60 }));
+    expect(mocks.rpc).not.toHaveBeenCalled();
+    const request = { ...plan('tasks'), selection: { order: 'manual', items: [{ kind: 'task', id: assignmentId }] } };
+    const preview = await data<Plan>(await post('planner/preview', A, request));
+    expect(titles(preview)).toEqual(['Synced work']);
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(['import_canvas_assignments_as_tasks_v1']);
+    const next = await data<Plan>(await post('planner/preview', A, request)); expect(next).toEqual(preview);
+    expect((await post('planner/apply', A, request)).status).toBe(200);
+    expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(['import_canvas_assignments_as_tasks_v1', 'apply_study_plan_v1']);
+  });
   it("TP2 reads grouped owned candidates without writes and defaults match TP1", async () => {
     const candidates = await data<import('@stay-focused/shared/task-planning').PlanningCandidates>(await post('planner/candidates', A, plan('reviewers_tasks')));
     expect(candidates.courses.map(course => course.id)).toEqual([C1]);

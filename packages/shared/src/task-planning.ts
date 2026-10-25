@@ -196,6 +196,9 @@ export interface PlanSelection {
 }
 
 export interface PlanningCandidate {
+  /** Stable owned assignment alias while its local task projection is admitted. */
+  readonly canvasAssignmentId?: string;
+  readonly needsTaskImport?: boolean;
   readonly smartRank?: number;
   readonly kind: StudyBlockKind;
   readonly id: string;
@@ -508,6 +511,7 @@ export function validatePlanSelection(value: unknown): ValidationResult<PlanSele
       items.push({ kind: item.kind, id: item.id.trim().toLowerCase() });
     }
     if (new Set(items.map(item => `${item.kind}:${item.id}`)).size !== items.length) return invalid("Duplicate selected items.");
+    if (items.filter(item => item.kind === 'task').length > MAX_PLANNING_TASKS || items.filter(item => item.kind === 'reviewer').length > MAX_PLANNING_REVIEWERS) return invalid("Too many selected items of one kind.");
   }
   if (value.order === "manual" && !items) return invalid("Manual order requires items.");
   return { ok: true, value: { order: value.order, ...(courseIds ? { courseIds } : {}), ...(items ? { items } : {}) } };
@@ -644,6 +648,12 @@ function generateSelectedStudyPlan(input: {
         const minutes = reviewerBlockMinutes(reviewer.estimatedMinutes);
         const window = prepared.state.windows.find(window => window.end - window.cursor >= minutes * 60_000);
         if (!window) { exhausted = true; continue; }
+        // Manual order is chronological across busy gaps. Once an item skips
+        // a short earlier window, later items cannot backfill before it.
+        for (const earlier of prepared.state.windows) {
+          if (earlier === window) break;
+          earlier.cursor = earlier.end;
+        }
         prepared.state.sessions.push({ kind: "reviewer", proposalId: proposalId(prepared.state.sessions.length + 1),
           reviewerId: reviewer.id, reviewerTitle: reviewer.title, courseId: reviewer.courseId,
           startsAt: new Date(window.cursor).toISOString(), endsAt: new Date(window.cursor + minutes * 60_000).toISOString(),

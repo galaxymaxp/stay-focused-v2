@@ -20,12 +20,14 @@ import type {
   TaskStatus,
   TaskView,
 } from "@stay-focused/shared/task-planning";
-import { isReviewerProposal, selectReviewerCandidates, reviewerBlockMinutes, REVIEWER_REOPEN_AFTER_MS } from "@stay-focused/shared/task-planning";
+import { isReviewerProposal, selectReviewerCandidates, reviewerBlockMinutes, REVIEWER_REOPEN_AFTER_MS, DEFAULT_CANVAS_TASK_ESTIMATE_MINUTES } from "@stay-focused/shared/task-planning";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isPastStoredCourse } from "@/lib/course-state";
 import { experienceRepository, readOwnedReviewerTargets, type ReviewerTarget } from "@/lib/experience/repository";
 import { readActivityContext } from "@/lib/experience/task-state";
+import { readStoredPlanningCourseInventory } from '@/lib/canvas-course-selection';
+import { orderGenerateCourses } from '@/lib/experience/mappers';
 
 const TASK_COLUMNS =
   "id,user_id,title,notes,status,priority,due_at,estimated_minutes,estimate_source,estimate_note,source_type,canvas_connection_id,canvas_course_id,canvas_assignment_id,canvas_assignment_row_id,created_at,updated_at,completed_at";
@@ -306,15 +308,30 @@ export async function loadOwnedPlanningCandidates(
     readOwnedLibraryReviewers(client, userId), readOwnedReviewerOpens(client, userId),
     readKeptReviewerBlocks(client, userId, request.planningRange),
   ]);
-  const courses = context.courses.filter(course => course.user_id === userId && !isPastStoredCourse(course, now))
-    .sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+  const current = context.courses.filter(course => course.user_id === userId && !isPastStoredCourse(course, now));
+  let courses: ReturnType<typeof orderGenerateCourses>;
+  try { courses = orderGenerateCourses(await readStoredPlanningCourseInventory(client, userId, current, new Date(now))); }
+  catch { throw storageFailure('Courses could not be loaded.'); }
   const courseIds = new Set(courses.map(course => course.id));
   const eligibleTasks = new Map(context.activities.filter(item => item.status !== "submitted" && item.status !== "completed")
     .map(item => [item.taskId, item]));
   const tasks: PlanningCandidate[] = context.tasks.filter(task => task.user_id === userId && task.status === "pending" && eligibleTasks.has(task.id))
     .map(task => ({ kind: "task", id: task.id, title: eligibleTasks.get(task.id)!.title,
+      ...(task.canvas_assignment_row_id ? { canvasAssignmentId: task.canvas_assignment_row_id } : {}),
       courseId: eligibleTasks.get(task.id)!.course?.id ?? null, estimateMinutes: task.estimated_minutes,
       openedWithin24h: false, dueAt: eligibleTasks.get(task.id)!.dueAt, priority: task.priority, createdAt: task.created_at }));
+  // A read must not materialize tasks. List synchronized future assignments
+  // using their owned UUID until Build admits only the selected local rows.
+  for (const activity of context.activities) {
+    if (activity.source !== 'canvas' || activity.taskId || activity.status === 'submitted' || activity.status === 'completed' ||
+      !activity.dueAt || Date.parse(activity.dueAt) <= now) continue;
+    const assignmentId = activity.id.slice('canvas:'.length);
+    const assignment = context.assignments.find(row => row.id === assignmentId && row.user_id === userId);
+    if (!assignment) continue;
+    tasks.push({ kind: 'task', id: assignmentId, canvasAssignmentId: assignmentId, needsTaskImport: true,
+      title: activity.title, courseId: activity.course?.id ?? null, estimateMinutes: DEFAULT_CANVAS_TASK_ESTIMATE_MINUTES,
+      openedWithin24h: false, dueAt: activity.dueAt, priority: activity.priority, createdAt: assignment.created_at });
+  }
   const nextDueByCourse = new Map<string, number>();
   for (const activity of context.activities) {
     if (!activity.course || !activity.dueAt || activity.status === "completed" || activity.status === "submitted") continue;

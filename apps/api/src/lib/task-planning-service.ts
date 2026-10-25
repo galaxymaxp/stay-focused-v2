@@ -16,6 +16,7 @@ import {
   loadOwnedPlannerTasks,
   loadOwnedReviewerCandidates,
   loadOwnedPlanningCandidates,
+  importOwnedCanvasAssignments,
   persistOwnedStudyPlan,
   toStudySessionView,
 } from "@/lib/task-planning-repository";
@@ -38,23 +39,43 @@ export async function previewOwnedStudyPlan(
   provider?: GenerationProvider | null,
 ): Promise<DeterministicStudyPlan> {
   if (request.selection) {
-    const candidates = await loadOwnedPlanningCandidates(client, userId, request, now);
+    let candidates = await loadOwnedPlanningCandidates(client, userId, request, now);
     const selection = request.selection;
-    const all = [...candidates.courses.flatMap(course => course.items), ...candidates.personalItems];
+    let all = [...candidates.courses.flatMap(course => course.items), ...candidates.personalItems];
     const allowedCourses = new Set(candidates.courses.map(course => course.id));
-    const ownedItems = new Map(all.map(item => [`${item.kind}:${item.id}`, item]));
+    const itemMap = () => new Map(all.flatMap(item => [[`${item.kind}:${item.id}`, item] as const,
+      ...(item.kind === 'task' && item.canvasAssignmentId ? [[`task:${item.canvasAssignmentId}`, item] as const] : [])]));
+    let ownedItems = itemMap();
     if (selection.courseIds?.some(id => !allowedCourses.has(id)) || selection.items?.some(item => {
       const candidate = ownedItems.get(`${item.kind}:${item.id}`);
       return !candidate || (selection.courseIds && (!candidate.courseId || !selection.courseIds.includes(candidate.courseId)));
     })) throw new OwnedPlanningError("task_not_found", "One or more selected items were not found.");
     const mode = request.mode ?? "tasks";
+    const chosen = selection.items?.map(item => ownedItems.get(`${item.kind}:${item.id}`)!) ?? all.filter(item =>
+      (!selection.courseIds || (!!item.courseId && selection.courseIds.includes(item.courseId))) && !item.openedWithin24h);
+    if (new Set(chosen.map(item => `${item.kind}:${item.id}`)).size !== chosen.length) throw new OwnedPlanningError('task_not_found', 'One or more selected items were not found.');
+    const imports = chosen.filter(item => item.kind === 'task' && item.needsTaskImport && mode !== 'reviewers').map(item => item.canvasAssignmentId!);
+    if (imports.length) {
+      // Local idempotent projection of already synchronized evidence, never a
+      // Canvas sync, Library refetch, provider call or estimate refresh.
+      for (let offset = 0; offset < imports.length; offset += 100) await importOwnedCanvasAssignments(client, userId, imports.slice(offset, offset + 100));
+      candidates = await loadOwnedPlanningCandidates(client, userId, request, now);
+      all = [...candidates.courses.flatMap(course => course.items), ...candidates.personalItems];
+      ownedItems = itemMap();
+    }
+    const effectiveItems = chosen.map(item => {
+      const resolved = ownedItems.get(`${item.kind}:${item.canvasAssignmentId ?? item.id}`);
+      if (!resolved || (resolved.needsTaskImport && mode !== 'reviewers')) throw new OwnedPlanningError('task_not_found', 'One or more selected items were not found.');
+      return { kind: resolved.kind, id: resolved.id };
+    });
     const explicit = new Set(selection.items?.map(item => `${item.kind}:${item.id}`));
     const reviewers = all.filter(item => item.kind === "reviewer" && (!item.openedWithin24h || explicit.has(`reviewer:${item.id}`)))
       .sort((a, b) => (a.smartRank ?? 0) - (b.smartRank ?? 0))
       .map(item => ({ id: item.id, title: item.title, courseId: item.courseId, estimatedMinutes: item.estimateMinutes }));
     const tasks = all.filter(item => item.kind === "task").map(item => ({ id: item.id, title: item.title, courseId: item.courseId,
       estimatedMinutes: item.estimateMinutes, dueAt: item.dueAt, priority: item.priority, createdAt: item.createdAt }));
-    return generateContentStudyPlan({ mode, tasks, reviewers, planningRange: request.planningRange, availability: request.availability, selection });
+    return generateContentStudyPlan({ mode, tasks, reviewers, planningRange: request.planningRange, availability: request.availability,
+      selection: { ...selection, items: effectiveItems } });
   }
   // An omitted mode is the original tasks-only plan. Reviewers mode never
   // touches task work, so it skips the Canvas import and estimate refresh.

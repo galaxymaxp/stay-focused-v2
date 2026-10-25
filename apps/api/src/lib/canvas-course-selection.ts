@@ -300,6 +300,26 @@ async function storedInventory(client: SupabaseClient<Database>, connection: Can
     selectedCourseIds: preferences.value.filter(row => row.selected).sort(comparePreferences).map(row => row.course_id), classificationSource: 'stored' } };
 }
 
+/** Planning shares Generate's stored mapping and ordering evidence. Unlike
+ * loadCanvasCourseInventory this never falls through to live discovery. */
+export async function readStoredPlanningCourseInventory(client: SupabaseClient<Database>, userId: string,
+  rows: readonly CanvasCourseRow[], now: Date): Promise<readonly CanvasCourseInventoryItem[]> {
+  const connections = [...new Set(rows.map(row => row.canvas_connection_id))];
+  const groups = await Promise.all(connections.map(async connectionId => {
+    const owned = rows.filter(row => row.user_id === userId && row.canvas_connection_id === connectionId);
+    const scope = { client, connectionId, userId };
+    const [preferences, states, runs] = await Promise.all([readCoursePreferences(scope), readCourseSyncStates(scope),
+      readLatestScopedRuns({ ...scope, courseIds: owned.map(row => row.id) })]);
+    if (!preferences.ok || !states.ok || !runs.ok) throw new Error('stored_course_order_unavailable');
+    const latest = latestRunByCourseId(runs.value);
+    return owned.map(row => mapInventoryItem({ row, liveCourse: undefined, now,
+      preference: preferences.value.find(item => item.user_id === userId && item.course_id === row.id) ?? null,
+      state: states.value.find(item => item.user_id === userId && item.course_id === row.id) ?? null,
+      run: latest.get(row.id) ?? null }));
+  }));
+  return groups.flat();
+}
+
 export async function saveCanvasCoursePreferences({
   client,
   selectedCourseIds,

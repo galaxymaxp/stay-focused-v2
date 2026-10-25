@@ -67,9 +67,21 @@ export function resetPlanningOrder(data: PlanningCandidates, draft: PlanningDraf
 }
 export const planningSelectionHash = (mode: PlanMode, selection?: PlanSelection) => JSON.stringify([mode, selection ?? null]);
 
+/** Device-process memory survives navigation; date/owner changes and a fresh
+ * JS process (reload) start with defaults. Never synchronized or stored on disk. */
+export function createPlanningSessionMemory<T>() {
+  let current: { identity: string; value: T } | null = null;
+  return {
+    read(identity: string): T | null { if (current?.identity !== identity) current = null; return current?.value ?? null; },
+    build(identity: string, value: T) { current = { identity, value }; },
+    reset() { current = null; },
+  };
+}
+
 /** A middle ellipsis preserves file extensions; the complete name remains the a11y label. */
 export function planningTitle(title: string, limit = 70): string {
   if (title.length <= limit) return title;
-  const tail = Math.min(24, Math.floor((limit - 1) / 2));
-  return `${title.slice(0, limit - tail - 1)}…${title.slice(-tail)}`;
+  const extension = /\.[^.\s]+$/u.exec(title)?.[0] ?? '';
+  const tail = Math.max(extension.length, Math.min(24, Math.floor((limit - 1) / 2)));
+  return `${title.slice(0, Math.max(1, limit - tail - 1))}…${title.slice(-tail)}`;
 }

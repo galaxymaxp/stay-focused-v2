@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateContentStudyPlan, generateDeterministicStudyPlan, selectReviewerCandidates, validateStudyPlanningRequest, type PlannerTask, type PlanningCandidates } from './task-planning';
-import { builtPlanningSelection, defaultPlanningDraft, movePlanningEntry, planningDraftSummary, resetPlanningOrder, scopedPlanningItems, togglePlanningItems } from './planning-sheet';
+import { createPlanningSessionMemory, builtPlanningSelection, defaultPlanningDraft, movePlanningEntry, planningDraftSummary, planningTitle, resetPlanningOrder, scopedPlanningItems, togglePlanningItems } from './planning-sheet';
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const range = { startsAt: '2026-10-25T00:00:00.000Z', endsAt: '2026-10-26T00:00:00.000Z' };
 const free = [{ startsAt: '2026-10-25T09:00:00.000Z', endsAt: '2026-10-25T11:00:00.000Z' }];
@@ -15,6 +15,12 @@ const data: PlanningCandidates = { planningRange: range, availability: free, fre
       openedWithin24h: false, dueAt: null, priority: 'medium' as const, createdAt: range.startsAt })),
   ] })), personalItems: [] };
 describe('TP2 selection contract and sheet model', () => {
+  it.each(['.pdf', '.pptx', '.customextension'])('keeps %s intact in narrow middle-ellipsis titles', extension => {
+    const title = `A long synthetic instructional filename${extension}`;
+    const display = planningTitle(title, 8);
+    expect(display).toContain('…'); expect(display.endsWith(extension)).toBe(true);
+    expect(planningTitle('Short.pdf', 20)).toBe('Short.pdf');
+  });
   it('leaves omitted-selection and old mode-only requests byte-identical', () => {
     const plan = generateContentStudyPlan(input);
     expect(JSON.stringify(generateContentStudyPlan({ ...input, selection: undefined }))).toBe(JSON.stringify(plan));
@@ -43,6 +49,18 @@ describe('TP2 selection contract and sheet model', () => {
     expect(plan.sessions.map(item => item.kind === 'reviewer' ? item.reviewerId : item.taskId)).toEqual([id(3), id(2), id(1)]);
     expect(plan.sessions.map(item => item.durationMinutes)).toEqual([20, 80, 20]);
     expect(plan.notFit).toEqual([{ kind: 'task', id: id(1), minutes: 60 }, { kind: 'reviewer', id: id(4), minutes: 20 }]);
+  });
+  it('keeps manual order chronological when a reviewer skips a short window before a busy gap', () => {
+    const availability = [
+      { startsAt: '2026-10-25T09:00:00.000Z', endsAt: '2026-10-25T09:10:00.000Z' },
+      { startsAt: '2026-10-25T10:00:00.000Z', endsAt: '2026-10-25T10:40:00.000Z' },
+    ];
+    const plan = generateContentStudyPlan({ ...input, availability, tasks: [{ ...tasks[0]!, estimatedMinutes: 20 }],
+      selection: { order: 'manual', items: [{ kind: 'reviewer', id: id(3) }, { kind: 'task', id: id(1) }] } });
+    expect(plan.sessions.map(session => [session.kind ?? 'task', session.startsAt, session.durationMinutes])).toEqual([
+      ['reviewer', '2026-10-25T10:00:00.000Z', 20], ['task', '2026-10-25T10:20:00.000Z', 20],
+    ]);
+    expect(plan.notFit).toEqual([]);
   });
   it('never overbooks or duplicates reviewer targets across disjoint windows', () => {
     const plan = generateContentStudyPlan({ ...input, availability: [free[0]!, { startsAt: '2026-10-25T12:00:00.000Z', endsAt: '2026-10-25T12:10:00.000Z' }], selection: { order: 'smart' } });
@@ -78,4 +96,12 @@ describe('TP2 selection contract and sheet model', () => {
   ])('rejects malformed selection %j', selection => {
     expect(validateStudyPlanningRequest({ planningRange: range, availability: free, selection })).toMatchObject({ ok: false });
   });
+});
+
+it('device session memory survives navigation, resets on owner/date and fresh reload', () => {
+ const memory = createPlanningSessionMemory<string>();
+ memory.build('a:2026-10-25', 'choice'); expect(memory.read('a:2026-10-25')).toBe('choice');
+ expect(memory.read('a:2026-10-26')).toBeNull(); expect(memory.read('a:2026-10-25')).toBeNull();
+ memory.build('a:2026-10-25', 'choice'); expect(memory.read('b:2026-10-25')).toBeNull();
+ expect(createPlanningSessionMemory<string>().read('a:2026-10-25')).toBeNull();
 });
