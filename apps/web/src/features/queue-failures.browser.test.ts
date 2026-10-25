@@ -55,7 +55,7 @@ ${extract(join(native, 'features/queue/QueueDropdown.tsx'), ['QueueDropdown'])}
 createRoot(document.getElementById('root')).render(<QueueDropdown/>);`;
   const webEntry = common + `
 const typeLabel=job=>job.jobType==='quiz_generation'?'Quiz':'Reviewer';
-const usePathname=()=>'/today',useSearchParams=()=>new URLSearchParams(),useOrbInteraction=()=>({}),OrbStill=()=>null;
+const usePathname=()=>'/today',useSearchParams=()=>new URLSearchParams(),useOrbInteraction=()=>({}),QueueOrb=()=>null;
 const useListPreferences=()=>({prefs:{hidden:{queue:[]}},hide:(_,id)=>window.hidden.push(id)});
 const Icon=()=> <span aria-hidden="true"/>,ContentIcon=()=> <span className="content-icon" aria-hidden="true"/>;
 const Notice=({children})=><p className="notice">{children}</p>;

@@ -10,7 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 
-import { OrbPoster } from '../features/generation-core/OrbPoster';
+import { QueueOrb } from '../features/queue/QueueOrb';
 import { useOrbInteraction } from '../features/generation-core/orbInteraction';
 import { useAppActivity } from "./appActivity";
 import { haptic } from "./haptics";
@@ -20,9 +20,9 @@ import { hitTarget } from "./tokens";
 const ORB_SIZE = 26;
 
 /**
- * The header Queue control is the Knowledge Core in miniature. Idle, it is a
- * still glass orb. While Stay Focused is generating or syncing, the orb turns
- * slowly inside a soft glow, and a count on its left shows how much work is in
+ * The header Queue control uses a cached still of the Today glass body.
+ * While Stay Focused is generating or syncing, the orb turns
+ * slowly, and a count on its left shows how much work is in
  * the queue. Either way a tap opens Queue.
  */
 export const QueueButton = memo(function QueueButton() {
@@ -170,7 +170,7 @@ export const QueueButton = memo(function QueueButton() {
         }}
       >
         <Animated.View style={{ transform: [{ rotate: turn.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }] }}>
-          <OrbPoster variant="standalone" size={ORB_SIZE} mode={mode} interaction={interaction} />
+          <QueueOrb size={ORB_SIZE} mode={mode} interaction={interaction} live={appActive && focused} reducedMotion={reducedMotion} />
         </Animated.View>
       </View>
     </Pressable>

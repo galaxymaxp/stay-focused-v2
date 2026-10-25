@@ -24,6 +24,7 @@ async function renderQueueOrbStill(request: OrbStillRequest): Promise<string> {
     renderer = new THREE.WebGLRenderer({ canvas: canvas as unknown as HTMLCanvasElement,
       context: threeContext(gl), alpha: true, antialias: true });
     target = new THREE.WebGLRenderTarget(request.pixels, request.pixels, { samples: 4 });
+    target.texture.colorSpace = THREE.SRGBColorSpace;
     renderer.setRenderTarget(target);
     scene = createOrbStillScene(request); scene.render(renderer);
     // Resolve multisampling before the snapshot. Bind the resolved framebuffer

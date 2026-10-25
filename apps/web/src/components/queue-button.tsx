@@ -7,7 +7,7 @@ import { CourseBatchQueue } from '../features/course-batch-queue';
 import { useQueueItems } from "../features/queue-items";
 import { useListPreferences } from "../lib/list-preferences";
 import { Icon } from './ui';
-import { OrbStill } from '../features/knowledge-core/OrbStill';
+import { QueueOrb } from './queue-orb';
 import { useOrbInteraction } from '../features/knowledge-core/orbInteraction';
 export { countActiveJobs } from "../features/queue-items";
 
@@ -110,7 +110,7 @@ export function QueueButton() {
           />
         ) : null}
         <span className="queue-orb" aria-hidden="true">
-          <OrbStill variant="standalone" interaction={orbInteraction} className="queue-orb-frame" />
+          <QueueOrb interaction={orbInteraction} live={!hidden} />
         </span>
         <span className="queue-label">Queue</span>
       </button>

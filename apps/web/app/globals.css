@@ -2884,6 +2884,22 @@ details[open] > :not(summary) {
   width: 26px;
   height: 26px;
 }
+.queue-orb-still {
+  /* Match the Today paper underneath the transmissive glass, even inside the
+     header's elevated button surface. All pixels remain inside the body. */
+  background: var(--bg) center / contain no-repeat url('/queue/stills/ql1-v1-e6eaf1-light.png');
+}
+:root[data-theme="dark"] .queue-orb-still {
+  background-image: url('/queue/stills/ql1-v1-e6eaf1-dark.png');
+}
+.queue-orb-fade::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit;
+  background: var(--bg) var(--queue-orb-previous) center / contain no-repeat;
+  animation: queue-orb-fade 600ms cubic-bezier(0.333333, 0, 0.666667, 1) forwards;
+}
+@keyframes queue-orb-fade { from { opacity: 1; } to { opacity: 0; } }
+.queue-button[data-hidden="true"] .queue-orb-fade::before { animation: none; opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .queue-orb-fade::before { animation: none; opacity: 0; } }
 .queue-glow {
   position: absolute;
   inset: -7px;
