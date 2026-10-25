@@ -1,3 +1,26 @@
+<!-- QL1 checkpoint begin -->
+## QL1b Queue miniature: FAILED verification checkpoint (2026-10-26)
+
+Baseline/inventory `5533c32b`, shared stills `cbb9703f` and Queue wiring
+`3a74047b` are retained. Resumed native output/orientation and web theme fixes,
+plus new web tests, remain uncommitted because the required web gate failed.
+FRESH: shared 888/89 files, mobile 1732/186 files and Queue GL 13/13 pass;
+24 web/native-proxy pairs meet luminance/hue limits. Full web first attempt:
+706 passed / 1 default-5s timeout. Isolated course options passes 3/3. The full
+retry was interrupted after 5 observed failures under severe resource pressure;
+isolated ambient still fails its unchanged generation capture deadline (13/14).
+The bounded gate attempts ended under QL1b unattended rule 5. No assertion or
+live orb renderer was changed to pass. Forced typecheck/lint, API/web builds,
+offline Android export and forced serial root build are NOT RUN in QL1b.
+
+[Acceptance and exact attempts](acceptance/ql1-queue-logo-orb.md). Resume this item after local
+resources permit green web regressions, then run remaining serial gates and
+commit retained code; do not redo committed steps or start another backlog item.
+Rollout/Device checks NOT RUN. Native GL, physical performance, other browsers,
+assistive technology and production/database/Scheduler state remain UNVERIFIED
+(owner to confirm). No deployment, remote service/SQL, env-file edit or push.
+<!-- QL1 checkpoint end -->
+
 <!-- TP2d completion begin -->
 ## TP2d Plan orb liquid/color: LOCAL PASS (2026-10-25)
 

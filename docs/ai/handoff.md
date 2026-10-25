@@ -11597,3 +11597,71 @@ UNVERIFIED (owner to confirm): native GL presentation, Realme appearance, physic
 No deployment, remote service/SQL, migration application, Scheduler/email,
 env-file edit, push, OTA/EAS or device action occurred. Endpoint TP2d only;
 no release, FULLSEND or other backlog item started.
+
+## Handoff - QL1b Queue miniature verification checkpoint (2026-10-26)
+
+Status: **FAILED at the required web regression gate**, under unattended rule 5.
+The resumed run inspected the expected branch, QL1 progress, Git history and all
+uncommitted work. STEP 0-2 commits were preserved, not repeated:
+
+```text
+5533c32b docs(queue): freeze QL1 miniature baseline
+cbb9703f feat(queue): cache shared orb scene stills on web and mobile
+3a74047b fix(queue): match miniature glass and lighting to Today
+```
+
+The documentation-only failure checkpoint is titled
+`docs(queue): checkpoint QL1b failed web regression gate`; exact hash is in Git
+and `tmp/overnight/QL1b.status`. No resumed implementation change is committed.
+Pending code: shared snapshot-only ACES/sRGB output and opaque paper, native
+upright PNG/NoColorSpace target, web theme crossfade reset, updated native
+adapter test and new web adapter/GL tests. All remain in the working tree for
+resume; no assertion or original live Today/Generation/Knowledge Core renderer
+was changed to obtain a pass.
+
+FRESH shared full: 888 passed / 0 failed, 89 files (45 source + 44 existing
+emitted mirrors). FRESH mobile full: 1732 passed / 0 failed, 186 files.
+FRESH corrected Queue GL proof: 13 passed / 0 failed, 24 web/native-adapter-proxy
+pairs at 390/1280 light/dark pearl/gold/green, maximum mean error 7.018%, p95
+5.667%, hue 0.924 degrees. Bundled fallback assertions pass. Native is explicitly
+Chromium/Expo-boundary proxy evidence, not a physical capture.
+
+Web attempts: first full 706 passed / 1 course-options 5s timeout, 88 files;
+unchanged isolated course-options 3/3 PASS. Second full attempt interrupted
+after 5 observed failures (ambient 1/14 and generation-screen 4/13), without a
+final aggregate. Windows measured 100% CPU, 361 MB available RAM and 2.3 GB memory
+compression. Only the verified QL1b Vitest process tree was stopped. Serial
+isolated validation then passed 544 tests/75 non-browser files and 3/3 course
+options, but ambient still failed 13 passed / 1 unchanged 30s generation-capture
+timeout. The 11 later browser files in that attempt were NOT RUN. These results
+establish no green final full web suite; no prior passing run is substituted.
+All attempt logs/partial inventory remain under tmp/overnight/QL1/ and are
+linked in [acceptance](acceptance/ql1-queue-logo-orb.md).
+
+Forced typecheck/lint, direct API/web builds, offline Android JS/assets export
+and forced serial root build: **NOT RUN, 0 executed in QL1b**, because the web
+gate remained red. No cached prior gate is claimed. API/provider/live suites
+NOT RUN. Final working/staged diff checks are recorded in acceptance.
+
+UNVERIFIED (owner to confirm): native GL/Realme appearance, physical GPU/FPS/
+power, other browsers/assistive technology, live served revision and production/
+database/Scheduler/provider state. Resource pressure is observed; an exclusive
+cause of the timeouts or an application regression has not been established.
+Unrelated UI/, apps/mobile/.gitignore, supabase/.temp/ and all tmp/ paths remain
+preserved and unstaged. No deployment, remote SQL/service call, migration,
+Scheduler/email, env-file edit, push, OTA/EAS or device action occurred.
+
+**Owner steps remaining**:
+
+- Resume QL1b with sufficient local resources. Inspect retained patches and
+  progress, obtain green full web regressions without weaker assertions, then
+  run the six remaining serial gate commands and commit code/completion docs.
+- Rollout NOT RUN: only after local acceptance passes, release with the next
+  separately authorized FULLSEND.
+- Device checks NOT RUN: website and Realme Queue versus Today, synced palette,
+  Reduce Motion, native snapshot orientation/presentation and performance.
+- Confirm live state separately. Vercel CLI is absent; strongly recommend
+  `npm i -g vercel` for future separately authorized env/deploy/log tooling.
+  Installation NOT RUN.
+
+Endpoint: failed QL1b checkpoint only. No other backlog item or FULLSEND started.
