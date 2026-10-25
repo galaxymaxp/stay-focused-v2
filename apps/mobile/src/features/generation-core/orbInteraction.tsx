@@ -9,7 +9,18 @@ export interface OrbInteractionHandle {
   readonly wake: MutableRefObject<(() => void) | null>;
 }
 let colorIndex = 0, revision = 0;
-const listeners = new Set<(index: number) => void>();
+type ColorTransition = Pick<OrbInteraction, 'colorIndex' | 'colorFrom' | 'colorAt'>;
+let palette = createOrbInteraction();
+const listeners = new Set<(transition: ColorTransition) => void>();
+function publishColor(index: number, source?: ColorTransition) {
+  const now = Date.now();
+  if (palette.colorIndex === index && !source) return;
+  const transition: ColorTransition = source
+    ? { colorIndex: source.colorIndex, colorFrom: source.colorFrom, colorAt: source.colorAt }
+    : { colorIndex: index, colorFrom: orbIdleColor(palette, now, false), colorAt: now };
+  palette = { ...palette, ...transition };
+  listeners.forEach(listener => listener(transition));
+}
 let writes: Promise<void> = Promise.resolve();
 function writeColor(index: number) {
   const key = ORB_IDLE_PALETTE[index]?.key ?? 'pearl';
@@ -36,31 +47,34 @@ const choices = new Set<(key: OrbColorKey) => void>();
 export function subscribeOrbColorChoices(listener: (key: OrbColorKey) => void) {
   choices.add(listener); return () => { choices.delete(listener); };
 }
-export function rememberOrbColor(index: number) {
-  saveOrbColor(index);
+export function rememberOrbColor(index: number, source?: ColorTransition) {
+  saveOrbColor(index, source);
   choices.forEach(listener => listener(ORB_IDLE_PALETTE[colorIndex]!.key));
 }
-function saveOrbColor(index: number) {
+function saveOrbColor(index: number, source?: ColorTransition) {
   colorIndex = orbColorIndex(parseOrbColorKey(ORB_IDLE_PALETTE[index]?.key ?? null)); revision++;
-  listeners.forEach(listener => listener(colorIndex));
+  publishColor(colorIndex, source);
   writeColor(colorIndex);
 }
-export function useOrbInteraction(): OrbInteractionHandle {
-  const state = useRef(createOrbInteraction(colorIndex));
+export function useOrbInteraction(supplied?: OrbInteractionHandle): OrbInteractionHandle {
+  if (listeners.size === 0) palette = createOrbInteraction(colorIndex);
+  const state = useRef({ ...createOrbInteraction(colorIndex), colorIndex: palette.colorIndex, colorFrom: palette.colorFrom, colorAt: palette.colorAt });
   const wake = useRef<(() => void) | null>(null);
   const ringDragging = useRef(false);
   useEffect(() => {
+    if (supplied) return;
     let live = true;
-    const apply = (index: number) => {
-      if (!live || state.current.colorIndex === index) return;
-      state.current = { ...state.current, colorIndex: index, colorFrom: orbIdleColor(state.current, Date.now(), false), colorAt: Date.now() };
+    const apply = (transition: ColorTransition) => {
+      if (!live) return;
+      state.current = { ...state.current, ...transition };
       wake.current?.();
     };
-    listeners.add(apply);
-    void readOrbColor().then(apply);
+    apply(palette); listeners.add(apply);
+    void readOrbColor().then(index => { if (live) publishColor(index); });
     return () => { live = false; listeners.delete(apply); };
-  }, []);
-  return useMemo(() => ({ state, wake, ringDragging }), []);
+  }, [supplied]);
+  const local = useMemo(() => ({ state, wake, ringDragging }), []);
+  return supplied ?? local;
 }
 
 /** Transparent ball-only target. Ring responder delegation wins in overlapping bands. */
@@ -78,7 +92,7 @@ export function OrbTouchLayer({ interaction, size, left = 0, top = 0, reducedMot
     }
     const [x, y] = point(event), previous = interaction.state.current.colorIndex;
     interaction.state.current = endOrbGesture(interaction.state.current, x, y, size, Date.now(), reducedMotion, cancelled);
-    if (previous !== interaction.state.current.colorIndex) rememberOrbColor(interaction.state.current.colorIndex);
+    if (previous !== interaction.state.current.colorIndex) rememberOrbColor(interaction.state.current.colorIndex, interaction.state.current);
     interaction.wake.current?.();
   };
   useEffect(() => () => {

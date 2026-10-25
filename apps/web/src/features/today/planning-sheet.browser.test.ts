@@ -181,13 +181,13 @@ it('Select courses, Include, keyboard focus and close preserve the built choice;
   expect(errors).toEqual([]);
  }finally{await page.close()}
 },60_000);
-it('keeps the glass shell fixed through slosh, pauses when unfocused, and statically fills Reduce Motion',async()=>{
+it('keeps the glass shell fixed on press, pauses when unfocused, and statically fills Reduce Motion',async()=>{
  const {page,errors}=await open(1280,'light','no-preference');
  try{
   const button=page.getByRole('button',{name:'Plan your free time',exact:true});
   const shell=()=>button.evaluate(el=>{const s=getComputedStyle(el),r=el.getBoundingClientRect();return {width:r.width,height:r.height,radius:s.borderRadius,border:s.borderColor,background:s.backgroundImage,color:s.color}});
   const before=await shell();await button.click();expect(await shell()).toEqual(before);
-  expect(await page.locator('.plan-action-liquid').evaluate(el=>el.getAnimations()[0]?.effect?.getTiming().duration)).toBe(600);
+  expect(await page.locator('.plan-action-liquid').evaluate(el=>el.getAnimations().length)).toBe(0);
   await page.keyboard.press('Escape');
   await page.evaluate(()=>{document.hasFocus=()=>false;window.dispatchEvent(new Event('blur'))});
   expect(await button.getAttribute('data-live')).toBe('false');

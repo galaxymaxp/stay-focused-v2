@@ -204,3 +204,18 @@ it('ring move, hold, move and release preserves a continuously decaying speed', 
   expect(release.state.spin.velocityY).toBeCloseTo(state.spin.velocityY * Math.exp(-0.3 / 0.4));
   expect(release.animating).toBe(true);
 });
+
+it('retains input delivered after the display-frame timestamp without ageing waves or momentum early', () => {
+  const tapped = endOrbGesture(beginOrbGesture(createOrbInteraction(), 50, 50, 550), 50, 50, 100, 600, false);
+  const pending = sampleOrbInteraction(tapped, 550, 16, false);
+  expect(pending.state.impulses).toHaveLength(1);
+  expect(pending.waves[0]!.time).toBe(0);
+  expect(sampleOrbInteraction(pending.state, 700, 16, false).waves[0]!.time).toBe(.1);
+  expect(sampleOrbInteraction(pending.state, 2400, 16, false).waves).toEqual([]);
+  expect(sampleOrbInteraction(tapped, 550, 16, true).waves).toEqual([]);
+  const spinning = pushOrbSpin(createOrbInteraction(), .2, 600);
+  const early = sampleOrbInteraction(spinning, 550, 16, false);
+  expect(early.state.spinAt).toBe(600);
+  expect(sampleOrbInteraction(early.state, 700, 16, false).state.spin)
+    .toEqual(sampleOrbInteraction(spinning, 700, 16, false).state.spin);
+});

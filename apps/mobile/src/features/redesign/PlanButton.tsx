@@ -3,12 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, AppState, Pressable } from 'react-native';
 import { useIsFocused } from 'expo-router/react-navigation';
 import { useTheme } from '../../design/theme';
+import { useOrbInteraction } from '../generation-core/orbInteraction';
 import { radius } from '../../design/tokens';
 import { PlanButtonFallback } from './PlanButtonFallback';
 import { PlanGlassView, type PlanGlassHandle } from './PlanGlassView';
 
 /** Accessible action owns the press; every visible live pixel comes from GL. */
-export function PlanButton({ onPress, disabled, accent = '#d7aa38' }: { onPress: () => void; disabled?: boolean; accent?: string }) {
+export function PlanButton({ onPress, disabled }: { onPress: () => void; disabled?: boolean }) {
+  const interaction = useOrbInteraction();
   const { mode, active, reducedMotion } = useTheme();
   const focused = useIsFocused();
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
@@ -37,7 +39,7 @@ export function PlanButton({ onPress, disabled, accent = '#d7aa38' }: { onPress:
   }, [live, opacity]);
   const ready = useCallback(() => gate.current?.ready(), []);
   const fail = useCallback(() => gate.current?.fail(), []);
-  if (status === 'failed') return <PlanButtonFallback onPress={onPress} disabled={disabled} />;
+  if (status === 'failed') return <PlanButtonFallback onPress={onPress} disabled={disabled} interaction={interaction} />;
   return <Animated.View style={{ opacity }}>
     <Pressable accessibilityRole="button" accessibilityLabel="Plan your free time" accessibilityHint="Opens planning options"
       accessibilityState={{ disabled }} disabled={disabled}
@@ -51,11 +53,11 @@ export function PlanButton({ onPress, disabled, accent = '#d7aa38' }: { onPress:
           ]);
           pressAnimation.current.start();
         }
-        handle.current?.press(width && Number.isFinite(event.nativeEvent.locationX) ? event.nativeEvent.locationX / width * 2 - 1 : 0.5);
+        handle.current?.press(width && Number.isFinite(event.nativeEvent.locationX) ? event.nativeEvent.locationX / width * 2 - 1 : 0, Number.isFinite(event.nativeEvent.locationY) ? 1 - event.nativeEvent.locationY / 52 * 2 : 0);
         onPress();
       }} style={{ height: 52, width: '100%', borderRadius: radius.control, overflow: 'hidden' }}>
       {width > 0 && <Animated.View pointerEvents="none" style={{ position: 'absolute', inset: 0, opacity: status === 'ready' ? 1 : 0 }}>
-        <PlanGlassView width={width} mode={mode} reducedMotion={reducedMotion} live={live} accent={accent}
+        <PlanGlassView width={width} mode={mode} reducedMotion={reducedMotion} live={live} interaction={interaction}
           handle={handle} onReady={ready} onFailure={fail} onLoading={startGate} />
       </Animated.View>}
     </Pressable>

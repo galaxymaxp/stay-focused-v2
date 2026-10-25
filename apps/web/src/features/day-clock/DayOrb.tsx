@@ -1,5 +1,5 @@
 "use client";
-import { type OrbVariant, cancelOrbSpin } from '@stay-focused/shared';
+import { type OrbVariant, cancelOrbSpin, orbAnimationTime } from '@stay-focused/shared';
 import { useOrbInteraction, type OrbInteractionHandle } from '../knowledge-core/orbInteraction';
 import { createOrbInteractionSampler } from '../knowledge-core/orbInteractionFrame';
 import { memo, useCallback, useEffect, useRef } from "react";
@@ -246,17 +246,17 @@ function buildScene(
   const spinMatrix = new THREE.Matrix3();
   const spinRotation = new THREE.Matrix4();
 
-  const draw = () => {
+  const draw = (timestamp: number) => {
     requestId = null;
     if (disposed || !runtime.current.running) return;
-    const now = Date.now();
+    const now = orbAnimationTime(timestamp);
     const current = runtime.current;
     const settled = levels ? coreLevelsExtra(levels, current.reducedMotion) : null;
     // A failed orb winds down and then stays still, as the Knowledge Core does.
     const moving = current.running && !current.reducedMotion && !(current.state === "error" && settled && !settled.lively);
     if (dirty || now - lastRender >= (interacting || interaction.ringDragging?.current || interaction.state.current.gesture?.rotating || settled?.lively ? 16 : FRAME_MS) || !moving) {
       dirty = false;
-      const delta = Math.min((now - lastFrame) / 1000, 0.08);
+      const delta = Math.max(0, Math.min((now - lastFrame) / 1000, 0.08));
       lastFrame = now;
       lastRender = now;
       levels = current.state

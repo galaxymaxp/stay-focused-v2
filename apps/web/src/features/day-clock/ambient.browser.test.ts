@@ -201,8 +201,9 @@ afterAll(async () => {
   await new Promise<void>(yes => server ? server.close(() => yes()) : yes());
   if (out) rmSync(out, { recursive: true, force: true });
 });
-async function open(width = 1440, theme = 'light', reducedMotion: 'reduce' | 'no-preference' = 'no-preference', fail?: string, query = '') {
+async function open(width = 1440, theme = 'light', reducedMotion: 'reduce' | 'no-preference' = 'no-preference', fail?: string, query = '', controlledClock = false) {
   const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion, recordVideo: { dir: join(evidence, 'video'), size: { width, height: 900 } } });
+  if (controlledClock) await page.clock.install();
   await page.route('**/*', route => route.request().url().startsWith(origin) && !route.request().url().endsWith(fail ?? '/never-block') ? route.continue() : route.abort());
   await page.addInitScript(({ theme, fail }) => {
     const syncTheme = () => { document.documentElement.dataset.theme = theme; };
@@ -309,16 +310,19 @@ it.each(['dark', 'light'].flatMap(theme => ['clock', 'standalone'].map(variant =
 }, 30_000);
 
 it.each(['', '?generation'])('records one tap, five overlapping taps at 150ms, directional taps and decay: %s', async query => {
-  const { page, errors } = await open(390, 'dark', 'no-preference', undefined, query);
+  const { page, errors } = await open(390, 'dark', 'no-preference', undefined, query, true);
   try {
     await page.waitForSelector('canvas'); if(!query) await glass(page);
+    // GPU/protocol work must not consume the 1800ms packet between taps.
+    // All rendering/cadence scenarios above retain their real wall clock.
+    await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000));
     const box = await page.locator('[data-testid="orb-touch"]').boundingBox(); if(!box) throw Error('orb_bounds');
     const name = query ? 'generation' : 'today';
     const at = (x: number) => page.mouse.click(box.x+box.width*x,box.y+box.height*0.5);
-    await at(0.5); await page.waitForTimeout(350);
+    await at(0.5); await page.clock.runFor(350);
     await page.screenshot({path: join(evidence, name+'-single-tap.png')});
-    await page.waitForTimeout(1900);
-    for(let i=0;i<5;i++) { await at(0.5); await page.waitForTimeout(150); }
+    await page.clock.runFor(1900);
+    for(let i=0;i<5;i++) { await at(0.5); await page.clock.runFor(150); }
     const activeSequence = await page.evaluate(() => {
       const u = (window as unknown as { __body: { uWaveCount:{value:number}; uWaves:{value:{w:number}[]} } }).__body;
       return u.uWaves.value.slice(0,u.uWaveCount.value).map(w=>w.w);
@@ -326,10 +330,10 @@ it.each(['', '?generation'])('records one tap, five overlapping taps at 150ms, d
     expect(activeSequence.length).toBe(5); expect(activeSequence[0]!).toBeGreaterThan(activeSequence[4]!);
     writeFileSync(join(evidence, name+'-impulse-ages.json'), JSON.stringify(activeSequence));
     await page.screenshot({path: join(evidence, name+'-five-taps.png')});
-    await at(0.28); await page.waitForTimeout(150); await at(0.72);
-    await page.waitForTimeout(200);
+    await at(0.28); await page.clock.runFor(150); await at(0.72);
+    await page.clock.runFor(200);
     await page.screenshot({path: join(evidence, name+'-distinct-directions.png')});
-    await page.waitForTimeout(2000);
+    await page.clock.runFor(2000);
     await page.screenshot({path: join(evidence, name+'-settled.png')});
     const active = await page.evaluate(() => {
       const body = (window as unknown as { __body: {uWaveCount:{value:number}} }).__body;

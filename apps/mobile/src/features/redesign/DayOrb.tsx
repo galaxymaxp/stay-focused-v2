@@ -1,4 +1,4 @@
-import { ORB_AMBIENT_PROFILES, type OrbVariant, type ClockGlassReadout, cancelOrbSpin, createOrbInteraction,
+import { orbAnimationTime, ORB_AMBIENT_PROFILES, type OrbVariant, type ClockGlassReadout, cancelOrbSpin, createOrbInteraction,
   createOrbLoadGate, ORB_REVEAL_MS, type OrbLoadStatus } from '@stay-focused/shared';
 import type { OrbInteractionHandle } from '../generation-core/orbInteraction';
 import { createOrbInteractionSampler } from '../generation-core/orbInteractionFrame';
@@ -246,10 +246,10 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
   const spinMatrix = new THREE.Matrix3();
   const spinRotation = new THREE.Matrix4();
 
-  const draw = () => {
+  const draw = (timestamp: number) => {
     requestId = null;
     if (disposed || !runtime.current.running) return;
-    const now = Date.now();
+    const now = orbAnimationTime(timestamp);
     const current = runtime.current;
     const settled = levels ? coreLevelsExtra(levels, current.reducedMotion) : null;
     // A failed orb winds down and then stays still, as the Knowledge Core does.
@@ -263,7 +263,7 @@ function buildScene(gl: ExpoWebGLRenderingContext, runtime: { current: Runtime }
     }
     if (dirty || now - lastRender >= (interacting || interaction.ringDragging?.current || interaction.state.current.gesture?.rotating || settled?.lively ? 16 : FRAME_MS) || !moving) {
       dirty = false;
-      const delta = Math.min((now - lastFrame) / 1000, 0.08);
+      const delta = Math.max(0, Math.min((now - lastFrame) / 1000, 0.08));
       lastFrame = now;
       lastRender = now;
       levels = current.state

@@ -17,29 +17,41 @@ const choices = new Set<(key: OrbColorKey) => void>();
 export function subscribeOrbColorChoices(listener: (key: OrbColorKey) => void) {
   choices.add(listener); return () => { choices.delete(listener); };
 }
-export function applySyncedOrbColor(key: OrbColorKey) {
+export function applySyncedOrbColor(key: OrbColorKey, source?: ColorTransition) {
   writeLocalPreference(ORB_COLOR_KEY, key);
-  listeners.forEach(listener => listener(orbColorIndex(key)));
+  publishColor(orbColorIndex(key), source);
 }
-export function rememberOrbColor(index: number) {
+export function rememberOrbColor(index: number, source?: ColorTransition) {
   const key = ORB_IDLE_PALETTE[index]?.key ?? 'pearl';
-  applySyncedOrbColor(key);
+  applySyncedOrbColor(key, source);
   choices.forEach(listener => listener(key));
 }
-const listeners = new Set<(index: number) => void>();
+type ColorTransition = Pick<OrbInteraction, 'colorIndex' | 'colorFrom' | 'colorAt'>;
+let palette = createOrbInteraction();
+const listeners = new Set<(transition: ColorTransition) => void>();
+function publishColor(index: number, source?: ColorTransition) {
+  const now = Date.now();
+  if (palette.colorIndex === index && !source) return;
+  const transition: ColorTransition = source
+    ? { colorIndex: source.colorIndex, colorFrom: source.colorFrom, colorAt: source.colorAt }
+    : { colorIndex: index, colorFrom: orbIdleColor(palette, now, false), colorAt: now };
+  palette = { ...palette, ...transition };
+  listeners.forEach(listener => listener(transition));
+}
 export function useOrbInteraction(supplied?: OrbInteractionHandle): OrbInteractionHandle {
-  const state = useRef(createOrbInteraction(readOrbColor()));
+  const initialIndex = readOrbColor();
+  if (listeners.size === 0) palette = createOrbInteraction(initialIndex);
+  const state = useRef({ ...createOrbInteraction(initialIndex), colorIndex: palette.colorIndex, colorFrom: palette.colorFrom, colorAt: palette.colorAt });
   const wake = useRef<(() => void) | null>(null);
   const ringDragging = useRef(false);
   useEffect(() => {
     if (supplied) return;
-    const apply = (index: number) => {
-      if (state.current.colorIndex === index) return;
-      state.current = { ...state.current, colorFrom: orbIdleColor(state.current, Date.now(), false), colorIndex: index, colorAt: Date.now() };
+    const apply = (transition: ColorTransition) => {
+      state.current = { ...state.current, ...transition };
       wake.current?.();
     };
-    apply(readOrbColor()); listeners.add(apply);
-    const stored = (event: StorageEvent) => { if (event.key === ORB_COLOR_KEY) apply(orbColorIndex(parseOrbColorKey(event.newValue))); };
+    apply(palette); listeners.add(apply);
+    const stored = (event: StorageEvent) => { if (event.key === ORB_COLOR_KEY) applySyncedOrbColor(parseOrbColorKey(event.newValue)); };
     window.addEventListener('storage', stored);
     return () => { listeners.delete(apply); window.removeEventListener('storage', stored); };
   }, [supplied]);
@@ -62,7 +74,7 @@ export function OrbPointerLayer({ interaction, fill, reducedMotion }: { interact
     if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     if (previous !== interaction.state.current.colorIndex) {
       const index = interaction.state.current.colorIndex;
-      rememberOrbColor(index);
+      rememberOrbColor(index, interaction.state.current);
     }
     interaction.wake.current?.();
   };

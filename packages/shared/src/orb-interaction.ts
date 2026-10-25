@@ -118,7 +118,7 @@ export function orbIdleColor(state: OrbInteraction, now: number, reducedMotion: 
 function advanceSpin(state: OrbInteraction, now: number, fallbackMs = 0, reducedMotion = false): OrbInteraction {
   const elapsed = Number.isFinite(state.spinAt) ? Math.max(0, now - state.spinAt) : fallbackMs;
   const spin = stepOrbSpin(state.spin, elapsed, reducedMotion);
-  return { ...state, spinAt: now, spin: state.gesture?.rotating ? { ...spin, x: state.spin.x, y: state.spin.y } : spin };
+  return { ...state, spinAt: Math.max(state.spinAt, now), spin: state.gesture?.rotating ? { ...spin, x: state.spin.x, y: state.spin.y } : spin };
 }
 function spinSample(state: OrbInteraction, dx: number, dy: number, now: number, reducedMotion: boolean): OrbInteraction {
   const dt = Math.max(16, Number.isFinite(state.inputAt) ? now - state.inputAt : 16) / 1000;
@@ -162,9 +162,20 @@ export function endOrbGesture(state: OrbInteraction, x: number, y: number, size:
       impulses: reducedMotion ? [] : [...impulses, { at: now, direction }].slice(-ORB_MAX_IMPULSES) } : {}) };
 }
 export function sampleOrbInteraction(state: OrbInteraction, now: number, dtMs: number, reducedMotion: boolean) {
-  const impulses = reducedMotion ? [] : state.impulses.filter(impulse => orbRippleTime(now - impulse.at, false) >= 0);
+  // An event may arrive after this display frame's timestamp. Keep it pending
+  // at zero age; it must not disappear before its first eligible frame.
+  const impulses = reducedMotion ? [] : state.impulses.filter(impulse =>
+    orbRippleTime(now - impulse.at, false) >= 0 || (Number.isFinite(now) && now >= 0 && Number.isFinite(impulse.at) && now < impulse.at));
   const next: OrbInteraction = { ...advanceSpin(state, now, dtMs, reducedMotion), impulses };
-  const waves: readonly OrbWave[] = impulses.map(impulse => ({ direction: impulse.direction, time: (now - impulse.at) / 1000 }));
+  const waves: readonly OrbWave[] = impulses.map(impulse => ({ direction: impulse.direction, time: Math.max(0, (now - impulse.at) / 1000) }));
   const animating = !reducedMotion && (waves.length > 0 || now - state.colorAt < 600 || next.spin.velocityX !== 0 || next.spin.velocityY !== 0);
   return { state: next, waves, idleColor: orbIdleColor(state, now, reducedMotion), animating };
+}
+
+// Every surface in a display frame receives the same rAF timestamp, even when
+// the first renderer takes several milliseconds to submit its draw.
+const animationEpoch = typeof performance === 'undefined' ? 0
+  : Date.now() - performance.now();
+export function orbAnimationTime(timestamp: number): number {
+  return timestamp > 1e12 ? timestamp : Math.round(animationEpoch + timestamp);
 }

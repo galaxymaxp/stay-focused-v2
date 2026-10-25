@@ -1,14 +1,14 @@
 import { createElement, Fragment } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ORB_COLOR_KEY, orbIdleColor } from '@stay-focused/shared';
+import { ORB_COLOR_KEY, orbIdleColor, beginOrbGesture, endOrbGesture } from '@stay-focused/shared';
 import { OrbPreferencesSync } from './orb-preferences-sync';
 import { rememberOrbColor, useOrbInteraction, type OrbInteractionHandle } from '../features/knowledge-core/orbInteraction';
 const store = new Map<string,string>();
 const mocks = vi.hoisted(() => ({ owner: 'owner-a', offline: false, request: vi.fn() }));
 vi.mock('./providers', () => ({ useAuth: () => ({ session: mocks.owner ? { user: { id: mocks.owner } } : null, api: mocks.request }) }));
-let tree: ReactTestRenderer | undefined, handle: OrbInteractionHandle;
-function Probe() { handle = useOrbInteraction(); return null; }
+let tree: ReactTestRenderer | undefined, handle: OrbInteractionHandle, plan: OrbInteractionHandle;
+function Probe() { handle = useOrbInteraction(); plan = useOrbInteraction(); return null; }
 const element = () => createElement(Fragment, null, createElement(OrbPreferencesSync), createElement(Probe));
 async function mount() { await act(async () => { tree = create(element()); }); }
 async function tick(ms: number) { await act(async () => { await vi.advanceTimersByTimeAsync(ms); }); }
@@ -78,4 +78,24 @@ it('refreshes on tab focus and visibility restoration, and removes listeners on 
   mocks.owner=''; await act(async () => tree!.update(element())); mocks.request.mockClear();
   await act(async () => { window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange')); });
   expect(mocks.request).not.toHaveBeenCalled();
+});
+
+it('shares the exact fade timeline for palette changes, cross-platform refresh and an orb tap', async () => {
+  await mount();
+  const equalFrames = () => {
+    expect(plan.state.current.colorAt).toBe(handle.state.current.colorAt);
+    for (const elapsed of [0, 16, 100, 300, 599, 600]) for (const reduced of [false, true]) {
+      const at = handle.state.current.colorAt + elapsed;
+      expect(orbIdleColor(plan.state.current, at, reduced)).toBe(orbIdleColor(handle.state.current, at, reduced));
+    }
+  };
+  await act(async () => rememberOrbColor(1)); equalFrames();
+  await tick(200);
+  const now = Date.now();
+  handle.state.current = endOrbGesture(beginOrbGesture(handle.state.current, 50, 50, now - 50), 50, 50, 100, now, false);
+  await act(async () => rememberOrbColor(handle.state.current.colorIndex, handle.state.current)); equalFrames();
+  expect(plan.state.current.impulses).toEqual([]);
+  mocks.request.mockResolvedValue({ orbColor: 'violet' });
+  await tick(15_000); equalFrames();
+  expect(plan.state.current.colorIndex).toBe(3);
 });

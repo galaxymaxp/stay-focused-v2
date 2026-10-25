@@ -2559,13 +2559,13 @@ details[open] > :not(summary) {
   position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center;
   width: 100%; height: 48px; min-height: 44px; padding: 0; overflow: hidden;
   border-radius: var(--radius-control); border: 0;
-  background: transparent; color: var(--plan-action-accent, #d7aa38); transform: none;
+  background: transparent; color: var(--orb-liquid-color, #E6EAF1); transform: none;
   box-shadow: none; transition: none;
 }
 .plan-action[data-plan-gl="failed"] {
-  border: 1px solid var(--plan-action-accent, #d7aa38);
+  border: 1px solid var(--orb-liquid-color, #E6EAF1);
   background: linear-gradient(135deg, #ffffff30, #ffffff06 50%, #ffffff20);
-  color: var(--plan-action-accent, #d7aa38); transform: none;
+  color: var(--orb-liquid-color, #E6EAF1); transform: none;
   box-shadow: inset 0 1px 1px #ffffff80, inset 0 -1px 1px #00000018;
   transition: none;
 }

@@ -1,8 +1,10 @@
 import { createElement } from 'react';
 import { act, create, type ReactTestRenderer } from 'react-test-renderer';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createOrbInteraction } from '@stay-focused/shared';
 import { PlanButton } from './PlanButton';
 
+vi.mock('../generation-core/orbInteraction', () => ({ useOrbInteraction: () => ({ state: { current: createOrbInteraction() }, wake: { current: null } }) }));
 const mocks = vi.hoisted(() => ({ reduced: false, active: true, focused: true, appState: null as ((state: string) => void) | null,
   timing: vi.fn(), stop: vi.fn(), press: vi.fn() }));
 vi.mock('expo-router/react-navigation', () => ({ useIsFocused: () => mocks.focused }));
@@ -28,15 +30,15 @@ async function mount(open = vi.fn()) {
   await act(async () => pressable().props.onLayout({ nativeEvent: { layout: { width: 358 } } }));
   return open;
 }
-it('keeps a 52px accessible action, displays GL only after a complete frame and directs the slosh toward the press', async () => {
+it('keeps a 52px accessible action, displays GL only after a complete frame and directs the wave toward the press', async () => {
   const open = await mount(); const shell = pressable().props.style;
   expect(shell).toMatchObject({ height: 52, width: '100%', borderRadius: 12 });
   expect(pressable().props.accessibilityLabel).toBe('Plan your free time');
-  expect(gl().props.accent).toBe('#d7aa38'); expect(gl().parent!.props.style.opacity).toBe(0);
+  expect(gl().props.interaction.state.current.colorIndex).toBe(0); expect(gl().parent!.props.style.opacity).toBe(0);
   gl().props.handle.current = { press: mocks.press };
   await act(async () => gl().props.onReady()); expect(gl().parent!.props.style.opacity).toBe(1);
   await act(async () => pressable().props.onPress({ nativeEvent: { locationX: 0 } }));
-  expect(mocks.press).toHaveBeenCalledWith(-1); expect(open).toHaveBeenCalledOnce();
+  expect(mocks.press).toHaveBeenCalledWith(-1, 0); expect(open).toHaveBeenCalledOnce();
   expect(pressable().props.style).toEqual(shell); expect(mocks.timing).not.toHaveBeenCalled();
 });
 it('passes Reduce Motion into GL and gives the press only a 0.85 opacity dip', async () => {
