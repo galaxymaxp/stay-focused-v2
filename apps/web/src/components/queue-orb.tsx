@@ -21,7 +21,8 @@ export function QueueOrb({ interaction, size = 26, live = true }: {
         pixels: Math.max(8, Math.min(512, Math.round(size * Math.min(window.devicePixelRatio || 1, 3)))),
       };
       const fallback = `/queue/stills/ql1-v1-${request.color.slice(1).toLowerCase()}-${request.mode}.png`;
-      if (node.dataset.color && node.dataset.color !== request.color) {
+      if (node.dataset.mode !== request.mode) node.classList.remove('queue-orb-fade');
+      if (node.dataset.mode === request.mode && node.dataset.color && node.dataset.color !== request.color) {
         node.style.setProperty('--queue-orb-previous', node.style.backgroundImage);
         node.classList.remove('queue-orb-fade');
         // Restart a finite compositor fade only on a palette change, never on a

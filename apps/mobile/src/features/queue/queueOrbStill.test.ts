@@ -7,18 +7,19 @@ vi.mock('expo-file-system/legacy', () => ({ cacheDirectory: 'file:///cache/', ge
 vi.mock('expo-gl', () => ({ GLView: { createContextAsync: mocks.create, destroyContextAsync: mocks.destroy, takeSnapshotAsync: mocks.snapshot } }));
 vi.mock('../generation-core/threeContext', () => ({ threeContext: (value: unknown) => value }));
 vi.mock('@stay-focused/shared/orb-still-renderer', () => ({ createOrbStillScene: () => ({ render: mocks.render, dispose: mocks.dispose }) }));
-vi.mock('three', () => ({ SRGBColorSpace: 'srgb',
+vi.mock('three', () => ({ NoColorSpace: 'none',
   WebGLRenderer: class { properties = { get: () => ({ __webglFramebuffer: mocks.framebuffer }) }; setRenderTarget = mocks.setTarget; dispose = mocks.rendererDispose; },
   WebGLRenderTarget: class { constructor(...args: unknown[]) { mocks.target(...args); } texture = mocks.texture; dispose = mocks.targetDispose; },
 }));
 const { queueOrbStills } = await import('./queueOrbStill');
 const request = { color: '#E6EAF1', mode: 'dark' as const, pixels: 78 };
 afterEach(() => { queueOrbStills.clear(); vi.clearAllMocks(); mocks.exists = false; });
-it('coalesces headless requests, snapshots resolved sRGB pixels upright, persists and releases GL', async () => {
+it('coalesces headless requests, snapshots resolved display bytes upright, persists and releases GL', async () => {
   const result = await Promise.all([queueOrbStills.get(request), queueOrbStills.get(request)]);
   expect(result[0]).toBe('file:///cache/ql1-v1-e6eaf1-dark-78.png'); expect(result[1]).toBe(result[0]);
-  expect(mocks.create).toHaveBeenCalledOnce(); expect(mocks.texture.colorSpace).toBe('srgb');
-  expect(mocks.snapshot).toHaveBeenCalledWith(expect.anything(), { framebuffer: mocks.framebuffer, rect: { x: 0, y: 0, width: 78, height: 78 }, flip: true, format: 'png' });
+  expect(mocks.create).toHaveBeenCalledOnce(); expect(mocks.texture.colorSpace).toBe('none');
+  expect(mocks.render).toHaveBeenCalledWith(expect.anything(), '#000000');
+  expect(mocks.snapshot).toHaveBeenCalledWith(expect.anything(), { framebuffer: mocks.framebuffer, rect: { x: 0, y: 0, width: 78, height: 78 }, flip: false, format: 'png' });
   expect(mocks.move).toHaveBeenCalledWith({ from: 'file:///snapshot.png', to: result[0] });
   expect(mocks.setTarget).toHaveBeenLastCalledWith(null);
   expect(mocks.dispose).toHaveBeenCalledOnce(); expect(mocks.targetDispose).toHaveBeenCalledOnce();

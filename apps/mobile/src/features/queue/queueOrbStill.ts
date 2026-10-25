@@ -1,4 +1,5 @@
 import { createOrbStillCache, orbStillKey, type OrbStillRequest } from '@stay-focused/shared/orb-still';
+import { palettes } from '../../design/themeTokens';
 
 let tail: Promise<unknown> = Promise.resolve();
 /** Headless one-shot GL, serialized across all consumers. No mounted GLView. */
@@ -24,16 +25,20 @@ async function renderQueueOrbStill(request: OrbStillRequest): Promise<string> {
     renderer = new THREE.WebGLRenderer({ canvas: canvas as unknown as HTMLCanvasElement,
       context: threeContext(gl), alpha: true, antialias: true });
     target = new THREE.WebGLRenderTarget(request.pixels, request.pixels, { samples: 4 });
-    target.texture.colorSpace = THREE.SRGBColorSpace;
+    // The shared snapshot shader writes display-encoded bytes itself, in the
+    // same order as Today's screen shader. Hardware sRGB would encode twice.
+    target.texture.colorSpace = THREE.NoColorSpace;
     renderer.setRenderTarget(target);
-    scene = createOrbStillScene(request); scene.render(renderer);
+    scene = createOrbStillScene(request); scene.render(renderer, palettes[request.mode].backgroundPrimary);
     // Resolve multisampling before the snapshot. Bind the resolved framebuffer
     // explicitly; a headless Expo context has no default presented framebuffer.
     renderer.setRenderTarget(null);
     const properties = renderer.properties.get(target) as { __webglFramebuffer?: WebGLFramebuffer };
     if (!properties.__webglFramebuffer) throw new Error('orb_still_unavailable');
     const snapshot = await GLView.takeSnapshotAsync(gl, { framebuffer: properties.__webglFramebuffer,
-      rect: { x: 0, y: 0, width: request.pixels, height: request.pixels }, flip: true, format: 'png' });
+      // Expo's default false already converts GL's bottom-up rows to an
+      // upright image (GLContext.java / EXGLContext.mm). True flips it again.
+      rect: { x: 0, y: 0, width: request.pixels, height: request.pixels }, flip: false, format: 'png' });
     if (uri) { await fs.moveAsync({ from: snapshot.localUri, to: uri }); return uri; }
     return snapshot.localUri;
   } finally {
