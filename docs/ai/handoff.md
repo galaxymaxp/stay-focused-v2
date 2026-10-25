@@ -11503,3 +11503,54 @@ Chromium cadence and the web GL proxy do not establish physical acceptance.
   separately authorized env/deploy/log tooling; installation NOT RUN.
 
 Endpoint TP2b only. No release, FULLSEND or next backlog task started.
+
+
+## Handoff - TP2c orb liquid/color: STOPPED (2026-10-25)
+
+Status: **STOPPED during STEP 0**, under unattended rule 3 (code contradicts
+prompt assumptions) and rule 4 (checkpoint and end). Branch is the expected
+`overnight/2026-10-15_feedback`; initial HEAD/prerequisite is `30687268`.
+The prompt assumes `(0.75 + 0.25 * smoothstep(...)) * held * filled`, while
+both the working source and `git show 30687268:packages/shared/src/orb-body-renderer.ts`
+contain `(0.35 + 0.65 * smoothstep(...)) * held * filled`.
+No implementation changes were made and no later step was started.
+
+Exact owner question for a future attended run: **May TP2c proceed from the
+actual TP2b `0.35 + 0.65` slab floor, treating the prompt's `0.75 + 0.25`
+baseline as a documentation error?** No question was sent in this unattended
+run. No DECISIONS-NEEDED entry was added.
+
+[Acceptance and evidence](acceptance/tp2c-plan-button-orb-liquid-color.md).
+Planning documents now record the stop without changing TP2b's historical PASS.
+Commit: `docs(today): record TP2c baseline contradiction stop` (author
+`galaxymaxp <omgraythekid@gmail.com>`; exact hash in Git and
+`tmp/overnight/TP2c.status`). No tmp or owner artifact is staged.
+
+Counts: FRESH branch/ancestry 2/2 PASS; baseline comparison 1/1 contradiction.
+FRESH working/staged diff checks 2/2 PASS, exit 0. Focused/full suites NOT RUN,
+0 tests executed; required typecheck/lint/API/web/Android/root build gates NOT
+RUN, 0 executed; GL captures/metrics NOT RUN, 0 captures. These were skipped
+because the earlier STOP rule requires ending, not because a gate failed.
+No cached TP2b result is claimed as TP2c validation.
+Checkpoint writer attempts: Python unavailable (exit 1), then Node stdin
+syntax error (PowerShell command exit 0, no writes); native PowerShell writer
+succeeded. No application gate was involved.
+
+UNVERIFIED (owner to confirm): live served revision, production/database/
+Scheduler/provider state, native GL presentation and physical performance.
+Unrelated `UI/`, `apps/mobile/.gitignore`, `supabase/.temp/` and tmp artifacts
+are preserved. No code/env edit, deployment, remote SQL/service call,
+Scheduler/email action, push, OTA/EAS or device action occurred.
+
+**Owner steps remaining**:
+
+- Resolve the recorded baseline contradiction, then resume STEP 0 and complete
+  STEP 1-4, local suites/gates/captures and final acceptance.
+- Rollout NOT RUN: release completed work with the next authorized FULLSEND.
+- Device checks NOT RUN: website and Realme gravity-free liquid, orb color
+  sync/fade and fixed shell during press wave; native GL/performance/accessibility.
+- Confirm production state separately. Vercel CLI is absent; strongly
+  recommend `npm i -g vercel` for future authorized env/deploy/log tooling.
+  Installation NOT RUN.
+
+Endpoint: unattended STOP only. No other backlog task or FULLSEND started.

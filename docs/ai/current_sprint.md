@@ -1,3 +1,16 @@
+<!-- TP2c stopped begin -->
+## TP2c Plan liquid/color: STOPPED at inventory (2026-10-25)
+
+The unattended code-contradiction STOP rule applies: TP2c assumes a
+`0.75 + 0.25` slab floor, but both HEAD and prerequisite `30687268` contain
+`0.35 + 0.65`. Expected branch and prerequisite ancestry pass. No code
+changed; STEP 0 is partial and STEP 1-4/tests/builds/captures are NOT RUN.
+Baseline clarification and remaining owner steps are recorded in
+[TP2c acceptance](acceptance/tp2c-plan-button-orb-liquid-color.md). Production/native state is UNVERIFIED (owner to
+confirm); Rollout and Device checks NOT RUN. No remote actions or push.
+TP2b remains the implemented baseline; TP2c is not complete.
+<!-- TP2c stopped end -->
+
 <!-- TP2b completion begin -->
 ## TP2b Plan button: real orb glass and liquid — LOCAL PASS (2026-10-25)
 
