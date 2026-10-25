@@ -22,6 +22,7 @@ import {
 } from "../knowledge-core/coreModel";
 import { dayOrbTones, type DayOrbTones } from "./dayClock";
 export { DAY_ORB_FILL } from './orb-footprint';
+export { PlanGlassCanvas } from './PlanGlassCanvas';
 
 // Web port of apps/mobile/src/features/redesign/DayOrb.tsx. Same scene,
 // camera, frame rate and tones; expo-gl becomes a canvas, and AppState/screen
@@ -340,4 +341,3 @@ function buildScene(
     },
   };
 }
-
