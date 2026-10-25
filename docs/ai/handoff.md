@@ -11554,3 +11554,46 @@ Scheduler/email action, push, OTA/EAS or device action occurred.
   Installation NOT RUN.
 
 Endpoint: unattended STOP only. No other backlog task or FULLSEND started.
+
+
+## Handoff - TP2d weightless Plan liquid and synchronized color (2026-10-25)
+
+Status: **PASS (local)**. STEP 0-4, focused/full suites, mandatory serial gates,
+docs and scoped local commits complete. The corrected unattended prompt
+resolves TP2c's historical floor contradiction.
+
+Plan now holds the orb's exact weightless liquid, uses its synced pearl-default palette and exact 600ms fade, and sends an 1800ms liquid-only tap wave from the press point. Web/mobile shells stay fixed; Reduce Motion queues no wave and dips opacity to 0.85. Fallback colors follow the same palette. TP2d supersedes the historical TP2b fixed-yellow/fill/slosh decisions and resolves TP2c's prompt-floor stop.
+
+FRESH: shared 876/88 files; API 2517/218 files (3 existing live skips); mobile 1726/184 files; web 688/85 files. **5807 passed / 0 failed / 3 existing live skips**.
+FRESH forced typecheck/lint/serial root build each 8/8 tasks, 0 cached; direct API/web builds and offline Android JS/assets export PASS. Seven existing lint warnings, no new warnings/errors. Working/staged diff checks PASS.
+Actual GL: 36 captures, 18 pairs, max hue difference 5.52 degrees, maximum
+step coverage 14.61%, no empty interior row; 120 matching rendered fade frames
+and 30 identical shell masks. All first failures, clock-origin and pending-input
+repairs, the real-time timing flake, and clean reruns are in
+[continued TP2c / TP2d acceptance](acceptance/tp2c-plan-button-orb-liquid-color.md).
+
+Commits (author galaxymaxp <omgraythekid@gmail.com>):
+
+```text
+9047abe4 docs(today): freeze corrected TP2d acceptance
+9868d2fd fix(glass): restore weightless orb liquid in Plan slab
+3173b75a fix(today): synchronize Plan palette and liquid tap waves
+```
+
+Completion documentation is titled "docs(today): close TP2d liquid and color
+verification"; exact hash/terminal status are in Git and tmp/overnight/TP2d.status.
+Unrelated UI/, apps/mobile/.gitignore, supabase/.temp/ and all tmp paths are
+preserved and unstaged. Generated framework declarations are excluded.
+
+UNVERIFIED (owner to confirm): native GL presentation, Realme appearance, physical FPS/power, other real browsers/assistive technology, served revision and production/database/Scheduler/provider state.
+
+**Owner steps remaining**:
+
+- Rollout NOT RUN: release via the next separately authorized FULLSEND.
+- Device checks NOT RUN: website and Realme weightless liquid, synchronized palette/fade, fixed shell and press wave; native GL, physical performance/power and accessibility.
+- Confirm live production/database/Scheduler state separately.
+- Vercel CLI is absent. Strongly recommend `npm i -g vercel` for future authorized env/deploy/log tooling; installation NOT RUN.
+
+No deployment, remote service/SQL, migration application, Scheduler/email,
+env-file edit, push, OTA/EAS or device action occurred. Endpoint TP2d only;
+no release, FULLSEND or other backlog item started.

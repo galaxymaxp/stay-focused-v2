@@ -1,15 +1,20 @@
-<!-- TP2c stopped begin -->
-## TP2c Plan liquid/color: STOPPED at inventory (2026-10-25)
+<!-- TP2d completion begin -->
+## TP2d Plan orb liquid/color: LOCAL PASS (2026-10-25)
 
-The unattended code-contradiction STOP rule applies: TP2c assumes a
-`0.75 + 0.25` slab floor, but both HEAD and prerequisite `30687268` contain
-`0.35 + 0.65`. Expected branch and prerequisite ancestry pass. No code
-changed; STEP 0 is partial and STEP 1-4/tests/builds/captures are NOT RUN.
-Baseline clarification and remaining owner steps are recorded in
-[TP2c acceptance](acceptance/tp2c-plan-button-orb-liquid-color.md). Production/native state is UNVERIFIED (owner to
-confirm); Rollout and Device checks NOT RUN. No remote actions or push.
-TP2b remains the implemented baseline; TP2c is not complete.
-<!-- TP2c stopped end -->
+Plan now holds the orb's exact weightless liquid, uses its synced pearl-default palette and exact 600ms fade, and sends an 1800ms liquid-only tap wave from the press point. Web/mobile shells stay fixed; Reduce Motion queues no wave and dips opacity to 0.85. Fallback colors follow the same palette. TP2d supersedes the historical TP2b fixed-yellow/fill/slosh decisions and resolves TP2c's prompt-floor stop.
+
+FRESH: shared 876/88 files; API 2517/218 files (3 existing live skips); mobile 1726/184 files; web 688/85 files. **5807 passed / 0 failed / 3 existing live skips**.
+FRESH forced typecheck/lint/serial root build each 8/8 tasks, 0 cached; direct API/web builds and offline Android JS/assets export PASS. Seven existing lint warnings, no new warnings/errors. Working/staged diff checks PASS.
+Real GL: 36 captures, 18 paired metrics, max hue difference 5.52 degrees,
+120 matching fade frames and 30 fixed-shell masks PASS. Clock-origin/pending-input
+repairs, real-time fixture flake and all failed first attempts are retained in
+[TP2d acceptance](acceptance/tp2c-plan-button-orb-liquid-color.md). Implementation 3173b75a.
+
+UNVERIFIED (owner to confirm): native GL presentation, Realme appearance, physical FPS/power, other real browsers/assistive technology, served revision and production/database/Scheduler/provider state.
+Rollout/Device checks NOT RUN; next FULLSEND and website/Realme checks are owner
+steps. No deployment, remote service/SQL, env edit or push. Endpoint TP2d only.
+Historical TP2c's baseline contradiction is resolved by the corrected prompt.
+<!-- TP2d completion end -->
 
 <!-- TP2b completion begin -->
 ## TP2b Plan button: real orb glass and liquid — LOCAL PASS (2026-10-25)
