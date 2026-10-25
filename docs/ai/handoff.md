@@ -11434,3 +11434,72 @@ UNVERIFIED (owner to confirm): live served revision (prompt FS10 versus newer FS
 - Vercel CLI is absent. Strongly recommend npm i -g vercel for future separately authorized env/deploy/log tooling; installation NOT RUN.
 
 Endpoint TP2 only. No other backlog item, release or FULLSEND started.
+
+
+## Handoff — TP2b orb-material 3D Plan button (2026-10-25)
+
+Status: **PASS (local)**. STEP 0–3, tests, gates, docs and scoped local commits
+complete; terminal status/commit list is tmp/overnight/TP2b.status. The
+owner's unattended rules governed the run; no other backlog item started.
+
+Web and mobile now use shared orb scene/body/studio/liquid/ambient factories
+for a fixed beveled slab, plus the clock's glass glyph shader and a sibling
+Plan MSDF atlas. Press feedback tilts only the liquid for 600ms; the accent
+stays fixed across themes and orb palette changes. Reduce Motion is static
+with a 0.85 opacity dip. The original TP2 renderer is visible only on GL
+failure/timeout. Accessibility, action size/behavior, planning sheets, planner
+and logo rules remain intact. Web shares the orb's cached lazy Three import;
+native uses one small GLView and the existing native atlas upload adapter.
+
+FRESH full suites: shared 862/83 files; API 2517/218 files
+(3 existing live skips); mobile 1725/184; web 675/85.
+**5779 passed / 0 failed / 3 existing live skips**. Shared's recorded run
+included 42 source and 41 existing emitted test-file mirrors.
+FRESH forced typecheck/lint/root serial build each **8/8, 0 cached**; API/web
+builds and offline Android JS/assets export exit 0. Seven existing lint
+warnings, zero new warnings/errors. FRESH working/staged diff checks PASS.
+
+Real Chromium GL: 14/14 new checks, all six width/theme rest/slosh pairs,
+30/30 identical shell silhouette masks, accent hue within 3 degrees,
+187 shaded glyph-interior pixels / 142 distinct RGB shades. Both orb
+extraction comparisons are pixel-identical: 0 changed channels / 396,900,
+light and dark. Native focused tests 42/42; unchanged TP2 planning browser
+checks 8/8. Cadence and source/evidence links, first failures and reruns are
+in [TP2b acceptance](acceptance/tp2b-plan-button-3d.md). Native proxy is
+explicitly labelled web GL at phone width/52px.
+
+Commits (author galaxymaxp <omgraythekid@gmail.com>):
+
+```text
+27c1ce35 docs(today): freeze TP2b 3D button acceptance
+2eb2a0ef refactor(glass): share orb optics and scene factories
+c97bd3a3 feat(glass): add Plan slab and glass glyph pipeline
+947ee3f1 feat(web): render Plan with the shared orb glass scene
+5c54a0f5 feat(mobile): render Plan through the native orb glass pipeline
+```
+
+Completion documentation is the local commit titled
+"docs(today): close TP2b local 3D button verification"; its exact hash is in
+Git and TP2b.status (the commit cannot embed its own hash). Expected owner
+paths UI/, apps/mobile/.gitignore, supabase/.temp/ and all tmp outputs remain
+unstaged. Generated Next framework declarations are restored to their clean
+baseline and excluded. No push.
+
+UNVERIFIED (owner to confirm): native GL presentation and Realme appearance,
+physical/GPU FPS and power, real browser/assistive technology behavior,
+served revision and production/database/Scheduler/provider state. Software
+Chromium cadence and the web GL proxy do not establish physical acceptance.
+
+**Owner steps remaining**:
+
+- Rollout NOT RUN: release with the next separately authorized FULLSEND.
+- Device checks NOT RUN: website and Realme glass/liquid appearance, the
+  press slosh, fixed shell and accent while the orb changes color; native
+  GL, real frame rate/power and accessibility.
+- Confirm live deployed/database/Scheduler state separately. No deployment,
+  remote SQL/migration/provider call, Scheduler/email action, env-file edit,
+  OTA/EAS publication, native build/install or device action occurred.
+- Vercel CLI remains absent. Strongly recommend npm i -g vercel for future
+  separately authorized env/deploy/log tooling; installation NOT RUN.
+
+Endpoint TP2b only. No release, FULLSEND or next backlog task started.

@@ -1,3 +1,27 @@
+<!-- TP2b completion begin -->
+## TP2b Plan button: real orb glass and liquid — LOCAL PASS (2026-10-25)
+
+The Plan button now uses the orb's shared Three.js body/scene, studio/refraction/
+liquid shader and ambient capture on a fixed beveled slab, with the clock's
+glass glyph shader and a bundled Plan MSDF atlas. Web reuses the cached lazy
+orb chunk; native uses a reduced-resolution GLView. The 600ms slosh changes
+only the liquid; accent, shape, action semantics and planning behavior stay
+fixed. Reduce Motion is static with opacity feedback; GL failure alone shows
+the original TP2 fallback. This supersedes TP2's flat-rendering equivalent.
+
+FRESH: shared 862/83 files; API 2517/218 files (3 existing live skips); mobile 1725/184 files; web 675/85 files. **5779 passed / 0 failed / 3 existing live skips**.
+Forced typecheck/lint/serial root build each 8/8, 0 cached; API/web builds and
+offline Android export PASS. Seven existing lint warnings. Actual GL captures
+at 390/768/1280 in both themes, 30 identical outline masks and shaded glyph
+checks PASS; the extracted orb is pixel-identical (0 changed channels).
+
+[TP2b acceptance](acceptance/tp2b-plan-button-3d.md). Native GL, physical performance and production state
+UNVERIFIED. Rollout/Device checks NOT RUN; next separately authorized FULLSEND
+and website/Realme material/slosh/color-isolation checks are owner steps.
+No deployment, remote service/SQL, migration, env-file edit or push occurred.
+Endpoint TP2b only; no successor work started.
+<!-- TP2b completion end -->
+
 <!-- TP2 completion begin -->
 ## TP2 Today Plan button and planning sheet: LOCAL PASS (2026-10-25)
 
