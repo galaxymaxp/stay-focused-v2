@@ -5,7 +5,109 @@ Scope frozen 2026-10-25 at `06e64db4`, branch
 Git and its acceptance report. Unattended rules prohibit remote services,
 deployment, database work, env-file access, push and device checks.
 
-## QL1b terminal checkpoint: FAILED (2026-10-26)
+## QL1c final verification: LOCAL PASS (2026-10-26)
+
+STEP 0-3, fresh serial gates, scoped code commit and completion documentation
+are complete. Implementation `63ec05c4` retains and verifies the native
+ACES/sRGB/opaque-paper correction, upright snapshots, and web theme-fade reset.
+No live Today, Generation or Knowledge Core renderer changed. QL1c supersedes
+the historical QL1b failed checkpoint below; rollout and device checks remain
+owner steps, NOT RUN.
+
+Resumed `4fad7fc8` with the six retained QL1b implementation/test paths;
+STEP 0–2 are already committed and are not repeated. Scope remains Queue
+miniatures only, through local tests, gates, documentation and scoped commits.
+The owner explicitly permits serial browser partitions and requires a TP2d
+comparison for the unchanged ambient timeout. No assertion, mask, threshold or
+deadline may change. No rollout, device check or remote service call is allowed.
+
+First current-tree ambient run: FRESH **13 passed / 1 timeout**, 149.68s total.
+The timeout was the initial generation spatial-spill case (30s); the previously
+failing generation gestures/timing case passed. Available RAM was 203–345 MiB;
+CPU samples were 31–38%. Temporary baseline worktree preparation overlapped
+this first run, so it is not treated as a quiet timing comparison. Subsequent
+current/baseline suites run strictly serially after worktree preparation.
+Logs and the new gate ledger are under `tmp/overnight/QL1c/`.
+
+TP2d `06e64db4` in `tmp/overnight/QL1c/baseline` (same installed dependencies,
+linked locally): FRESH **13 passed / 1 timeout**, 136.80s total; generation
+gestures/timing reached 30,326ms. Second current-tree run, after preparation:
+FRESH **13 passed / 1 timeout**, 126.13s total; that same case reached 30,231ms
+(0.31% shorter than baseline). Spatial spill passed in 3,433ms. Both gesture
+measurements hit the unchanged deadline, so they do not measure uncapped
+completion latency. They satisfy the owner's equally-slow/timeouts comparison;
+there is no evidence of a QL1-only slowdown. Source-isolation diff against TP2d
+is empty for live body/scene/ambient/clock and Today/Generation/Core paths.
+CPU was 32–60%, available RAM about 206 MiB. The owner's environmental-timeout
+rule allowed continuation through serial partitions and all remaining gates.
+
+FRESH QL1c final results: shared **888/89 files**, mobile **1732/186 files**,
+full web **707/88 files** (75 unit files plus 13 isolated browser files),
+forced typecheck **8/8 tasks, 0 cached**, forced lint **8/8 tasks, 0 cached**
+(0 errors, 7 existing warnings), direct API build **1/1**, direct web build
+**1/1**, offline Android export **1/1** (4,354 modules, 47 assets, one bundle).
+Node 24.16.0 / npm 11.13.0 / installed Vitest 4.1.11. Forced serial root build
+also passes **8/8 tasks, 0 cached**, in 14m4.084s (including all-platform Expo
+export). Total affected-suite result: **3327 passed / 0 failed / 0 skipped**
+across 363 files. No cached QL1b result substitutes for these checks. Generated
+Next declarations were restored to their initial clean versions and excluded.
+
+The third and final current-tree ambient invocation passes **14/14** in
+71.73s; generation gestures/timing takes **15,462ms**. It runs alone with
+`--maxWorkers=1 --pool=threads --reporter=verbose`; the thread pool reduces
+fork overhead while preserving all cases, assertions, browser settings and
+deadlines. Before this run, CPU settles from 34% to **21%**, with **842,984 KiB**
+free RAM. Both the baseline timeout and the final quiet pass support the
+environmental classification. No QL1 runtime optimization or test edit was
+needed to obtain this pass.
+
+| Final check | Evidence label | Exact result / local log |
+|---|---|---|
+| Shared full | FRESH PASS | 888/89 files, `shared-full.log` |
+| Mobile full | FRESH PASS | 1732/186 files, `mobile-full.log` |
+| Web full, serial partitions | FRESH PASS | 707/88 files, `web-partition-summary.json`; no skips |
+| QN1 failure cards | FRESH PASS | 32/32, `partition-src-features-queue-failures.browser.log` |
+| Queue GL/fallback/lifecycle | FRESH PASS | 13/13, 24 pairs, `partition-src-features-queue-orb.browser.log` |
+| Forced typecheck / lint | FRESH PASS | 8/8 tasks each, 0 cached; 7 existing lint warnings, 0 errors |
+| Direct API / web builds | FRESH PASS | 1/1 each, `api-build.log`, `web-build.log` |
+| Offline Android export | FRESH PASS | 1 bundle / 47 assets / 4354 modules, `android-export.log` |
+| Forced serial root build | FRESH PASS | 8/8 tasks, 0 cached, `root-build.log` |
+| Working / staged diff hygiene | FRESH PASS | 2/2 checks, exit 0; repeated for completion docs |
+| API full/provider/live suites | NOT APPLICABLE / NOT RUN | API behavior unchanged; remote services prohibited |
+
+All logs in this table are under `tmp/overnight/QL1c/`. Its `gates.jsonl`
+records exact commands/exits, `web-test-inventory.txt` records all 88 web
+files, and `ambient-final-load.jsonl` records the settling samples.
+
+QL1c first attempts are preserved:
+
+- `typecheck-invocation-failed.log`: `--force --cache=local:w` was rejected
+  by Turbo before any task ran (0 tasks). Corrected forced invocation passes;
+  Turbo confirms remote caching disabled. Typecheck/lint use `--concurrency=1`.
+- `android-export-interrupted.log`: the default-worker export was stopped by
+  this run after severe scheduling/resource pressure; exit -1 from the stopped
+  process is **INTERRUPTED**, not a product compilation verdict. Only the
+  command-line-verified QL1c Expo PID 12940 was stopped. The one-worker retry
+  passes with unchanged source and assets. The final root build likewise caps
+  Metro workers through a temporary, logged preload under `tmp/overnight/QL1c/`.
+  No tracked Metro config, env file, test assertion, mask or deadline changes.
+- `partition-orb-load-first-failed.log`: FRESH 6 passed / 1 readiness timeout
+  in the existing dark Slow 4G case, 96.93s total. With CPU at 11% and
+  1,002,704 KiB free, the unchanged isolated retry passes **7/7**, 100.06s
+  total. Its original 30s readiness deadline, 4x CPU throttle and network
+  conditions are preserved. Successful partitions were retained rather than
+  rerun; generation-screen also passes **13/13** in 49.92s.
+- Temporary TP2d worktree and its task-created dependency junctions were
+  removed safely. Existing owner worktrees and untracked paths are preserved.
+- Completion-doc helper initially failed Node syntax parsing because Markdown
+  backticks were not escaped; no file changed. Escaping was corrected, syntax
+  checked, and reconciliation succeeded. This was not an application gate.
+  The additional Node ledger audit initially assumed UTF-8 logs; PowerShell
+  writes UTF-16LE logs. BOM-aware decoding corrected that audit without reruns.
+
+## Historical QL1b terminal checkpoint: FAILED (2026-10-26)
+
+This section records the earlier run only and is superseded by QL1c above.
 
 Stopped under unattended rule 5 after bounded attempts to obtain green web
 regressions. The existing ambient generation capture exceeds its unchanged
@@ -202,9 +304,9 @@ The native snapshot source was checked locally in installed Expo GL
 `GLContext.java` and `EXGLContext.mm`. Physical Expo/driver presentation remains
 UNVERIFIED; the stronger Chromium proxy does not change that evidence label.
 
-## STEP 3: real GL captures (QL1b, 2026-10-26)
+## STEP 3: real GL captures (QL1c, 2026-10-26)
 
-FRESH `gl-output-correction.log`: **13 passed / 0 failed**, including 12
+FRESH `QL1c/partition-src-features-queue-orb.browser.log`: **13 passed / 0 failed**, including 12
 width/theme/color cases and one no-WebGL/Reduce Motion/hidden rotation case.
 Each matrix case compares both web and the native adapter proxy with an
 independent Today body crop: **24 paired comparisons**. Bundled fallback
@@ -218,7 +320,7 @@ by their separate regression tests. No authenticated or remote app was opened.
 |---|---|---|---|---|
 | 390 | web | 0.050% | 0.545% | 0.414 degrees |
 | 390 | native adapter web proxy | 0.050% | 0.545% | 0.678 degrees |
-| 1280 | web | 7.018% | 5.667% | 0.924 degrees |
+| 1280 | web | 7.018% | 5.667% | 0.9233 degrees |
 | 1280 | native adapter web proxy | 0.050% | 0.545% | 0.678 degrees |
 
 All values satisfy mean/p95 within 10% and hue within 6 degrees. The body is
@@ -250,16 +352,24 @@ per-case JSON are under `tmp/overnight/QL1/visual/` with the same naming scheme.
 |---|---|---|---|
 | Shared body/stage/output and fixed still frame | shared renderer | GL comparison against independent Today crop | FRESH PASS, 24 pairs |
 | Color × theme × physical-size cache, invalidation/retry | shared/platform adapters | focused tests | FRESH PASS, shared/mobile full and web unit suites |
-| Web/mobile Queue only; layout and QN1 intact | header components | focused/full client suites, Chromium and mobile proxy | Queue checks PASS; full web gate FAILED |
+| Web/mobile Queue only; layout and QN1 intact | header components | focused/full client suites, Chromium and mobile proxy | FRESH PASS, full web 707/mobile 1732, QN1 32/32 |
 | Mean/p95 within 10%, hue within 6 degrees | captures | 390/1280 light/dark pearl/gold/green | FRESH PASS, 24 pairs |
 | Quiet fallback, no extra spill, no hidden work, Reduce Motion | adapters/components | lifecycle/fallback/rotation checks | FRESH PASS, GL proof and client tests |
-| Fresh serial gates and scoped commits | repository | exact counts/logs | FAILED web gate; remaining gates NOT RUN; code uncommitted |
+| Fresh serial gates and scoped commits | repository | exact counts/logs | FRESH PASS, all six gates; code 63ec05c4 and completion docs committed locally |
+
+## Local commits
+
+Prior completed steps remain `5533c32b` (baseline), `cbb9703f` (shared/platform
+caches), `3a74047b` (Queue wiring), and `4fad7fc8` (historical QL1b checkpoint).
+QL1c code is `63ec05c4 fix(queue): preserve still exposure and verify orb parity`.
+Completion documentation is titled `docs(queue): close QL1c local verification`;
+its exact hash is in Git and `tmp/overnight/QL1c.status`. Author for both new
+commits: `galaxymaxp <omgraythekid@gmail.com>`. No push; no tmp/validation output
+or unrelated owner artifact is staged.
 
 ## Owner steps remaining
 
-- Restore sufficient local test resources and resume the pending web/gates/code
-  commits before considering this item complete.
-- Rollout NOT RUN: after local acceptance passes, release via the next separately
+- Rollout NOT RUN: release via the next separately
   authorized FULLSEND.
 - Device checks NOT RUN: website and Realme visual comparison with Today;
   native GL presentation and physical performance.
@@ -267,3 +377,5 @@ per-case JSON are under `tmp/overnight/QL1/visual/` with the same naming scheme.
   **UNVERIFIED (owner to confirm)**. No live call is needed for this code slice.
 - Other browsers, assistive technology and physical GPU performance/power:
   **UNVERIFIED (owner to confirm)**.
+- Vercel CLI is absent. Strongly recommend `npm i -g vercel` for future
+  separately authorized env/deploy/log tooling; installation NOT RUN.

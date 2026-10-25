@@ -11665,3 +11665,81 @@ Scheduler/email, env-file edit, push, OTA/EAS or device action occurred.
   Installation NOT RUN.
 
 Endpoint: failed QL1b checkpoint only. No other backlog item or FULLSEND started.
+
+
+## Handoff - QL1c Queue miniature: LOCAL PASS (2026-10-26)
+
+Status: **PASS (local)**. Resumed the retained QL1b patches on the expected
+`overnight/2026-10-15_feedback` branch; STEP 0-2 were not repeated. STEP 3,
+fresh serial gates, scoped implementation commit and completion docs are done.
+Queue uses shared-scene cached stills, synced palette and Today exposure,
+without a miniature spill. Native output now preserves screen ACES/sRGB order,
+opaque paper and upright snapshots; web theme changes clear stale fades.
+All live Today/Generation/Knowledge Core renderer paths remain unchanged.
+
+Commits (author galaxymaxp <omgraythekid@gmail.com>):
+
+```text
+5533c32b docs(queue): freeze QL1 miniature baseline
+cbb9703f feat(queue): cache shared orb scene stills on web and mobile
+3a74047b fix(queue): match miniature glass and lighting to Today
+4fad7fc8 docs(queue): checkpoint QL1b failed web regression gate
+63ec05c4 fix(queue): preserve still exposure and verify orb parity
+```
+
+The completion commit is titled `docs(queue): close QL1c local verification`;
+its exact hash is in Git and `tmp/overnight/QL1c.status`. Both new commits are
+local only. Explicit owned paths only; UI/, apps/mobile/.gitignore,
+supabase/.temp/ and all tmp/ outputs are preserved and unstaged. Generated Next
+declarations were restored to their initially clean versions.
+
+FRESH full suites: **shared 888/89 files; mobile 1732/186; web 707/88**:
+**3327 passed / 0 failed / 0 skipped**, including QN1 failure cards **32/32**.
+Web uses 75 unit files and 13 separate serial browser invocations. Queue GL
+proof **13/13**, **24 pairs** at 390/1280, light/dark, pearl/gold/green;
+maximum mean error **7.018%**, p95 **5.667%**, hue **0.9233 degrees**.
+Bundled fallback and no-GL/Reduce Motion/hidden-state checks pass. Native is
+explicitly a Chromium proxy of the production Expo adapter, not a device capture.
+
+FRESH forced typecheck, lint and root serial build: **8/8 tasks each, 0 cached**.
+Seven existing lint warnings, no errors/new warnings. Direct API/web builds
+**1/1 each**; offline Android JS/assets export **1/1**, 4354 modules, 47 assets,
+one bundle. Forced root build also exports all Expo platforms. Working and
+staged diff checks **2/2 PASS**, exit 0, repeated for completion docs.
+API full/provider/live suites NOT APPLICABLE / NOT RUN: behavior unchanged,
+remote services prohibited. No previous cached run is substituted for a gate.
+
+Ambient investigation: first current run **13/14** (cold spatial-spill timeout;
+worktree setup overlapped). TP2d worktree **13/14**, generation case **30,326ms**;
+second current run **13/14**, same case **30,231ms** (both deadline-capped).
+Final quiet current invocation **14/14** in 71.73s, generation **15,462ms**,
+CPU 21%, 842984 KiB free. Single-worker thread pool reduces fork overhead;
+all tests, assertions, thresholds, masks and deadlines remain unchanged. The
+baseline timeout and quiet pass support the owner's environmental classification.
+The task-created baseline worktree/junctions were removed; other worktrees remain.
+
+Other first attempts: orb-load **6/7**, unchanged isolated retry **7/7**;
+generation-screen **13/13**. Initial Turbo flag combination was rejected before
+tasks (0 executed), then corrected forced checks passed. The verified QL1c Expo
+process was stopped once under scheduling pressure; one-worker export retry
+passed. Root Metro also uses one worker through a temporary logged preload;
+tracked Metro configuration was not edited. All failures/interruption logs,
+exact commands and counts are in [acceptance](acceptance/ql1-queue-logo-orb.md)
+and `tmp/overnight/QL1c/`.
+
+UNVERIFIED (owner to confirm): native GL/Realme appearance and snapshot
+presentation, physical GPU/FPS/power, other real browsers/assistive technology,
+live served revision and production/database/Scheduler/provider state.
+
+**Owner steps remaining**:
+
+- Rollout NOT RUN: release via the next separately authorized FULLSEND.
+- Device checks NOT RUN: website and Realme Queue against Today, synced palette,
+  fallback, Reduce Motion, native orientation/presentation and performance.
+- Confirm the UNVERIFIED live state separately.
+- Vercel CLI is absent. Strongly recommend `npm i -g vercel` for future
+  separately authorized env/deploy/log tooling; installation NOT RUN.
+
+No deployment, remote service/SQL, migration application, Scheduler/email action,
+env-file edit, push, OTA/EAS or device action occurred. Endpoint QL1c only;
+no other backlog item, release or FULLSEND was started.

@@ -1,24 +1,34 @@
 <!-- QL1 checkpoint begin -->
-## QL1b Queue miniature: FAILED verification checkpoint (2026-10-26)
+## QL1c Queue miniature: LOCAL PASS (2026-10-26)
 
-Baseline/inventory `5533c32b`, shared stills `cbb9703f` and Queue wiring
-`3a74047b` are retained. Resumed native output/orientation and web theme fixes,
-plus new web tests, remain uncommitted because the required web gate failed.
-FRESH: shared 888/89 files, mobile 1732/186 files and Queue GL 13/13 pass;
-24 web/native-proxy pairs meet luminance/hue limits. Full web first attempt:
-706 passed / 1 default-5s timeout. Isolated course options passes 3/3. The full
-retry was interrupted after 5 observed failures under severe resource pressure;
-isolated ambient still fails its unchanged generation capture deadline (13/14).
-The bounded gate attempts ended under QL1b unattended rule 5. No assertion or
-live orb renderer was changed to pass. Forced typecheck/lint, API/web builds,
-offline Android export and forced serial root build are NOT RUN in QL1b.
+Queue miniatures now use cached shared-scene stills with the synced orb palette,
+Today exposure and weightless liquid, no miniature spill, quiet bundled fallback,
+and unchanged layout/behavior. Native snapshots preserve ACES/sRGB ordering,
+opaque theme paper and upright orientation; web theme changes clear stale fades.
+Live Today/Generation/Knowledge Core renderers remain unchanged from TP2d.
 
-[Acceptance and exact attempts](acceptance/ql1-queue-logo-orb.md). Resume this item after local
-resources permit green web regressions, then run remaining serial gates and
-commit retained code; do not redo committed steps or start another backlog item.
-Rollout/Device checks NOT RUN. Native GL, physical performance, other browsers,
-assistive technology and production/database/Scheduler state remain UNVERIFIED
-(owner to confirm). No deployment, remote service/SQL, env-file edit or push.
+Baseline `5533c32b`, caches `cbb9703f`, wiring `3a74047b` and historical
+QL1b checkpoint `4fad7fc8` are retained. QL1c implementation: `63ec05c4`.
+FRESH full suites: shared 888/89 files, mobile 1732/186, web 707/88 in serial
+partitions: **3327 passed / 0 failed / 0 skipped**. QN1 failure cards 32/32;
+Queue GL 13/13, 24 web/native-proxy pairs; maximum mean/p95 errors 7.018%/5.667%,
+hue 0.9233 degrees. Native proxy remains labelled as Chromium evidence.
+
+FRESH forced typecheck/lint/root build each 8/8 tasks, 0 cached; direct API/web
+builds and offline Android export PASS (4354 modules, 47 assets, one bundle).
+Seven existing lint warnings, 0 errors. Working/staged diff hygiene PASS.
+Ambient baseline/current timeouts were equal (30,326/30,231ms); final quiet
+single-worker ambient passes 14/14, generation case 15,462ms. Orb-load first
+attempt 6/7, unchanged isolated retry 7/7. No assertions/deadlines were changed.
+
+[Acceptance, first attempts and exact commands](acceptance/ql1-queue-logo-orb.md). Code and completion
+docs are committed locally; final hashes/status are in Git and QL1c.status.
+No tmp outputs or unrelated owner paths are staged. Rollout and Device checks
+are NOT RUN: next separately authorized FULLSEND and website/Realme comparison.
+Native GL, physical performance, other browsers/assistive technology and live
+served revision/database/Scheduler/provider state are **UNVERIFIED (owner to
+confirm)**. No deployment, remote service/SQL, env-file edit or push occurred.
+Endpoint QL1c only; no release/FULLSEND or other backlog item is started.
 <!-- QL1 checkpoint end -->
 
 <!-- TP2d completion begin -->
