@@ -17,7 +17,7 @@ vi.mock("./PlanningSheet", () => ({ PlanningControl: "PlanningControl" }));
 
 
 
-const mocks = vi.hoisted(() => ({ request: vi.fn(), push: vi.fn(), save: vi.fn(), date: '2026-10-24', data: null as TodayScreenData | null,
+const mocks = vi.hoisted(() => ({ candidates: vi.fn(), request: vi.fn(), push: vi.fn(), save: vi.fn(), date: '2026-10-24', data: null as TodayScreenData | null,
   adjusting: { current: false }, client: { baseUrl: 'https://api.test', accessToken: 'token' }, owner: 'owner' }));
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
 vi.mock('lucide-react-native', () => ({ EyeOff: 'EyeOff', Pin: 'Pin', PinOff: 'PinOff' }));
@@ -25,7 +25,7 @@ vi.mock('expo-router', () => ({ router: { push: mocks.push, navigate: vi.fn() } 
 vi.mock('expo-router/react-navigation', () => ({ useIsFocused: () => true }));
 vi.mock('../../auth', () => ({ useAuth: () => ({ session: { user: { id: mocks.owner } } }) }));
 vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: async () => null, setItem: async () => {} } }));
-vi.mock('../../services/experienceApi', () => ({ experienceRequest: mocks.request }));
+vi.mock('../../services/experienceApi', () => ({ experienceRequest: (client: unknown, path: string, options: unknown) => path === '/api/experience/planner/candidates' ? mocks.candidates(client, path, options) : mocks.request(client, path, options) }));
 vi.mock('../../design/haptics', () => ({ haptic: { success: vi.fn() } }));
 vi.mock('../../design/theme', async () => { const { palettes } = await import('../../design/themeTokens'); return { useTheme: () => ({ colors: palettes.light, mode: 'light', reducedMotion: true }) }; });
 vi.mock('../../design/primitives', () => ({ Action: 'Action', Copy: 'Copy', Notice: 'Notice', Page: 'Page', RowLink: 'RowLink', Surface: 'Surface', ContentIcon: 'ContentIcon', SkeletonBlock: 'SkeletonBlock', SkeletonCards: 'SkeletonCards' }));
@@ -38,7 +38,7 @@ vi.mock('./TodayCalendar', () => ({ TodayCalendar: 'TodayCalendar' }));
 vi.mock('./AppUpdateNotice', () => ({ AppUpdateBanner: 'AppUpdateBanner' }));
 vi.mock('./SnapshotStatus', () => ({ SnapshotStatus: 'SnapshotStatus' }));
 vi.mock('./useExperience', () => ({ useExperienceClient: () => mocks.client, useExperience: () => ({ data: mocks.data, loading: false, error: null, refresh: vi.fn() }) }));
-vi.mock('./useTodayClockWindow', () => ({ useTodayClockWindow: () => ({ date: mocks.date, path: '/api/today', adjusting: mocks.adjusting, window: undefined, save: mocks.save, reconcile: vi.fn(), setAdjusting: (active: boolean) => { mocks.adjusting.current = active; } }) }));
+vi.mock('./useTodayClockWindow', () => ({ useTodayClockWindow: () => ({ date: mocks.date, path: '/api/today', ready: true, adjusting: mocks.adjusting, window: null, save: mocks.save, reconcile: vi.fn(), setAdjusting: (active: boolean) => { mocks.adjusting.current = active; } }) }));
 vi.mock('./useListPreferences', () => ({ useListPreferences: () => ({ prefs: { pinned: { today: [] }, hidden: { today: [] } }, pin: vi.fn(), hide: vi.fn() }) }));
 vi.mock('../announcements/AnnouncementsScreen', () => ({ AnnouncementItem: 'AnnouncementItem', useArrangedAnnouncements: () => ({ unread: [] }) }));
 
@@ -54,6 +54,8 @@ beforeEach(async () => {
   todayPlanningMemory.reset(); planModeStore.reset(); mocks.request.mockReset(); mocks.push.mockReset(); mocks.owner = 'owner'; mocks.date = '2026-10-24';
   mocks.data = { date: mocks.date, capabilities: { planner: { status: 'available' } }, announcements: { items: [] },
     activities: { items: [activity] }, timeline: [reviewer], next: reviewer, later: [], overdue: [], upcomingDeadlines: [] } as unknown as TodayScreenData;
+  mocks.candidates.mockReset();
+  mocks.candidates.mockImplementation(async (_client: unknown, _path: string, options: { body: import('@stay-focused/shared/task-planning').StudyPlanningRequest }) => ({ courses: [], personalItems: ['task', 'reviewer'].map(kind => ({ kind, id: 'selected', title: 'Synthetic selection', courseId: null, estimateMinutes: 30, openedWithin24h: false, dueAt: null, priority: 'medium', createdAt: options.body.planningRange.startsAt })), planningRange: options.body.planningRange, availability: options.body.availability, freeWindowMinutes: 120 }));
   mocks.request.mockResolvedValue(plan('default'));
   await act(async () => { tree = create(createElement(TodayScreen)); });
 });

@@ -42,7 +42,8 @@ beforeEach(async () => {
   mocks.reduced = true;
   listeners.window.clear(); listeners.document.clear();
   mocks.entries.set("sf.today.free-time.2026-10-24", JSON.stringify({ start: 600, end: 720 }));
-  mocks.api.mockImplementation(async (path: string) => path.startsWith("/api/today") ? fixture() : { sessions: [], unscheduledWork: [] });
+  mocks.api.mockImplementation(async (path: string, options?: { body: import('@stay-focused/shared/task-planning').StudyPlanningRequest }) => path.startsWith("/api/today") ? fixture() : path === '/api/experience/planner/candidates'
+    ? { courses: [], personalItems: [], freeWindowMinutes: 120, planningRange: options!.body.planningRange, availability: options!.body.availability } : { sessions: [], unscheduledWork: [] });
   vi.stubGlobal("localStorage", { getItem: (key: string) => mocks.entries.get(key) ?? null, setItem: (key: string, value: string) => { mocks.entries.set(key, value); mocks.writes(key, value); } });
   vi.stubGlobal("window", { ...listen("window"), matchMedia: () => ({ matches: mocks.reduced, addEventListener() {}, removeEventListener() {} }) });
   vi.stubGlobal("document", { ...listen("document"), visibilityState: "visible" });
@@ -54,6 +55,7 @@ beforeEach(async () => {
     }
     return null;
   } }); });
+  expect(mocks.api.mock.calls.filter(([path]) => path === '/api/experience/planner/candidates')).toHaveLength(1);
   mocks.api.mockClear(); mocks.writes.mockClear();
 });
 afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -63,7 +65,8 @@ const event = (minute: number, pointerType = "mouse") => {
   return { button: 0, pointerType, pointerId: 1, clientX: point.x, clientY: point.y, currentTarget: { setPointerCapture() {} } };
 };
 const tick = async (ms: number) => { await act(async () => { vi.advanceTimersByTime(ms); }); };
-const writes = () => mocks.writes.mock.calls.filter(([key]) => String(key).startsWith("sf.today.free-time."));
+const writes = () => mocks.writes.mock.calls.filter(([key]) => String(key).startsWith("sf.today.free-time.") && key !== "sf.today.free-time.last");
+const lastWrites = () => mocks.writes.mock.calls.filter(([key]) => key === "sf.today.free-time.last");
 const previews = () => mocks.api.mock.calls.filter(([path]) => path === "/api/experience/planner/preview");
 const reads = () => mocks.api.mock.calls.filter(([path]) => path !== "/api/experience/planner/preview");
 it.each([["start", 600, 1], ["end", 720, 1], ["end", 720, 100], ["move", 660, 100]] as const)("%s drag (%i, %i ms/move) remains local; release saves once", async (_kind, at, delay) => {
@@ -77,7 +80,7 @@ it.each([["start", 600, 1], ["end", 720, 1], ["end", 720, 100], ["move", 660, 10
   }
   expect(mocks.api).not.toHaveBeenCalled(); expect(writes()).toHaveLength(0);
   await act(async () => ring().props.onPointerUp());
-  expect(writes()).toHaveLength(1); expect(mocks.api).not.toHaveBeenCalled();
+  expect(writes()).toHaveLength(1); expect(lastWrites()).toHaveLength(1); expect(mocks.api).not.toHaveBeenCalled();
   await tick(399); expect(previews()).toHaveLength(0);
   await tick(1); expect(previews()).toHaveLength(1); expect(reads()).toHaveLength(0);
   expect(tree!.root.findByType(DayRingClock)).toBe(instance); expect(mocks.mounts).toBe(mounts);
@@ -93,7 +96,7 @@ it("cancels a dragged range without saving or requesting", async () => {
 it('a handle tap saves once; a short touch on the middle remains a scroll candidate', async () => {
   await act(async () => ring().props.onPointerDown(event(720)));
   await act(async () => ring().props.onPointerUp());
-  expect(writes()).toHaveLength(1); await tick(400); expect(previews()).toHaveLength(1);
+  expect(writes()).toHaveLength(1); expect(lastWrites()).toHaveLength(1); await tick(400); expect(previews()).toHaveLength(1);
   mocks.api.mockClear(); mocks.writes.mockClear();
   await act(async () => ring().props.onPointerDown(event(660, 'touch')));
   await tick(100); await act(async () => ring().props.onPointerUp()); await tick(500);
@@ -103,7 +106,7 @@ it('touch hold moves the whole range locally and commits once', async () => {
   await act(async () => ring().props.onPointerDown(event(660, 'touch'))); await tick(240);
   await act(async () => ring().props.onPointerMove(event(720, 'touch')));
   expect(mocks.api).not.toHaveBeenCalled(); expect(writes()).toHaveLength(0);
-  await act(async () => ring().props.onPointerUp()); expect(writes()).toHaveLength(1);
+  await act(async () => ring().props.onPointerUp()); expect(writes()).toHaveLength(1); expect(lastWrites()).toHaveLength(1);
   await tick(400); expect(previews()).toHaveLength(1); expect(reads()).toHaveLength(0);
 });
 it("coalesces consecutive keyboard steps and typed overnight entry without refetches", async () => {
@@ -112,7 +115,7 @@ it("coalesces consecutive keyboard steps and typed overnight entry without refet
     await tick(100);
   }
   await act(async () => tree!.root.findByType(ClockOptions).props.onCommit(1320, 240));
-  expect(writes()).toHaveLength(4); expect(mocks.api).not.toHaveBeenCalled();
+  expect(writes()).toHaveLength(4); expect(lastWrites()).toHaveLength(4); expect(mocks.api).not.toHaveBeenCalled();
   await tick(400); expect(previews()).toHaveLength(1); expect(reads()).toHaveLength(0);
   const body = previews()[0]![1].body;
   expect(body.availability[0].endsAt).toBe(new Date(2026, 9, 25, 4).toISOString());

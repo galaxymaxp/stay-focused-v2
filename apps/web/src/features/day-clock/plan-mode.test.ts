@@ -66,7 +66,8 @@ beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 9, 24, 12));
   todayPlanningMemory.reset(); mocks.api.mockReset(); mocks.push.mockReset(); mocks.entries.clear(); planModeStore.reset();
   mocks.entries.set("sf.today.free-time.2026-10-24", JSON.stringify({ start: 600, end: 720 }));
-  mocks.api.mockImplementation(async (path: string) => path.startsWith("/api/today") ? fixture() : plan("default"));
+  mocks.api.mockImplementation(async (path: string, options?: { body: import('@stay-focused/shared/task-planning').StudyPlanningRequest }) => path.startsWith("/api/today") ? fixture() : path === '/api/experience/planner/candidates'
+    ? { courses: [], personalItems: ['task', 'reviewer'].map(kind => ({ kind, id: 'selected', title: 'Synthetic selection', courseId: null, estimateMinutes: 30, openedWithin24h: false, dueAt: null, priority: 'medium', createdAt: options!.body.planningRange.startsAt })), planningRange: options!.body.planningRange, availability: options!.body.availability, freeWindowMinutes: 120 } : plan("default"));
   vi.stubGlobal("localStorage", { getItem: (key: string) => mocks.entries.get(key) ?? null, setItem: (key: string, value: string) => { mocks.entries.set(key, value); } });
   vi.stubGlobal("window", { ...noop, matchMedia: () => ({ matches: true, addEventListener() {}, removeEventListener() {} }) });
   vi.stubGlobal("document", { ...noop, visibilityState: "visible" });
@@ -91,7 +92,7 @@ it("defaults to Both without menu radios and applies exactly the previewed selec
   expect(previews()).toHaveLength(1);
   const body = previews()[0]![1].body;
   expect(body.mode).toBe("reviewers_tasks");
-  expect(body.selection).toEqual({ order: "smart" });
+  expect(body.selection).toEqual({ order: "smart", items: [{ kind: "task", id: "selected" }, { kind: "reviewer", id: "selected" }] });
   await act(async () => { await Promise.resolve(); });
   const preview = tree!.root.findByType("PlanPreview" as never);
   await act(async () => (preview.props as { onApply: () => void }).onApply());
@@ -114,14 +115,15 @@ it("builds a new selection and drops a late older-selection preview", async () =
   expect(shown().map(value => value.planningRange.startsAt)).toEqual(["reviewers"]);
 });
 
-it("ignores stored modes and clock release keeps the built selection", async () => {
+it("ignores stored modes while automatic proposals and clock release keep the active selection", async () => {
   await act(async () => planModeStore.apply("tasks")); await tick(1000);
-  expect(previews()).toHaveLength(0);
+  expect(previews()).toHaveLength(1);
+  expect(previews()[0]![1].body.mode).toBe("reviewers_tasks");
   await act(async () => control().props.onBuild(choice("reviewers"))); await tick(400);
   await act(async () => planModeStore.apply("reviewers_tasks")); await tick(400);
-  expect(previews()).toHaveLength(1);
+  expect(previews()).toHaveLength(2);
   await act(async () => options().onCommit(660, 840)); await tick(400);
-  expect(previews()[1]![1].body).toMatchObject({ mode: "reviewers", selection: choice("reviewers").selection });
+  expect(previews()[2]![1].body).toMatchObject({ mode: "reviewers", selection: choice("reviewers").selection });
 });
 it("reload clears the local selection", async () => {
   await act(async () => control().props.onBuild(choice("tasks"))); await tick(400);

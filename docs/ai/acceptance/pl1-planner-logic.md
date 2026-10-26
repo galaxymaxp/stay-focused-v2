@@ -152,3 +152,45 @@ existing controls/accessibility preserved. API typecheck first failed on the
 test-local Plan type missing optional metadata (2 errors); extended that type
 with the shared planningTargets contract, rerun FRESH PASS. Mobile first lint
 also found two duplicate-import warnings in Today; imports merged.
+
+## STEP 5 verification checkpoint
+
+A final review adds split-block index coverage and startup-drag coverage: move
+indices apply before duplicate targets are collapsed for strict selection;
+a clock commit before candidates arrive retains the default recent-reviewer
+opt-in rule. No new reads or visual behavior. These small repairs and their
+proofs are part of PL1; the stable final source is under local verification.
+
+First full shared attempt: 920 passed / 1 failed / 0 skipped, 93 files. The
+new split-index test was discovered after the older helper had already loaded
+(the source/test save occurred mid-run). The failed mixed-time result is kept;
+restarted all serial checks on a stable tree. FRESH shared rerun: 921 passed /
+0 failed / 0 skipped, 93 files, including the new regression.
+
+First full mobile attempt: 1748 passed / 3 failed / 0 skipped, 188 files. Only
+legacy plan-mode fixture failed: mocked clock lacked ready and no candidate
+response existed. Added ready and a typed synthetic candidate response while
+preserving mode, stale owner/date/range response and exact apply assertions.
+Focused rerun 6/6. The corresponding web fixture now provides candidates and
+requires exactly one automatic Both-mode proposal instead of the superseded
+zero-preview assertion. Full mobile/web reruns follow below.
+
+Forced typecheck and lint were repeated after final source/fixture edits:
+8/8 tasks each, 0 cached. Seven pre-existing lint warnings, no new warnings or
+errors. Earlier passing type/lint attempts and every failed suite remain in
+receipts.jsonl and gates/*.log; no failure is replaced or erased.
+
+All commands use normal filesystem paths, repo-local TEMP/TMP/TMPDIR and local
+npm/Turbo/Metro caches, EXPO_NO_DOTENV=1, EXPO_OFFLINE=1, telemetry disabled,
+service credentials removed from child-process environment and a network-only
+loopback guard. No filesystem interception or module/config substitution.
+The final root build uses Windows CPU affinity 1 from the start, following
+RR1d's successful resource setting; no Metro/repository config change.
+
+FRESH full mobile rerun: 1751 passed / 0 failed / 0 skipped, 188 files.
+First full web unit partition: 552 passed / 9 failed / 0 skipped, 77 files;
+only clock-interaction fixture lacked the candidate response. Added its typed
+synthetic candidates, explicitly counted the initial read, and asserted one
+last-used save alongside each existing date save. Original zero gesture IO,
+quiet coalescing, no-refetch and lifecycle-refresh assertions remain.
+Focused web clock/mode rerun: 15 passed / 0 failed / 0 skipped, 2 files.

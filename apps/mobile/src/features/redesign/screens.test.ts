@@ -324,7 +324,7 @@ beforeEach(() => {
   mocks.navigationListeners.clear();
   mocks.appListeners.clear();
   vi.clearAllMocks();
-  mocks.planningCandidates.mockImplementation(async (_client, _path, options) => ({ courses: [], personalItems: [], freeWindowMinutes: 120, planningRange: options.body.planningRange, availability: options.body.availability }));
+  mocks.planningCandidates.mockImplementation(async (_client: unknown, _path: string, options: { body: import('@stay-focused/shared/task-planning').StudyPlanningRequest }) => ({ courses: [], personalItems: [], freeWindowMinutes: 120, planningRange: options.body.planningRange, availability: options.body.availability }));
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
 afterEach(async () => {

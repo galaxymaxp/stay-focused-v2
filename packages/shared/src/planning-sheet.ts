@@ -33,8 +33,8 @@ export function moveProposalUp(plan: DeterministicStudyPlan & { readonly selecti
     const id = isReviewerProposal(session) ? session.reviewerId : session.taskId;
     return { kind, id: plan.planningTargets?.find(target => target.kind === kind && target.id === id)?.selectionId ?? id };
   });
+  if (Number.isInteger(index) && index > 0 && index < proposed.length) [proposed[index - 1], proposed[index]] = [proposed[index]!, proposed[index - 1]!];
   const items = [...new Map(proposed.map(item => [planningItemKey(item), item])).values()];
-  if (Number.isInteger(index) && index > 0 && index < items.length) [items[index - 1], items[index]] = [items[index]!, items[index - 1]!];
   const seen = new Set(items.map(planningItemKey));
   const rest = plan.selection?.items ?? plan.notFit ?? [];
   for (const item of rest) {

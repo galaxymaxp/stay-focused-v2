@@ -140,3 +140,12 @@ it('keeps candidate reads cached across clock releases and sheet/action proposal
   await act(async () => current.propose());
   expect(input.load).toHaveBeenCalledTimes(1); expect(input.queue).toHaveBeenCalledTimes(4);
 });
+
+it('clock changes before candidates arrive retain the recent-reviewer opt-in default', async () => {
+  let finish!: (data: PlanningCandidates) => void;
+  input = { ...input, load: vi.fn().mockImplementation(() => new Promise<PlanningCandidates>(resolve => { finish = resolve; })) };
+  await render(); await act(async () => current.change(600, 720));
+  await act(async () => finish({ ...candidates, personalItems: candidates.personalItems.map(item => ({ ...item, openedWithin24h: item.kind === 'reviewer' })) }));
+  expect(vi.mocked(input.queue).mock.lastCall![0].selection?.items).toEqual([{ kind: 'task', id: id(1) }]);
+  expect(input.queue).toHaveBeenCalledTimes(1); expect(input.load).toHaveBeenCalledTimes(1);
+});

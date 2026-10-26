@@ -46,6 +46,10 @@ describe('PL1 manual order and snapshots', () => {
     const snapshot = snapshotFromPlan('2026-10-27', 1200, 1320, { ...plan, sessions: [plan.sessions[0]!, plan.sessions[0]!] });
     expect(restoreSelectionFromSnapshot(snapshot).items).toHaveLength(1);
   });
+  it('moves by proposal block index before deduplicating split target sessions', () => {
+    const split = { ...plan, selection, sessions: [plan.sessions[0]!, plan.sessions[0]!, plan.sessions[1]!] };
+    expect(moveProposalUp(split, 1).items).toEqual(selection.items);
+  });
 });
 it('cleans piped all-caps course names and preserves non-piped names', () => {
   expect(splitCourseName('CC17 | CITCS 3F Group A | MOBILE APPLICATION DESIGN AND DEVELOPMENT')).toEqual({ code: 'CC17', name: 'Mobile Application Design and Development' });

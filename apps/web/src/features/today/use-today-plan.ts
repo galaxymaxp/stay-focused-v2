@@ -99,7 +99,7 @@ export function useTodayPlan(input: Input) {
     live.current.clear();
     setMoved({ identity, window: window.window });
     clock.save(window.window);
-    intent.current = { identity, ...activeChoice.current };
+    intent.current = { identity, mode: activeChoice.current.mode, selection: candidates ? activeChoice.current.selection : choice?.identity === identity ? choice.selection : input.selection };
   }
   function updateOverrides(next: PlanOverrides) {
     activeOverrides.current = next;
