@@ -104,7 +104,7 @@ async function mount(id = 'page:first') {
   });
 }
 function button(label: string) {
-  const found = tree!.root.findAllByType('button').find(node => node.props.children === label);
+  const found = tree!.root.findAllByType('button').find(node => (node.props.children === label || node.props['aria-label'] === label));
   if (!found) throw new Error(`Missing button: ${label}`);
   return found;
 }
@@ -146,17 +146,17 @@ it('opens the encoded Library artifact, offers secondary Remake and reports Revi
   expect(button('Remake').props.className).not.toBe('primary');
   expect(button('Remake').props['aria-expanded']).toBe(false);
   expect(reviewerFact()).toBe('Ready');
-  expect(button('Generate Quiz').props.disabled).toBe(false);
-  expect(tree!.root.findAllByType('button').some(node => node.props.children === 'Generate Reviewer')).toBe(false);
+  expect(button('Generate quiz').props.disabled).toBe(false);
+  expect(tree!.root.findAllByType('button').some(node => node.props['aria-label'] === 'Generate reviewer')).toBe(false);
 });
 
-it('keeps direct Generate Reviewer and the existing Quiz availability without a saved Reviewer', async () => {
+it('keeps direct Generate reviewer and the existing Quiz availability without a saved Reviewer', async () => {
   await mount('page:second');
   expect(openReviewer()).toBeUndefined();
-  expect(button('Generate Reviewer').props).toMatchObject({ className: 'primary', disabled: false });
-  expect(button('Generate Quiz').props.disabled).toBe(true);
+  expect(button('Generate reviewer').props).toMatchObject({ className: 'glass-pill glass-pill-md', disabled: false });
+  expect(tree!.root.findAllByType('button').filter(node => node.props['aria-label'] === 'Generate quiz')).toHaveLength(0);
   expect(reviewerFact()).toBe('Available');
-  await click('Generate Reviewer');
+  await click('Generate reviewer');
   expect(posts()).toEqual([[generationsPath, { method: 'POST', body: { courseId: 'course', materialId: 'page:second' }, key: 'idempotency-key' }]]);
   expect(mocks.push).toHaveBeenCalledWith('/generation/job');
 });
@@ -166,11 +166,11 @@ it.each([null, 'Covers cells and their energy needs.'])('renders the optional ma
   await mount('page:second');
   const paragraphs = tree!.root.findAllByType('p').filter(node => text(node) === description);
   expect(paragraphs).toHaveLength(description ? 1 : 0);
-  expect(button('Generate Reviewer').props.disabled).toBe(false);
+  expect(button('Generate reviewer').props.disabled).toBe(false);
   if (description) {
     const serialized = JSON.stringify(tree!.toJSON());
     expect(paragraphs[0]!.props.className).toBe('muted');
-    expect(serialized.indexOf(description)).toBeLessThan(serialized.indexOf('Generate Reviewer'));
+    expect(serialized.indexOf(description)).toBeLessThan(serialized.indexOf('Generate reviewer'));
   }
 });
 
@@ -297,14 +297,14 @@ it('keeps saved reading available when generation is disabled', async () => {
   await mount();
   expect(openReviewer()?.props.href).toBe(`/library/artifact%3A${reviewerId}`);
   expect(button('Remake').props.disabled).toBe(true);
-  expect(button('Generate Quiz').props.disabled).toBe(true);
+  expect(button('Generate quiz').props.disabled).toBe(true);
   expect(reviewerFact()).toBe('Ready');
 });
 
 it('preserves the existing material Quiz setup and submission when a Reviewer exists', async () => {
   await mount();
-  await click('Generate Quiz');
-  const quizButtons = tree!.root.findAllByType('button').filter(node => node.props.children === 'Generate Quiz');
+  await click('Generate quiz');
+  const quizButtons = tree!.root.findAllByType('button').filter(node => node.props['aria-label'] === 'Generate quiz');
   await act(async () => { quizButtons[quizButtons.length - 1]!.props.onClick(); });
   expect(posts()).toEqual([['/api/experience/quizzes', {
     method: 'POST', key: 'idempotency-key',
@@ -312,4 +312,27 @@ it('preserves the existing material Quiz setup and submission when a Reviewer ex
   }]]);
   expect(mocks.push).toHaveBeenCalledWith('/generation/quiz-job');
   expect(tree!.root.findAllByProps({ role: 'alertdialog' })).toHaveLength(0);
+});
+it('shows exactly one busy reviewer pill, keeps admission unchanged and hides it for a completed pair', async () => {
+  let resolve!: (value: GenerationView) => void; submission = new Promise(done => { resolve = done; });
+  await mount('page:second');
+  const pills = () => tree!.root.findAllByType('button').filter(node => node.props.className === 'glass-pill glass-pill-md');
+  expect(pills()).toHaveLength(1); await click('Generate reviewer');
+  expect(pills()).toHaveLength(1); expect(pills()[0]!.props).toMatchObject({ 'aria-label': 'Generating reviewer', 'aria-busy': true, disabled: true });
+  expect(posts()).toHaveLength(1); await act(async () => resolve(job));
+  expect(mocks.accepted).toHaveBeenCalledOnce();
+  workspace = { ...workspace, materials: { ...workspace.materials, items: [{ ...material('page:first', reviewerId), hasQuiz: true }] } };
+  await act(async () => { tree!.update(view()); window.dispatchEvent(new Event('focus')); });
+  expect(pills()).toHaveLength(0); expect(mocks.api.mock.calls.some(([path]) => path.includes('/library'))).toBe(false);
+});
+it('shows one busy Quiz pill in the existing options and submits through its original handler', async () => {
+  let resolve!: (value: { id: string }) => void;
+  const response = new Promise(done => { resolve = done; }); const original = mocks.api.getMockImplementation()!;
+  mocks.api.mockImplementation((path: string, ...args: unknown[]) => path === '/api/experience/quizzes' ? response : original(path, ...args));
+  await mount(); await click('Generate quiz');
+  expect(tree!.root.findAllByType('button').filter(node => node.props.className === 'glass-pill glass-pill-md')).toHaveLength(1);
+  await click('Generate quiz');
+  expect(button('Generating quiz').props).toMatchObject({ 'aria-busy': true, disabled: true });
+  expect(posts()).toHaveLength(1); await act(async () => resolve({ id: 'quiz-job' }));
+  expect(mocks.push).toHaveBeenCalledWith('/generation/quiz-job');
 });

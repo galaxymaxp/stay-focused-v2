@@ -70,7 +70,7 @@ export class ExperienceService {
         this.dependencies.repository.materialReviewers(userId, courseId, ids),
         this.dependencies.repository.materialDescriptions?.(userId, courseId, ids),
       ]);
-      return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewers.get(row.id) ?? null, descriptions?.get(row.id) ?? null)), totalKnown: result.value.pagination.totalKnown,
+      return { items: await this.materialQuizState(userId, result.value.sources.map(row => learningMaterial(row, courseId, reviewers.get(row.id) ?? null, descriptions?.get(row.id) ?? null))), totalKnown: result.value.pagination.totalKnown,
         nextOffset: result.value.pagination.hasMore ? result.value.pagination.offset + result.value.pagination.returned : null };
     }
     const [result, artifacts, versions, sourceVersions, snapshots, snapshotItems] = await Promise.all([
@@ -84,8 +84,29 @@ export class ExperienceService {
     if (!result.ok) this.materialsFailure(result);
     const reviewerByMaterial = mapReviewerArtifactsByMaterial({ courseId, artifacts, versions, sourceVersions, snapshots, snapshotItems });
     const descriptions = await this.dependencies.repository.materialDescriptions?.(userId, courseId, result.value.sources.map(row => row.id));
-    return { items: result.value.sources.map(row => learningMaterial(row, courseId, reviewerByMaterial.get(row.id)?.id ?? null, descriptions?.get(row.id) ?? null)), totalKnown: result.value.pagination.totalKnown,
+    return { items: await this.materialQuizState(userId, result.value.sources.map(row => learningMaterial(row, courseId, reviewerByMaterial.get(row.id)?.id ?? null, descriptions?.get(row.id) ?? null))), totalKnown: result.value.pagination.totalKnown,
       nextOffset: result.value.pagination.hasMore ? result.value.pagination.offset + result.value.pagination.returned : null };
+  }
+  /** Existing owner-scoped response metadata; no client Library fetch is needed. */
+  private async materialQuizState(userId: string, materials: CourseMaterials['items']): Promise<CourseMaterials['items']> {
+    if (!materials.some(material => material.reviewerArtifactId)) return materials;
+    if (this.dependencies.repository.reviewerQuizIds) {
+      const linked = await this.dependencies.repository.reviewerQuizIds(userId, materials.flatMap(material => material.reviewerArtifactId ? [material.reviewerArtifactId] : []));
+      return materials.map(material => ({ ...material, hasQuiz: !!material.reviewerArtifactId && !!linked.get(material.reviewerArtifactId)?.length }));
+    }
+    const quizzes = await this.rows('quizzes', userId);
+    const reviewers = new Set(quizzes.flatMap(quiz => quiz.reviewer_artifact_id ? [quiz.reviewer_artifact_id] : []));
+    return materials.map(material => ({ ...material, hasQuiz: !!material.reviewerArtifactId && reviewers.has(material.reviewerArtifactId) }));
+  }
+  private async reviewerQuizState(userId: string, summary: LibraryArtifactSummary, reviewerId: string): Promise<LibraryArtifactSummary> {
+    const repository = this.dependencies.repository;
+    if (repository.reviewerQuizIds) {
+      const linked = (await repository.reviewerQuizIds(userId, [reviewerId])).get(reviewerId) ?? [];
+      return { ...summary, relatedArtifactIds: [...new Set([...summary.relatedArtifactIds, ...linked.map(id => `quiz:${id}`)])] };
+    }
+    const quizzes = repository.exactRows ? await repository.exactRows('quizzes', userId, 'reviewer_artifact_id', reviewerId) : await this.rows('quizzes', userId);
+    const linked = quizzes.filter(quiz => quiz.user_id === userId && quiz.reviewer_artifact_id === reviewerId).map(quiz => `quiz:${quiz.id}`);
+    return { ...summary, relatedArtifactIds: [...new Set([...summary.relatedArtifactIds, ...linked])] };
   }
   private materialsFailure(result: Extract<CanvasReviewerSourceResult<CanvasReviewerSourceList>, { ok: false }>): never {
       // Unselected or disconnected courses are a sync state, not a server outage.
@@ -320,13 +341,15 @@ export class ExperienceService {
       }
       const entry = requireFound(await repository.reviewerDetail(userId, artifactId));
       const freshness = this.dependencies.freshness ? await this.dependencies.freshness(userId, entry.artifactId) : 'unknown';
-      return { artifact: entry.summary, reviewer: reviewerReader(entry.payload, entry.summary, freshness) };
+      const summary = await this.reviewerQuizState(userId, entry.summary, entry.artifactId);
+      return { artifact: summary, reviewer: reviewerReader(entry.payload, summary, freshness) };
     }
     if (artifactId.startsWith('quiz:')) { const entry=requireFound((await this.quizRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,quiz:entry.quiz}; }
     if (artifactId.startsWith('activity:')) { const entry=requireFound((await this.activityDraftRecords(userId)).find(r=>r.summary.id===artifactId)); return {artifact:entry.summary,draft:entry.draft}; }
     const entry = requireFound((await this.artifactRecords(userId)).find(r => r.aliases.includes(artifactId)));
     const freshness = entry.reviewerArtifactId && this.dependencies.freshness ? await this.dependencies.freshness(userId, entry.reviewerArtifactId) : 'unknown';
-    return { artifact: entry.summary, reviewer: reviewerReader(entry.payload, entry.summary, freshness) };
+    const summary = entry.reviewerArtifactId ? await this.reviewerQuizState(userId, entry.summary, entry.reviewerArtifactId) : entry.summary;
+    return { artifact: summary, reviewer: reviewerReader(entry.payload, summary, freshness) };
   }
   async getGeneration(userId: string, generationId: string): Promise<GenerationView> {
     const rows = this.dependencies.repository.exactRows

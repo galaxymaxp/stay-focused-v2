@@ -119,6 +119,7 @@ export function ReviewerReaderScreen({
   const [query, setQuery] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [quizOpen, setQuizOpen] = useState(openQuizInitially);
+  const [quizBusy, setQuizBusy] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const { session } = useAuth();
   const snapshotClient = useMemo(() => ({ baseUrl: getApiBaseUrl() ?? '', accessToken: session?.accessToken ?? '' }), [session?.accessToken]);
@@ -380,7 +381,7 @@ export function ReviewerReaderScreen({
       {offlineImages.needsConnection ? <Copy muted size="caption">Some images need a connection</Copy> : null}
       <ReviewerHeader artifact={artifact} reviewer={reviewer} secondaryLine={secondaryLine}
         topicCount={anchors.length} client={snapshotClient} offline={deviceCopy}
-        onExport={() => setExportOpen(true)} onQuiz={() => setQuizOpen(true)} />
+        onExport={() => setExportOpen(true)} onQuiz={() => setQuizOpen(true)} quizBusy={quizBusy} />
       <View
         ref={node => { rootRef.current = node; topicScroll.root.current = node; }}
         collapsable={false}
@@ -496,7 +497,7 @@ export function ReviewerReaderScreen({
           </View>
         ))}
       </View>
-      {quizOpen ? <QuizFromReviewerSheet artifact={artifact} reviewer={reviewer} deviceCopy={deviceCopy} onClose={() => setQuizOpen(false)} /> : null}
+      {quizOpen ? <QuizFromReviewerSheet artifact={artifact} reviewer={reviewer} deviceCopy={deviceCopy} onBusyChange={setQuizBusy} onClose={() => setQuizOpen(false)} /> : null}
       {exportOpen ? <ExportSheet detail={{ artifact, reviewer }} onClose={() => setExportOpen(false)} /> : null}
       {assistPassage ? <StudyAssistSheet key={`${openKey ?? "missing"}|${assistPassage.image?.reference.id ?? ""}`} target={assistTarget} image={assistPassage.image} onClose={() => setAssistPassage(null)} /> : null}
     </Page></StudyAnswerScrollContext.Provider>
@@ -533,7 +534,7 @@ const QUIZ_FORMATS: readonly { value: QuizQuestionType | "mixed"; label: string 
  * has to be selected again; the request goes to the same confirmation screen
  * as every other generation, and nothing starts until the student confirms.
  */
-function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { artifact: LibraryArtifactSummary; reviewer: ReviewerReaderModel; deviceCopy: boolean; onClose: () => void }) {
+function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose, onBusyChange }: { artifact: LibraryArtifactSummary; reviewer: ReviewerReaderModel; deviceCopy: boolean; onClose: () => void; onBusyChange: (busy: boolean) => void }) {
   const { session } = useAuth();
   const { colors } = useTheme();
   const reviewerArtifactId = reviewerArtifactIdFromLibraryId(artifact.id);
@@ -558,6 +559,7 @@ function QuizFromReviewerSheet({ artifact, reviewer, deviceCopy, onClose }: { ar
   }, [maximum, count, countOptions, customCount, format]);
   const [difficulty, setDifficulty] = useState<QuizDifficulty | "mixed">("mixed");
   const [busy, setBusy] = useState(false);
+  useEffect(() => { onBusyChange(busy); return () => onBusyChange(false); }, [busy, onBusyChange]);
   const [error, setError] = useState<string | null>(null);
   async function next() {
     if (!session || !reviewerArtifactId || busy || !validCount || selectedTopics.length === 0) return;

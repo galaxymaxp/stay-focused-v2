@@ -37,14 +37,14 @@ const trigger = () => tree!.root.findAllByType('button').find(node => node.props
 const items = () => tree!.root.findAllByType('button').filter(node => node.props.role === 'menuitem');
 const menu = () => tree!.root.findAllByType('div').find(node => node.props.role === 'menu');
 const open = async () => act(async () => trigger().props.onClick());
-it('offers Share, Export PDF and Text in the menu, and keeps Generate Quiz visible', async () => {
+it('offers Share, Export PDF and Text in the menu, and keeps Generate quiz visible', async () => {
   await mount(); expect(trigger().props['aria-haspopup']).toBe('menu'); expect(trigger().props['aria-expanded']).toBe(false);
   expect(items()).toHaveLength(0); expect(mocks.api).not.toHaveBeenCalled();
   await open(); expect(trigger().props['aria-expanded']).toBe(true);
   expect(items().map(item => item.props.children[1])).toEqual(['Share', 'Export PDF', 'Text (.txt)']); expect(mocks.firstFocus).toHaveBeenCalledOnce();
   await act(async () => items()[1]!.props.onClick()); expect(mocks.pdf).toHaveBeenCalledOnce();
   await open(); await act(async () => items()[2]!.props.onClick()); expect(mocks.save).toHaveBeenCalledOnce(); expect(items()).toHaveLength(0);
-  const quiz = tree!.root.findAllByType('button').find(node => node.props.children === 'Generate Quiz')!;
+  const quiz = tree!.root.findAllByType('button').find(node => node.props['aria-label'] === 'Generate quiz')!;
   await act(async () => quiz.props.onClick()); expect(mocks.quiz).toHaveBeenCalledOnce();
 });
 it('opens the existing Share interface using its unchanged request', async () => {
@@ -92,11 +92,18 @@ it.each([
 it('omits empty meta and preserves the generation-disabled state', async () => {
   await mount({ reviewer: { ...reviewer, reviewMinutes: undefined, sections: reviewer.sections.slice(0, 1) }, quizDisabled: true });
   expect(tree!.root.findAllByType('div').some(node => node.props.className === 'meta reviewer-meta')).toBe(false);
-  expect(tree!.root.findAllByType('button').find(node => node.props.children === 'Generate Quiz')!.props.disabled).toBe(true);
+  expect(tree!.root.findAllByType('button').find(node => node.props['aria-label'] === 'Generate quiz')!.props.disabled).toBe(true);
 });
 
 it('disables both export formats while a file is being created', async () => {
   await mount({ exportBusy: true }); await open();
   expect(items().slice(1).map(item => item.props.disabled)).toEqual([true, true]);
   expect(JSON.stringify(tree!.toJSON())).toContain('Creating file');
+});
+it('uses a small busy pill and hides it for an existing saved Quiz', async () => {
+  await mount({ quizBusy: true });
+  expect(tree!.root.findAllByType('button').find(node => node.props['aria-label'] === 'Generating quiz')!.props).toMatchObject({ className: 'glass-pill glass-pill-sm', disabled: true, 'aria-busy': true });
+  await act(async () => tree!.update(createElement(ReviewerHeader, { ...props, artifact: { ...artifact, relatedArtifactIds: ['quiz:saved'] } })));
+  expect(tree!.root.findAllByType('button').filter(node => String(node.props.className).startsWith('glass-pill'))).toHaveLength(0);
+  expect(mocks.api).not.toHaveBeenCalled();
 });

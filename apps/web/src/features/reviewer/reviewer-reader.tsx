@@ -307,6 +307,7 @@ export function ReviewerReader({
   };
 
   const [quizOpen, setQuizOpen] = useState(false);
+  const [quizBusy, setQuizBusy] = useState(false);
   const exportAction = useAction();
   function saveText() {
     const body = [
@@ -333,7 +334,7 @@ export function ReviewerReader({
         onSave={() => void exportAction.run(async () => {
           try { saveText(); } catch { throw new Error(EXPORT_FAILURE); }
         })}
-        onQuiz={() => setQuizOpen(true)} quizDisabled={!generationEnabled} />
+        onQuiz={() => setQuizOpen(true)} quizDisabled={!generationEnabled} quizBusy={quizBusy} />
       {exportAction.message && <Notice>{exportAction.message}</Notice>}
       {snapshotStatus}
       {reviewer.generationNotice ? <Notice>{reviewer.generationNotice}</Notice> : null}
@@ -582,7 +583,7 @@ export function ReviewerReader({
         </div>
       ) : null}
       {quizOpen && (
-        <QuizFromReviewerDialog libraryId={artifact.id} title={artifact.title} reviewer={reviewer} onClose={() => setQuizOpen(false)} />
+        <QuizFromReviewerDialog onBusyChange={setQuizBusy} libraryId={artifact.id} title={artifact.title} reviewer={reviewer} onClose={() => setQuizOpen(false)} />
       )}
     </StudyAnswerScrollContext.Provider>
   );

@@ -323,6 +323,31 @@ describe('Learn and Activity details', () => {
   });
 });
 describe('Library ownership and persisted output', () => {
+  it.each(['owner', 'other'])('exposes linked Quiz state only for the verified %s', async owner => {
+    const { api } = service({ ...libraryData, quizzes: [{ id: 'saved-quiz', user_id: owner, reviewer_artifact_id: 'artifact' }] });
+    const material = (await api.getCourseMaterials('owner', course.id)).items[0]!;
+    expect(material.hasQuiz).toBe(owner === 'owner');
+    const detail = await api.getLibraryArtifact('owner', 'artifact:artifact');
+    expect(detail.artifact.relatedArtifactIds).toEqual(owner === 'owner' ? ['quiz:saved-quiz'] : []);
+    await expect(api.getLibraryArtifact('other', 'artifact:artifact')).rejects.toMatchObject({ status: 404 });
+  });
+  it('adds the same Quiz state through production-shaped read adapters without loading Library', async () => {
+    const { api, repo } = service({ canvas_courses: [course], quizzes: [
+      { id: 'saved', user_id: 'owner', reviewer_artifact_id: 'artifact' },
+      { id: 'private', user_id: 'other', reviewer_artifact_id: 'artifact' },
+    ] });
+    repo.materialReviewers = vi.fn(async () => new Map([[descriptor.id, 'artifact']]));
+    repo.reviewerDetail = vi.fn(async () => ({ artifactId: 'artifact', payload, summary: {
+      id: 'artifact:artifact', type: 'reviewer', title: 'Cells', course: null, sourceId: null, sourceTitle: null,
+      activityId: null, createdAt: date, updatedAt: date, lastOpenedAt: null, status: 'completed', relatedArtifactIds: [],
+    } }));
+    repo.librarySummary = vi.fn(async () => null);
+    repo.exactRows = async <T extends ExperienceTable>(table: T) => repo.rows(table, 'owner');
+    expect((await api.getCourseMaterials('owner', course.id)).items[0]?.hasQuiz).toBe(true);
+    const detail = await api.getLibraryArtifact('owner', 'artifact:artifact');
+    expect(detail.artifact.relatedArtifactIds).toEqual(['quiz:saved']);
+    expect(repo.librarySummary).not.toHaveBeenCalled();
+  });
   it('estimates the exact saved version in both Library and the reader', async () => {
     const { api } = service(libraryData);
     expect((await api.getLibrary('owner')).items[0]?.reviewMinutes).toBe(5);

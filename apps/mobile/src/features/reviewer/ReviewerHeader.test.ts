@@ -7,10 +7,11 @@ import { hitTarget, spacing } from '../../design/tokens';
 
 const state = vi.hoisted(() => ({ fontScale: 1, read: vi.fn(), mutate: vi.fn(), export: vi.fn(), quiz: vi.fn() }));
 vi.mock('react-native', () => ({
-  View: 'View', Text: 'Text', Pressable: 'Pressable', Modal: 'Modal', ScrollView: 'ScrollView', Share: { share: vi.fn() },
+  StyleSheet: { hairlineWidth: .5 }, ActivityIndicator: 'ActivityIndicator', View: 'View', Text: 'Text', Pressable: 'Pressable', Modal: 'Modal', ScrollView: 'ScrollView', Share: { share: vi.fn() },
   useWindowDimensions: () => ({ width: 320, height: 640, scale: 1, fontScale: state.fontScale }),
   Animated: { View: 'AnimatedView', Value: class { stopAnimation() {} setValue() {} } },
 }));
+vi.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 vi.mock('expo-router', () => ({ router: {} }));
 vi.mock('expo-router/js-tabs', () => ({ BottomTabBarHeightContext: {} }));
 vi.mock('lucide-react-native', () => ({
@@ -69,12 +70,12 @@ it.each([1, 2, 3])('keeps a wrapping title beside a top-aligned 48pt actions tri
   expect(text(props.artifact.title).parent!.parent!.props.style.alignItems).toBe('flex-start');
   expect(modal()).toHaveLength(0); expect(state.read).not.toHaveBeenCalled();
 });
-it('opens Export/Share, exports and dismisses while keeping Generate Quiz visible', async () => {
+it('opens Export/Share, exports and dismisses while keeping Generate quiz visible', async () => {
   await mount(); await open();
   expect(button('Export')).toBeDefined(); expect(button('Share')).toBeDefined();
   await act(async () => button('Export').props.onPress());
   expect(state.export).toHaveBeenCalledOnce(); expect(modal()).toHaveLength(0);
-  await act(async () => button('Generate Quiz').props.onPress()); expect(state.quiz).toHaveBeenCalledOnce();
+  await act(async () => button('Generate quiz').props.onPress()); expect(state.quiz).toHaveBeenCalledOnce();
   expect(state.read).not.toHaveBeenCalled(); expect(state.mutate).not.toHaveBeenCalled();
 });
 it('opens the existing share sheet from the menu without creating a link', async () => {
@@ -121,4 +122,12 @@ it.each([
 it('omits an empty meta block', async () => {
   await mount({ secondaryLine: null, topicCount: 1 });
   expect(tree!.root.findAll(node => node.props.testID === 'reviewer-meta')).toHaveLength(0);
+});
+it('uses a small busy pill and hides it when a persisted Quiz exists', async () => {
+  await mount({ quizBusy: true });
+  expect(button('Generating quiz').props.accessibilityState).toMatchObject({ busy: true, disabled: true });
+  expect(tree!.root.findByProps({ testID: 'glass-pill-shell' }).props.style.height).toBe(34);
+  await act(async () => tree!.update(createElement(ReviewerHeader, { ...props, artifact: { ...props.artifact, relatedArtifactIds: ['quiz:saved'] } })));
+  expect(tree!.root.findAllByProps({ testID: 'glass-pill-shell' })).toHaveLength(0);
+  expect(state.read).not.toHaveBeenCalled(); expect(state.mutate).not.toHaveBeenCalled();
 });

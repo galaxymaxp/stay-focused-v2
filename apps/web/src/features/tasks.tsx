@@ -1,4 +1,5 @@
 "use client";
+import { GlassPill } from "../components/ui/glass-pill";
 import type { ActivityDetail, ActivitySummary } from "@stay-focused/shared";
 import type {
   TaskView,
@@ -358,9 +359,7 @@ export function TaskDetailScreen({ id }: { id: string }) {
                 A first draft for this activity from its instructions and your course material, saved to your
                 Library. You can leave while it works.
               </p>
-              <button className="primary" disabled={!canDraft || draft.busy} onClick={createDraft}>
-                {draft.busy ? "Starting…" : "Create Draft"}
-              </button>
+              <GlassPill size="md" label={draft.busy ? "Creating draft" : "Create draft"} busy={draft.busy} disabled={!canDraft} onClick={createDraft} />
               {!available(assistance) && <p className="meta">{capabilityNote(assistance)}</p>}
               {!generationEnabled && <p className="meta">Generation is unavailable in this environment.</p>}
               {draft.message && <Notice error>{draft.message}</Notice>}

@@ -24,6 +24,7 @@ import { localDate, planningRequest } from "./presentation";
 import { TASK_COURSE_GRADES_PATHNAME, courseRouteParams } from "../../navigation/appRoutes";
 import { AnnouncementDetailScreen, AnnouncementsScreen } from "../announcements/AnnouncementsScreen";
 beforeEach(() => todayPlanningMemory.reset());
+vi.mock("../../components/GlassPill", () => ({ GlassPill: "GlassPill" }));
 vi.mock("./PlanningSheet", () => ({ PlanningControl: "PlanningControl" }));
 
 
@@ -362,7 +363,7 @@ describe("Generate and confirmed Library Remake grace", () => {
       mocks.data["/api/experience/courses/course"] = workspace;
       mocks.params = { courseId: "course", materialId: "file:one" };
       const root = await render(createElement(GenerateMaterialScreen));
-      await act(async () => root.findAll(node => String(node.type) === "Action" && node.props.children === "Generate Reviewer")[0]!.props.onPress());
+      await act(async () => root.findAll(node => String(node.type) === "GlassPill" && node.props.label === "Generate reviewer")[0]!.props.onPress());
       return GenerateMaterialScreen;
     }
     mocks.params = { courseKey: "course" };
@@ -812,12 +813,11 @@ describe("B25 screen interactions", () => {
     mocks.params = { courseId: "course", materialId: "file:one" };
     const root = await render(createElement(GenerateMaterialScreen));
     const quiz = root
-      .findAll((node) => String(node.type) === "Action")
-      .find((node) => node.props.children === "Generate Quiz")!;
-    expect(quiz.props.disabled).toBe(true);
+      .findAll((node) => String(node.type) === "GlassPill").find((node) => node.props.label === "Generate quiz")!;
+    expect(quiz).toBeUndefined();
+    expect(root.findAll(node => String(node.type) === "GlassPill")).toHaveLength(1);
     const reviewer = root
-      .findAll((node) => String(node.type) === "Action")
-      .find((node) => node.props.children === "Generate Reviewer")!;
+      .findAll((node) => String(node.type) === "GlassPill").find((node) => node.props.label === "Generate reviewer")!;
     await act(async () => reviewer.props.onPress());
     expect(mocks.createIntent).toHaveBeenCalledWith(
       "owner",
@@ -841,7 +841,7 @@ describe("B25 screen interactions", () => {
     const root = await render(createElement(GenerateMaterialScreen));
     const copies = root.findAll(node => String(node.type) === 'Copy' && node.props.children === description);
     expect(copies).toHaveLength(description ? 1 : 0);
-    const generate = root.findAll(node => String(node.type) === 'Action' && node.props.children === 'Generate Reviewer')[0]!;
+    const generate = root.findAll(node => String(node.type) === 'GlassPill' && node.props.label === 'Generate reviewer')[0]!;
     expect(generate.props.disabled).toBe(false);
     if (description) {
       expect(copies[0]!.props.size).toBe('bodySmall');
@@ -888,7 +888,7 @@ describe("B25 screen interactions", () => {
     expect(copyText(root).join(' ')).toContain(status==='failed'?"Couldn't prepare":status==='ready'?'Ready':'Preparing');
     const actions=root.findAll(node=>String(node.type)==='Action');
     expect(actions.some(node=>node.props.children==='Retry')).toBe(status==='failed');
-    expect(actions.find(node=>node.props.children==='Generate Reviewer')!.props.disabled).toBe(status!=='ready');
+    expect(root.findByType('GlassPill' as never).props.disabled).toBe(status!=='ready');
     expect(root.findAll(node=>String(node.type)==='GenerationCore')).toHaveLength(0);
     expect(mocks.request).not.toHaveBeenCalled();
   });
@@ -917,12 +917,13 @@ describe("B25 screen interactions", () => {
     let resolveIntent!: (value: { key: string }) => void;
     mocks.createIntent.mockImplementationOnce(() => new Promise((resolve) => { resolveIntent = resolve; }));
     const root = await render(createElement(GenerateMaterialScreen));
-    const reviewer = root.findAll((node) => String(node.type) === "Action").find((node) => node.props.children === "Generate Reviewer")!;
+    const reviewer = root.findAll((node) => String(node.type) === "GlassPill").find((node) => node.props.label === "Generate reviewer")!;
     await act(async () => { void reviewer.props.onPress(); void reviewer.props.onPress(); });
     expect(copyText(root).join(" ")).not.toContain("Submitting generation");
     expect(root.findAll((node) => String(node.type) === "GenerationCore")).toHaveLength(0);
     expect(mocks.createIntent).toHaveBeenCalledTimes(1);
     await act(async () => resolveIntent({ key: "intent" }));
+    expect(root.findByType('GlassPill' as never).props).toMatchObject({ size: 'md', label: 'Generating reviewer', busy: true });
     expect(mocks.push).not.toHaveBeenCalled();
     expect(root.findAll(node => String(node.type) === 'Notice').map(node => node.props.children).join(' ')).toContain('Request saved.');
   });
@@ -932,7 +933,7 @@ describe("B25 screen interactions", () => {
     let resolveIntent!: (value: { key: string }) => void;
     mocks.createIntent.mockImplementationOnce(() => new Promise(resolve => { resolveIntent = resolve; }));
     const root = await render(createElement(GenerateMaterialScreen));
-    const button = root.findAll(node => String(node.type) === "Action" && node.props.children === "Generate Reviewer")[0]!;
+    const button = root.findAll(node => String(node.type) === "GlassPill" && node.props.label === "Generate reviewer")[0]!;
     await act(async () => { void button.props.onPress(); });
     await act(async () => rendered!.unmount()); rendered = undefined;
     await act(async () => { resolveIntent({ key: "saved-after-navigation" }); });
@@ -958,9 +959,13 @@ describe("B25 screen interactions", () => {
     mocks.createIntent.mockResolvedValue({ key: "quiz-key" });
     mocks.params = { courseId: "course", materialId: "file:one" };
     const root = await render(createElement(GenerateMaterialScreen));
-    const quiz = root.findAll((node) => String(node.type) === "Action").find((node) => node.props.children === "Generate Quiz")!;
+    const quiz = root.findAll((node) => String(node.type) === "GlassPill").find((node) => node.props.label === "Generate quiz")!;
     expect(quiz.props.disabled).toBe(false);
-    await act(async () => quiz.props.onPress());
+    let resolveQuiz!: (value: { key: string }) => void;
+    mocks.createIntent.mockReturnValueOnce(new Promise(resolve => { resolveQuiz = resolve; }));
+    await act(async () => { void quiz.props.onPress(); });
+    expect(root.findByType('GlassPill' as never).props).toMatchObject({ size: 'md', label: 'Generating quiz', busy: true });
+    await act(async () => resolveQuiz({ key: 'quiz-key' }));
     expect(mocks.createIntent).toHaveBeenCalledWith("owner", expect.objectContaining({
       body: expect.objectContaining({
         sourceType: "reviewer",
@@ -1492,8 +1497,13 @@ describe("B38 saved assignment Draft", () => {
     mocks.createIntent.mockResolvedValue({ key: "draft-request" });
     const root = await render(createElement(ActivityScreen));
     expect(root.findAll(node => String(node.type) === "Page")[0]!.props.title).toBe("Assignment");
-    const generate = root.findAll(node => String(node.type) === "Action" && node.props.children === "Generate Draft")[0]!;
-    await act(async () => generate.props.onPress());
+    const generate = root.findAll(node => String(node.type) === "GlassPill" && node.props.label === "Create draft")[0]!;
+    let resolveDraft!: (value: { key: string }) => void;
+    mocks.createIntent.mockReturnValueOnce(new Promise(resolve => { resolveDraft = resolve; }));
+    await act(async () => { void generate.props.onPress(); void generate.props.onPress(); });
+    expect(root.findByType('GlassPill' as never).props).toMatchObject({ size: 'md', label: 'Creating draft', busy: true });
+    expect(mocks.createIntent).toHaveBeenCalledOnce();
+    await act(async () => resolveDraft({ key: 'draft-request' }));
     expect(mocks.createIntent).toHaveBeenCalledWith("owner", { title: draft.title, type: "activity_output", path: "/api/experience/activities/canvas%3Aassignment/generate", body: { mode: "draft" } });
     expect(mocks.push).toHaveBeenCalledWith({ pathname: "/generation", params: { intent: "draft-request", start: "1" } });
   });
@@ -1827,4 +1837,13 @@ describe('TC2 real mobile clock gesture counters', () => {
     expect(mocks.request.mock.calls[0]![2].body).toEqual({ ...planningRequest(localDate(), 1320, 240, "reviewers_tasks"), selection: { order: "smart", items: [] } });
     expect(new Set(mocks.paths).size).toBe(1); expect(mocks.sync).not.toHaveBeenCalled(); expect(mocks.refresh).not.toHaveBeenCalled();
   });
+});
+it('hides the material generation pill when its persisted Reviewer already has a Quiz', async () => {
+  mocks.params = { courseId: 'course', materialId: 'file:one' };
+  mocks.data['/api/experience/courses/course'] = { ...workspace, materials: { ...workspace.materials,
+    items: workspace.materials.items.map(item => ({ ...item, reviewerArtifactId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', hasQuiz: true })) } };
+  const root = await render(createElement(GenerateMaterialScreen));
+  expect(root.findAllByType('GlassPill' as never)).toHaveLength(0);
+  expect(mocks.createIntent).not.toHaveBeenCalled();
+  expect(mocks.paths.some(path => path.includes('/library'))).toBe(false);
 });

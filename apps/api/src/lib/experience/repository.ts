@@ -39,6 +39,7 @@ export interface ExperienceRepository {
   reviewerDetail?(userId: string, id: string): Promise<{ summary: LibraryArtifactSummary; payload: unknown; artifactId: string } | null>;
   materialReviewers?(userId: string, courseId: string, materialIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
   materialDescriptions?(userId: string, courseId: string, materialIds: readonly string[]): Promise<ReadonlyMap<string, string>>;
+  reviewerQuizIds?(userId: string, reviewerIds: readonly string[]): Promise<ReadonlyMap<string, readonly string[]>>;
   exactRows?<T extends ExperienceTable>(table: T, userId: string, key: keyof ExperienceRow<T> & string, value: string): Promise<readonly ExperienceRow<T>[]>;
   /** Saved reviewers that Today reviewer blocks open, keyed by artifact UUID. */
   reviewerTargets?(userId: string, artifactIds: readonly string[]): Promise<ReadonlyMap<string, ReviewerTarget>>;
@@ -100,6 +101,7 @@ export function trustedExperienceReadRepository(
     reviewerDetail: (_userId, id) => repository.reviewerDetail!(authenticatedUserId, id),
     materialReviewers: (_userId, courseId, materialIds) => repository.materialReviewers!(authenticatedUserId, courseId, materialIds),
     materialDescriptions: (_userId, courseId, materialIds) => repository.materialDescriptions!(authenticatedUserId, courseId, materialIds),
+    reviewerQuizIds: (_userId, reviewerIds) => repository.reviewerQuizIds!(authenticatedUserId, reviewerIds),
     exactRows: (table, _userId, key, value) => repository.exactRows!(table, authenticatedUserId, key, value),
     reviewerTargets: (_userId, artifactIds) => repository.reviewerTargets!(authenticatedUserId, artifactIds),
     rows<T extends ExperienceTable>(table: T): Promise<readonly ExperienceRow<T>[]> {
@@ -122,6 +124,26 @@ export function experienceRepository(client: SupabaseClient<Database>): Experien
   }
   return {
     reviewerTargets: (userId, artifactIds) => readOwnedReviewerTargets(client, userId, artifactIds),
+    async reviewerQuizIds(userId, reviewerIds) {
+      const linked = new Map<string, string[]>(), ids = [...new Set(reviewerIds)];
+      for (let start = 0; start < ids.length; start += 100) {
+        const batch = ids.slice(start, start + 100);
+        let complete = false;
+        for (let offset = 0; offset < 10_000; offset += 200) {
+          const result = await client.from('quizzes').select('id,user_id,reviewer_artifact_id').eq('user_id', userId)
+            .in('reviewer_artifact_id', batch).order('id').range(offset, offset + 199);
+          if (result.error || !result.data) fail(result.error);
+          for (const row of result.data) {
+            if (row.user_id !== userId || !row.reviewer_artifact_id || !batch.includes(row.reviewer_artifact_id)) continue;
+            const previous = linked.get(row.reviewer_artifact_id) ?? [];
+            previous.push(row.id); linked.set(row.reviewer_artifact_id, previous);
+          }
+          if (result.data.length < 200) { complete = true; break; }
+        }
+        if (!complete) fail(null);
+      }
+      return linked;
+    },
     async materialDescriptions(userId, courseId, materialIds) {
       const ids = [...new Set(materialIds)];
       if (!ids.length) return new Map();

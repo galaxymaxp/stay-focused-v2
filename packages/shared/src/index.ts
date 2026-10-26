@@ -279,3 +279,4 @@ export * from './plan-device-store';
 export * from './previous-plan';
 export * from './plan-block-marks';
 export * from './planner-presentation';
+export * from './glass-pill';

@@ -44,11 +44,13 @@ export function QuizFromReviewerDialog({
   title,
   reviewer,
   onClose,
+  onBusyChange,
 }: {
   libraryId: string;
   title: string;
   reviewer: ReviewerReaderModel;
   onClose: () => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const { api, session } = useAuth();
   const router = useRouter();
@@ -72,6 +74,7 @@ export function QuizFromReviewerDialog({
   const [difficulty, setDifficulty] = useState<QuizDifficulty | "mixed">("mixed");
   const [format, setFormat] = useState<QuizQuestionType | "mixed">("mixed");
   const [busy, setBusy] = useState(false);
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   const [error, setError] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
   useEffect(() => {

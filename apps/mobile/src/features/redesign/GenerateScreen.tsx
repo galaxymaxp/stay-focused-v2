@@ -1,3 +1,5 @@
+import { materialGenerationPill } from '@stay-focused/shared';
+import { GlassPill } from '../../components/GlassPill';
 import { useSavedMaterialPages } from "./useSavedMaterialPages";
 import { CourseBatchControls } from '../courses/CourseBatchControls';
 import { SnapshotStatus } from "./SnapshotStatus";
@@ -349,7 +351,7 @@ export function GenerateMaterialScreen() {
   const prepared = preparedState.identity === preparedIdentity ? preparedState.data : null;
   const setPrepared = useCallback((data: LearningMaterial) => setPreparedState({ identity: preparedIdentity, data }), [preparedIdentity]);
   const [busy, setBusy] = useState(false);
-  const [activeAction, setActiveAction] = useState<"submitting" | null>(null);
+  const [activeAction, setActiveAction] = useState<"reviewer" | "quiz" | null>(null);
   const [generationNote, setGenerationNote] = useState<string | null>(null);
   const [reviewerSubmitted, setReviewerSubmitted] = useState(false);
   const queue = useQueueItems();
@@ -440,7 +442,7 @@ export function GenerateMaterialScreen() {
 
     submitting.current = true;
     setBusy(true);
-    if (type !== "reviewer") setActiveAction("submitting");
+    setActiveAction(type);
     setError(null);
     try {
       const intent = await createGenerationIntent(
@@ -468,14 +470,8 @@ export function GenerateMaterialScreen() {
     }
   }
 
-  if (activeAction) return (
-    <Page back title="" scroll={false}>
-      <GenerationLayout title={material?.title ?? "Material"} state="reading"
-        compactStatus={<Copy size="h2" style={{ textAlign: "center" }}>Submitting…</Copy>}
-        status={<Copy size="h2" style={{ textAlign: "center" }}>Submitting generation…</Copy>}
-        note="Saving your request. The server will take over once it accepts the job." />
-    </Page>
-  );
+  const pill = material ? materialGenerationPill({ reviewerArtifactId: material.reviewerArtifactId, hasQuiz: material.hasQuiz,
+    generating: activeAction ?? (reviewerSubmitted && !material.reviewerArtifactId ? 'reviewer' : null) }) : null;
 
   return (
     <Page back title={material?.title ?? "Material"} subtitle={identity.title}>
@@ -502,9 +498,9 @@ export function GenerateMaterialScreen() {
             {material.description ? <Copy muted size="bodySmall">{material.description}</Copy> : null}
             <Copy muted size="bodySmall">{preparationPresentation(materialStatus(material)).message}</Copy>
             {materialStatus(material).status === "failed" && workspace.errorCode !== "connection" && materialPage.errorCode !== 'connection' && !retryOffline ? <Action disabled={busy} onPress={() => void retry()}>{busy ? "Retrying…" : "Retry"}</Action> : null}
-            <Action disabled={busy || reviewerSubmitted || materialStatus(material).status !== "ready" || !available(material.generation.reviewer) || !available(workspace.data?.capabilities.reviewerGeneration)} onPress={() => void generate("reviewer")}>
-              {material.reviewerArtifactId ? 'Remake Reviewer' : 'Generate Reviewer'}
-            </Action>
+            {!material.reviewerArtifactId && pill ? <GlassPill size="md" label={pill.label} busy={pill.busy}
+              disabled={busy || reviewerSubmitted || materialStatus(material).status !== "ready" || !available(material.generation.reviewer) || !available(workspace.data?.capabilities.reviewerGeneration)} onPress={() => void generate("reviewer")} /> : null}
+            {material.reviewerArtifactId ? <Action secondary disabled={busy || !available(material.generation.reviewer) || !available(workspace.data?.capabilities.reviewerGeneration)} onPress={() => void generate("reviewer")}>Remake Reviewer</Action> : null}
             {material.reviewerArtifactId ? <Action secondary onPress={() => router.push({ pathname: '/artifact', params: { id: `artifact:${material.reviewerArtifactId}` } })}>Open saved Reviewer</Action> : null}
             {!available(material.generation.reviewer) ? <Copy muted size="caption">{capabilityNote(material.generation.reviewer)}</Copy> : null}
           </Surface>
@@ -513,9 +509,8 @@ export function GenerateMaterialScreen() {
             <Copy muted size="bodySmall">
               {material.reviewerArtifactId ? "Build a study quiz from the saved Reviewer for this material." : "Generate and save a Reviewer first. Quizzes use that Reviewer as their study source."}
             </Copy>
-            <Action secondary disabled={busy || materialStatus(material).status !== "ready" || !material.reviewerArtifactId || !available(material.generation.quiz) || !available(workspace.data?.capabilities.quizGeneration)} onPress={() => void generate("quiz")}>
-              Generate Quiz
-            </Action>
+            {material.reviewerArtifactId && pill ? <GlassPill size="md" label={pill.label} busy={pill.busy}
+              disabled={busy || materialStatus(material).status !== "ready" || !available(material.generation.quiz) || !available(workspace.data?.capabilities.quizGeneration)} onPress={() => void generate("quiz")} /> : null}
           </Surface>
           <Action secondary disabled={materialStatus(material).status !== "ready"} onPress={() => router.push({ pathname: "/courses/[courseId]/reviewer", params: { courseId: material.courseId, courseName: workspace.data?.course.name ?? "Course" } })}>
             Choose source sections

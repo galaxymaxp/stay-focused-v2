@@ -90,6 +90,8 @@ export interface LearningMaterial {
   readonly sourceId: string;
   /** Latest owner-persisted Reviewer grounded in this exact Canvas material. */
   readonly reviewerArtifactId: string | null;
+  /** A persisted Quiz for that exact saved Reviewer; absent on older APIs. */
+  readonly hasQuiz?: boolean;
   readonly moduleTitle: string | null;
   readonly generation: GenerationCapability;
 }

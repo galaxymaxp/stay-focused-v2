@@ -1,3 +1,4 @@
+import { GlassPill } from '../../components/GlassPill';
 import { SnapshotStatus } from "./SnapshotStatus";
 import { useStableSnapshotGroups } from "./useStableSnapshotGroups";
 import type { ActivityAttachment, ActivityDetail, ActivitySummary } from "@stay-focused/shared";
@@ -341,14 +342,8 @@ export function ActivityScreen() {
               Open Draft: {output.title}
             </Action>
           ))}
-          <Action
-            disabled={
-              busy || !available(activity.data.generation.activityAssistance)
-            }
-            onPress={() => void create()}
-          >
-            Generate Draft
-          </Action>
+          <GlassPill size="md" label={busy ? 'Creating draft' : 'Create draft'} busy={busy}
+            disabled={!available(activity.data.generation.activityAssistance)} onPress={() => void create()} />
           {!available(activity.data.generation.activityAssistance) && (
             <Notice>
               {capabilityNote(activity.data.generation.activityAssistance)}

@@ -3,13 +3,14 @@ import { Download, Ellipsis, Globe } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Action, Copy, IconAction } from '../../design/primitives';
+import { Copy, IconAction } from '../../design/primitives';
+import { GlassPill } from '../../components/GlassPill';
 import { useTheme } from '../../design/theme';
 import { density, hitTarget, radius, spacing, typography } from '../../design/tokens';
 import type { ExperienceClient } from '../../services/experienceApi';
 import { ShareReviewerMenu, type ShareReviewerTrigger } from './ShareReviewerMenu';
 
-export function ReviewerHeader({ artifact, reviewer, secondaryLine, topicCount, client, offline, onExport, onQuiz }: {
+export function ReviewerHeader({ artifact, reviewer, secondaryLine, topicCount, client, offline, onExport, onQuiz, quizBusy = false }: {
   artifact: LibraryArtifactSummary;
   reviewer: ReviewerReaderModel;
   secondaryLine: string | null;
@@ -18,6 +19,7 @@ export function ReviewerHeader({ artifact, reviewer, secondaryLine, topicCount, 
   offline: boolean;
   onExport: () => void;
   onQuiz: () => void;
+  quizBusy?: boolean;
 }) {
   return (
     <View style={{ gap: spacing[1], paddingRight: spacing[2] }}>
@@ -32,7 +34,9 @@ export function ReviewerHeader({ artifact, reviewer, secondaryLine, topicCount, 
         {secondaryLine ? <Copy muted size="caption" style={{ lineHeight: typography.caption * 1.2 }}>{secondaryLine}</Copy> : null}
         {topicCount > 1 ? <Copy muted size="caption" style={{ lineHeight: typography.caption * 1.2 }}>{`${topicCount} topics`}</Copy> : null}
       </View> : null}
-      <View style={{ paddingTop: spacing[2] }}><Action hero onPress={onQuiz}>Generate Quiz</Action></View>
+      {!artifact.relatedArtifactIds.some(id => id.startsWith('quiz:')) && <View style={{ paddingTop: spacing[2] }}>
+        <GlassPill size="sm" label={quizBusy ? 'Generating quiz' : 'Generate quiz'} busy={quizBusy} disabled={offline} onPress={onQuiz} />
+      </View>}
       <Copy muted size="caption">Tap a key point to select it. Hold its group to select all.</Copy>
     </View>
   );

@@ -5,8 +5,9 @@ import { courseIdentity } from '../../app-model/courseIdentity';
 import { Heading, Icon } from '../../components/ui';
 import { dateLabel } from '../../lib/api';
 import { ShareReviewer, type ShareReviewerTrigger } from './share-reviewer';
+import { GlassPill } from '../../components/ui/glass-pill';
 
-export function ReviewerHeader({ artifact, reviewer, onSave, onExport, exportBusy, onQuiz, quizDisabled }: {
+export function ReviewerHeader({ artifact, reviewer, onSave, onExport, exportBusy, onQuiz, quizDisabled, quizBusy = false }: {
   artifact: LibraryArtifactSummary;
   reviewer: ReviewerReaderModel;
   onSave: () => void;
@@ -14,6 +15,7 @@ export function ReviewerHeader({ artifact, reviewer, onSave, onExport, exportBus
   exportBusy: boolean;
   onQuiz: () => void;
   quizDisabled: boolean;
+  quizBusy?: boolean;
 }) {
   const course = `/library/course/${encodeURIComponent(artifact.course?.id ?? 'personal')}`;
   return <div className="reviewer-heading">
@@ -21,7 +23,8 @@ export function ReviewerHeader({ artifact, reviewer, onSave, onExport, exportBus
       parent={{ label: artifact.course ? courseIdentity(artifact.course).title : 'Personal & other', href: course }}
       subtitle={[reviewer.course?.name, dateLabel(reviewer.generatedAt)].filter(Boolean).join(' · ')} back={course}
       action={<div className="row wrap reviewer-heading-actions">
-        <button className="primary" disabled={quizDisabled} onClick={onQuiz}>Generate Quiz</button>
+        {!artifact.relatedArtifactIds.some(id => id.startsWith('quiz:')) && <GlassPill size="sm"
+          label={quizBusy ? 'Generating quiz' : 'Generate quiz'} busy={quizBusy} disabled={quizDisabled} onClick={onQuiz} />}
         {artifact.id.startsWith('artifact:') ? <ShareReviewer artifactId={artifact.id.slice('artifact:'.length)} reviewer={reviewer}
           renderTrigger={share => <ReviewerActions onExport={onExport} busy={exportBusy} onSave={onSave} share={share} />} /> : <ReviewerActions onExport={onExport} busy={exportBusy} onSave={onSave} />}
       </div>} />

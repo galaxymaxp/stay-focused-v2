@@ -1,4 +1,6 @@
 "use client";
+import { materialGenerationPill } from "@stay-focused/shared";
+import { GlassPill } from "../components/ui/glass-pill";
 import { useSavedMaterialPages } from "../lib/use-saved-material-pages";
 import { useHideOnScroll } from "../lib/use-hide-on-scroll";
 import { CourseBatchControls } from './course-batch';
@@ -583,9 +585,11 @@ export function MaterialScreen({ id }: { id: string }) {
     };
   }, [course.data, api, courseId, id]);
   const [quiz, setQuiz] = useState(false);
+  const [reviewerStarting, setReviewerStarting] = useState(false);
   function generate() {
-    if (!material || material.id !== id || !session ||
+    if (!material || material.id !== id || !session || action.busy ||
       (material.reviewerArtifactId && !confirmingRemake)) return;
+    setReviewerStarting(true);
     void action.run(async () => {
       if (!generationEnabled)
         throw new Error("Generation is unavailable in this environment.");
@@ -600,9 +604,11 @@ export function MaterialScreen({ id }: { id: string }) {
       setRemakeFor(null);
       course.refresh();
       router.push(`/generation/${job.id}`);
-    });
+    }).finally(() => setReviewerStarting(false));
   }
   const courseName = course.data?.course.name;
+  const pill = material ? materialGenerationPill({ reviewerArtifactId: material.reviewerArtifactId, hasQuiz: material.hasQuiz,
+    generating: reviewerStarting && !material.reviewerArtifactId ? 'reviewer' : null }) : null;
   return (
     <div className="material-panel">
       <PageCrumb
@@ -674,30 +680,15 @@ export function MaterialScreen({ id }: { id: string }) {
                   Open reviewer
                 </Link>
               ) : null}
-              <button
-                ref={remakeButton}
-                className={material.reviewerArtifactId ? undefined : "primary"}
-                aria-expanded={material.reviewerArtifactId ? confirmingRemake : undefined}
-                aria-controls={confirmingRemake ? remakeDialogId : undefined}
-                disabled={
-                  action.busy ||
-                  !generationEnabled ||
-                  material.generation.reviewer.status !== "available"
-                }
-                onClick={material.reviewerArtifactId ? () => setRemakeFor(remakeKey) : generate}
-              >
-                {material.reviewerArtifactId ? "Remake" : "Generate Reviewer"}
-              </button>
-              <button
-                aria-expanded={quiz}
-                disabled={
-                  !generationEnabled ||
-                  material.generation.quiz.status !== "available"
-                }
-                onClick={() => setQuiz(!quiz)}
-              >
-                Generate Quiz
-              </button>
+              {material.reviewerArtifactId ? <button ref={remakeButton}
+                aria-expanded={confirmingRemake} aria-controls={confirmingRemake ? remakeDialogId : undefined}
+                disabled={action.busy || !generationEnabled || material.generation.reviewer.status !== "available"}
+                onClick={() => setRemakeFor(remakeKey)}>Remake</button> : null}
+              {!quiz && pill ? <GlassPill size="md" label={pill.label} busy={pill.busy}
+                  ariaExpanded={pill.kind === 'quiz' ? quiz : undefined}
+                  disabled={action.busy || !generationEnabled || material.generation[pill.kind].status !== 'available'}
+                  onClick={pill.kind === 'reviewer' ? generate : () => setQuiz(true)} /> : null}
+              {quiz ? <button onClick={() => setQuiz(false)}>Cancel quiz</button> : null}
             </div>
             {confirmingRemake ? (
               <div
@@ -738,7 +729,7 @@ export function MaterialScreen({ id }: { id: string }) {
           </header>
           <div className="detail-body">
             <div className="stack">
-              {quiz ? (
+              {quiz && material.reviewerArtifactId && !material.hasQuiz ? (
                 <QuizSetup sourceType="material" sourceId={id} />
               ) : (
                 <div className="detail-hint">
@@ -846,9 +837,8 @@ export function QuizSetup({
           </label>
         ))}
       </fieldset>
-      <button
-        className="primary"
-        disabled={!generationEnabled || action.busy || !types.length}
+      <GlassPill size="md" label={action.busy ? 'Generating quiz' : 'Generate quiz'} busy={action.busy}
+        disabled={!generationEnabled || !types.length}
         onClick={() =>
           void action.run(async () => {
             if (!generationEnabled)
@@ -870,9 +860,7 @@ export function QuizSetup({
             router.push(`/generation/${job.id}`);
           })
         }
-      >
-        {action.busy ? "Starting…" : "Generate Quiz"}
-      </button>
+      />
       {action.message && <Notice error>{action.message}</Notice>}
     </section>
   );
