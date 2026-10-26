@@ -1,4 +1,65 @@
 import { generateContentStudyPlan, type PlanMode, type PlanSelection, type PlanningCandidate, type PlanningCandidates } from './task-planning';
+import { isReviewerProposal, proposalTitle, type DeterministicStudyPlan } from './task-planning';
+import { validFreeTime, type FreeTimeRange } from './free-time';
+
+export const FIRST_RUN_WINDOW = { start: 20 * 60, end: 22 * 60 } as const;
+export function resolveFreeWindow(input: { savedForDate?: unknown; aroundPlanned?: unknown; lastUsed?: unknown }) {
+  for (const [source, window] of [['saved', input.savedForDate], ['around', input.aroundPlanned], ['last', input.lastUsed], ['first-run', FIRST_RUN_WINDOW]] as const) {
+    if (validFreeTime(window)) return { window: { start: window.start, end: window.end }, source };
+  }
+  throw new Error('Invalid first-run window');
+}
+export interface PlanOverrides { readonly removed: readonly string[]; readonly skipped: readonly string[] }
+/** Materialize implicit scope before excluding keys; retain smart/manual semantics. */
+export function applyPlanOverrides(selection: PlanSelection, candidates: PlanningCandidates, overrides: PlanOverrides): PlanSelection {
+  const excluded = new Set([...overrides.removed, ...overrides.skipped]);
+  const items = selection.items ?? allPlanningItems(candidates).filter(item =>
+    !selection.courseIds || (!!item.courseId && selection.courseIds.includes(item.courseId)));
+  return { ...selection, items: items.filter(item => !excluded.has(planningItemKey(item))).map(({ kind, id }) => ({ kind, id })) };
+}
+export function takenOutItems(candidates: PlanningCandidates, overrides: PlanOverrides) {
+  const items = allPlanningItems(candidates), skipped = new Set(overrides.skipped), removed = new Set(overrides.removed);
+  return [
+    ...items.filter(item => skipped.has(planningItemKey(item))).map(item => ({ key: planningItemKey(item), item, reason: 'skipped' as const })),
+    ...items.filter(item => removed.has(planningItemKey(item)) && !skipped.has(planningItemKey(item))).map(item => ({ key: planningItemKey(item), item, reason: 'removed' as const })),
+  ];
+}
+/** selection is local request metadata; legacy server responses need no new fields. */
+export function moveProposalUp(plan: DeterministicStudyPlan & { readonly selection?: PlanSelection }, index: number): PlanSelection {
+  const proposed = plan.sessions.map(session => isReviewerProposal(session)
+    ? { kind: 'reviewer' as const, id: session.reviewerId } : { kind: 'task' as const, id: session.taskId });
+  const items = [...new Map(proposed.map(item => [planningItemKey(item), item])).values()];
+  if (Number.isInteger(index) && index > 0 && index < items.length) [items[index - 1], items[index]] = [items[index]!, items[index - 1]!];
+  const seen = new Set(items.map(planningItemKey));
+  const rest = plan.selection?.items ?? plan.notFit ?? [];
+  for (const item of rest) if (!seen.has(planningItemKey(item))) { items.push({ kind: item.kind, id: item.id }); seen.add(planningItemKey(item)); }
+  return { order: 'manual', items, ...(plan.selection?.courseIds ? { courseIds: plan.selection.courseIds } : {}) };
+}
+export interface PlanSnapshot extends FreeTimeRange {
+  readonly date: string;
+  readonly sessions: readonly { readonly kind: 'task' | 'reviewer'; readonly id: string; readonly title: string;
+    readonly courseId: string | null; readonly startMinute: number; readonly minutes: number }[];
+}
+export function snapshotFromPlan(date: string, start: number, end: number, plan: DeterministicStudyPlan): PlanSnapshot {
+  return { date, start, end, sessions: plan.sessions.map(session => {
+    const at = new Date(session.startsAt);
+    const day = new Date(at.getFullYear(), at.getMonth(), at.getDate());
+    const base = new Date(`${date}T00:00:00`);
+    return { kind: isReviewerProposal(session) ? 'reviewer' : 'task', id: isReviewerProposal(session) ? session.reviewerId : session.taskId,
+      title: proposalTitle(session), courseId: isReviewerProposal(session) ? session.courseId : null,
+      startMinute: Math.round((day.getTime() - base.getTime()) / 86_400_000) * 1440 + at.getHours() * 60 + at.getMinutes(), minutes: session.durationMinutes };
+  }) };
+}
+export function restoreSelectionFromSnapshot(snapshot: PlanSnapshot): PlanSelection {
+  return { order: 'manual', items: [...new Map(snapshot.sessions.map(({ kind, id }) => [planningItemKey({ kind, id }), { kind, id }])).values()] };
+}
+export function splitCourseName(raw: string): { code: string; name: string } {
+  if (!raw.includes('|')) return { code: raw, name: '' };
+  const parts = raw.split('|').map(part => part.trim()), name = parts.at(-1) ?? '';
+  const small = new Set(['and', 'in', 'of', 'the', 'for', 'to']);
+  return { code: parts[0] ?? '', name: name === name.toUpperCase() ? name.toLowerCase().split(/\s+/u)
+    .map((word, index) => index > 0 && small.has(word) ? word : word.charAt(0).toUpperCase() + word.slice(1)).join(' ') : name };
+}
 
 export const planningItemKey = (item: { kind: string; id: string }) => `${item.kind}:${item.id}`;
 export interface PlanningDraft {
