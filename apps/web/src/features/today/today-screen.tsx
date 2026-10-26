@@ -297,6 +297,7 @@ export function TodayScreen() {
           <TodayPlanner key={identity} candidates={planner.candidates} plan={preview} timeline={today.data?.timeline ?? []}
             active={activePlan} overrides={planner.overrides} start={start} end={end} busy={busy || previewing}
             adjust={adjustPlan} onToggleAdjust={() => setAdjustPlan(value => !value)}
+            onSkip={planner.skip} onRemove={planner.remove} onMoveUp={planner.moveUp}
             onItemCheck={(key, checked) => checked ? planner.putBack(key) : planner.remove(key)}
             onBuild={choice => { todayPlanningMemory.build(identity, choice); renderBuiltChoice(revision => revision + 1); setNote(null); planner.propose(choice.mode, choice.selection); }}
             onApply={() => void apply()} previous={planner.previousPlan} onRestore={planner.restorePrevious}

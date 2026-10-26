@@ -12,13 +12,17 @@ export function PlanFitCard({ plan, blocks, free, candidates }: { plan: Determin
 export function PlannerDot({ targets, target }: { targets: readonly string[]; target: string }) {
   return <span className="planner-dot" aria-hidden="true" style={{ background: `var(--${planToneFor(targets, target)})` }} />;
 }
-export function PlanTimeline({ blocks, end, candidates, onOpen }: { blocks: readonly PlannerBlock[]; end: number; candidates?: PlanningCandidates | null; onOpen?: (block: PlannerBlock) => void }) {
+export function PlanTimeline({ blocks, end, candidates, onOpen, onSkip, onRemove, onMoveUp }: { blocks: readonly PlannerBlock[]; end: number; candidates?: PlanningCandidates | null; onOpen?: (block: PlannerBlock) => void; onSkip?: (key: string) => void; onRemove?: (key: string) => void; onMoveUp?: (index: number) => void }) {
   const targets = plannerToneKeys(blocks, candidates?.courses);
-  return <div className="planner-timeline" aria-label="Plan timeline">{blocks.map(block => <div className="planner-block" key={block.key}><span className="planner-time">{block.start}</span>
+  return <div className="planner-timeline" aria-label="Plan timeline">{blocks.map((block, index) => <div className="planner-block" key={block.key}><span className="planner-time">{block.start}</span><div className="planner-action-card">
     <button type="button" className="planner-block-card" onClick={() => onOpen?.(block)} disabled={!onOpen} aria-label={`${block.kind === 'reviewer' ? 'Review: ' : ''}${block.title}`}>
       <span className="planner-block-course"><PlannerDot targets={targets} target={plannerToneTarget(block)} />{candidates?.courses.find(course => course.id === block.courseId)?.name.split('|')[0]?.trim() ?? block.savedItem?.course?.code ?? 'Personal'}</span>
       <strong>{block.title}</strong><span className="meta">{block.minutes} min · {block.kind === 'reviewer' ? 'Reviewer' : 'Task'}</span>
-    </button></div>)}<div className="planner-block planner-end"><span className="planner-time">{plannerShortTime(end)}</span><span className="meta">Free time ends</span></div></div>;
+    </button>{onSkip && onRemove && onMoveUp && <div className="planner-block-actions" role="group" aria-label={`Actions for ${block.title}`}>
+      <button type="button" aria-label="Move up" title="Move up" disabled={index === 0} onClick={() => onMoveUp(index)}><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 11.5V2.5M3 6.5l4-4 4 4" /></svg></button>
+      <button type="button" aria-label="Skip tonight" title="Skip tonight" onClick={() => onSkip(block.selectionKey)}><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 2l12 12M6.6 6.7a2 2 0 002.7 2.7M4.2 4.4C2.9 5.3 2 6.6 1.5 8c1.1 3 3.8 5 6.5 5 1.3 0 2.5-.4 3.6-1.1M7 3.1c.3 0 .7-.1 1-.1 2.7 0 5.4 2 6.5 5-.3.8-.7 1.5-1.2 2.2" /></svg></button>
+      <button type="button" aria-label="Remove" title="Remove" onClick={() => onRemove(block.selectionKey)}><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true"><path d="M3 3l8 8M11 3l-8 8" /></svg></button>
+    </div>}</div></div>)}<div className="planner-block planner-end"><span className="planner-time">{plannerShortTime(end)}</span><span className="meta">Free time ends</span></div></div>;
 }
 export function PreviousPlan({ previous, onRestore, disabled }: { previous: PreviousPlanView; onRestore: () => void; disabled?: boolean }) {
   if (!previous) return <section className="planner-previous-empty"><strong>No previous plan yet</strong><p className="meta">{PREVIOUS_PLAN_EMPTY}</p></section>;
