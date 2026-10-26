@@ -194,3 +194,14 @@ synthetic candidates, explicitly counted the initial read, and asserted one
 last-used save alongside each existing date save. Original zero gesture IO,
 quiet coalescing, no-refetch and lifecycle-refresh assertions remain.
 Focused web clock/mode rerun: 15 passed / 0 failed / 0 skipped, 2 files.
+
+Final sheet edge: Reset to all and course-level checks must preserve Remove/Skip
+until Put back. Added regression on both platforms. First Chromium attempt:
+8 passed / 1 failed / 0 skipped because effect-based masking briefly showed
+the removed item checked. Replaced it with a synchronous memoized draft derived
+from overrides on both platforms; no delayed correction or assertion weakening.
+FRESH focused mobile sheet 9/9 and Chromium sheet rerun 9/9. Final full mobile
+and existing final type/lint/build gates run on this source below.
+
+Final FRESH mobile after synchronous override masking: 1752 passed / 0 failed /
+0 skipped, 188 files. The sheet regression is included in that full suite.

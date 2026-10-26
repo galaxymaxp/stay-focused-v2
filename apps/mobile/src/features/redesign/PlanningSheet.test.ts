@@ -110,3 +110,15 @@ it('persisted removed/skipped items start unchecked and stay excluded from Build
   await act(async () => action('Build plan').props.onPress());
   expect(mocks.build.mock.calls[0]![0].selection.items).toEqual([{ kind: 'task', id: id(12) }]);
 });
+
+it('Reset to all and group checks preserve removals until an item is explicitly put back', async () => {
+  await act(async () => { tree = create(createElement(PlanningControl, { request: { planningRange: range, availability: [range] }, active: null, load: mocks.load, onBuild: mocks.build,
+    overrides: { removed: [`task:${id(11)}`], skipped: [] } })); });
+  await open(); await act(async () => action('Reset to all').props.onPress());
+  await act(async () => named('Planning summary').props.onPress());
+  expect(named('Task 1, 40 minutes').props.accessibilityState.checked).toBe(false);
+  await act(async () => named('Course 1, 2 items').props.onPress());
+  expect(named('Task 1, 40 minutes').props.accessibilityState.checked).toBe(false);
+  await act(async () => action('Build plan').props.onPress());
+  expect(mocks.build.mock.calls[0]![0].selection.items).not.toContainEqual({ kind: 'task', id: id(11) });
+});

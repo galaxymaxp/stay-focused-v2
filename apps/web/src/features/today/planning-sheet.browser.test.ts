@@ -226,6 +226,8 @@ it('per-item uncheck/remove and check/putBack send exact keys without building o
   await panel.getByRole('button',{name:/3 items/}).click();
   const check=panel.getByRole('checkbox',{name:'Cell diagram practice',exact:true});
   await check.uncheck(); expect(await check.isChecked()).toBe(false);
+  await panel.getByRole('button',{name:'Reset to all',exact:true}).click(); expect(await check.isChecked()).toBe(false);
+  await panel.getByRole('checkbox',{name:'Biology, 2 items',exact:true}).click(); expect(await check.isChecked()).toBe(false);
   await check.check(); expect(await check.isChecked()).toBe(true);
   expect(await page.evaluate(()=>(window as unknown as {__checks:unknown[]}).__checks)).toEqual([
     ['task:00000000-0000-4000-8000-000000000011',false], ['task:00000000-0000-4000-8000-000000000011',true]

@@ -1,7 +1,7 @@
 import { builtPlanningSelection, defaultPlanningDraft, movePlanningEntry, planningDraftSummary, allPlanningItems, planningOverrideKey, planningItemKey, planningTitle,
   resetPlanningOrder, scopedPlanningItems, togglePlanningItems, type PlanningDraft, type PlanOverrides } from '@stay-focused/shared';
 import { PLAN_EMPTY_COPY, type PlanMode, type PlanSelection, type PlanningCandidates, type StudyPlanningRequest } from '@stay-focused/shared/task-planning';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Action, ContentIcon, Copy, SegmentedControl, Sheet } from '../../design/primitives';
 import { useTheme } from '../../design/theme';
@@ -24,9 +24,17 @@ export function PlanningSheet({ request, active, load, onBuild, onClose, overrid
   request: StudyPlanningRequest; active: BuiltPlanningChoice | null; load: (request: StudyPlanningRequest) => Promise<PlanningCandidates>;
   onBuild: (choice: BuiltPlanningChoice) => void; onClose: () => void; overrides?: PlanOverrides; onItemCheck?: (key: string, checked: boolean) => void;
 }) {
-  const [data, setData] = useState<PlanningCandidates | null>(null), [draft, setDraft] = useState<PlanningDraft | null>(null);
+  const [data, setData] = useState<PlanningCandidates | null>(null), [storedDraft, setDraft] = useState<PlanningDraft | null>(null);
   const [error, setError] = useState<string | null>(null), [expanded, setExpanded] = useState(false);
   const latest = useRef({ active, load, overrides }); latest.current = { active, load, overrides };
+  const excluded = JSON.stringify([...(overrides?.removed ?? []), ...(overrides?.skipped ?? [])]);
+  const draft = useMemo(() => {
+    if (!storedDraft) return null;
+    const keys = new Set(JSON.parse(excluded) as string[]);
+    if (data) for (const item of allPlanningItems(data)) if (keys.has(planningOverrideKey(item))) keys.add(planningItemKey(item));
+    const checked = storedDraft.checked.filter(key => !keys.has(key));
+    return checked.length === storedDraft.checked.length ? storedDraft : { ...storedDraft, checked };
+  }, [storedDraft, excluded, data]);
   const requestKey = JSON.stringify(request);
   useEffect(() => {
     let live = true; setData(null); setDraft(null); setError(null);
@@ -36,12 +44,6 @@ export function PlanningSheet({ request, active, load, onBuild, onClose, overrid
     return () => { live = false; };
   }, [requestKey]);
   const { colors } = useTheme();
-  const excluded = JSON.stringify([...(overrides?.removed ?? []), ...(overrides?.skipped ?? [])]);
-  useEffect(() => {
-    const keys = new Set(JSON.parse(excluded) as string[]);
-    if (data) for (const item of allPlanningItems(data)) if (keys.has(planningOverrideKey(item))) keys.add(planningItemKey(item));
-    setDraft(old => old ? { ...old, checked: old.checked.filter(key => !keys.has(key)) } : old);
-  }, [excluded, data]);
   const summary = data && draft ? planningDraftSummary(data, draft) : null;
   const shown = data && draft ? scopedPlanningItems(data, draft) : [];
   const groups = draft?.groupOrder.map(id => ({ id, name: data?.courses.find(course => course.id === id)?.name ?? 'Personal', items: shown.filter(item => (item.courseId ?? 'personal') === id) })).filter(group => group.items.length) ?? [];

@@ -2,7 +2,7 @@
 import { builtPlanningSelection, defaultPlanningDraft, movePlanningEntry, planningDraftSummary, allPlanningItems, planningOverrideKey, planningItemKey, planningTitle,
   resetPlanningOrder, scopedPlanningItems, togglePlanningItems, type PlanningDraft, type PlanOverrides } from '@stay-focused/shared';
 import { PLAN_EMPTY_COPY, type PlanMode, type PlanSelection, type PlanningCandidates, type StudyPlanningRequest } from '@stay-focused/shared/task-planning';
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Icon } from '../../components/ui';
 import { PlanButton } from './plan-button';
 
@@ -12,11 +12,19 @@ export function PlanningControl({ request, active, load, onBuild, disabled, over
   onBuild: (choice: BuiltPlanningChoice) => void; disabled?: boolean; overrides?: PlanOverrides; onItemCheck?: (key: string, checked: boolean) => void;
 }) {
   const [open, setOpen] = useState(false), [data, setData] = useState<PlanningCandidates | null>(null);
-  const [draft, setDraft] = useState<PlanningDraft | null>(null), [expanded, setExpanded] = useState(false);
+  const [storedDraft, setDraft] = useState<PlanningDraft | null>(null), [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null), panel = useRef<HTMLDivElement>(null);
   const [panelHeight, setPanelHeight] = useState(400);
   const latest = useRef({ load, active, overrides }); latest.current = { load, active, overrides };
+  const excluded = JSON.stringify([...(overrides?.removed ?? []), ...(overrides?.skipped ?? [])]);
+  const draft = useMemo(() => {
+    if (!storedDraft) return null;
+    const keys = new Set(JSON.parse(excluded) as string[]);
+    if (data) for (const item of allPlanningItems(data)) if (keys.has(planningOverrideKey(item))) keys.add(planningItemKey(item));
+    const checked = storedDraft.checked.filter(key => !keys.has(key));
+    return checked.length === storedDraft.checked.length ? storedDraft : { ...storedDraft, checked };
+  }, [storedDraft, excluded, data]);
   const requestKey = JSON.stringify(request);
   useEffect(() => {
     if (!open) return;
@@ -46,12 +54,6 @@ export function PlanningControl({ request, active, load, onBuild, disabled, over
     document.addEventListener('keydown', keydown);
     return () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', keydown); window.removeEventListener('resize', fit); previous?.focus(); };
   }, [open]);
-  const excluded = JSON.stringify([...(overrides?.removed ?? []), ...(overrides?.skipped ?? [])]);
-  useEffect(() => {
-    const keys = new Set(JSON.parse(excluded) as string[]);
-    if (data) for (const item of allPlanningItems(data)) if (keys.has(planningOverrideKey(item))) keys.add(planningItemKey(item));
-    setDraft(old => old ? { ...old, checked: old.checked.filter(key => !keys.has(key)) } : old);
-  }, [excluded, data]);
   const summary = data && draft ? planningDraftSummary(data, draft) : null;
   const shown = data && draft ? scopedPlanningItems(data, draft) : [];
   const groups = draft?.groupOrder.map(id => ({ id, name: data?.courses.find(course => course.id === id)?.name ?? 'Personal', items: shown.filter(item => (item.courseId ?? 'personal') === id) })).filter(group => group.items.length) ?? [];
