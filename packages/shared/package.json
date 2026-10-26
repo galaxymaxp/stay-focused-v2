@@ -14,8 +14,7 @@
     "./orb-body-renderer": "./src/orb-body-renderer.ts",
     "./orb-scene": "./src/orb-scene.ts",
     "./orb-still": "./src/orb-still.ts",
-    "./orb-still-renderer": "./src/orb-still-renderer.ts",
-    "./plan-glass-renderer": "./src/plan-glass-renderer.ts"
+    "./orb-still-renderer": "./src/orb-still-renderer.ts"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

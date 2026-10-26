@@ -29,12 +29,18 @@ async function mount(extra: Partial<PlanningSheetProps> = {}) { await act(async 
 it('one single-scroll sheet renders fit/timeline, defaults Both/smart, and applies without changing selection', async () => {
   const data = fixture(), plan = planningDraftSummary(data, defaultPlanningDraft(data)).plan;
   await mount({ plan, candidates: data, onApply: mocks.apply });
+  expect(root().findByType('PlanButton' as never).props.blocks).toBe(plan.sessions.length);
   expect(mocks.load).not.toHaveBeenCalled(); expect(root().findAllByType('Sheet' as never)).toHaveLength(1);
   expect(root().findByType('Sheet' as never).props.maxHeight).toBe('94%'); expect(root().findAllByType('ScrollView' as never)).toHaveLength(0);
   expect(control(0).props.value).toBe('proposed'); expect(control(1).props.value).toBe('reviewers_tasks');
   expect(text()).toContain('Free time ends'); expect(text()).toContain('60 / 60 min');
   expect(text()).toContain('1 more items (40 min) wait for your next free window.');
   await act(async () => named('Use this plan').props.onPress()); expect(mocks.apply).toHaveBeenCalledTimes(1); expect(mocks.build).not.toHaveBeenCalled();
+});
+it('keeps the Plan action mounted while the clock is adjusting', async () => {
+  await mount({ adjusting: true });
+  expect(root().findAllByType('PlanButton' as never)).toHaveLength(1);
+  expect(root().findByType('PlanButton' as never).props.adjusting).toBe(true);
 });
 it('course list uses splitCourseName, no chips; selecting none disables apply and Include previews without reads', async () => {
   await mount(); await act(async () => named('Courses').props.onPress());

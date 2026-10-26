@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { GlassPill } from '../components/GlassPill';
 
 const mocks = vi.hoisted(() => ({
   reducedMotion: true,
@@ -10,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   loop: vi.fn(), start: vi.fn(), stop: vi.fn(), timing: vi.fn(),
 }));
 vi.mock("react-native", () => ({
-  View: "View", StyleSheet: { absoluteFill: { position: "absolute" } },
+  View: "View", Pressable: 'Pressable', Text: 'Text', ActivityIndicator: 'ActivityIndicator', StyleSheet: { hairlineWidth: .5, absoluteFill: { position: "absolute" } },
   Easing: { ease: "ease", inOut: () => "inOut" },
   Animated: {
     View: "AnimatedView", Value: class { setValue() {} stopAnimation() {} },
@@ -18,6 +19,7 @@ vi.mock("react-native", () => ({
   },
 }));
 vi.mock("react-native-svg", () => ({ default: "Svg", Path: "Path", Rect: "Rect", G: "G" }));
+vi.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 vi.mock("expo-router/react-navigation", () => ({ useIsFocused: () => mocks.focused }));
 vi.mock("./primitives", () => ({ Copy: "Copy" }));
 vi.mock("./theme", async () => {
@@ -37,9 +39,10 @@ afterEach(async () => { if (rendered) await act(async () => rendered!.unmount())
 
 describe("ClearDay", () => {
   it("renders the default title, detail and optional action without animation under reduced motion", async () => {
-    await act(async () => { rendered = create(createElement(ClearDay, { action: createElement("Action", null, "Plan your free time") })); });
+    await act(async () => { rendered = create(createElement(ClearDay, { action: createElement(GlassPill, { size: 'lg', label: 'Plan', sub: '0 blocks ready', accessibilityLabel: 'Plan your free time' }) })); });
     expect(rendered!.root.findAll((node) => String(node.type) === "Copy").map((node) => node.props.children)).toEqual(["Your day is clear.", "Make room for what matters."]);
-    expect(rendered!.root.find((node) => String(node.type) === "Action").props.children).toBe("Plan your free time");
+    expect(rendered!.root.findByType(GlassPill).props).toMatchObject({ label: 'Plan', sub: '0 blocks ready' });
+    expect(rendered!.root.findByType('Pressable' as never).props.accessibilityLabel).toBe('Plan your free time');
     expect(mocks.loop).not.toHaveBeenCalled();
     expect(mocks.timing).not.toHaveBeenCalled();
   });

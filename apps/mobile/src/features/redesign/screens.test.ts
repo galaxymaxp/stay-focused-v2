@@ -1186,6 +1186,10 @@ describe("B25 screen interactions", () => {
     } as unknown as TodayOverview;
     mocks.request.mockResolvedValue({ sessions: [], unscheduledWork: [] });
     const root = await render(createElement(TodayScreen));
+    await act(async () => root.findByType(DayRingClock).props.onAdjustingChange(true));
+    expect(root.findByType('PlanningControl' as never).props.adjusting).toBe(true);
+    await act(async () => root.findByType(DayRingClock).props.onAdjustingChange(false));
+    expect(root.findByType('PlanningControl' as never).props.adjusting).toBe(false);
     await act(async () =>
       root.findByType(DayRingClock).props.onCommit(600, 720),
     );

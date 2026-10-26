@@ -33,9 +33,9 @@ const plugin: Plugin = { name: 'pl2-local-only', enforce: 'pre', resolveId(sourc
   if(/(?:^|\/)lib\/canvas-refresh$/.test(source))return '\0pl2:refresh'; return null;
 }, load(id) { return id.startsWith('\0pl2:') ? stubs[id.slice(5)] : null; } };
 let server: Server, browser: Browser, origin: string, out: string;
-const evidence = resolve('../../tmp/overnight/PL3/browser');
+const evidence = resolve('../../tmp/overnight/PL4/browser');
 beforeAll(async () => {
-  mkdirSync(evidence,{recursive:true}); out=mkdtempSync(resolve('../../tmp/overnight/PL3-browser-'));
+  mkdirSync(evidence,{recursive:true}); out=mkdtempSync(resolve('../../tmp/overnight/PL4-browser-'));
   await build({ configFile:false,logLevel:'silent',root:resolve('.'),publicDir:false,plugins:[plugin],oxc:{jsx:{runtime:'automatic',development:false}},define:{'process.env.NODE_ENV':'"production"'},build:{outDir:out,emptyOutDir:true,minify:false,modulePreload:false,rollupOptions:{input:'pl2:entry',output:{format:'es',entryFileNames:'entry.js',chunkFileNames:'[name]-[hash].js'}}} });
   const css=readFileSync(resolve('app/globals.css'),'utf8')+'\n'+readFileSync(resolve('src/features/today/planner.css'),'utf8');
   server=createServer((request,response)=>{const path=new URL(request.url??'/','http://localhost').pathname;
@@ -123,6 +123,8 @@ it('block hover/focus actions move, skip and remove through local preview reques
     await page.getByRole('button',{name:'Start now',exact:true}).waitFor();
     const rows=page.locator('.planner-timeline > .planner-block:not(.planner-end)');
     const title=(index:number)=>rows.nth(index).locator('strong').textContent();
+    await page.getByRole('button',{name:'Use this plan',exact:true}).waitFor({state:'visible'});
+    await page.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(el=>el.textContent==='Use this plan')?.disabled);
     const first=await title(0),second=await title(1);
     const actions=rows.first().getByRole('group');
     await page.mouse.move(0,0); expect(await actions.evaluate(el=>getComputedStyle(el).opacity)).toBe('0');
@@ -156,6 +158,23 @@ it('hover-none devices always show all block actions',async()=>{
     await page.getByRole('button',{name:'Start now',exact:true}).waitFor();
     expect(await page.evaluate(()=>matchMedia('(hover: none)').matches)).toBe(true);
     expect(await page.locator('.planner-block-actions').evaluateAll(els=>els.every(el=>getComputedStyle(el).opacity==='1'))).toBe(true);
+    expect(errors).toEqual([]);
+  }finally{await page.close();}
+},60_000);
+it('Plan count remains visible while dragging and controls the inline adjust panel',async()=>{
+  const {page,errors}=await open();try{
+    await page.getByRole('button',{name:'Start now',exact:true}).waitFor();
+    const pill=page.getByRole('button',{name:'Plan your free time',exact:true});
+    const count=await page.locator('.planner-timeline > .planner-block:not(.planner-end)').count();
+    expect(await pill.textContent()).toBe('Plan'+count+' blocks ready');
+    expect(await pill.locator('canvas,img').count()).toBe(0);
+    expect(await pill.getAttribute('aria-expanded')).toBe('false');await pill.click();
+    expect(await pill.getAttribute('aria-expanded')).toBe('true');await pill.click();
+    expect(await pill.getAttribute('aria-expanded')).toBe('false');
+    const handle=await page.getByRole('slider',{name:'Free time starts',exact:true}).boundingBox();expect(handle).toBeTruthy();
+    await page.mouse.move(handle!.x+handle!.width/2,handle!.y+handle!.height/2);await page.mouse.down();await page.mouse.move(handle!.x+handle!.width/2+12,handle!.y+handle!.height/2+8,{steps:4});
+    await page.waitForFunction(()=>document.querySelector('.glass-pill-sub')?.textContent==='Updating\u2026');expect(await pill.isVisible()).toBe(true);
+    await page.mouse.up();await page.waitForFunction(()=>/blocks ready$/.test(document.querySelector('.glass-pill-sub')?.textContent??''));
     expect(errors).toEqual([]);
   }finally{await page.close();}
 },60_000);

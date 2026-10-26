@@ -1,6 +1,6 @@
 "use client";
 import "./planner.css";
-import { defaultPlanningDraft, planningItemKey } from "@stay-focused/shared";
+import { defaultPlanningDraft, draftWithOverrides, planningDraftSummary, plannerBlocks, planningItemKey } from "@stay-focused/shared";
 import { useTodayPlan } from "./use-today-plan";
 import { freeTimeDuration } from "@stay-focused/shared";
 import { useQuietPlanner } from "../day-clock/use-quiet-planner";
@@ -199,6 +199,7 @@ export function TodayScreen() {
     date,
   );
   const [adjustPlan, setAdjustPlan] = useState(false);
+  const [clockAdjusting, setClockAdjusting] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [lastHidden, setLastHidden] = useState<TodayItem | null>(null);
   const rowActions = (item: TodayItem) => {
@@ -223,6 +224,8 @@ export function TodayScreen() {
   const unreadAnnouncements = (announcements.data?.items ?? [])
     .filter((item) => !prefs.read.announcements.includes(item.id))
     .slice(0, 3);
+  const pillPlan = preview ?? (planner.candidates && !(today.data?.timeline ?? []).some(item => item.kind === "study_session" && item.status === "planned")
+    ? planningDraftSummary(planner.candidates, draftWithOverrides(planner.candidates, activePlan?.draft ?? defaultPlanningDraft(planner.candidates), planner.overrides)).plan : null);
   const proposed = preview
     ? preview.sessions.map((session) => {
         const at = new Date(session.startsAt);
@@ -272,11 +275,11 @@ export function TodayScreen() {
                 if (item) openItem(item);
               }}
               onCommit={change}
-              onAdjustingChange={(active) => { clockWindow.setAdjusting(active); if (active) clearPreview(); }}
+              onAdjustingChange={(active) => { clockWindow.setAdjusting(active); setClockAdjusting(active); if (active) clearPreview(); }}
               disabled={busy || !plannerReady}
               proposed={proposed}
             />
-            <PlanButton disabled={busy || !plannerReady} onPress={() => setAdjustPlan(value => !value)} />
+            <PlanButton blocks={plannerBlocks(pillPlan, planner.candidates, today.data?.timeline ?? []).length} adjusting={clockAdjusting} expanded={adjustPlan} disabled={busy || !plannerReady} onPress={() => setAdjustPlan(value => !value)} />
             <p className="free-time-line">
               <span className="free-swatch" aria-hidden="true" />
               {formatFreeTime(freeTimeDuration(start, end))} free · {clockLabel(start)} – {clockLabel(end)}

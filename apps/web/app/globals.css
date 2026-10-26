@@ -2589,29 +2589,6 @@ button.glass-pill-sm { height: 34px; padding-inline: 14px; font-size: 13px; }
   button.glass-pill:active:not(:disabled) { transform: none; }
   .glass-pill-spinner { animation: none; }
 }
-.plan-action, .plan-action:hover, .plan-action:active {
-  position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center;
-  width: 100%; height: 48px; min-height: 44px; padding: 0; overflow: hidden;
-  border-radius: 24px; border: 0;
-  background: transparent; color: var(--orb-liquid-color, #E6EAF1); transform: none;
-  box-shadow: none; transition: none;
-}
-.plan-action[data-plan-gl="failed"] {
-  border: 1px solid var(--orb-liquid-color, #E6EAF1);
-  background: linear-gradient(135deg, #ffffff30, #ffffff06 50%, #ffffff20);
-  color: var(--orb-liquid-color, #E6EAF1); transform: none;
-  box-shadow: inset 0 1px 1px #ffffff80, inset 0 -1px 1px #00000018;
-  transition: none;
-}
-.plan-action-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; visibility: hidden; }
-.plan-action[data-plan-gl="ready"] .plan-action-canvas { visibility: visible; }
-.plan-action-fallback { display: none; }
-.plan-action[data-plan-gl="failed"] .plan-action-fallback { display: contents; }
-.plan-action-liquid { position: absolute; inset: -8px -12px; width: calc(100% + 24px); height: calc(100% + 16px); pointer-events: none; }
-.plan-liquid-flow { animation: plan-liquid-flow 9s linear infinite; }
-.plan-action[data-live="false"] .plan-liquid-flow { animation-play-state: paused; }
-.plan-glass-label { position: relative; font-family: 'Inter Clock', sans-serif; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); text-shadow: 0 1px 1px #ffffff99, 0 -1px 1px #00000030; }
-@keyframes plan-liquid-flow { to { transform: translateX(200px); } }
 .planning-dim { position: fixed; inset: 0; background: #00000020; z-index: 60; }
 .planning-sheet { position: absolute; top: calc(100% + 8px); left: 0; width: 100%; z-index: 61;
   max-height: var(--planning-height, 60vh); overflow-y: auto; overscroll-behavior: contain;
@@ -2646,7 +2623,6 @@ button.glass-pill-sm { height: 34px; padding-inline: 14px; font-size: 13px; }
 @media (max-width: 767px) {
   .planning-sheet { position: fixed; top: auto; bottom: 0; left: 0; right: 0; width: 100%; max-height: 65dvh; padding-bottom: max(16px, env(safe-area-inset-bottom)); border-radius: var(--radius-card) var(--radius-card) 0 0; }
 }
-@media (prefers-reduced-motion: reduce) { .plan-liquid-flow { animation: none; } }
 .plan-block span {
   opacity: 0.85;
   font-size: 10px;

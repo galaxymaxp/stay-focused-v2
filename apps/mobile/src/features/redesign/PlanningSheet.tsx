@@ -14,7 +14,7 @@ import { useLibraryOrganizer } from './useLibraryOrganizer';
 export interface BuiltPlanningChoice { readonly mode: PlanMode; readonly selection: PlanSelection; readonly draft: PlanningDraft }
 export interface PlanningSheetProps {
   request: StudyPlanningRequest; active: BuiltPlanningChoice | null; load: (request: StudyPlanningRequest) => Promise<PlanningCandidates>;
-  onBuild: (choice: BuiltPlanningChoice) => void; disabled?: boolean; overrides?: PlanOverrides; onItemCheck?: (key: string, checked: boolean) => void;
+  onBuild: (choice: BuiltPlanningChoice) => void; disabled?: boolean; adjusting?: boolean; overrides?: PlanOverrides; onItemCheck?: (key: string, checked: boolean) => void;
   candidates?: PlanningCandidates | null; plan?: DeterministicStudyPlan | null; timeline?: readonly TodayItem[];
   start?: number; end?: number; busy?: boolean; onApply?: () => void; onOpen?: (block: PlannerBlock) => void;
   previous?: PreviousPlanView; onRestore?: () => void;
@@ -22,7 +22,9 @@ export interface PlanningSheetProps {
 }
 export function PlanningControl(props: PlanningSheetProps) {
   const [open, setOpen] = useState(false);
-  return <><PlanButton disabled={props.disabled} onPress={() => setOpen(true)} />{open && <PlanningSheet {...props} onClose={() => setOpen(false)} />}</>;
+  const pillPlan = props.plan ?? (props.candidates && !(props.timeline ?? []).some(item => item.kind === "study_session" && item.status === "planned")
+    ? planningDraftSummary(props.candidates, draftWithOverrides(props.candidates, props.active?.draft ?? defaultPlanningDraft(props.candidates), props.overrides)).plan : null);
+  return <><PlanButton blocks={plannerBlocks(pillPlan, props.candidates ?? null, props.timeline ?? []).length} adjusting={props.adjusting} disabled={props.disabled} onPress={() => setOpen(true)} />{open && <PlanningSheet {...props} onClose={() => setOpen(false)} />}</>;
 }
 export function RoundCheck({ checked }: { checked: boolean }) {
   const { colors } = useTheme();
