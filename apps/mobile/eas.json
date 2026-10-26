@@ -14,6 +14,7 @@
       }
     },
     "preview": {
+      "node": "24.16.0",
       "distribution": "internal",
       "channel": "preview",
       "environment": "preview",
