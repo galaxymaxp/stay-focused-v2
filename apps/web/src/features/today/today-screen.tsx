@@ -16,6 +16,7 @@ import {
   proposalTargetKey,
   type StudySessionView, type PlanningCandidates, type DeterministicStudyPlan,
 } from "@stay-focused/shared/task-planning";
+import { TodayWelcome } from "./today-welcome";
 import { TodayPlanner } from "./today-planner";
 import { PlanButton } from "./plan-button";
 import { todayPlanningMemory } from './planning-session';
@@ -289,6 +290,7 @@ export function TodayScreen() {
               <p className="meta center">Planning is not available right now.</p>
             )}
           </section>
+          <TodayWelcome source={planner.windowSource} dismissed={planner.welcomeDismissed} ready={planner.ready} onDismiss={planner.dismissWelcome} />
         </div>
 
         <div className="stack today-work-column">

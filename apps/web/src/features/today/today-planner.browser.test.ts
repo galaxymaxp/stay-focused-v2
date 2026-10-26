@@ -73,3 +73,14 @@ it.each([[1280,'light'],[1280,'dark'],[390,'light'],[390,'dark']] as const)('Tod
 },60_000);
 
 
+it('welcome dismiss and clock movement permanently write the device key across reload',async()=>{
+  for(const move of [false,true]){
+    const {page,errors}=await open(1280,'dark');try{
+      const welcome=page.getByRole('complementary',{name:'Your first free-time window'});await welcome.waitFor();
+      if(move){const end=page.getByRole('slider',{name:'Free time ends',exact:true});await end.focus();await page.keyboard.press('ArrowRight');}
+      else await page.getByRole('button',{name:'Dismiss welcome note',exact:true}).click();
+      await page.waitForFunction(()=>localStorage.getItem('sf.today.welcome-dismissed')==='1');expect(await welcome.count()).toBe(0);
+      await page.reload();await page.getByRole('tab',{name:'Proposed',exact:true}).waitFor();expect(await welcome.count()).toBe(0);expect(errors).toEqual([]);
+    }finally{await page.close();}
+  }
+},60_000);

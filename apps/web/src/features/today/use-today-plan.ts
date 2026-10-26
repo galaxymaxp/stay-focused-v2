@@ -96,6 +96,7 @@ export function useTodayPlan(input: Input) {
   function change(from: number, to: number) {
     const window = resolveFreeWindow({ savedForDate: { start: from, end: to } });
     if (window.source !== 'saved') return;
+    dismissWelcome();
     live.current.clear();
     setMoved({ identity, window: window.window });
     clock.save(window.window);
@@ -157,10 +158,14 @@ export function useTodayPlan(input: Input) {
     updateOverrides(next); remember('reviewers_tasks', restored);
     live.current.clear(); latestQueue.current('reviewers_tasks', restored, next);
   }
+  function dismissWelcome() {
+    setDevice(old => old?.identity === identity ? { identity, value: { ...old.value, welcomeDismissed: true } } : old);
+    void planDeviceStore.dismissWelcome();
+  }
   return { start, end, windowSource: resolved.source, welcomeDismissed: preferences.welcomeDismissed,
     candidates, selection, overrides, ready, candidateNote: candidateError?.key === identity ? candidateError.message : null,
     change, propose, skip: (key: string) => exclude(key, 'skipped'), remove: (key: string) => exclude(key, 'removed'), putBack, moveUp, applied,
     takenOut: candidates ? takenOutItems(candidates, overrides) : [], previousPlan: previousPlanData(preferences.previous, date, input.timeline), restorePrevious,
-    dismissWelcome: () => { setDevice(old => old?.identity === identity ? { identity, value: { ...old.value, welcomeDismissed: true } } : old); void planDeviceStore.dismissWelcome(); },
+    dismissWelcome,
   };
 }

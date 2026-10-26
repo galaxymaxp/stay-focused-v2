@@ -62,6 +62,7 @@ it('excludes persisted overrides in auto and explicit payloads; kinds remain sco
 it('clock release previews the new window with overrides and does not save defaults', async () => {
   await render(); await act(async () => current.change(1260, 1380));
   expect(input.clock.save).toHaveBeenCalledWith({ start: 1260, end: 1380 });
+  expect(current.welcomeDismissed).toBe(true); expect(mocks.dismissWelcome).toHaveBeenCalledTimes(1);
   expect(vi.mocked(input.queue).mock.lastCall![0].availability).toEqual([{ startsAt: localMinuteIso(date,1260), endsAt: localMinuteIso(date,1380) }]);
   expect(input.queue).toHaveBeenCalledTimes(2);
 });

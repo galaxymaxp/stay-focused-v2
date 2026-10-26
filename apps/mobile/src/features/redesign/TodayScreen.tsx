@@ -9,6 +9,7 @@ import type {
   TodayScreenData,
 } from "@stay-focused/shared";
 import { proposalTargetKey, type StudySessionView, type PlanningCandidates, type DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
+import { TodayWelcome } from "./TodayWelcome";
 import { PlanningControl } from "./PlanningSheet";
 import { todayPlanningMemory } from './planningSession';
 import { router } from "expo-router";
@@ -290,6 +291,7 @@ export function TodayScreen() {
           renderBuiltChoice(revision => revision + 1); setNote(null);
           planner.propose(choice.mode, choice.selection);
         }} />
+      <TodayWelcome source={planner.windowSource} dismissed={planner.welcomeDismissed} ready={planner.ready} onDismiss={planner.dismissWelcome} />
       {(note || previewNote || planner.candidateNote) && <Notice>{note || previewNote || planner.candidateNote}</Notice>}
       {today.error && !today.data ? (
         <Notice>{today.error}</Notice>
