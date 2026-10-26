@@ -37,7 +37,7 @@ it('Canvas aliases resolve back to the candidate check key for every split block
 });
 
 it('saved blocks use explicit work identities and leave legacy unknown targets unavailable for actions', () => {
-  const saved = { id: 'session:one', kind: 'study_session', status: 'planned', title: 'Synthetic saved task', startAt: range.startsAt, endAt: range.endsAt, reviewer: undefined, task: { id: id(2) } } as import('./experience').TodayItem;
+  const saved: import('./experience').TodayItem = { id: 'session:one', kind: 'study_session', status: 'planned', title: 'Synthetic saved task', startAt: range.startsAt, endAt: range.endsAt, course: null, dueAt: null, estimatedMinutes: 120, estimateSource: null, priority: 'medium', source: 'local', deepLinkTarget: { surface: 'study_session', id: 'one' }, task: { id: id(2) } };
   expect(plannerBlocks(null, data, [saved])[0]?.selectionKey).toBe('task:' + id(2));
   expect(plannerBlocks(null, data, [{ ...saved, task: undefined }])[0]?.selectionKey).toBe('');
   expect(plannerBlocks(null, data, [{ ...saved, task: undefined, reviewer: { id: 'artifact:' + id(4) } }])[0]?.selectionKey).toBe('reviewer:' + id(4));
