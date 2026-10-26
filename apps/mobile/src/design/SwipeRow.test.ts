@@ -57,7 +57,7 @@ function actions() {
   };
 }
 
-async function renderRow(spy: ReturnType<typeof actions>, fullSwipe = false) {
+async function renderRow(spy: ReturnType<typeof actions>, fullSwipe = false, planner = false) {
   await act(async () => {
     rendered = create(createElement(Row, {
       leading: [{ key: "pin", label: "Pin", icon: "Pin" as never, tone: "accent", onPress: spy.pin }],
@@ -65,7 +65,7 @@ async function renderRow(spy: ReturnType<typeof actions>, fullSwipe = false) {
         { key: "hide", label: "Hide", icon: "EyeOff" as never, tone: "neutral", onPress: spy.hide },
         { key: "unsync", label: "Unsync", icon: "CloudOff" as never, tone: "warning", onPress: spy.unsync },
       ],
-      fullSwipe,
+      fullSwipe, planner,
     }, createElement("Card")));
   });
   // A laid-out row, so a full swipe has a width to measure against.
@@ -142,4 +142,15 @@ describe("SwipeRow", () => {
     await act(async () => shield.props.onPress());
     expect(row.openSide()).toEqual([]);
   });
+});
+
+it('planner swipes use mirrored 104px actions, ignore velocity, return short swipes and cancel safely', async () => {
+  const spy = actions(), row = await renderRow(spy, false, true);
+  expect(row.layer('pin').props.style({ pressed: false }).width).toBe(104);
+  await row.drag(104); await row.drag(-104);
+  expect(spy.pin).not.toHaveBeenCalled(); expect(spy.hide).not.toHaveBeenCalled(); expect(row.openSide()).toEqual([]);
+  await row.drag(105); await row.drag(-105);
+  expect(spy.pin).toHaveBeenCalledTimes(1); expect(spy.hide).toHaveBeenCalledTimes(1);
+  await act(async () => { row.surface().props.onPanResponderGrant(); row.surface().props.onPanResponderMove({}, { dx: 140, dy: 0 }); row.surface().props.onPanResponderTerminate(); });
+  expect(spy.pin).toHaveBeenCalledTimes(1); expect(row.openSide()).toEqual([]);
 });

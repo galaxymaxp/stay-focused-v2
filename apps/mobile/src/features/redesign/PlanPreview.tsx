@@ -1,6 +1,8 @@
 import { plannerShortTime, freeTimeDuration, plannerFit, plannerBlocks, plannerToneKeys, plannerToneTarget, PREVIOUS_PLAN_EMPTY, type PlannerBlock, type PreviousPlanView } from '@stay-focused/shared';
 import { proposalTargetKey, type DeterministicStudyPlan, type PlanningCandidates } from '@stay-focused/shared/task-planning';
 import { Pressable, View } from 'react-native';
+import { EyeOff, X } from 'lucide-react-native';
+import { SwipeRow, swipeAccessibility } from '../../design/SwipeRow';
 import { Copy } from '../../design/primitives';
 import { useTheme } from '../../design/theme';
 
@@ -39,18 +41,26 @@ export function PlanFitCard({ plan, blocks, free, candidates }: { plan: Determin
     <Copy muted style={{ fontSize: 13, lineHeight: 19.5 }}>{fit.subline}</Copy>
   </View>;
 }
-export function PlanTimeline({ blocks, end, candidates, onOpen }: { blocks: readonly PlannerBlock[]; end: number; candidates?: PlanningCandidates | null; onOpen?: (block: PlannerBlock) => void }) {
+export function PlanTimeline({ blocks, end, candidates, onOpen, onSkip, onRemove, onMoveUp }: { blocks: readonly PlannerBlock[]; end: number; candidates?: PlanningCandidates | null; onOpen?: (block: PlannerBlock) => void; onSkip?: (key: string) => void; onRemove?: (block: PlannerBlock) => void; onMoveUp?: (index: number) => void }) {
   const { colors } = useTheme(), targets = plannerToneKeys(blocks, candidates?.courses);
   return <View style={{ gap: 8 }}>
-    {blocks.map(block => <View key={block.key} style={{ flexDirection: 'row', gap: 12, alignItems: 'stretch' }}>
-      <Copy muted style={{ width: 44, paddingTop: 14, textAlign: 'right', fontSize: 13, fontVariant: ['tabular-nums'] }}>{block.start}</Copy>
-      <Pressable accessibilityRole="button" accessibilityLabel={`${block.kind === 'reviewer' ? 'Review: ' : ''}${block.title}`} disabled={!onOpen} onPress={() => onOpen?.(block)}
+    {blocks.map((block, index) => {
+      const actions = onSkip && onRemove && onMoveUp ? [
+        { key: 'skip', label: 'Skip tonight', icon: EyeOff, tone: 'neutral' as const, onPress: () => onSkip(block.selectionKey) },
+        { key: 'remove', label: 'Remove', icon: X, tone: 'neutral' as const, onPress: () => onRemove(block) },
+        ...(index ? [{ key: 'moveUp', label: 'Move up', icon: X, tone: 'neutral' as const, onPress: () => onMoveUp(index) }] : []),
+      ] : [];
+      const card = <Pressable accessibilityRole="button" accessibilityLabel={`${block.kind === 'reviewer' ? 'Review: ' : ''}${block.title}`} disabled={!onOpen && !actions.length} {...swipeAccessibility(actions)} onPress={() => onOpen?.(block)}
         style={{ flex: 1, minWidth: 0, minHeight: 80, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: colors.surfacePrimary, gap: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><PlannerDot targets={targets} target={plannerToneTarget(block)} /><Copy muted size="caption">{candidates?.courses.find(course => course.id === block.courseId)?.name.split('|')[0]?.trim() ?? block.savedItem?.course?.code ?? 'Personal'}</Copy></View>
         <Copy style={{ fontSize: 15, fontWeight: '600', lineHeight: 20.25 }}>{block.title}</Copy>
         <Copy muted size="caption">{block.minutes} min · {block.kind === 'reviewer' ? 'Reviewer' : 'Task'}</Copy>
-      </Pressable>
-    </View>)}
+      </Pressable>;
+      return <View key={block.key} style={{ flexDirection: 'row', gap: 12, alignItems: 'stretch' }}>
+        <Copy muted style={{ width: 44, paddingTop: 14, textAlign: 'right', fontSize: 13, fontVariant: ['tabular-nums'] }}>{block.start}</Copy>
+        <View style={{ flex: 1, minWidth: 0 }}>{actions.length ? <SwipeRow planner background={colors.surfacePrimary} leading={[{ ...actions[0]!, label: 'Skip' }]} trailing={[actions[1]!]}>{card}</SwipeRow> : card}</View>
+      </View>;
+    })}
     <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}><Copy muted style={{ width: 44, textAlign: 'right', fontSize: 13 }}>{plannerShortTime(end)}</Copy><Copy muted size="caption">Free time ends</Copy></View>
   </View>;
 }

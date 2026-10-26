@@ -15,6 +15,7 @@ import { haptic } from "./haptics";
 import { Copy } from "./primitives";
 import { motion, useTheme } from "./theme";
 import { radius } from "./tokens";
+import { plannerSwipeAction, PLANNER_SWIPE_THRESHOLD } from './plannerSwipe';
 
 /**
  * One gesture language across the app (Today, Announcements, Generate, Library):
@@ -75,6 +76,8 @@ export function SwipeRow({
   compact = false,
   fullSwipe = false,
   background,
+  planner = false,
+  disabled = false,
 }: {
   children: ReactNode;
   leading?: readonly SwipeAction[];
@@ -86,6 +89,9 @@ export function SwipeRow({
   fullSwipe?: boolean;
   /** Opaque fill for rows that have no card of their own, so actions never show through. */
   background?: string;
+  /** Planner blocks commit only past 104px and otherwise return closed. */
+  planner?: boolean;
+  disabled?: boolean;
 }) {
   const { colors, reducedMotion } = useTheme();
   const [width, setWidth] = useState(0);
@@ -93,15 +99,17 @@ export function SwipeRow({
   const translate = useRef(new Animated.Value(0)).current;
   const exit = useRef(new Animated.Value(1)).current;
   const offset = useRef(0);
-  const actionWidth = compact && width > 0 ? Math.min(ACTION_WIDTH, Math.floor(width / 2.2)) : ACTION_WIDTH;
+  const crossed = useRef(false);
+  const [swipeSide, setSwipeSide] = useState(0);
+  const actionWidth = planner ? PLANNER_SWIPE_THRESHOLD : compact && width > 0 ? Math.min(ACTION_WIDTH, Math.floor(width / 2.2)) : ACTION_WIDTH;
   const leadingWidth = leading.length * actionWidth;
   const leadingRef = useRef(leading);
   leadingRef.current = leading;
   const trailingRef = useRef(trailing);
   trailingRef.current = trailing;
   const trailingWidth = trailing.length * actionWidth;
-  const limits = useRef({ leadingWidth, trailingWidth, width, fullSwipe });
-  limits.current = { leadingWidth, trailingWidth, width, fullSwipe };
+  const limits = useRef({ leadingWidth, trailingWidth, width, fullSwipe, planner, disabled });
+  limits.current = { leadingWidth, trailingWidth, width, fullSwipe, planner, disabled };
   const runRef = useRef<(action: SwipeAction, direction: 1 | -1) => void>(() => {});
 
   const settle = (to: number, done?: () => void) => {
@@ -109,7 +117,7 @@ export function SwipeRow({
     setOpen(to > 0 ? "leading" : to < 0 ? "trailing" : null);
     translate.stopAnimation();
     const animation = reducedMotion
-      ? Animated.timing(translate, { toValue: to, duration: motion.press, easing: Easing.out(Easing.quad), useNativeDriver: true })
+      ? Animated.timing(translate, { toValue: to, duration: planner ? 0 : motion.press, easing: Easing.out(Easing.quad), useNativeDriver: true })
       : Animated.spring(translate, { toValue: to, ...motion.spring, useNativeDriver: true });
     animation.start(({ finished }) => {
       if (finished) done?.();
@@ -129,6 +137,7 @@ export function SwipeRow({
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponder: (_event, gesture) => {
+          if (limits.current.disabled) return false;
           const horizontal = Math.abs(gesture.dx) > CLAIM_DISTANCE && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.6;
           if (!horizontal) return false;
           const { leadingWidth: left, trailingWidth: right } = limits.current;
@@ -138,10 +147,19 @@ export function SwipeRow({
           if (closeOpenRow && closeOpenRow !== closeRef.current) closeOpenRow();
           closeOpenRow = closeRef.current;
           translate.stopAnimation();
+          crossed.current = false;
         },
         onPanResponderMove: (_event, gesture) => {
           const { leadingWidth: left, trailingWidth: right, fullSwipe: full } = limits.current;
           const raw = offset.current + gesture.dx;
+          if (limits.current.planner) {
+            const threshold = plannerSwipeAction(raw) !== null;
+            if (threshold && !crossed.current) haptic.select();
+            crossed.current = threshold;
+            setSwipeSide(Math.sign(raw));
+            translate.setValue(raw);
+            return;
+          }
           // Past the actions the row resists instead of sliding freely, unless
           // a full swipe can carry it across.
           const give = full ? 0.75 : 0.2;
@@ -152,6 +170,14 @@ export function SwipeRow({
         onPanResponderRelease: (_event, gesture) => {
           const { leadingWidth: left, trailingWidth: right, width: rowWidth, fullSwipe: full } = limits.current;
           const value = offset.current + gesture.dx;
+          if (limits.current.planner) {
+            const action = plannerSwipeAction(value);
+            if (action === 'skip' && left > 0) runRef.current(leadingRef.current[0]!, 1);
+            else if (action === 'remove' && right > 0) runRef.current(trailingRef.current[0]!, -1);
+            else settle(0);
+            setSwipeSide(0);
+            return;
+          }
           const across = full && rowWidth > 0 ? rowWidth * 0.55 : Infinity;
           const wasOpen = offset.current !== 0;
           if (left > 0 && value > Math.max(across, left + 40)) {
@@ -168,11 +194,11 @@ export function SwipeRow({
             settle(-right);
           } else settle(0);
         },
-        onPanResponderTerminate: () => settle(0),
+        onPanResponderTerminate: () => { crossed.current = false; setSwipeSide(0); settle(0); },
       }),
     // `settle` only reads refs and stable animated values.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [reducedMotion],
+    [reducedMotion, planner],
   );
 
   const run = (action: SwipeAction, swiped?: 1 | -1) => {
@@ -241,10 +267,10 @@ export function SwipeRow({
               opacity: pressed ? 0.6 : 1,
             })}
           >
-            <View style={{ width: 36, height: 36, borderRadius: radius.pill, backgroundColor: tone(action.tone), alignItems: "center", justifyContent: "center" }}>
-              <Icon color={colors.backgroundPrimary} size={17} strokeWidth={2} />
+            <View style={{ width: 36, height: 36, borderRadius: radius.pill, backgroundColor: planner ? 'transparent' : tone(action.tone), alignItems: "center", justifyContent: "center" }}>
+              <Icon color={planner ? '#f2efe8' : colors.backgroundPrimary} size={planner ? 18 : 17} strokeWidth={planner ? 1.6 : 2} />
             </View>
-            <Copy size="caption" color={tone(action.tone)} style={{ fontSize: 11, lineHeight: 14, fontWeight: "600" }}>{action.label}</Copy>
+            <Copy size="caption" color={planner ? '#f2efe8' : tone(action.tone)} style={{ fontSize: planner ? 12 : 11, lineHeight: 14, fontWeight: "600" }}>{action.label}</Copy>
           </Pressable>
         );
       })}
@@ -253,10 +279,10 @@ export function SwipeRow({
 
   return (
     // Clipped to the card's own corners, so a grid tile never slides over its neighbour.
-    <View style={[{ overflow: "hidden", borderRadius: radius.card }, style]} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
+    <View style={[{ overflow: "hidden", borderRadius: planner ? 16 : radius.card, backgroundColor: planner ? 'rgba(255,255,255,0.10)' : undefined }, style]} onLayout={(event) => setWidth(event.nativeEvent.layout.width)}>
       {leading.length > 0 ? renderActions(leading, "leading") : null}
       {trailing.length > 0 ? renderActions(trailing, "trailing") : null}
-      <Animated.View {...responder.panHandlers} style={{ opacity: exit, backgroundColor: background, transform: [{ translateX: translate }] }}>
+      <Animated.View {...responder.panHandlers} style={{ opacity: exit, backgroundColor: background, borderRadius: planner ? 16 : undefined, shadowColor: '#000', shadowOpacity: planner && swipeSide ? .35 : 0, shadowRadius: 18, shadowOffset: { width: -6 * swipeSide, height: 0 }, elevation: planner && swipeSide ? 8 : 0, transform: [{ translateX: translate }] }}>
         {children}
         {open ? (
           // While actions show, a tap on the item closes them instead of opening it.

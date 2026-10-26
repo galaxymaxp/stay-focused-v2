@@ -6,6 +6,7 @@ import type { PlanningCandidates } from '@stay-focused/shared/task-planning';
 import { defaultPlanningDraft, planningDraftSummary, previousPlanData } from '@stay-focused/shared';
 const mocks = vi.hoisted(() => ({ load: vi.fn(), build: vi.fn(), hold: vi.fn(), check: vi.fn(), apply: vi.fn(), restore: vi.fn() }));
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
+vi.mock('lucide-react-native', () => ({ EyeOff: 'EyeOff', X: 'X' }));
 vi.mock('../../design/primitives', () => ({ Copy: 'Copy', SkeletonBlock: 'SkeletonBlock', SegmentedControl: 'SegmentedControl', Sheet: 'Sheet' }));
 vi.mock('../../design/theme', async () => { const { palettes } = await import('../../design/themeTokens'); return { useTheme: () => ({ colors: palettes.light }) }; });
 vi.mock('./PlanButton', () => ({ PlanButton: 'PlanButton' }));
