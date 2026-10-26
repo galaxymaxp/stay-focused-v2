@@ -1,3 +1,38 @@
+<!-- FS12 publication begin -->
+## FULLSEND 20261026-0024 publication (2026-10-26)
+
+FS12: **PASS for publication; physical Plan/Queue acceptance NOT RUN**
+(Realme asleep behind keyguard; no connected browser session).
+Owner-authorized finite scope: release finished WEB-A2/A3/A4, TP2 through
+TP2e and QL1c, with RR1d readiness evidence; no later roadmap work.
+
+Source `37ce7307`; previous main `2e01a62`; merged release `735505c`;
+application main `61239d3e2586bb245cc56adfa3a8d70baf96e4aa`.
+FRESH release gates: shared 450/45 source files (RR1d's 900/90 includes dist
+mirrors), Canvas 75, OCR 27, engine 606, API 2,517 + 3 existing live skips,
+mobile 1,732/186, web 707/88: **6,114 passed / 0 failed / 3 existing skips**;
+provider 20/20; Doctor 21/21. Forced typecheck/lint/build each 8/8, 0 cached;
+7 existing lint warnings. Retained first API/web/build failures, CI failure
+and test-only measured-layout repair; replacement CI 40291658540 SUCCESS.
+
+No migrations or native changes. Worker `generation-worker-00036-gw2`,
+image `worker:61239d3`, Ready/100%; Cloud Build 01f57112-0703-4eba-9004-f00d23f1b6d9.
+API `dpl_45Zx7NpbAav51pa3uqmmJJy5RBbZ` and website
+`dpl_4V3zknzsNYB9i6QmGrQAjTVpYNb2` READY; production health 200 at
+application main and matching Plan asset; bounded 15-minute error scans zero.
+OTA group `decdf143-eb7e-4d40-9c62-9ff27ce72730` / Android `01a1778c-a72d-7a63-8c9d-059037a5897f`,
+preview/runtime 2.4.0-sdk57; Realme version 2.4.0/code 8.
+FRESH PASS: Realme DownloadComplete/NEW_UPDATE_LOADED for 01a1778c, followed by a cold launch reporting no newer update; visual UI NOT RUN behind keyguard.
+
+Pending owner: unlock Realme and verify Plan/Queue, sheet selections/order,
+light/dark and Reduce Motion; repeat signed-in website acceptance at desktop
+width. Native GL parity, physical performance and assistive technology remain
+UNVERIFIED. Zero paid generations; source local artifacts preserved.
+Historical rollout-pending records below are superseded only by these bounded
+deployment/results; their broader visual/physical claims remain unverified.
+[Release evidence, exact readiness JSON and failures](ai/acceptance/fullsend-20261026-0024.md).
+<!-- FS12 publication end -->
+
 <!-- RR1d verification begin -->
 ## RR1d TP2e verification: LOCAL PASS (2026-10-26)
 

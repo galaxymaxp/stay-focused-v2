@@ -1,5 +1,36 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff — FULLSEND (20261026-0024)
+
+What changed: shipped current WEB-A3 saved-draft/copy repairs and WEB-A4 readiness,
+TP2 selected planning/sheet/marks, TP2d liquid/color/waves, TP2e glass pill,
+QL1c cached Queue scene stills; retained shipped main and readiness history.
+
+Verification (exact counts): FRESH shared 450/45, Canvas 75, OCR 27, engine 606,
+API 2517 + 3 existing live skips, mobile 1732/186, web 707/88: 6114 passed;
+provider 20/20, Doctor 21/21; forced typecheck/lint/build 8/8 each, 0 cached,
+7 existing warnings. CI 40291658540 SUCCESS at 61239d3, focused repair 8/8.
+Original API/web/build/CI/upload/OTA first attempts retained in acceptance.
+
+Deployments (IDs, SHAs): source 37ce7307; previous main 2e01a62; merge 735505c;
+application main 61239d3e2586bb245cc56adfa3a8d70baf96e4aa. Worker
+generation-worker-00036-gw2 / worker:61239d3, Cloud Build 01f57112-0703-4eba-9004-f00d23f1b6d9;
+API dpl_45Zx7NpbAav51pa3uqmmJJy5RBbZ; website dpl_4V3zknzsNYB9i6QmGrQAjTVpYNb2;
+OTA group decdf143-eb7e-4d40-9c62-9ff27ce72730 / Android 01a1778c-a72d-7a63-8c9d-059037a5897f, runtime 2.4.0-sdk57.
+No migration; no native change/APK required.
+
+Live checks: API/website health 200 at 61239d3, Today 200 and Plan asset match;
+worker Ready/100%, bounded error scans zero. FRESH PASS: Realme DownloadComplete/NEW_UPDATE_LOADED for 01a1778c, followed by a cold launch reporting no newer update; visual UI NOT RUN behind keyguard.
+Six physical Plan/Queue checks and desktop UI NOT RUN (keyguard/no browser).
+
+Next steps: owner unlocks Realme for Plan/Queue light-dark/Reduce Motion and
+sheet modes/selection/order; repeat signed-in desktop website checks.
+Blockers: none for publication; keyguard/browser access blocks UI acceptance.
+Risks: broader native GL/performance/accessibility UNVERIFIED; retained test
+resource flakes and interrupted exports; zero paid generations/settings changes.
+Source local artifacts left local; only final github/main fetch, no source merge.
+[Exact readiness JSON, first attempts and release evidence](acceptance/fullsend-20261026-0024.md).
+
 ## Handoff — FULLSEND (20261025-0127)
 
 FULLSEND 20261025-0127: **PASS for publication; Realme OTA fetch PASS; on-device
