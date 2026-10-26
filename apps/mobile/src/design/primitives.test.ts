@@ -1,9 +1,10 @@
 import { createElement } from "react";
 import { act, create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Action, Page, ProfileButton, RowLink, SearchField, Sheet } from "./primitives";
+import { Action, Page, ProfileButton, RowLink, SearchField, Sheet, SkeletonBlock } from "./primitives";
 import { hitTarget, spacing } from "./tokens";
 
+const skeletonMotion = vi.hoisted(() => ({ reduced: true, timings: [] as { duration: number }[], loopStart: vi.fn(), loopStop: vi.fn() }));
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("expo-router", () => ({ router: { ...navigation, canGoBack: () => true, back: vi.fn() } }));
 vi.mock("expo-router/js-tabs", async () => ({ BottomTabBarHeightContext: (await import("react")).createContext(undefined) }));
@@ -15,7 +16,7 @@ vi.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView",
 vi.mock("lucide-react-native", () => Object.fromEntries(["ArrowLeft", "ChevronRight", "FileText", "RefreshCw", "Search", "Settings", "X", "BookOpen", "ClipboardList", "Presentation", "FileQuestion", "Globe", "Info"].map(name => [name, name])));
 vi.mock("./theme", async () => {
   const tokens = await import("./themeTokens");
-  return { ...tokens, useTheme: () => ({ colors: tokens.palettes.light, mode: "light", reducedMotion: true }) };
+  return { ...tokens, useTheme: () => ({ colors: tokens.palettes.light, mode: "light", reducedMotion: skeletonMotion.reduced }) };
 });
 vi.mock("react-native", () => ({
   View: "View", Text: "Text", TextInput: "TextInput", ScrollView: "ScrollView", RefreshControl: "RefreshControl",
@@ -23,7 +24,9 @@ vi.mock("react-native", () => ({
   useWindowDimensions: () => ({ width: 360, height: 800 }),
   Easing: { inOut: (value: unknown) => value, out: (value: unknown) => value, in: (value: unknown) => value, quad: "quad" },
   Animated: {
-    timing: () => ({ start: (done?: () => void) => done?.() }),
+    timing: (_value: unknown, config: { duration: number }) => { skeletonMotion.timings.push(config); return { start: (done?: () => void) => done?.() }; },
+    sequence: (steps: unknown) => steps,
+    loop: () => ({ start: skeletonMotion.loopStart, stop: skeletonMotion.loopStop }),
     parallel: () => ({ start: (done?: () => void) => done?.() }),
     multiply: () => 1,
     add: () => 0,
@@ -32,13 +35,13 @@ vi.mock("react-native", () => ({
       constructor(public value: number) {}
       setValue(value: number) { this.value = value; }
       stopAnimation() {}
-      interpolate(config: { outputRange: number[] }) { return { __getValue: () => this.value * config.outputRange[1]! }; }
+      interpolate(config: { outputRange: number[] }) { return { __getValue: () => this.value * config.outputRange[1]!, outputRange: config.outputRange }; }
     },
   },
 }));
 
 let rendered: ReactTestRenderer | undefined;
-beforeEach(() => { Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers(); });
+beforeEach(() => { skeletonMotion.reduced = true; skeletonMotion.timings.length = 0; skeletonMotion.loopStart.mockClear(); skeletonMotion.loopStop.mockClear(); Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true }); vi.useFakeTimers(); });
 afterEach(async () => {
   if (rendered) await act(async () => rendered!.unmount());
   rendered = undefined;
@@ -195,4 +198,12 @@ it.each([false, true])("RowLink retains its accessible 48pt unfilled press targe
     await act(async () => target.props.onPress());
     expect(onPress).toHaveBeenCalledOnce();
   }
+});
+
+it.each([false, true])('planner skeleton uses shared 1.6 second .55–1 loop, static under Reduce Motion (%s)', async reduced => {
+  skeletonMotion.reduced = reduced;
+  await act(async () => { rendered = create(createElement(SkeletonBlock, { width: 100, height: 12, opacityRange: [0.55, 1] })); });
+  const opacity = rendered!.root.findByType('AnimatedView' as never).props.style[0].opacity;
+  if (reduced) { expect(opacity).toBe(0.55); expect(skeletonMotion.loopStart).not.toHaveBeenCalled(); }
+  else { expect(opacity.outputRange).toEqual([0.55, 1]); expect(skeletonMotion.timings.map(config => config.duration)).toEqual([800, 800]); expect(skeletonMotion.loopStart).toHaveBeenCalledTimes(1); }
 });

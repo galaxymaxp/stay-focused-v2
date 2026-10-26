@@ -6,7 +6,7 @@ import type { PlanningCandidates } from '@stay-focused/shared/task-planning';
 import { defaultPlanningDraft, planningDraftSummary, previousPlanData } from '@stay-focused/shared';
 const mocks = vi.hoisted(() => ({ load: vi.fn(), build: vi.fn(), hold: vi.fn(), check: vi.fn(), apply: vi.fn(), restore: vi.fn() }));
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
-vi.mock('../../design/primitives', () => ({ Copy: 'Copy', SegmentedControl: 'SegmentedControl', Sheet: 'Sheet' }));
+vi.mock('../../design/primitives', () => ({ Copy: 'Copy', SkeletonBlock: 'SkeletonBlock', SegmentedControl: 'SegmentedControl', Sheet: 'Sheet' }));
 vi.mock('../../design/theme', async () => { const { palettes } = await import('../../design/themeTokens'); return { useTheme: () => ({ colors: palettes.light }) }; });
 vi.mock('./PlanButton', () => ({ PlanButton: 'PlanButton' }));
 vi.mock('./useLibraryOrganizer', () => ({ useLibraryOrganizer: () => ({ scrollRef: { current: null }, listRef: { current: null }, layouts: { current: new Map() }, panHandlers: {}, hold: mocks.hold, touchStart() {}, touchEnd() {}, touchCancel() {}, onScroll() {}, dragging: null }) }));
@@ -86,4 +86,15 @@ it('Close changes no plan; stale candidate completion cannot replace a newer ran
   await act(async () => tree!.update(createElement(PlanningControl, { request: { planningRange: range, availability: [nextRange] }, active: null, load: mocks.load, onBuild: mocks.build })));
   await act(async () => finish({ ...fixture(), freeWindowMinutes: 999 })); expect(text()).not.toContain('999');
   await act(async () => root().findByType('Sheet' as never).props.onClose()); expect(mocks.build).not.toHaveBeenCalled();
+});
+
+it('skeleton shows only without cached candidates; cached candidates stay visible during refresh', async () => {
+  let finish!: (data: PlanningCandidates) => void; mocks.load.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  await mount(); expect(root().findAll(node => node.props.testID === 'planner-skeleton')).toHaveLength(1);
+  expect(root().findAll(node => node.props.testID === 'skeleton-block-row')).toHaveLength(3);
+  expect(root().findAll(node => node.props.testID === 'skeleton-course-row')).toHaveLength(4);
+  expect(named('Use this plan').props.disabled).toBe(true);
+  await act(async () => finish(fixture())); expect(root().findAll(node => node.props.testID === 'planner-skeleton')).toHaveLength(0);
+  await act(async () => tree!.update(createElement(PlanningControl, { request: { planningRange: range, availability: [{ ...range, endsAt: '2026-10-25T11:00:00.000Z' }] }, active: null, load: () => new Promise(() => {}), onBuild: mocks.build })));
+  expect(root().findAll(node => node.props.testID === 'planner-skeleton')).toHaveLength(0); expect(text()).toContain('Free time ends');
 });

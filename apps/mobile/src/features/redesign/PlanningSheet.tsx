@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Copy, SegmentedControl, Sheet } from '../../design/primitives';
 import { useTheme } from '../../design/theme';
+import { PlannerSkeleton } from './PlannerSkeleton';
 import { PlanButton } from './PlanButton';
 import { PlanFitCard, PlanTimeline, PlannerButton, PlannerDot, PreviousPlan } from './PlanPreview';
 import { useLibraryOrganizer } from './useLibraryOrganizer';
@@ -72,7 +73,7 @@ export function PlanningSheet({ request, active, load, onBuild, onClose, overrid
   return <Sheet title="Plan your free time" onClose={onClose} maxHeight="94%" scrollRef={organizer.scrollRef} onScroll={organizer.onScroll} scrollEnabled={!organizer.dragging} dragEnabled={!organizer.dragging}
     renderHeader={close => <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 20, paddingVertical: 10 }}><View style={{ flex: 1, gap: 4 }}><Copy style={{ fontSize: 20, fontWeight: '600', letterSpacing: -0.2 }}>Plan your free time</Copy><Copy muted style={{ fontSize: 13 }}>{plannerWindowLabel(from, to)}</Copy></View><Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={close} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center' }}><Copy style={{ fontSize: 20 }}>{'×'}</Copy></Pressable></View>}>
     <SegmentedControl segments={[{ value: 'proposed', label: 'Proposed' }, { value: 'previous', label: 'Previous' }]} value={tab} onChange={setTab} />
-    {tab === 'previous' ? <PreviousPlan previous={previous} disabled={busy || !data} onRestore={() => { onRestore?.(); setTab('proposed'); }} /> : !data || !draft ? error ? <View accessibilityRole="alert"><Copy>{error}</Copy></View> : <Copy>Loading planning items·</Copy> : <View style={{ gap: 20 }}>
+    {tab === 'previous' ? <PreviousPlan previous={previous} disabled={busy || !data} onRestore={() => { onRestore?.(); setTab('proposed'); }} /> : !data || !draft ? error ? <View accessibilityRole="alert"><Copy>{error}</Copy></View> : <PlannerSkeleton /> : <View style={{ gap: 20 }}>
       <PlanFitCard plan={displayPlan} blocks={blocks} free={data.freeWindowMinutes} /><PlanTimeline blocks={blocks} end={to} candidates={data} onOpen={onOpen} />
       {!!tray.length && <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: colors.separator, borderRadius: 18, paddingHorizontal: 16, paddingBottom: 10 }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Taken out" accessibilityState={{ expanded: trayOpen }} onPress={() => setTrayOpen(!trayOpen)} style={{ minHeight: 44, justifyContent: 'center' }}><Copy style={{ fontSize: 14, fontWeight: '600' }}>Taken out · {tray.length} {trayOpen ? '^' : '?'}</Copy></Pressable>

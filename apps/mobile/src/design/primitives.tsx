@@ -896,14 +896,14 @@ function useSharedShimmer(enabled: boolean) {
 }
 
 /** A loading placeholder block. Under Reduced Motion it holds still. */
-export function SkeletonBlock({ width, height, radius: corner = 8, style }: { width: number | `${number}%`; height: number; radius?: number; style?: StyleProp<ViewStyle> }) {
+export function SkeletonBlock({ width, height, radius: corner = 8, style, opacityRange }: { width: number | `${number}%`; height: number; radius?: number; style?: StyleProp<ViewStyle>; opacityRange?: readonly [number, number] }) {
   const { colors, reducedMotion } = useTheme();
   useSharedShimmer(!reducedMotion);
   return (
     <Animated.View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
-      style={[{ width, height, borderRadius: corner, backgroundColor: colors.textMuted, opacity: reducedMotion ? 0.16 : shimmer.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.28] }) }, style]}
+      style={[{ width, height, borderRadius: corner, backgroundColor: colors.textMuted, opacity: reducedMotion ? opacityRange?.[0] ?? 0.16 : shimmer.interpolate({ inputRange: [0, 1], outputRange: opacityRange ? [...opacityRange] : [0.08, 0.28] }) }, style]}
     />
   );
 }

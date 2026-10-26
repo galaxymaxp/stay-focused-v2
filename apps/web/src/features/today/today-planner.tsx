@@ -1,8 +1,9 @@
 ﻿"use client";
 import { builtPlanningSelection, defaultPlanningDraft, draftWithOverrides, movePlanningEntry, planningDraftSummary, planningItemKey, planningOverrideKey, plannerBlocks, plannerWindowLabel, resetPlanningOrder, scopedPlanningItems, splitCourseName, takenOutItems, togglePlanningItems,
-  type PlannerBlock, type PlanningDraft, type PlanOverrides, type PreviousPlanView, type TodayItem } from '@stay-focused/shared';
+  freeTimeDuration, type PlannerBlock, type PlanningDraft, type PlanOverrides, type PreviousPlanView, type TodayItem } from '@stay-focused/shared';
 import type { DeterministicStudyPlan, PlanMode, PlanSelection, PlanningCandidates } from '@stay-focused/shared/task-planning';
 import { useMemo, useRef, useState, type DragEvent } from 'react';
+import { PlannerSkeleton } from './planner-skeleton';
 import { PlanFitCard, PlanTimeline, PlannerDot, PreviousPlan } from './plan-preview';
 
 export interface BuiltPlanningChoice { readonly mode: PlanMode; readonly selection: PlanSelection; readonly draft: PlanningDraft }
@@ -35,8 +36,8 @@ export function TodayPlanner({ candidates: data, plan, timeline, active, overrid
       <div className="planner-tabs" role="tablist" aria-label="Plans">{['proposed', 'previous'].map(value => <button type="button" role="tab" aria-selected={tab === value} aria-controls={`planner-${value}`} id={`planner-tab-${value}`} key={value} onClick={() => setTab(value)}>{value === 'proposed' ? 'Proposed' : 'Previous'}</button>)}</div></header>
     {tab === 'previous' ? <div role="tabpanel" id="planner-previous" aria-labelledby="planner-tab-previous"><PreviousPlan previous={previous} disabled={busy || !data} onRestore={() => { onRestore(); setTab('proposed'); }} /></div> : <div role="tabpanel" id="planner-proposed" aria-labelledby="planner-tab-proposed" className="planner-proposal">
       {next && <section className="planner-next"><div><span className="planner-kicker">Up next</span><span className="planner-block-course"><PlannerDot targets={blocks.map(block => block.targetKey)} target={next.targetKey} />{data?.courses.find(course => course.id === next.courseId)?.name.split('|')[0]?.trim() ?? next.savedItem?.course?.code ?? 'Personal'}</span><h3>{next.title}</h3><span className="meta">{next.start} · {next.minutes} min · {next.kind === 'reviewer' ? 'Reviewer' : 'Task'}</span></div><button type="button" className="planner-primary" onClick={() => onOpen(next)}>Start now</button></section>}
-      {!data && !blocks.length ? <p role="status">Loading planning items…</p> : <>
-        <div className="planner-plan-row"><PlanTimeline blocks={blocks} end={end} candidates={data} onOpen={onOpen} /><div className="planner-side"><PlanFitCard plan={displayPlan} blocks={blocks} free={data?.freeWindowMinutes ?? 0} />
+      {!data && !blocks.length ? <PlannerSkeleton /> : <>
+        <div className="planner-plan-row"><PlanTimeline blocks={blocks} end={end} candidates={data} onOpen={onOpen} /><div className="planner-side"><PlanFitCard plan={displayPlan} blocks={blocks} free={data?.freeWindowMinutes ?? freeTimeDuration(start, end)} />
           {!!tray.length && <section className="planner-tray"><button type="button" className="planner-tray-heading" aria-expanded={trayOpen} onClick={() => setTrayOpen(!trayOpen)}>Taken out · {tray.length}</button>{trayOpen && tray.map(entry => <div className="planner-tray-row" key={entry.key}><PlannerDot targets={blocks.map(block => block.targetKey)} target={planningItemKey(entry.item)} /><span className="grow"><span>{entry.item.title}</span><small>{entry.reason === 'skipped' ? 'Skipped tonight · returns next window' : 'Removed from plan'}</small></span><button type="button" className="planner-outline" aria-label={`Put back ${entry.item.title}`} onClick={() => { onItemCheck(entry.key, true); if (draft) setDraft({ ...draft, checked: [...new Set([...draft.checked, planningItemKey(entry.item)])] }); }}>Put back</button></div>)}</section>}
           <button type="button" className="planner-outline" aria-expanded={adjust} aria-controls="planner-adjust" onClick={onToggleAdjust}>{adjust ? 'Hide plan settings' : 'Adjust plan'}</button>
           <button type="button" className="planner-primary" disabled={busy || !plan?.sessions.length} onClick={onApply}>Use this plan</button>

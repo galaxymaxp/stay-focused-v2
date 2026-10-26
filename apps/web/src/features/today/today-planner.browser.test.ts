@@ -16,7 +16,7 @@ const stubs: Record<string, string> = {
       {kind:'reviewer',id:id(n+10),title:n===1?'Managing Data with a Synthetic Database':'Synthetic reviewer '+n,courseId:id(n),estimateMinutes:45,openedWithin24h:false,dueAt:null,priority:'medium',createdAt:at(0)},
       {kind:'task',id:id(n+20),title:n===1?'A long synthetic task title that wraps fully on a phone without losing the final assignment words':'Synthetic task '+n,courseId:id(n),estimateMinutes:60,openedWithin24h:false,dueAt:null,priority:'medium',createdAt:at(0)}]}))};
     export const today={date:'2026-10-27',utcOffsetMinutes:0,asOf:at(1140),progress:{completed:0,total:0,scheduledMinutes:0},urgent:[],current:null,next:null,later:[],overdue:[],upcomingDeadlines:[],timeline:[],plannerState:{status:'not_planned',lastPlannedAt:null,needsTaskImport:false},capabilities:{planner:{status:'available'},calendar:{status:'available'}},announcements:{items:[],nextOffset:null},activities:{items:allPlanningItems(data).filter(i=>i.kind==='task').map(i=>({...i,id:'task:'+i.id,taskId:i.id,course:{id:i.courseId,name:'Synthetic course',code:'C'},status:'pending',source:'local',submissionTypes:[],isOverdue:false,urgency:'later',hasGeneratedDraft:false,estimatedMinutes:i.estimateMinutes,estimateSource:null}))}};
-    export const api=async(path,options)=>{window.__calls??=[];window.__calls.push([path,options?.body]); if(path.endsWith('/candidates')){if(location.search.includes('loading'))return new Promise(()=>{});return {...data,...options.body}};
+    export const api=async(path,options)=>{window.__calls??=[];window.__calls.push([path,options?.body]); if(path.endsWith('/candidates')){if(new URLSearchParams(location.search).has('loading'))return new Promise(()=>{});return {...data,...options.body}};
       if(path.endsWith('/preview')){if(location.search.includes('preview-loading'))return new Promise(()=>{});const items=allPlanningItems(data);return generateContentStudyPlan({...options.body,tasks:items.filter(i=>i.kind==='task').map(i=>({...i,estimatedMinutes:i.estimateMinutes})),reviewers:items.filter(i=>i.kind==='reviewer').map(i=>({...i,estimatedMinutes:i.estimateMinutes}))})};
       if(path.endsWith('/replan'))return {sessions:[]}; throw Error('Unexpected local fixture API '+path)};`,
   providers: `import {api} from 'pl2:fixtures'; export const useAuth=()=>({api,session:{user:{id:'synthetic-owner',user_metadata:{}}}});`,
@@ -83,4 +83,15 @@ it('welcome dismiss and clock movement permanently write the device key across r
       await page.reload();await page.getByRole('tab',{name:'Proposed',exact:true}).waitFor();expect(await welcome.count()).toBe(0);expect(errors).toEqual([]);
     }finally{await page.close();}
   }
+},60_000);
+it('planner skeleton has exact rows and busy semantics, honors Reduce Motion and never covers cached candidates',async()=>{
+  const {page,errors}=await open(390,'dark','?loading');try{
+    const skeleton=page.locator('.planner-skeleton');await skeleton.waitFor();expect(await skeleton.getAttribute('aria-busy')).toBe('true');
+    expect(await skeleton.locator('[data-testid="skeleton-block-row"]').count()).toBe(3);expect(await skeleton.locator('[data-testid="skeleton-course-row"]').count()).toBe(4);
+    expect(await skeleton.getByRole('button',{name:'Use this plan',exact:true}).isDisabled()).toBe(true);
+    expect(await skeleton.locator('.planner-sk').first().evaluate(el=>getComputedStyle(el).animationName)).toBe('none');
+    await page.emulateMedia({reducedMotion:'no-preference'});expect(await skeleton.locator('.planner-sk').first().evaluate(el=>getComputedStyle(el).animationDuration)).toBe('1.6s');
+    await page.screenshot({path:join(evidence,'skeleton-390-dark.png'),fullPage:true});expect(errors).toEqual([]);
+  }finally{await page.close();}
+  const cached=await open(1280,'light','?preview-loading');try{await cached.page.getByRole('button',{name:'Start now',exact:true}).waitFor();expect(await cached.page.locator('.planner-skeleton').count()).toBe(0);expect(await cached.page.getByRole('button',{name:'Use this plan',exact:true}).isDisabled()).toBe(true);expect(cached.errors).toEqual([]);}finally{await cached.page.close();}
 },60_000);
