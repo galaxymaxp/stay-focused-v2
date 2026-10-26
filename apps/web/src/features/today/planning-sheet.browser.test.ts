@@ -138,6 +138,8 @@ it.each([[390,'light'],[390,'dark'],[768,'light'],[1280,'light'],[1280,'dark']] 
   expect(await page.getByRole('dialog').count()).toBe(0);
   const choice=await page.evaluate(()=>(window as unknown as {__choice:{mode:string;selection:{order:string;items:unknown[]}}}).__choice);
   expect(choice.mode).toBe('reviewers_tasks');expect(choice.selection.order).toBe('smart');expect(choice.selection.items).toHaveLength(3);
+  // Kind marks appear after PlanPreview's ResizeObserver measures the bar.
+  await page.locator('.plan-block .icon').first().waitFor({state:'attached'});
   expect(await page.locator('.plan-block .icon').count()).toBeGreaterThan(0);
   await page.screenshot({path:join(evidence,`${width}-${theme}-built.png`)});
   const countBefore=await page.locator('.plan-block .icon').count();
