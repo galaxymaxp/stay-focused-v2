@@ -1,4 +1,4 @@
-import { validFreeTime } from "@stay-focused/shared";
+import { useTodayPlan } from "./useTodayPlan";
 import { useQuietPlanner } from "./useQuietPlanner";
 import { useTodayClockWindow } from "./useTodayClockWindow";
 import { AppUpdateBanner } from './AppUpdateNotice';
@@ -195,54 +195,17 @@ export function TodayScreen() {
   // Holding the ring must never scroll the page.
   const [ringActive, setRingActive] = useState(false);
   const requestBusy = useRef(false);
-  const [start, setStart] = useState(() =>
-    Math.min(
-      1410,
-      Math.ceil((new Date().getHours() * 60 + new Date().getMinutes()) / 15) *
-        15,
-    ),
-  );
-  const [end, setEnd] = useState(() => Math.min(1440, start + 120));
   const [busy, setBusy] = useState(false),
     [note, setNote] = useState<string | null>(null),
     [expanded, setExpanded] = useState(false);
-  // The free time is remembered per day, so the planned blocks it holds and
-  // the window you set stay together across launches.
-  const [windowKnown, setWindowKnown] = useState(false);
-  const savedWindow = clockWindow.window;
-  useEffect(() => {
-    if (adjusting.current) return;
-    setWindowKnown(!!savedWindow);
-    const fallback = Math.min(1410, Math.ceil((new Date().getHours() * 60 + new Date().getMinutes()) / 15) * 15);
-    setStart(savedWindow?.start ?? fallback);
-    setEnd(savedWindow?.end ?? Math.min(1440, fallback + 120));
-  }, [date, savedWindow, adjusting]);
-  // Nothing saved yet: wrap the free time around today's planned blocks.
-  const planned = today.data?.timeline;
-  useEffect(() => {
-    if (adjusting.current || windowKnown || !planned) return;
-    const now = new Date();
-    const around = freeTimeAround(timelineSegments(planned.filter((item) => item.status === "planned"), date), (now.getTime() - new Date(`${date}T00:00:00`).getTime()) / 60000);
-    if (around) {
-      setStart(around.start);
-      setEnd(around.end);
-      setWindowKnown(true);
-    }
-  }, [date, planned, windowKnown, adjusting]);
-  const change = (from: number, to: number) => {
-    if (!validFreeTime({ start: from, end: to })) return;
-    setStart(from);
-    setEnd(to);
-    clearPreview();
-    setWindowKnown(true);
-    clockWindow.save({ start: from, end: to });
-    plan(from, to);
-  };
-  function plan(from: number, to: number) {
-    if (!validFreeTime({ start: from, end: to }) || !available(capabilities.data?.planner)) return;
-    setNote(null);
-    queuePreview({ ...planningRequest(date, from, to, planMode), selection: activePlan?.selection ?? { order: "smart" } });
-  }
+  const planner = useTodayPlan({ identity, ownerId: session?.user.id ?? "", date, clock: clockWindow,
+    around: freeTimeAround(timelineSegments((today.data?.timeline ?? []).filter(item => item.status === "planned"), date),
+      (Date.now() - new Date(date + "T00:00:00").getTime()) / 60000),
+    timeline: today.data?.timeline ?? [], timelineReady: !!today.data, enabled: available(capabilities.data?.planner), busy, previewing, preview,
+    mode: planMode, selection: activePlan?.selection,
+    load: request => experienceRequest<PlanningCandidates>(client, "/api/experience/planner/candidates", { method: "POST", body: request }),
+    queue: queuePreview, clear: clearPreview });
+  const { start, end, change } = planner;
   async function apply() {
     if (!previewRequest || requestBusy.current) return;
     requestBusy.current = true;
@@ -316,10 +279,10 @@ export function TodayScreen() {
         onBuild={choice => {
           todayPlanningMemory.build(identity, choice);
           renderBuiltChoice(revision => revision + 1); setNote(null);
-          queuePreview({ ...planningRequest(date, start, end, choice.mode), selection: choice.selection });
+          planner.propose(choice.mode, choice.selection);
         }} />
       {(busy || previewing) && !preview ? <PlanPreviewLoading /> : null}
-      {(note || previewNote) && <Notice>{note || previewNote}</Notice>}
+      {(note || previewNote || planner.candidateNote) && <Notice>{note || previewNote || planner.candidateNote}</Notice>}
       {preview && (
         <PlanPreview
           plan={preview}
@@ -483,7 +446,7 @@ export function TodayScreen() {
           </View>
           <Action
             disabled={busy || !available(capabilities.data?.planner)}
-            onPress={() => void plan(start, end)}
+            onPress={() => planner.propose()}
           >
             Preview schedule
           </Action>

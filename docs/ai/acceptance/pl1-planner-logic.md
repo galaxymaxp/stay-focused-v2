@@ -90,3 +90,8 @@ STEP 2 FRESH: shared store 3/3, web stores 10/10, mobile store/window 7/7.
 Snapshots include an additive ownerId tag in the same device key; foreign-owner
 titles are denied. All keys and snapshot fields otherwise follow D7. No new
 server contract, database or provider access. Storage failures are best-effort.
+
+STEP 3 focused hooks FRESH PASS: web 7/7, mobile 7/7 (1 file each).
+Includes first-run exactly-once, last/saved/around priority, readiness guards,
+existing planned overlap suppression, override/kind payloads, release preview
+and stale candidate responses. Both Today screens now consume these adapters.
