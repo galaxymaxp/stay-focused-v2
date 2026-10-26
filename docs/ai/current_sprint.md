@@ -1,3 +1,37 @@
+<!-- PL3 block actions begin -->
+## PL3 Today block actions: LOCAL PASS (2026-10-27)
+
+PL3 steps 0-4 are complete locally: web hover/focus/hover-none Move up,
+Skip tonight and Remove; mobile mirrored 104px swipes, five-second pinned
+Undo, accessibility actions and 350ms long-press manual reorder. Up next
+follows the first proposal block. Existing SwipeRow, organizer and haptics are
+reused with no new dependencies. Saved task identities are explicit in the
+existing Today mapper; legacy unknown task targets safely disable actions.
+Saved reviewer action keys normalize the existing artifact prefix.
+
+FRESH final suites: shared **953/98 files**, mobile
+**1772/191**, web **731/91**
+(567 unit + 164 Chromium): **3456 passed / 0 failed / 0 skipped**.
+Additional affected API experience/today-window suite: **90/90, two files**.
+Forced typecheck/lint and serial root build each **8/8 tasks, 0 cached**;
+closing typecheck **8/8, 0 cached**. Direct API/web builds and offline Android
+JS/assets export **PASS, 1/1 each**. Seven existing lint warnings, zero errors.
+All first failures, repairs and exact commands are retained in [PL3 acceptance](acceptance/pl3-block-actions.md).
+
+Clock and Plan button files are unchanged. Actions reuse cached candidates
+and the existing latest-wins preview path; no Canvas sync or Library refetch.
+No migration, deployment, remote service/SQL call, Scheduler/email, env-file
+edit, push, OTA/EAS or device action. Owner UI/, apps/mobile/.gitignore and
+supabase/.temp/ remain untouched; tmp evidence stays uncommitted.
+
+**Owner steps remaining**: rollout **NOT RUN**, skipped entirely: owner
+FULLSEND after PL4. Device checks **NOT RUN**, skipped entirely: Realme swipe
+feel and native gesture/accessibility/Reduce Motion/appearance/performance.
+Live FS12/served revision/database/Scheduler/provider state, native presentation
+and other real browsers/assistive technology are **UNVERIFIED (owner to confirm)**.
+Endpoint PL3 only; PL4 and FULLSEND were not started.
+<!-- PL3 block actions end -->
+
 <!-- PL2 planner UI begin -->
 ## PL2 Today planner UI: LOCAL PASS (2026-10-27)
 

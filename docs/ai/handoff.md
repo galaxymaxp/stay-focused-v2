@@ -12214,3 +12214,65 @@ unfinished gate was waived.
 
 Vercel CLI remains absent. Strongly recommend `npm i -g vercel` for future
 owner-authorized env/deploy/log tooling; installation NOT RUN.
+
+
+## PL3 Today block actions: LOCAL PASS (2026-10-27)
+
+PL3 steps 0-4 are complete locally: web hover/focus/hover-none Move up,
+Skip tonight and Remove; mobile mirrored 104px swipes, five-second pinned
+Undo, accessibility actions and 350ms long-press manual reorder. Up next
+follows the first proposal block. Existing SwipeRow, organizer and haptics are
+reused with no new dependencies. Saved task identities are explicit in the
+existing Today mapper; legacy unknown task targets safely disable actions.
+Saved reviewer action keys normalize the existing artifact prefix.
+
+FRESH final suites: shared **953/98 files**, mobile
+**1772/191**, web **731/91**
+(567 unit + 164 Chromium): **3456 passed / 0 failed / 0 skipped**.
+Additional affected API experience/today-window suite: **90/90, two files**.
+Forced typecheck/lint and serial root build each **8/8 tasks, 0 cached**;
+closing typecheck **8/8, 0 cached**. Direct API/web builds and offline Android
+JS/assets export **PASS, 1/1 each**. Seven existing lint warnings, zero errors.
+All first failures, repairs and exact commands are retained in [PL3 acceptance](acceptance/pl3-block-actions.md).
+
+Clock and Plan button files are unchanged. Actions reuse cached candidates
+and the existing latest-wins preview path; no Canvas sync or Library refetch.
+No migration, deployment, remote service/SQL call, Scheduler/email, env-file
+edit, push, OTA/EAS or device action. Owner UI/, apps/mobile/.gitignore and
+supabase/.temp/ remain untouched; tmp evidence stays uncommitted.
+
+**Owner steps remaining**: rollout **NOT RUN**, skipped entirely: owner
+FULLSEND after PL4. Device checks **NOT RUN**, skipped entirely: Realme swipe
+feel and native gesture/accessibility/Reduce Motion/appearance/performance.
+Live FS12/served revision/database/Scheduler/provider state, native presentation
+and other real browsers/assistive technology are **UNVERIFIED (owner to confirm)**.
+Endpoint PL3 only; PL4 and FULLSEND were not started.
+
+Local commits (galaxymaxp <omgraythekid@gmail.com>; no attribution trailers):
+
+```text
+1d70e50c feat(today-web): hover actions on plan blocks
+ddc8b981 feat(today-mobile): swipe to skip or remove with undo
+7e08db36 feat(today-mobile): long-press reorder of plan blocks
+4e266a13 fix(today): preserve saved block action identities
+7d3133a3 test(today): prove block actions in local Chromium
+fa02dc47 fix(today): normalize saved reviewer action keys
+6ee0f5e1 test(today): use complete saved timeline fixtures
+d3633495 fix(today-mobile): release edit state after cancelled block drag
+```
+
+Final docs commit follows; its exact hash is in Git and PL3.status/progress.
+Retained first full shared attempt: 952 passed / 1 failed (incomplete synthetic
+fixture); fixed final 953/953. Focused Chromium first attempt: 8 passed / 1
+failed (missing hover in the test); rerun and final 9/9. Earlier local type
+and fixture/mock repairs are recorded in acceptance. No assertion weakened.
+The cancellation review fix d3633495 is covered by the final full mobile,
+lint, Android export and forced root-build reruns, then closing typecheck.
+The preliminary Today browser runs refreshed five synthetic captures under
+the test's old PL2/browser path before it was redirected to PL3/browser;
+historical image bytes were not pinned/restored. This validation-output
+deviation is recorded in acceptance; no tmp output is staged.
+
+Vercel CLI remains absent. Strongly recommend npm i -g vercel for future
+owner-authorized env/deploy/log work; installation NOT RUN in this code-only
+run. No release or follow-on backlog work started.
