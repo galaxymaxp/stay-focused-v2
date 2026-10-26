@@ -1,3 +1,37 @@
+<!-- PL4 vector GlassPill begin -->
+## PL4 vector GlassPill: LOCAL PASS (2026-10-27)
+
+PL4 steps 0-5 are complete locally on `overnight/2026-10-15_feedback`.
+Web/native vector GlassPill replaces the old Today Plan renderer and existing
+Generate, Tasks and Library actions. Plan keeps its block count and Updating
+state, existing sheet/adjust behavior and accessibility label. Material actions
+follow Reviewer/Quiz/busy/completed states; Library hides Quiz when it exists.
+Owner-scoped metadata extends existing reads, with no client Library fetch,
+Canvas sync, migration or generation-handler change. Clock rendering/gestures
+and orb/Queue/Generation renderers are preserved. Native gradient dependency
+was installed through Expo; small native shells retain >=44px targets.
+
+FRESH suites: shared **476/49 files**, mobile **1768/190**,
+web **715/92** (573 unit + 142 Chromium):
+**2959 passed / 0 failed / 0 skipped**, plus affected API **92/3**.
+Shared now runs source tests only; old counts included duplicated dist tests.
+Forced typecheck/lint/root build and closing typecheck each **8/8, 0 cached**;
+direct API/web builds and offline Android export **PASS, 1/1 each**. Seven
+existing lint warnings, zero new warnings/errors. Earlier failures and repairs
+are retained in [PL4 acceptance](ai/acceptance/pl4-glass-pill.md).
+
+No remote service/SQL, migration, deployment, Scheduler/email, env-file edit,
+push, OTA/EAS or physical-device action. Owner UI/, apps/mobile/.gitignore and
+supabase/.temp/ are preserved; tmp evidence remains uncommitted.
+
+**Owner steps remaining**: rollout **NOT RUN**, skipped entirely: owner
+FULLSEND. Device checks **NOT RUN**, skipped entirely: Realme pill sharpness
+at 3x and placements, native gradient availability/accessibility/Reduce Motion/
+appearance/performance. Live FS12/served revision/database/Scheduler/provider
+state, native presentation and other real browsers/assistive technology remain
+**UNVERIFIED (owner to confirm)**. Endpoint PL4; no release or backlog follow-on.
+<!-- PL4 vector GlassPill end -->
+
 <!-- PL3 block actions begin -->
 ## PL3 Today block actions: LOCAL PASS (2026-10-27)
 
