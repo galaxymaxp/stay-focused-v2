@@ -12161,3 +12161,56 @@ application, Scheduler/email, env-file edit, push, OTA/EAS or device action.
   installation NOT RUN.
 
 Endpoint PL1. PL2-PL4/FULLSEND are not started; no new OPEN decision entry.
+
+
+## PL2b Today planner UI: LOCAL PASS (2026-10-27)
+
+Status: **PASS**, finite unattended local code scope only.
+
+PL2 steps 0-5 are complete locally: mobile Proposed/Previous sheet, course fit
+segments, timeline, conditional Taken out tray, nested course/item controls,
+manual ordering and restore; web Today columns with Up next and inline Adjust;
+first-run welcome dismissal and no-cache-only reduced-motion-aware skeletons.
+Course tones and Canvas alias checks remain consistent; cached mobile blocks
+stay visible while candidates load. Existing clock and PlanButton are unchanged.
+
+FRESH final suites: shared **946/97 files**, mobile **1759/189**, web **727/91** (565 unit + 162 Chromium): **3432 passed / 0 failed / 0 skipped**. Forced closing typecheck/lint and serial root
+build each **8/8 tasks, 0 cached**; direct API/web builds and offline Android
+JS/assets export **PASS, 1/1 each**. Seven pre-existing lint warnings, zero
+errors (initial lint had four additional PL2 warnings, now removed).
+Browser layout/navigation/tray/restore checks include 1280 and 390 px, light
+and dark, and Reduce Motion. Exact commands and retained failures are in
+[PL2 acceptance](acceptance/pl2-planner-ui.md).
+
+Steps 1-4: 0621d075, dcd783ae, 8b15376f, ed1c98bc. Final code: 48170548 fix(today): finish planner parity and cached plan loading.
+No dependency, migration, deployment, remote call/SQL, Scheduler/email, env-file
+edit, push, OTA/EAS or device action. Owner UI/, apps/mobile/.gitignore and
+supabase/.temp/ remain untouched; tmp evidence stays uncommitted.
+
+**Owner steps remaining**: rollout **NOT RUN**, skipped entirely: owner FULLSEND
+after PL4. Device checks **NOT RUN**, skipped entirely: Realme + website look
+check against approved mockups, native gestures/accessibility/motion/performance.
+Live FS12/served revision/database/Scheduler/provider state, native appearance
+and other real browsers/assistive technology are **UNVERIFIED (owner to confirm)**.
+Endpoint PL2 only; PL3/PL4/FULLSEND were not started.
+
+Local commits:
+
+```text
+0621d075 feat(today-mobile): redesigned plan sheet (proposed/previous, tray, nested smart order)
+dcd783ae feat(today-web): two-column Today with Up next, timeline and adjust panel
+8b15376f feat(today): first-run window note
+ed1c98bc feat(today): skeleton loading for the planner
+48170548 fix(today): finish planner parity and cached plan loading
+```
+
+The final scoped docs commit follows; its exact hash is recorded in Git and
+tmp/overnight/PL2b.status/progress. Commits use galaxymaxp
+<omgraythekid@gmail.com>, no attribution trailers. First failures include the
+legacy clock fixture mock (556 passed / 9 failed), unknown pending Promise
+(typecheck 7/8) and browser debounce assertion (7 passed / 1 failed); repaired
+reruns and earlier interrupted-run failures are retained in acceptance. No
+unfinished gate was waived.
+
+Vercel CLI remains absent. Strongly recommend `npm i -g vercel` for future
+owner-authorized env/deploy/log tooling; installation NOT RUN.
