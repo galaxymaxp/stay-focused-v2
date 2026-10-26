@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useIsFocused } from "expo-router/react-navigation";
 import { sessionStore } from "../../auth/sessionStore";
 import { useTheme } from "../../design/theme";
+import { planDeviceStore } from './planDeviceStore';
 
 const key = (date: string) => `sf.today.free-time.${date}`;
 function parse(raw: string | null): FreeTimeRange | null {
@@ -48,6 +49,7 @@ export function useTodayClockWindow() {
     const next = { ...old, ...(date === old.date ? { current: value } : { previous: value }) };
     liveSaved.current = next;
     setSaved(next);
+    void planDeviceStore.saveLastWindow(value);
     void Promise.resolve(sessionStore.setItem(key(date), JSON.stringify(value))).catch(() => {});
   };
   return { ...selection, window: ready && saved ? (selection.date === saved.date ? saved.current : saved.previous) : null,

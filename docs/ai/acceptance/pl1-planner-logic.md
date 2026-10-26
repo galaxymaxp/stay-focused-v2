@@ -1,4 +1,4 @@
-﻿# PL1 planner logic acceptance
+# PL1 planner logic acceptance
 
 Status: IN PROGRESS. Finite scope: PL1 steps 0-5 only; local code, tests, gates,
 docs and atomic local commits. No rollout, device checks, remote services,
@@ -86,3 +86,7 @@ timezone); fixture corrected to localMinuteIso, no validation weakened.
 Local move helper accepts optional request selection metadata; API unchanged.
 Split targets deduplicate for strict API selection validation.
 
+STEP 2 FRESH: shared store 3/3, web stores 10/10, mobile store/window 7/7.
+Snapshots include an additive ownerId tag in the same device key; foreign-owner
+titles are denied. All keys and snapshot fields otherwise follow D7. No new
+server contract, database or provider access. Storage failures are best-effort.

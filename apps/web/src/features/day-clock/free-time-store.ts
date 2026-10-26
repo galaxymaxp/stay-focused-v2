@@ -1,5 +1,6 @@
 import { readLocalPreference, writeLocalPreference } from '../../lib/local-preference';
 import { validFreeTime as valid } from "@stay-focused/shared";
+import { planDeviceStore } from '../today/plan-device-store';
 // Minutes from local midnight, shared by Today's clock and Schedule's planner.
 export interface FreeTime {
   readonly start: number;
@@ -19,6 +20,7 @@ export function readFreeTime(date: string): FreeTime | null {
 
 export function writeFreeTime(date: string, value: FreeTime): void {
   if (!valid(value)) return;
+  void planDeviceStore.saveLastWindow(value);
   try {
     writeLocalPreference(key(date), JSON.stringify(value));
   } catch {
