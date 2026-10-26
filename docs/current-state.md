@@ -1,36 +1,30 @@
-<!-- RR1c verification begin -->
-## RR1c TP2e verification: FAILED at STEP 1 (2026-10-26)
+<!-- RR1d verification begin -->
+## RR1d TP2e verification: LOCAL PASS (2026-10-26)
 
-Finite owner scope: correct the stale dark Plan test, verify TP2e, record
-supersessions and stop before FS12. Test-only T **e52276f3** keeps every light
-and non-luminance assertion intact; dark minimum must be finite/>0 and peak
-must exceed .05 (lowest fresh peak .1105266). Calibration and post-T Plan
-browser runs each pass 26/26; product source remains c8cfb180.
+Finite RR1d scope: verify current TP2e locally, commit completion X, append six
+supersessions and dry-run readiness; stop before FS12. Product c8cfb180 and
+test-only T e52276f3 remain unchanged. Fresh normal-configuration suites:
+shared **900/90 files**, mobile **1732/186**, web **707/88** in serial
+partitions: **3339 passed / 0 failed / 0 skipped**. Focused Plan/orb **59/59**.
+Forced typecheck/lint/root build **8/8 tasks each, 0 cached**; direct API/web
+builds and offline Android export PASS. Seven existing lint warnings, 0 errors.
 
-FRESH full shared **900/90 files**, mobile **1732/186 files**, web unit partition
-**544/75 files** PASS. Focused post-T Plan/shared/mobile/orb tests **59/59** PASS.
-The first full-web browser partition (course-options, 320/768/1280) fails
-**0 passed / 3 timeouts / 3 unhandled ENOENT errors / 0 skipped**: native
-esbuild wrote an ignored original LM1 path while the temporary collector read
-from the missing redirected RR1c path. This is validation-tooling evidence;
-no product regression is inferred. All executed cases, including calibration:
-**3,261 passed / 3 failed / 0 skipped**. No failed attempt is hidden or retried.
+[Acceptance, exact commands and retained failures](ai/acceptance/tp2e-plan-button-glass-pill.md).
+RR1b's stale dark floor is resolved by committed T; RR1c's native-esbuild
+collector mismatch is resolved by running normal filesystem paths. Historical
+failed records remain unchanged. All 14,900 backup pins and 18 original
+status/progress / 23 owner-artifact pins are protected; post-run changed/added
+evidence is audited without restore or deletion.
 
-The mandatory non-luminance gate stop leaves remaining browser files,
-typecheck/lint/build/export and readiness validator/tests **NOT RUN**.
-No completion X or manifest supersession was created; original manifest,
-16 historical status/progress files, 23 owner artifacts and all 14,900 backed-up
-TP2d file hashes remain unchanged. Full web verification is incomplete.
-**Roadmap is not ready for FULLSEND.**
-
-[Exact commands, counts, calibration and evidence](ai/acceptance/tp2e-plan-button-glass-pill.md).
-Next action: repair the temporary native esbuild evidence-path handling and
-rerun unfinished gates at T, then complete acceptance/supersessions/readiness.
-No open owner decision is requested. Rollout and Device checks are **NOT RUN**
-owner steps; live/native state is **UNVERIFIED (owner to confirm)**.
-No provider/database/deployment/env-file/push action occurred. Endpoint RR1c;
-do not start FS12, FULLSEND or another roadmap item in this run.
-<!-- RR1c verification end -->
+TP2e is verified; roadmap ready for owner FULLSEND after RR1d's six append-only
+supersessions/readiness dry run and the stable-boundary FS12 readiness check.
+Completion X: docs(today): verify TP2e glass pill at HEAD. Final handoff records
+X, the six proof results and readiness test counts. Rollout and Device checks
+are **NOT RUN**, skipped owner steps. Live production/database/Scheduler/provider
+state, native GL/Realme and physical performance **UNVERIFIED (owner to confirm)**.
+No deployment, remote service/SQL, env-file edit or push. Endpoint RR1d; do not
+start FS12, FULLSEND or another roadmap item in this run.
+<!-- RR1d verification end -->
 
 <!-- QL1 checkpoint begin -->
 ## QL1c Queue miniature: LOCAL PASS (2026-10-26)
