@@ -1,3 +1,33 @@
+<!-- PL1 planner logic begin -->
+## PL1 Today planner logic: LOCAL PASS (2026-10-27)
+
+PL1 steps 0-5 are complete locally: saved > around planned > last-used >
+20:00-22:00 window defaults; one idle automatic proposal; device-local
+skip/remove/putBack/manual move-up; successful-apply snapshot, previous statuses
+and manual restore. Candidates are cached for actions/clock releases; no new
+sync or Library refetch. Sheet item checks invoke Remove/Put back and resets
+preserve exclusions. Window source/welcome dismissal and taken-out data are
+available for PL2. Clock rendering/gestures remain unchanged.
+
+FRESH: shared **921/93 files**, mobile **1752/188**, web **725/90**, API
+planning **29/2**: **3427 passed / 0 failed / 0 skipped**. Forced typecheck,
+lint and serial root build each **8/8 tasks, 0 cached**; direct API/web builds
+and offline Android export PASS. Seven existing lint warnings, zero errors.
+All failed first attempts and repairs are retained in [acceptance](ai/acceptance/pl1-planner-logic.md).
+
+Code commits d6cda5ee, a8baa121, 767c5b46, d9d03849, ac0ba4fc, d0bd46b9;
+this completion document records final gates. Selection-only task identity
+metadata preserves Canvas aliases; legacy omitted-selection behavior and
+server ownership validation remain unchanged. Snapshots carry an owner tag.
+
+Rollout and Device checks **NOT RUN**, skipped entirely: owner FULLSEND after
+PL4 and fresh-install 8-10 PM/no-taps check. Live FS12/served revision/database/
+Scheduler/provider state, native GL/physical appearance/performance and other
+real browsers/assistive technology are **UNVERIFIED (owner to confirm)**.
+No remote call/SQL, migration, deployment, env edit, push or device action.
+Endpoint PL1 only. PL2/PL3/PL4 and FULLSEND are outside this run.
+<!-- PL1 planner logic end -->
+
 <!-- RR1d verification begin -->
 ## RR1d TP2e verification: LOCAL PASS (2026-10-26)
 

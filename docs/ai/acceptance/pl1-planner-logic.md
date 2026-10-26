@@ -1,6 +1,6 @@
 # PL1 planner logic acceptance
 
-Status: IN PROGRESS. Finite scope: PL1 steps 0-5 only; local code, tests, gates,
+Status: LOCAL PASS. Finite scope: PL1 steps 0-5 only; local code, tests, gates,
 docs and atomic local commits. No rollout, device checks, remote services,
 SQL, deployment, env-file changes or push. PL2-PL4 remain outside this run.
 
@@ -37,7 +37,7 @@ hooks, quiet hooks, planning-session modules, mobile planMode and sessionStore.
 - Both quiet planners use createQuietPreview, identity owner:date, request
   hash plus selection hash, invalidate on drag/date/unmount, serial latest-wins.
 - Device selection/draft is process-only createPlanningSessionMemory, scoped
-  owner:date, reset on reload/date/owner. Candidates currently load only when
+  owner:date, reset on reload/date/owner. At baseline candidates loaded only when
   sheet opens. Default All/Both/smart excludes recently opened reviewers.
 - TodayItem has kind study_session, id, status planned/completed/skipped,
   startAt/endAt, reviewer.id and course.id. Task target IDs are absent; exact
@@ -57,21 +57,21 @@ production contradiction and does not authorize remote checking.
 
 | Decision | Layer / proof | Result |
 | --- | --- | --- |
-| D3 | shared resolver + platform stores; saved > around > last > 20-22; validation; no implicit date save | pending |
-| D4 | both Today adapters; ready/idle/no saved session guard; one automatic request per key; latest-wins | pending |
-| D5 | shared overrides/order; device/date persistence; action payload/store tests; existing sheet checks | pending |
-| D6 data | skipped-first takenOut with stable candidate order | pending |
-| D7 | last successful apply snapshot; timeline statuses; manual restore | pending |
-| D9 helper | course code/title cleanup for piped and non-piped names | pending |
-| D10 data | windowSource and device welcome dismissal | pending |
-| D1/D2/D15 | no clock/visual redesign, no new amber, local-only changes | pending |
-| compatibility | omitted-selection and old-client suites remain green | pending |
+| D3 | shared resolver + platform stores; saved > around > last > 20-22; validation; no implicit date save | FRESH PASS |
+| D4 | both Today adapters; ready/idle/no saved session guard; one automatic request per key; latest-wins | FRESH PASS |
+| D5 | shared overrides/order; device/date persistence; action payload/store tests; existing sheet checks | FRESH PASS |
+| D6 data | skipped-first takenOut with stable candidate order | FRESH PASS |
+| D7 | last successful apply snapshot; timeline statuses; manual restore | FRESH PASS |
+| D9 helper | course code/title cleanup for piped and non-piped names | FRESH PASS |
+| D10 data | windowSource and device welcome dismissal | FRESH PASS |
+| D1/D2/D15 | no clock/visual redesign, no new amber, local-only changes | FRESH PASS |
+| compatibility | omitted-selection and old-client suites remain green | FRESH PASS |
 
 ## Verification
 
-NOT RUN yet. Fresh serial gates required by PL1; exact commands, counts,
-first failures and reruns will be recorded here. Synthetic fixtures only.
-Visual, native GL, physical and production evidence UNVERIFIED.
+All required local gates are FRESH PASS; exact commands, counts and retained
+first attempts are recorded below. Synthetic fixtures only. Native GL, physical
+and production evidence remains UNVERIFIED (owner to confirm).
 
 ## Owner steps remaining
 
@@ -205,3 +205,62 @@ and existing final type/lint/build gates run on this source below.
 
 Final FRESH mobile after synchronous override masking: 1752 passed / 0 failed /
 0 skipped, 188 files. The sheet regression is included in that full suite.
+
+## Final local result
+
+Effective mandatory suites: **3427 passed / 0 failed / 0 skipped**.
+Shared 921/93 files; mobile 1752/188; web 725/90 (561 unit/77 + 164
+browser/13); API planning 29/2. All application tests use fictional local
+evidence. All attempts including repeated/overlapping suites: 9136 passed /
+40 failed / 0 skipped, plus one first-attempt collection failure;
+every failed attempt is retained above and in receipts.jsonl. No gate is waived.
+
+Forced typecheck/lint/serial root build each report 8 successful tasks, 0 cached.
+Seven existing lint warnings, 0 errors. Direct API/web builds and offline
+Android JS/assets export pass. Rollout/Device checks NOT RUN, skipped entirely.
+No dependency, migration, remote call/SQL, deployment, Scheduler/email, env-file
+edit, push, OTA/EAS or physical-device action.
+
+| Command | Result | Evidence |
+| --- | --- | --- |
+| `npm run typecheck -- --force` | FRESH PASS, exit 0; 8/8 tasks; 0 cached | [typecheck-close](../../../tmp/overnight/PL1/gates/typecheck-close.log) |
+| `npm run lint -- --force` | FRESH PASS, exit 0; 8/8 tasks; 0 cached | [lint-close](../../../tmp/overnight/PL1/gates/lint-close.log) |
+| `npm run test --workspace @stay-focused/shared -- --maxWorkers=1` | FRESH PASS, exit 0; 921 passed / 0 failed / 0 skipped; 93 files | [shared-rerun](../../../tmp/overnight/PL1/gates/shared-rerun.log) |
+| `npm run test --workspace @stay-focused/mobile -- --maxWorkers=1` | FRESH PASS, exit 0; 1752 passed / 0 failed / 0 skipped; 188 files | [mobile-final](../../../tmp/overnight/PL1/gates/mobile-final.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 --exclude **/*.browser.test.ts` | FRESH PASS, exit 0; 561 passed / 0 failed / 0 skipped; 77 files | [web-unit-rerun](../../../tmp/overnight/PL1/gates/web-unit-rerun.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/components/course-options.browser.test.ts` | FRESH PASS, exit 0; 3 passed / 0 failed / 0 skipped; 1 files | [web-browser-01](../../../tmp/overnight/PL1/gates/web-browser-01.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/day-clock/glass-clock.browser.test.ts` | FRESH PASS, exit 0; 14 passed / 0 failed / 0 skipped; 1 files | [web-browser-02](../../../tmp/overnight/PL1/gates/web-browser-02.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/day-clock/orb-load.browser.test.ts` | FRESH PASS, exit 0; 7 passed / 0 failed / 0 skipped; 1 files | [web-browser-03](../../../tmp/overnight/PL1/gates/web-browser-03.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/generation-screen.browser.test.ts` | FRESH PASS, exit 0; 13 passed / 0 failed / 0 skipped; 1 files | [web-browser-04](../../../tmp/overnight/PL1/gates/web-browser-04.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/knowledge-core/orbBody.browser.test.ts` | FRESH PASS, exit 0; 5 passed / 0 failed / 0 skipped; 1 files | [web-browser-05](../../../tmp/overnight/PL1/gates/web-browser-05.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/password-reset.browser.test.ts` | FRESH PASS, exit 0; 20 passed / 0 failed / 0 skipped; 1 files | [web-browser-06](../../../tmp/overnight/PL1/gates/web-browser-06.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/queue-failures.browser.test.ts` | FRESH PASS, exit 0; 32 passed / 0 failed / 0 skipped; 1 files | [web-browser-07](../../../tmp/overnight/PL1/gates/web-browser-07.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/queue-orb.browser.test.ts` | FRESH PASS, exit 0; 13 passed / 0 failed / 0 skipped; 1 files | [web-browser-08](../../../tmp/overnight/PL1/gates/web-browser-08.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/today/plan-glass.browser.test.ts` | FRESH PASS, exit 0; 26 passed / 0 failed / 0 skipped; 1 files | [web-browser-09](../../../tmp/overnight/PL1/gates/web-browser-09.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/today/planning-sheet.browser.test.ts` | FRESH PASS, exit 0; 9 passed / 0 failed / 0 skipped; 1 files | [web-browser-10-rerun](../../../tmp/overnight/PL1/gates/web-browser-10-rerun.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/lib/hide-on-scroll.browser.test.ts` | FRESH PASS, exit 0; 4 passed / 0 failed / 0 skipped; 1 files | [web-browser-11](../../../tmp/overnight/PL1/gates/web-browser-11.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/lib/screen-snapshots.browser.test.ts` | FRESH PASS, exit 0; 4 passed / 0 failed / 0 skipped; 1 files | [web-browser-12](../../../tmp/overnight/PL1/gates/web-browser-12.log) |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/day-clock/ambient.browser.test.ts --pool=threads --reporter=verbose` | FRESH PASS, exit 0; 14 passed / 0 failed / 0 skipped; 1 files | [web-browser-13](../../../tmp/overnight/PL1/gates/web-browser-13.log) |
+| `npm run test --workspace @stay-focused/api -- --maxWorkers=1 app/api/experience/planner-content.acceptance.test.ts src/lib/task-planning-service.test.ts` | FRESH PASS, exit 0; 29 passed / 0 failed / 0 skipped; 2 files | [api-planning](../../../tmp/overnight/PL1/gates/api-planning.log) |
+| `npm run build --workspace @stay-focused/api` | FRESH PASS, exit 0; 1 passed / 0 failed / 0 skipped | [api-build](../../../tmp/overnight/PL1/gates/api-build.log) |
+| `npm run build --workspace @stay-focused/web` | FRESH PASS, exit 0; 1 passed / 0 failed / 0 skipped | [web-build](../../../tmp/overnight/PL1/gates/web-build.log) |
+| `npm run build --workspace @stay-focused/mobile -- --platform android --max-workers 1 --output-dir ../../tmp/overnight/PL1/android-export` | FRESH PASS, exit 0; 1 passed / 0 failed / 0 skipped | [android-export](../../../tmp/overnight/PL1/gates/android-export.log) |
+| `npm run build -- --force --concurrency=1 --env-mode=loose` | FRESH PASS, exit 0; 8/8 tasks; 0 cached | [root-build](../../../tmp/overnight/PL1/gates/root-build.log) |
+
+| `git diff --check` | FRESH PASS, exit 0; 1 passed / 0 failed / 0 skipped | [working diff](../../../tmp/overnight/PL1/gates/diff.log) |
+| `git diff --cached --check` | FRESH PASS, exit 0; 1 passed / 0 failed / 0 skipped | [staged diff](../../../tmp/overnight/PL1/gates/cached-diff.log) |
+
+Tested implementation: d0bd46b9 (six scoped code commits from baseline
+37ce7307); the closing commit changes documentation only. API build generated
+38/38 pages; web build 23/23. Offline Android export: 4359 modules, 47 assets,
+one bundle. Forced serial root build: 8/8 tasks, 0 cached, 10m19.433s.
+Working/staged diff hygiene is checked before the scoped docs commit.
+Build-generated declarations are restored to their original pre-gate bytes
+before the closing typecheck (generated-declarations.json retains the output).
+The 23 owner artifacts are hash-checked after export and never staged.
+
+Owner steps remaining: FULLSEND after PL4, including the selection-only API
+identity metadata; fresh-install 8-10 PM/no-taps device check; confirm live FS12
+revision, database/Scheduler/provider state and native/physical behavior.
+All are NOT RUN / UNVERIFIED (owner to confirm), as applicable.
+No new product decision or OPEN entry. Endpoint PL1; PL2-PL4 remain unstarted.

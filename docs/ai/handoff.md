@@ -12091,3 +12091,73 @@ loopback guards. Owner UI/, apps/mobile/.gitignore and supabase/.temp/ stay loca
   tooling; installation NOT RUN.
 
 Endpoint RR1d only. No FS12, release, FULLSEND or next roadmap item started.
+
+
+## PL1 Today planner logic: LOCAL PASS (2026-10-27)
+
+Status: **PASS**, local code scope only. Window defaults/automatic proposals,
+local exclusions and manual moves, persisted previous plan and PL2 data are
+implemented on web/mobile. Existing sheet checks are connected; resets keep
+exclusions. No clock renderer/gesture or visual redesign. Candidates are cached;
+actions/clock releases queue only the existing latest-wins preview.
+Canvas assignment/task identity is preserved by optional selection-only task
+metadata. Actual apply results supply snapshot times/targets; owner tags deny
+foreign-account titles. Legacy omitted-selection/ownership behavior is preserved.
+
+Local code commits:
+
+```text
+d6cda5ee feat(plan): shared window, override and snapshot helpers
+a8baa121 feat(today): device stores for plan overrides and last plan
+767c5b46 feat(today): automatic plan proposal with first-run 8-10 PM window
+d9d03849 feat(today): skip, remove, put back, move up and previous-plan data
+ac0ba4fc fix(plan): preserve startup defaults and split-block order
+d0bd46b9 fix(today): keep exclusions through sheet resets
+```
+
+Final scoped docs commit: docs(today): close PL1 planner logic verification.
+Its exact hash is in Git and tmp/overnight/PL1.status/progress. All commits use
+galaxymaxp <omgraythekid@gmail.com>, no attribution trailers or tmp artifacts.
+
+FRESH final suites: shared **921 passed / 93 files**, mobile **1752 / 188**,
+web **725 / 90** (561 unit + 164 Chromium), API planning **29 / 2**.
+**3427 passed / 0 failed / 0 skipped**. Forced typecheck/lint/root serial build
+**8/8 tasks each, 0 cached**. Direct API/web builds and offline Android JS/assets
+export PASS, 1/1 each (Android 4359 modules, 47 assets, one bundle; API 38/38
+pages, web 23/23). Seven existing lint warnings, zero errors. Working/staged
+diff hygiene checked before commit. Exact commands, individual browser counts,
+failures and reruns: [PL1 acceptance](acceptance/pl1-planner-logic.md),
+tmp/overnight/PL1/gates, receipts.jsonl, counts.json and effective-gates.json.
+
+Retained first failures: timezone-less synthetic fixture collection; persisted
+session union/test-local metadata typing; missing candidate/readiness fixtures;
+superseded implicit-selection/zero-preview expectations; split-index test loaded
+with older helper during a mid-run edit; and effect-based reset masking flashed
+a removed check. All were repaired within PL1 and rerun; no assertion/deadline
+was weakened or unfinished gate waived. Prior failure counts are in acceptance.
+Reset exclusions are now derived synchronously. Task split targets deduplicate
+to strict selections. Legacy Today task statuses use exact time/kind/title/course
+matching, never marking ambiguous evidence Done; ineligible restore targets
+retain safe not-found denial. These equivalents are documented; no new decision.
+
+Temps/caches are repo-local, normal paths, dotenv/telemetry off, loopback-only
+network guard and credential-stripped children. Root build uses OS CPU affinity
+1, unchanged repository/Metro config. Generated declarations are restored before
+closing typecheck. Owner UI/, mobile .gitignore and supabase/.temp/ are preserved.
+
+UNVERIFIED (owner to confirm): live FS12/served revision, production database,
+Scheduler/provider state, native GL/Realme appearance, physical FPS/power, other
+real browsers and assistive technology. No deployment, remote call/SQL/migration
+application, Scheduler/email, env-file edit, push, OTA/EAS or device action.
+
+**Owner steps remaining**:
+
+- Rollout **NOT RUN**, skipped entirely: owner FULLSEND after PL4, including
+  selection-only API identity metadata. No release in this run.
+- Device checks **NOT RUN**, skipped entirely: fresh install lands on an 8-10 PM
+  proposal without taps; website/Realme behavior, accessibility and performance.
+- Confirm the UNVERIFIED live/native state separately. Vercel CLI is absent;
+  strongly recommend npm i -g vercel for future authorized env/deploy/log tooling;
+  installation NOT RUN.
+
+Endpoint PL1. PL2-PL4/FULLSEND are not started; no new OPEN decision entry.
