@@ -24,9 +24,11 @@ it('single timeline drag commits only on drop, cancels without writes and leaves
   expect(current.dragging).toBe('one'); expect(save).not.toHaveBeenCalled();
   await act(async () => mocks.handlers.onPanResponderMove!(touch(160), {} as never));
   await act(async () => current.touchCancel()); expect(save).not.toHaveBeenCalled();
+  expect(current.editing).toBe(false);
+  await act(async () => { current.touchStart(touch(40)); current.tap('one', open); }); expect(open).toHaveBeenCalledTimes(1);
   await act(async () => { current.touchStart(touch(40)); current.hold('one'); });
   await act(async () => mocks.handlers.onPanResponderMove!(touch(160), {} as never));
   expect(save).not.toHaveBeenCalled(); await act(async () => current.touchEnd());
   expect(save).toHaveBeenCalledExactlyOnceWith(['two', 'one']); expect(current.dragging).toBe(null); expect(current.editing).toBe(false);
-  await act(async () => { current.touchStart(touch(40)); current.tap('one', open); }); expect(open).toHaveBeenCalledTimes(1);
+  await act(async () => { current.touchStart(touch(40)); current.tap('one', open); }); expect(open).toHaveBeenCalledTimes(2);
 });

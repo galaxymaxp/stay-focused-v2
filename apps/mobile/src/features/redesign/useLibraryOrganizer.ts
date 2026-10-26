@@ -40,6 +40,7 @@ export function useLibraryOrganizer(scope: string, all: readonly string[], visib
     translate.setValue(0);
     setDragging(null);
     setDrop(null);
+    if (single) { setEditing(false); setSelected(new Set()); }
   };
   const done = () => { cancel(); setEditing(false); setSelected(new Set()); };
   const callbacks = useRef({ cancel, done });
@@ -89,7 +90,6 @@ export function useLibraryOrganizer(scope: string, all: readonly string[], visib
       if (next.some((id, index) => id !== all[index])) { save(next); haptic.success(); }
     }
     cancel();
-    if (single) { setEditing(false); setSelected(new Set()); }
   };
   const gestureCallbacks = useRef({ updatePointer, release, cancel });
   gestureCallbacks.current = { updatePointer, release, cancel };
