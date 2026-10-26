@@ -14,10 +14,10 @@ it('Undo restores the exact key, expires at five seconds and cancels stale timer
   await render('Synthetic block');
   const button = () => tree!.root.findByType('Pressable' as never);
   expect(tree!.root.findAllByType('Copy' as never)[0]!.props.numberOfLines).toBe(1);
-  await act(async () => vi.advanceTimersByTime(4999)); expect(expire).not.toHaveBeenCalled();
+  await act(async () => { vi.advanceTimersByTime(4999); }); expect(expire).not.toHaveBeenCalled();
   await act(async () => button().props.onPress()); expect(undo).toHaveBeenLastCalledWith('Synthetic block');
-  await render('Replacement'); await act(async () => vi.advanceTimersByTime(1)); expect(expire).toHaveBeenCalledTimes(1);
-  await act(async () => vi.advanceTimersByTime(4999)); expect(expire).toHaveBeenCalledTimes(2);
+  await render('Replacement'); await act(async () => { vi.advanceTimersByTime(1); }); expect(expire).toHaveBeenCalledTimes(1);
+  await act(async () => { vi.advanceTimersByTime(4999); }); expect(expire).toHaveBeenCalledTimes(2);
   expect(tree!.root.findAllByType('Pressable' as never)).toHaveLength(0);
   expect(undo).toHaveBeenCalledTimes(1);
 });

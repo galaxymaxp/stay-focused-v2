@@ -4,13 +4,14 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { PlanningControl, type PlanningSheetProps } from './PlanningSheet';
 import type { PlanningCandidates } from '@stay-focused/shared/task-planning';
 import { defaultPlanningDraft, planningDraftSummary, previousPlanData } from '@stay-focused/shared';
-const mocks = vi.hoisted(() => ({ load: vi.fn(), build: vi.fn(), hold: vi.fn(), check: vi.fn(), apply: vi.fn(), restore: vi.fn() }));
-vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));
+const mocks = vi.hoisted(() => ({ load: vi.fn(), build: vi.fn(), hold: vi.fn(), check: vi.fn(), apply: vi.fn(), restore: vi.fn(), skip: vi.fn(), remove: vi.fn(), putBack: vi.fn(), moveUp: vi.fn(), reorder: vi.fn(), saves: new Map<string, (keys: readonly string[]) => void>() }));
+vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', Animated: { View: 'AnimatedView' } }));
 vi.mock('lucide-react-native', () => ({ EyeOff: 'EyeOff', X: 'X' }));
 vi.mock('../../design/primitives', () => ({ Copy: 'Copy', SkeletonBlock: 'SkeletonBlock', SegmentedControl: 'SegmentedControl', Sheet: 'Sheet' }));
 vi.mock('../../design/theme', async () => { const { palettes } = await import('../../design/themeTokens'); return { useTheme: () => ({ colors: palettes.light }) }; });
+vi.mock('../../design/SwipeRow', async importOriginal => ({ ...await importOriginal<typeof import('../../design/SwipeRow')>(), SwipeRow: 'SwipeRow' }));
 vi.mock('./PlanButton', () => ({ PlanButton: 'PlanButton' }));
-vi.mock('./useLibraryOrganizer', () => ({ useLibraryOrganizer: () => ({ scrollRef: { current: null }, listRef: { current: null }, layouts: { current: new Map() }, panHandlers: {}, hold: mocks.hold, touchStart() {}, touchEnd() {}, touchCancel() {}, onScroll() {}, dragging: null }) }));
+vi.mock('./useLibraryOrganizer', () => ({ useLibraryOrganizer: (scope: string, _all: readonly string[], _visible: readonly string[], save: (keys: readonly string[]) => void) => { mocks.saves.set(scope, save); return ({ scrollRef: { current: null }, listRef: { current: null }, layouts: { current: new Map() }, panHandlers: {}, hold: mocks.hold, touchStart() {}, touchEnd() {}, touchCancel() {}, onScroll() {}, dragging: null, translate: 0, tap: (_key: string, open: () => void) => open() }); } }));
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const range = { startsAt: '2026-10-25T09:00:00.000Z', endsAt: '2026-10-25T10:00:00.000Z' };
 const fixture = (): PlanningCandidates => ({ planningRange: range, availability: [range], freeWindowMinutes: 60, personalItems: [], courses: [1, 2].map(n => ({ id: id(n), name: n === 1 ? 'CC17 | CITCS 3F Group A | MOBILE APPLICATION DESIGN AND DEVELOPMENT' : 'Chemistry', items: [
@@ -126,4 +127,23 @@ it('cached plan blocks stay visible while candidates are pending', async () => {
   expect(text()).toContain('Free time ends');
   expect(text()).toContain('60 / 60 min');
   expect(named('Use this plan').props.disabled).toBe(true);
+});
+
+it('timeline swipe and accessibility actions use exact keys; 350ms hold/drop shares the organizer', async () => {
+  const data = fixture(), plan = planningDraftSummary(data, defaultPlanningDraft(data)).plan;
+  await mount({ plan, candidates: data, onSkip: mocks.skip, onRemove: mocks.remove, onPutBack: mocks.putBack, onMoveUp: mocks.moveUp, onReorder: mocks.reorder });
+  const rows = root().findAllByType('SwipeRow' as never);
+  expect(rows.length).toBeGreaterThan(1);
+  const first = rows[0]!, second = rows[1]!;
+  const card = (row: typeof first) => row.findAll(node => String(node.type) === 'Pressable' && !!node.props.accessibilityActions)[0]!;
+  expect(card(first).props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['skip', 'remove']);
+  expect(card(second).props.accessibilityActions.map((a: { name: string }) => a.name)).toEqual(['skip', 'remove', 'moveUp']);
+  await act(async () => card(second).props.onAccessibilityAction({ nativeEvent: { actionName: 'moveUp' } })); expect(mocks.moveUp).toHaveBeenCalledWith(1);
+  await act(async () => card(first).props.onAccessibilityAction({ nativeEvent: { actionName: 'skip' } })); expect(mocks.skip).toHaveBeenCalledWith(plan.sessions[0]!.kind === 'reviewer' ? 'reviewer:' + id(22) : 'task:' + id(11));
+  await act(async () => first.props.trailing[0].onPress()); expect(mocks.remove).toHaveBeenCalledTimes(1);
+  const footer = root().findByType('Sheet' as never).props.footer;
+  expect(footer.props.removed.title).toBeTruthy(); await act(async () => footer.props.onUndo(footer.props.removed.key)); expect(mocks.putBack).toHaveBeenCalledWith(footer.props.removed.key);
+  expect(card(second).props.delayLongPress).toBe(350); await act(async () => card(second).props.onLongPress()); expect(mocks.hold).toHaveBeenCalledWith(plan.sessions[1]!.proposalId);
+  await act(async () => mocks.saves.get('planning-timeline')!([...plan.sessions].reverse().map(s => s.proposalId)));
+  expect(mocks.reorder.mock.calls[0]![0]).toHaveLength(plan.sessions.length); expect(mocks.load).not.toHaveBeenCalled();
 });

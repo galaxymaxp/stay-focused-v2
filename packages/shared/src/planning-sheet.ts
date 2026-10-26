@@ -43,6 +43,17 @@ export function moveProposalUp(plan: DeterministicStudyPlan & { readonly selecti
   }
   return { order: 'manual', items, ...(plan.selection?.courseIds ? { courseIds: plan.selection.courseIds } : {}) };
 }
+/** Timeline drops may cross course groups. Retain selected work outside the
+ * visible proposal and normalize server task IDs to canonical selection IDs. */
+export function reorderProposal(plan: DeterministicStudyPlan & { readonly selection?: PlanSelection }, keys: readonly string[]): PlanSelection {
+  const selection = moveProposalUp(plan, 0);
+  const canonical = (key: string) => {
+    const target = plan.planningTargets?.find(target => planningItemKey(target) === key);
+    return target ? planningItemKey({ kind: target.kind, id: target.selectionId }) : key;
+  };
+  const ranks = new Map([...new Set(keys.map(canonical))].map((key, index) => [key, index]));
+  return { ...selection, items: [...(selection.items ?? [])].sort((a, b) => (ranks.get(planningItemKey(a)) ?? Infinity) - (ranks.get(planningItemKey(b)) ?? Infinity)) };
+}
 export interface PlanSnapshot extends FreeTimeRange {
   readonly date: string;
   readonly sessions: readonly { readonly kind: 'task' | 'reviewer'; readonly id: string; readonly title: string;

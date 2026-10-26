@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyPlanOverrides, FIRST_RUN_WINDOW, moveProposalUp, resolveFreeWindow, restoreSelectionFromSnapshot, snapshotFromPlan, splitCourseName, takenOutItems } from './planning-sheet';
+import { applyPlanOverrides, reorderProposal, FIRST_RUN_WINDOW, moveProposalUp, resolveFreeWindow, restoreSelectionFromSnapshot, snapshotFromPlan, splitCourseName, takenOutItems } from './planning-sheet';
 import { generateContentStudyPlan, type PlanningCandidates } from './task-planning';
 import { localMinuteIso } from './free-time';
 
@@ -36,6 +36,10 @@ describe('PL1 manual order and snapshots', () => {
     expect(moveProposalUp({ ...plan, selection }, 1)).toEqual({ ...selection, items: [selection.items[1], selection.items[0], selection.items[2]] });
     expect(moveProposalUp({ ...plan, selection }, 0)).toEqual(selection);
     expect(moveProposalUp({ ...plan, selection }, -1)).toEqual(selection);
+  });
+  it('timeline drop changes global order, retaining not-fit work, scope and canonical aliases', () => {
+    expect(reorderProposal({ ...plan, selection }, [`reviewer:${id(2)}`, `reviewer:${id(1)}`])).toEqual({ ...selection, items: [selection.items[1], selection.items[0], selection.items[2]] });
+    expect(reorderProposal({ ...plan, selection }, ['unknown'])).toEqual(selection);
   });
   it('snapshots session times/kinds/titles and restores exact target order manually', () => {
     const snapshot = snapshotFromPlan('2026-10-27', 1200, 1320, plan);

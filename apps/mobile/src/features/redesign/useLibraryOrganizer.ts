@@ -18,7 +18,7 @@ interface Drag {
 
 /** A hold arms dragging; ordinary swipes still belong to scrolling/row actions.
  * Commit only on release, so interruption leaves the saved order intact. */
-export function useLibraryOrganizer(scope: string, all: readonly string[], visible: readonly string[], save: (ids: readonly string[]) => void) {
+export function useLibraryOrganizer(scope: string, all: readonly string[], visible: readonly string[], save: (ids: readonly string[]) => void, single = false) {
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [dragging, setDragging] = useState<string | null>(null);
@@ -89,6 +89,7 @@ export function useLibraryOrganizer(scope: string, all: readonly string[], visib
       if (next.some((id, index) => id !== all[index])) { save(next); haptic.success(); }
     }
     cancel();
+    if (single) { setEditing(false); setSelected(new Set()); }
   };
   const gestureCallbacks = useRef({ updatePointer, release, cancel });
   gestureCallbacks.current = { updatePointer, release, cancel };
@@ -116,7 +117,7 @@ export function useLibraryOrganizer(scope: string, all: readonly string[], visib
   }, [dragging]);
 
   const hold = (id: string) => {
-    const group = selected.has(id) ? selected : new Set([id]);
+    const group = !single && selected.has(id) ? selected : new Set([id]);
     suppressTap.current = id;
     setEditing(true);
     setSelected(group);

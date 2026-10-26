@@ -1,5 +1,5 @@
 "use client";
-import { allPlanningItems, moveProposalUp, planningItemKey, planningOverrideKey, previousPlanData, restoreSelectionFromSnapshot, snapshotFromPlan, takenOutItems, applyPlanOverrides, builtPlanningSelection, defaultPlanningDraft, planningSelectionHash, resolveFreeWindow,
+import { allPlanningItems, reorderProposal, moveProposalUp, planningItemKey, planningOverrideKey, previousPlanData, restoreSelectionFromSnapshot, snapshotFromPlan, takenOutItems, applyPlanOverrides, builtPlanningSelection, defaultPlanningDraft, planningSelectionHash, resolveFreeWindow,
   freeTimeDuration, freeTimePlanningRange, localMinuteIso, type PlanDeviceState, type PlanOverrides, type FreeTimeRange, type TodayItem } from '@stay-focused/shared';
 import type { PlanMode, PlanSelection, PlanningCandidates, StudyPlanningRequest, DeterministicStudyPlan, StudySessionView, ProposedStudySession } from '@stay-focused/shared/task-planning';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -137,6 +137,10 @@ export function useTodayPlan(input: Input) {
     if (!input.preview || !candidates) return;
     propose(activeChoice.current.mode, moveProposalUp({ ...input.preview, selection: activeChoice.current.selection }, index));
   }
+  function reorder(keys: readonly string[]) {
+    if (!input.preview || !candidates) return;
+    propose(activeChoice.current.mode, reorderProposal({ ...input.preview, selection: activeChoice.current.selection }, keys.map(canonical)));
+  }
   async function applied(sessions?: readonly StudySessionView[]) {
     if (!input.preview) return;
     const plan = sessions ? { ...input.preview, sessions: sessions.flatMap((session): ProposedStudySession[] => {
@@ -164,7 +168,7 @@ export function useTodayPlan(input: Input) {
   }
   return { start, end, windowSource: resolved.source, welcomeDismissed: preferences.welcomeDismissed,
     candidates, selection, overrides, ready, candidateNote: candidateError?.key === identity ? candidateError.message : null,
-    change, propose, skip: (key: string) => exclude(key, 'skipped'), remove: (key: string) => exclude(key, 'removed'), putBack, moveUp, applied,
+    change, propose, skip: (key: string) => exclude(key, 'skipped'), remove: (key: string) => exclude(key, 'removed'), putBack, moveUp, reorder, applied,
     takenOut: candidates ? takenOutItems(candidates, overrides) : [], previousPlan: previousPlanData(preferences.previous, date, input.timeline), restorePrevious,
     dismissWelcome,
   };

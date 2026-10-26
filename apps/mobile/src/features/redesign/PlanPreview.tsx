@@ -1,6 +1,7 @@
 import { plannerShortTime, freeTimeDuration, plannerFit, plannerBlocks, plannerToneKeys, plannerToneTarget, PREVIOUS_PLAN_EMPTY, type PlannerBlock, type PreviousPlanView } from '@stay-focused/shared';
 import { proposalTargetKey, type DeterministicStudyPlan, type PlanningCandidates } from '@stay-focused/shared/task-planning';
-import { Pressable, View } from 'react-native';
+import { Animated, Pressable, View } from 'react-native';
+import type { useLibraryOrganizer } from './useLibraryOrganizer';
 import { EyeOff, X } from 'lucide-react-native';
 import { SwipeRow, swipeAccessibility } from '../../design/SwipeRow';
 import { Copy } from '../../design/primitives';
@@ -41,25 +42,26 @@ export function PlanFitCard({ plan, blocks, free, candidates }: { plan: Determin
     <Copy muted style={{ fontSize: 13, lineHeight: 19.5 }}>{fit.subline}</Copy>
   </View>;
 }
-export function PlanTimeline({ blocks, end, candidates, onOpen, onSkip, onRemove, onMoveUp }: { blocks: readonly PlannerBlock[]; end: number; candidates?: PlanningCandidates | null; onOpen?: (block: PlannerBlock) => void; onSkip?: (key: string) => void; onRemove?: (block: PlannerBlock) => void; onMoveUp?: (index: number) => void }) {
-  const { colors } = useTheme(), targets = plannerToneKeys(blocks, candidates?.courses);
-  return <View style={{ gap: 8 }}>
+export function PlanTimeline({ blocks, end, candidates, onOpen, onSkip, onRemove, onMoveUp, organizer }: { blocks: readonly PlannerBlock[]; end: number; candidates?: PlanningCandidates | null; onOpen?: (block: PlannerBlock) => void; onSkip?: (key: string) => void; onRemove?: (block: PlannerBlock) => void; onMoveUp?: (index: number) => void; organizer?: ReturnType<typeof useLibraryOrganizer> }) {
+  const { colors, reducedMotion } = useTheme(), targets = plannerToneKeys(blocks, candidates?.courses);
+  return <View ref={organizer?.listRef} {...organizer?.panHandlers} onTouchEnd={organizer?.touchEnd} onTouchCancel={organizer?.touchCancel} style={{ gap: 8 }}>
     {blocks.map((block, index) => {
       const actions = onSkip && onRemove && onMoveUp ? [
         { key: 'skip', label: 'Skip tonight', icon: EyeOff, tone: 'neutral' as const, onPress: () => onSkip(block.selectionKey) },
         { key: 'remove', label: 'Remove', icon: X, tone: 'neutral' as const, onPress: () => onRemove(block) },
         ...(index ? [{ key: 'moveUp', label: 'Move up', icon: X, tone: 'neutral' as const, onPress: () => onMoveUp(index) }] : []),
       ] : [];
-      const card = <Pressable accessibilityRole="button" accessibilityLabel={`${block.kind === 'reviewer' ? 'Review: ' : ''}${block.title}`} disabled={!onOpen && !actions.length} {...swipeAccessibility(actions)} onPress={() => onOpen?.(block)}
-        style={{ flex: 1, minWidth: 0, minHeight: 80, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: colors.surfacePrimary, gap: 4 }}>
+      const card = <Pressable accessibilityRole="button" accessibilityLabel={`${block.kind === 'reviewer' ? 'Review: ' : ''}${block.title}`} disabled={!onOpen && !actions.length} {...swipeAccessibility(actions)} delayLongPress={350} onTouchStart={organizer?.touchStart} onLongPress={organizer ? () => organizer.hold(block.key) : undefined} onPress={() => { if (organizer) organizer.tap(block.key, () => onOpen?.(block)); else onOpen?.(block); }}
+        style={{ flex: 1, minWidth: 0, minHeight: 80, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: colors.surfacePrimary, borderWidth: organizer?.dragging === block.key ? 1 : 0, borderColor: 'rgba(255,255,255,0.12)', gap: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><PlannerDot targets={targets} target={plannerToneTarget(block)} /><Copy muted size="caption">{candidates?.courses.find(course => course.id === block.courseId)?.name.split('|')[0]?.trim() ?? block.savedItem?.course?.code ?? 'Personal'}</Copy></View>
         <Copy style={{ fontSize: 15, fontWeight: '600', lineHeight: 20.25 }}>{block.title}</Copy>
         <Copy muted size="caption">{block.minutes} min · {block.kind === 'reviewer' ? 'Reviewer' : 'Task'}</Copy>
       </Pressable>;
-      return <View key={block.key} style={{ flexDirection: 'row', gap: 12, alignItems: 'stretch' }}>
+      const lifted = organizer?.dragging === block.key;
+      return <Animated.View key={block.key} testID={'timeline-block-' + block.key} onLayout={event => organizer?.layouts.current.set(block.key, event.nativeEvent.layout)} style={{ flexDirection: 'row', gap: 12, alignItems: 'stretch', zIndex: lifted ? 10 : 0, transform: lifted ? [{ translateY: organizer.translate }, { scale: reducedMotion ? 1 : 1.03 }, { rotate: reducedMotion ? '0deg' : '-1deg' }] : [], shadowColor: '#000', shadowOpacity: lifted ? .5 : 0, shadowRadius: 34, shadowOffset: { width: 0, height: 16 }, elevation: lifted ? 16 : 0 }}>
         <Copy muted style={{ width: 44, paddingTop: 14, textAlign: 'right', fontSize: 13, fontVariant: ['tabular-nums'] }}>{block.start}</Copy>
-        <View style={{ flex: 1, minWidth: 0 }}>{actions.length ? <SwipeRow planner background={colors.surfacePrimary} leading={[{ ...actions[0]!, label: 'Skip' }]} trailing={[actions[1]!]}>{card}</SwipeRow> : card}</View>
-      </View>;
+        <View style={{ flex: 1, minWidth: 0 }}>{actions.length ? <SwipeRow planner disabled={!!organizer?.dragging} background={colors.surfacePrimary} leading={[{ ...actions[0]!, label: 'Skip' }]} trailing={[actions[1]!]}>{card}</SwipeRow> : card}</View>
+      </Animated.View>;
     })}
     <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}><Copy muted style={{ width: 44, textAlign: 'right', fontSize: 13 }}>{plannerShortTime(end)}</Copy><Copy muted size="caption">Free time ends</Copy></View>
   </View>;

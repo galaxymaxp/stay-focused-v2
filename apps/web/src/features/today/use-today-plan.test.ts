@@ -150,3 +150,10 @@ it('clock changes before candidates arrive retain the recent-reviewer opt-in def
   expect(vi.mocked(input.queue).mock.lastCall![0].selection?.items).toEqual([{ kind: 'task', id: id(1) }]);
   expect(input.queue).toHaveBeenCalledTimes(1); expect(input.load).toHaveBeenCalledTimes(1);
 });
+
+it('timeline drop reorders manually and keeps candidate reads cached', async () => {
+  input = { ...input, preview: proposal() }; await render();
+  await act(async () => current.reorder(['reviewer:' + id(2), 'task:' + id(1)]));
+  expect(vi.mocked(input.queue).mock.lastCall![0].selection).toEqual({ order: 'manual', items: [{ kind: 'reviewer', id: id(2) }, { kind: 'task', id: id(1) }] });
+  expect(input.queue).toHaveBeenCalledTimes(1); expect(input.load).toHaveBeenCalledTimes(1);
+});

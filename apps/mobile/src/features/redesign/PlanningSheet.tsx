@@ -18,7 +18,7 @@ export interface PlanningSheetProps {
   candidates?: PlanningCandidates | null; plan?: DeterministicStudyPlan | null; timeline?: readonly TodayItem[];
   start?: number; end?: number; busy?: boolean; onApply?: () => void; onOpen?: (block: PlannerBlock) => void;
   previous?: PreviousPlanView; onRestore?: () => void;
-  onSkip?: (key: string) => void; onRemove?: (key: string) => void; onPutBack?: (key: string) => void; onMoveUp?: (index: number) => void;
+  onSkip?: (key: string) => void; onRemove?: (key: string) => void; onPutBack?: (key: string) => void; onMoveUp?: (index: number) => void; onReorder?: (keys: readonly string[]) => void;
 }
 export function PlanningControl(props: PlanningSheetProps) {
   const [open, setOpen] = useState(false);
@@ -28,7 +28,7 @@ export function RoundCheck({ checked }: { checked: boolean }) {
   const { colors } = useTheme();
   return <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: checked ? colors.textPrimary : colors.textMuted, backgroundColor: checked ? colors.textPrimary : 'transparent', alignItems: 'center', justifyContent: 'center' }}>{checked && <Copy color={colors.backgroundPrimary} style={{ fontSize: 13, fontWeight: '700' }}>{'✓'}</Copy>}</View>;
 }
-export function PlanningSheet({ request, active, load, onBuild, onClose, overrides, onItemCheck, candidates, plan, timeline = [], start, end, busy, onApply, onOpen, previous = null, onRestore, onSkip, onRemove, onPutBack, onMoveUp }: PlanningSheetProps & { onClose: () => void }) {
+export function PlanningSheet({ request, active, load, onBuild, onClose, overrides, onItemCheck, candidates, plan, timeline = [], start, end, busy, onApply, onOpen, previous = null, onRestore, onSkip, onRemove, onPutBack, onMoveUp, onReorder }: PlanningSheetProps & { onClose: () => void }) {
   const [removed, setRemoved] = useState<RemovedPlanBlock | null>(null);
   const removeBlock = (block: PlannerBlock) => { onRemove?.(block.selectionKey); setRemoved({ key: block.selectionKey, title: block.title, expiresAt: Date.now() + 5000 }); };
   const [loaded, setData] = useState<PlanningCandidates | null>(candidates ?? null), [storedDraft, setDraft] = useState<PlanningDraft | null>(null);
@@ -68,6 +68,12 @@ export function PlanningSheet({ request, active, load, onBuild, onClose, overrid
     const to = oldOrder[nextOrder.indexOf(from)];
     if (to) reorder(from.startsWith('group:') ? from.slice(6) : from, to.startsWith('group:') ? to.slice(6) : to, from.startsWith('group:'));
   });
+  const blockKeys = blocks.map(block => block.key);
+  const blockOrganizer = useLibraryOrganizer('planning-timeline', blockKeys, blockKeys, next => {
+    setDraft(null);
+    onReorder?.(next.flatMap(key => { const block = blocks.find(block => block.key === key); return block ? [block.selectionKey] : []; }));
+  }, true);
+  const dragging = !!organizer.dragging || !!blockOrganizer.dragging;
   const actions = (id: string, ids: readonly string[], group = false) => ({
     accessibilityActions: [{ name: 'moveUp', label: 'Move up' }, { name: 'moveDown', label: 'Move down' }],
     onAccessibilityAction: (event: { nativeEvent: { actionName: string } }) => { const delta = event.nativeEvent.actionName === 'moveUp' ? -1 : event.nativeEvent.actionName === 'moveDown' ? 1 : 0; const to = ids[ids.indexOf(id) + delta]; if (delta && to) reorder(id, to, group); },
@@ -75,15 +81,15 @@ export function PlanningSheet({ request, active, load, onBuild, onClose, overrid
   const grip = (key: string, scope: string, title: string, ids: readonly string[], group = false) => <Pressable accessibilityRole="button" accessibilityLabel={`Reorder ${title}`} accessibilityHint="Hold and drag, or use Move up and Move down" {...actions(group ? key.slice(6) : key, ids, group)} delayLongPress={350}
     onTouchStart={organizer.touchStart} onLongPress={() => { setDragScope(scope); moving.current = key; organizer.hold(key); }} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}><Copy muted style={{ fontSize: 20 }}>{'⠿'}</Copy></Pressable>;
   const check = (key: string, checked: boolean) => { if (!draft) return; setDraft(togglePlanningItems(draft, [key])); const item = shown.find(item => planningItemKey(item) === key); if (item) onItemCheck?.(planningOverrideKey(item), checked); };
-  return <Sheet appearance="planner" title="Plan your free time" onClose={onClose} maxHeight="94%" footer={<PlanUndoBar removed={removed} onUndo={key => onPutBack?.(key)} onExpire={() => setRemoved(null)} />} scrollRef={organizer.scrollRef} onScroll={organizer.onScroll} scrollEnabled={!organizer.dragging} dragEnabled={!organizer.dragging}
+  return <Sheet appearance="planner" title="Plan your free time" onClose={onClose} maxHeight="94%" footer={<PlanUndoBar removed={removed} onUndo={key => onPutBack?.(key)} onExpire={() => setRemoved(null)} />} scrollRef={value => { organizer.scrollRef.current = value; blockOrganizer.scrollRef.current = value; }} onScroll={event => { organizer.onScroll(event); blockOrganizer.onScroll(event); }} scrollEnabled={!dragging} dragEnabled={!dragging}
     renderHeader={close => <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 20, paddingVertical: 10 }}><View style={{ flex: 1, gap: 4 }}><Copy style={{ fontSize: 20, fontWeight: '600', letterSpacing: -0.2 }}>Plan your free time</Copy><Copy muted style={{ fontSize: 13 }}>{plannerWindowLabel(from, to)}</Copy></View><Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={close} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center' }}><Copy style={{ fontSize: 20 }}>{'×'}</Copy></Pressable></View>}>
     <SegmentedControl planner segments={[{ value: 'proposed', label: 'Proposed' }, { value: 'previous', label: 'Previous' }]} value={tab} onChange={setTab} />
     {tab === 'previous' ? <PreviousPlan previous={previous} disabled={busy || !data} onRestore={() => { setDraft(null); onRestore?.(); setTab('proposed'); }} /> : !data || !draft ? blocks.length ? <View style={{ gap: 20 }}>
-      <PlanFitCard plan={displayPlan} blocks={blocks} free={freeTimeDuration(from, to)} /><PlanTimeline blocks={blocks} end={to} onOpen={onOpen} onSkip={onSkip} onRemove={onRemove ? removeBlock : undefined} onMoveUp={onMoveUp} />
+      <PlanFitCard plan={displayPlan} blocks={blocks} free={freeTimeDuration(from, to)} /><PlanTimeline blocks={blocks} end={to} onOpen={onOpen} onSkip={onSkip} onRemove={onRemove ? removeBlock : undefined} onMoveUp={onMoveUp ? index => { setDraft(null); onMoveUp(index); } : undefined} organizer={onReorder ? blockOrganizer : undefined} />
       {error && <View accessibilityRole="alert"><Copy>{error}</Copy></View>}
       <PlannerButton disabled onPress={() => {}}>Use this plan</PlannerButton>
     </View> : error ? <View accessibilityRole="alert"><Copy>{error}</Copy></View> : <PlannerSkeleton /> : <View style={{ gap: 20 }}>
-      <PlanFitCard candidates={data} plan={displayPlan} blocks={blocks} free={data.freeWindowMinutes} /><PlanTimeline blocks={blocks} end={to} candidates={data} onOpen={onOpen} onSkip={onSkip} onRemove={onRemove ? removeBlock : undefined} onMoveUp={onMoveUp} />
+      <PlanFitCard candidates={data} plan={displayPlan} blocks={blocks} free={data.freeWindowMinutes} /><PlanTimeline blocks={blocks} end={to} candidates={data} onOpen={onOpen} onSkip={onSkip} onRemove={onRemove ? removeBlock : undefined} onMoveUp={onMoveUp ? index => { setDraft(null); onMoveUp(index); } : undefined} organizer={onReorder ? blockOrganizer : undefined} />
       {!!tray.length && <View style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: colors.separator, borderRadius: 18, paddingHorizontal: 16, paddingBottom: 10 }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Taken out" accessibilityState={{ expanded: trayOpen }} onPress={() => setTrayOpen(!trayOpen)} style={{ minHeight: 44, justifyContent: 'center' }}><Copy style={{ fontSize: 14, fontWeight: '600' }}>Taken out · {tray.length} {trayOpen ? '^' : '?'}</Copy></Pressable>
         {trayOpen && tray.map(entry => <View key={entry.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderColor: colors.separator, paddingVertical: 8 }}><PlannerDot targets={targets} target={entry.item.courseId ?? planningItemKey(entry.item)} /><View style={{ flex: 1, gap: 2 }}><Copy style={{ fontSize: 13, lineHeight: 18 }}>{entry.item.title}</Copy><Copy muted size="caption">{entry.reason === 'skipped' ? 'Skipped tonight · returns next window' : 'Removed from plan'}</Copy></View><Pressable accessibilityRole="button" accessibilityLabel={`Put back ${entry.item.title}`} onPress={() => { onItemCheck?.(entry.key, true); setDraft({ ...draft, checked: [...new Set([...draft.checked, planningItemKey(entry.item)])] }); }} style={{ minHeight: 44, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: colors.separator, justifyContent: 'center' }}><Copy style={{ fontSize: 13 }}>Put back</Copy></Pressable></View>)}
