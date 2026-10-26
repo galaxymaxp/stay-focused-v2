@@ -538,6 +538,7 @@ export function Sheet({
   scrollEnabled = true,
   dragEnabled = true,
   renderHeader,
+  appearance = "default",
 }: {
   children: ReactNode;
   onClose: () => void;
@@ -557,8 +558,9 @@ export function Sheet({
   dragEnabled?: boolean;
   /** Custom sheet header keeps the same animated dismissal and single scroll. */
   renderHeader?: (close: () => void) => ReactNode;
+  appearance?: "default" | "planner";
 }) {
-  const { colors, reducedMotion } = useTheme();
+  const { colors, reducedMotion, mode } = useTheme();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const tint = useRef(new Animated.Value(0)).current;
@@ -614,9 +616,10 @@ export function Sheet({
             maxHeight,
             flexShrink: 1,
             marginBottom: -SHEET_OVERSHOOT,
-            backgroundColor: colors.surfaceElevated,
-            borderTopLeftRadius: radius.page,
-            borderTopRightRadius: radius.page,
+            backgroundColor: appearance === "planner" && mode === "dark" ? colors.surfacePrimary : colors.surfaceElevated,
+            borderTopWidth: appearance === "planner" ? 1 : 0, borderColor: colors.separator,
+            borderTopLeftRadius: appearance === "planner" ? 28 : radius.page,
+            borderTopRightRadius: appearance === "planner" ? 28 : radius.page,
             paddingBottom: Math.max(insets.bottom, spacing[4]) + SHEET_OVERSHOOT,
             paddingLeft: insets.left,
             paddingRight: insets.right,
@@ -624,8 +627,8 @@ export function Sheet({
             transform: [{ translateY: Animated.add(rise, pull.drag) }],
           }}
         >
-          <View style={{ alignItems: "center", paddingTop: spacing[2], paddingBottom: spacing[1] }}>
-            {dismissible ? <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: colors.separator }} /> : null}
+          <View style={{ alignItems: "center", paddingTop: appearance === "planner" ? 10 : spacing[2], paddingBottom: appearance === "planner" ? 10 : spacing[1] }}>
+            {dismissible ? <View style={{ width: appearance === "planner" ? 40 : 36, height: 5, borderRadius: 3, backgroundColor: colors.separator }} /> : null}
           </View>
           {renderHeader ? renderHeader(() => dismiss()) : <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: spacing[5], paddingRight: spacing[2], minHeight: hitTarget.min }}>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -645,7 +648,7 @@ export function Sheet({
             scrollEventThrottle={16}
             alwaysBounceVertical={false}
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ gap: spacing[3], paddingHorizontal: spacing[5], paddingBottom: spacing[4] }}
+            contentContainerStyle={{ gap: appearance === "planner" ? 20 : spacing[3], paddingHorizontal: spacing[5], paddingBottom: spacing[4] }}
           >
             {children}
           </ScrollView>
@@ -684,15 +687,17 @@ export function SegmentedControl<T extends string>({
   segments,
   value,
   onChange,
+  planner = false,
 }: {
   segments: readonly { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
+  planner?: boolean;
 }) {
   const { colors, mode, reducedMotion } = useTheme();
   const [width, setWidth] = useState(0);
   const index = Math.max(0, segments.findIndex((segment) => segment.value === value));
-  const segmentWidth = width > 0 ? (width - 4) / segments.length : 0;
+  const segmentWidth = width > 0 ? (width - (planner ? 8 : 4)) / segments.length : 0;
   const offset = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     const toValue = index * segmentWidth;
@@ -703,18 +708,18 @@ export function SegmentedControl<T extends string>({
     <View
       accessibilityRole="tablist"
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-      style={{ flexDirection: "row", padding: 2, minHeight: 36, borderRadius: 10, backgroundColor: colors.surfaceSecondary }}
+      style={{ flexDirection: "row", padding: planner ? 4 : 2, minHeight: planner ? 52 : 36, borderRadius: planner ? 14 : 10, backgroundColor: colors.surfaceSecondary }}
     >
       {segmentWidth > 0 ? (
         <Animated.View
           pointerEvents="none"
           style={{
             position: "absolute",
-            top: 2,
-            bottom: 2,
-            left: 2,
+            top: planner ? 4 : 2,
+            bottom: planner ? 4 : 2,
+            left: planner ? 4 : 2,
             width: segmentWidth,
-            borderRadius: 8,
+            borderRadius: planner ? 10 : 8,
             backgroundColor: mode === "dark" ? colors.surfaceElevated : "#FFFFFF",
             shadowColor: "#000",
             shadowOpacity: mode === "dark" ? 0 : 0.08,
@@ -738,9 +743,9 @@ export function SegmentedControl<T extends string>({
               onChange(segment.value);
             }}
             hitSlop={{ top: 6, bottom: 6 }}
-            style={{ flex: 1, minHeight: 32, alignItems: "center", justifyContent: "center" }}
+            style={{ flex: 1, minHeight: planner ? 44 : 32, alignItems: "center", justifyContent: "center" }}
           >
-            <Copy size="caption" color={selected ? colors.textPrimary : colors.textSecondary} style={{ fontWeight: selected ? "600" : "500", fontSize: 13 }}>
+            <Copy size="caption" color={selected ? colors.textPrimary : colors.textSecondary} style={{ fontWeight: selected ? "600" : "500", fontSize: planner ? 14 : 13 }}>
               {segment.label}
             </Copy>
           </Pressable>

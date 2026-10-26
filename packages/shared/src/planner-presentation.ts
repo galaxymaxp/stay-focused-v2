@@ -41,12 +41,17 @@ export function plannerBlocks(plan: DeterministicStudyPlan | null, candidates: P
     const kind = isReviewerProposal(session) ? 'reviewer' as const : 'task' as const;
     const id = isReviewerProposal(session) ? session.reviewerId : session.taskId;
     const target = plan.planningTargets?.find(target => target.kind === kind && target.id === id);
-    const candidate = items.find(item => item.kind === kind && (item.id === (target?.selectionId ?? id) || item.canvasAssignmentId === id));
+    const candidate = items.find(item => item.kind === kind && (item.id === id || item.id === target?.selectionId || item.canvasAssignmentId === id || (!!target && item.canvasAssignmentId === target.selectionId)));
     const at = new Date(session.startsAt);
-    return { key: session.proposalId, selectionKey: planningItemKey({ kind, id: target?.selectionId ?? candidate?.id ?? id }), targetKey: proposalTargetKey(session), title: proposalTitle(session), kind, id,
+    return { key: session.proposalId, selectionKey: planningItemKey({ kind, id: candidate?.id ?? target?.selectionId ?? id }), targetKey: proposalTargetKey(session), title: proposalTitle(session), kind, id,
       courseId: isReviewerProposal(session) ? session.courseId : target?.courseId ?? candidate?.courseId ?? null,
       start: plannerShortTime(at.getHours() * 60 + at.getMinutes()), minutes: session.durationMinutes };
   });
+}
+/** Use the existing ring palette, consistently keyed by course on planner content. */
+export const plannerToneTarget = (block: Pick<PlannerBlock, 'courseId' | 'targetKey'>) => block.courseId ?? block.targetKey;
+export function plannerToneKeys(blocks: readonly PlannerBlock[], courses: readonly { id: string }[] = []) {
+  return [...new Set([...courses.map(course => course.id), ...blocks.map(plannerToneTarget)])];
 }
 export function plannerFit(plan: DeterministicStudyPlan | null, blocks: readonly PlannerBlock[], free: number) {
   const used = blocks.reduce((sum, block) => sum + block.minutes, 0);
@@ -54,5 +59,5 @@ export function plannerFit(plan: DeterministicStudyPlan | null, blocks: readonly
   const waitingMinutes = plan?.notFit?.reduce((sum, item) => sum + item.minutes, 0) ?? plan?.unscheduledWork.reduce((sum, item) => sum + item.unscheduledMinutes, 0) ?? 0;
   return { used, free, headline: !blocks.length ? 'Nothing fits yet' : !waiting ? 'Everything fits' : `${blocks.length} blocks fill your ${plannerDuration(free)}`,
     ratio: `${used} / ${free} min`, subline: waiting ? `${waiting} more items (${plannerDuration(waitingMinutes)}) wait for your next free window.` : 'Every selected item is in tonight’s plan.',
-    segments: blocks.map(block => ({ key: block.key, targetKey: block.targetKey, fraction: Math.min(1, block.minutes / Math.max(1, free)) })) };
+    segments: blocks.map(block => ({ key: block.key, targetKey: plannerToneTarget(block), fraction: Math.min(1, block.minutes / Math.max(1, free)) })) };
 }

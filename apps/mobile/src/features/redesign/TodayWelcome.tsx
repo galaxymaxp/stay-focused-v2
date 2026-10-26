@@ -1,4 +1,4 @@
-﻿import { WELCOME_BODY, WELCOME_TITLE } from '@stay-focused/shared';
+import { WELCOME_BODY, WELCOME_TITLE } from '@stay-focused/shared';
 import { Pressable, View } from 'react-native';
 import { Copy } from '../../design/primitives';
 import { useTheme } from '../../design/theme';

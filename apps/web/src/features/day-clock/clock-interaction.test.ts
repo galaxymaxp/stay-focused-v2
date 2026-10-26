@@ -16,7 +16,7 @@ vi.mock("../../components/ui", () => ({ Icon: "Icon", ContentIcon: "ContentIcon"
 vi.mock("../../components/brand", () => ({ BookLoader: "BookLoader" }));
 vi.mock("../../components/course", () => ({ CourseDot: "CourseDot" }));
 vi.mock("../today/today-calendar", () => ({ TodayCalendar: "TodayCalendar" }));
-vi.mock("../today/plan-preview", () => ({ PlanPreview: "PlanPreview" }));
+vi.mock("../today/today-planner", () => ({ TodayPlanner: "TodayPlanner" }));
 vi.mock("./DeferredDayOrb", () => ({ DeferredDayOrb: "DeferredDayOrb" }));
 vi.mock("../../lib/motion", () => ({ useSpringNumber: () => 1 }));
 vi.mock("../../lib/list-preferences", () => ({ useListPreferences: () => ({ prefs: { pinned: { today: [] }, hidden: { today: [] }, read: { announcements: [] } }, pin: vi.fn(), hide: vi.fn(), read: vi.fn() }) }));

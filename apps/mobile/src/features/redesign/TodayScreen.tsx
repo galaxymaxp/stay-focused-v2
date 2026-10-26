@@ -451,7 +451,7 @@ export function TodayScreen() {
           {!available(capabilities.data?.planner) && (
             <Notice>Planning is not available right now.</Notice>
           )}
-          {today.data?.timeline.map((item) => (
+          {today.data?.timeline.filter(item => item.kind !== "study_session").map((item) => (
             <TodayRow key={item.id} item={item} onOpen={() => openItem(item)} />
           ))}
         </Surface>

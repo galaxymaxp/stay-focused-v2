@@ -95,6 +95,34 @@ it('skeleton shows only without cached candidates; cached candidates stay visibl
   expect(root().findAll(node => node.props.testID === 'skeleton-course-row')).toHaveLength(4);
   expect(named('Use this plan').props.disabled).toBe(true);
   await act(async () => finish(fixture())); expect(root().findAll(node => node.props.testID === 'planner-skeleton')).toHaveLength(0);
-  await act(async () => tree!.update(createElement(PlanningControl, { request: { planningRange: range, availability: [{ ...range, endsAt: '2026-10-25T11:00:00.000Z' }] }, active: null, load: () => new Promise(() => {}), onBuild: mocks.build })));
+  await act(async () => tree!.update(createElement(PlanningControl, { request: { planningRange: range, availability: [{ ...range, endsAt: '2026-10-25T11:00:00.000Z' }] }, active: null, load: () => new Promise<PlanningCandidates>(() => {}), onBuild: mocks.build })));
   expect(root().findAll(node => node.props.testID === 'planner-skeleton')).toHaveLength(0); expect(text()).toContain('Free time ends');
+});
+
+it('restoring replaces an edited local draft with the active restored selection', async () => {
+  const data = fixture();
+  const previous = previousPlanData({ date: '2026-10-25', start: 540, end: 600, sessions: [{ kind: 'task', id: id(12), title: 'Task 2', courseId: id(2), startMinute: 540, minutes: 40 }] }, '2026-10-25', []);
+  const restored = { ...defaultPlanningDraft(data), mode: 'tasks' as const, checked: [`task:${id(12)}`] };
+  const props: PlanningSheetProps = { request: { planningRange: range, availability: [range] }, active: null, candidates: data, load: mocks.load, onBuild: mocks.build, previous,
+    onRestore: () => tree!.update(createElement(PlanningControl, { ...props, active: { mode: 'tasks', selection: { order: 'manual', items: [{ kind: 'task', id: id(12) }] }, draft: restored } })),
+  };
+  await mount(props);
+  await act(async () => control(1).props.onChange('reviewers'));
+  await act(async () => control(0).props.onChange('previous'));
+  await act(async () => named('Restore this plan').props.onPress());
+  expect(control(0).props.value).toBe('proposed');
+  expect(control(1).props.value).toBe('tasks');
+  expect(named('Task 1').props.accessibilityState.checked).toBe(false);
+  await act(async () => named('Chemistry smart order').props.onPress());
+  expect(named('Task 2').props.accessibilityState.checked).toBe(true);
+});
+
+it('cached plan blocks stay visible while candidates are pending', async () => {
+  mocks.load.mockImplementationOnce(() => new Promise<PlanningCandidates>(() => {}));
+  const data = fixture(), plan = planningDraftSummary(data, defaultPlanningDraft(data)).plan;
+  await mount({ plan });
+  expect(root().findAll(node => node.props.testID === 'planner-skeleton')).toHaveLength(0);
+  expect(text()).toContain('Free time ends');
+  expect(text()).toContain('60 / 60 min');
+  expect(named('Use this plan').props.disabled).toBe(true);
 });

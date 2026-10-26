@@ -1,4 +1,4 @@
-﻿import { View } from 'react-native';
+import { View } from 'react-native';
 import { Copy, SkeletonBlock } from '../../design/primitives';
 import { useTheme } from '../../design/theme';
 import { PlannerButton } from './PlanPreview';

@@ -48,7 +48,8 @@ beforeAll(async () => {
 afterAll(async()=>{await browser?.close();await new Promise<void>(yes=>server?server.close(()=>yes()):yes());if(out)rmSync(out,{recursive:true,force:true});});
 async function open(width=1280,theme='dark',query=''){
   const page=await browser.newPage({viewport:{width,height:1000},reducedMotion:'reduce'});await page.route('**/*',route=>route.request().url().startsWith(origin)?route.continue():route.abort());
-  await page.addInitScript(theme=>{document.addEventListener('DOMContentLoaded',()=>document.documentElement.dataset.theme=theme,{once:true});const Original=Date;Object.defineProperty(window,'Date',{value:new Proxy(Original,{construct(target,args){return args.length?Reflect.construct(target,args):new Original(2026,9,27,19,40)}})});},theme);
+  await page.addInitScript(theme=>{document.addEventListener('DOMContentLoaded',()=>document.documentElement.dataset.theme=theme,{once:true});const Original=Date;Object.defineProperty(window,'Date',{value:new Proxy(Original,{construct(target,args){return args.length?Reflect.construct(target,args):new Original(2026,9,27,19,40)}})});Object.defineProperty(window.Date,'now',{value:()=>new Original(2026,9,27,19,40).getTime()});},theme);
+  if(query.includes('previous')) await page.addInitScript(()=>localStorage.setItem('sf.today.last-plan',JSON.stringify({ownerId:'synthetic-owner',date:'2026-10-27',start:1200,end:1320,sessions:[{kind:'task',id:'00000000-0000-4000-8000-000000000021',title:'Synthetic previous task',courseId:'00000000-0000-4000-8000-000000000001',startMinute:1200,minutes:60}]})));
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/'+query);return{page,errors};
 }
 it.each([[1280,'light'],[1280,'dark'],[390,'light'],[390,'dark']] as const)('Today columns, inline adjust, exact fit, wrapping and Up next at %i %s',async(width,theme)=>{
@@ -69,6 +70,27 @@ it.each([[1280,'light'],[1280,'dark'],[390,'light'],[390,'dark']] as const)('Tod
     await page.waitForFunction(()=>!document.querySelector('.planner-side .planner-primary')?.hasAttribute('disabled'));
     await page.screenshot({path:join(evidence,`today-${width}-${theme}.png`),fullPage:true});
     await page.getByRole('tab',{name:'Previous',exact:true}).click();expect(await page.getByText('No previous plan yet',{exact:true}).count()).toBe(1);expect(errors).toEqual([]);
+  }finally{await page.close();}
+},60_000);
+
+it('Previous shows the persisted summary and status; restoring replaces edited settings with its manual selection',async()=>{
+  const {page,errors}=await open(390,'dark','?previous');try{
+    await page.getByRole('button',{name:'Start now',exact:true}).waitFor();
+    await page.getByRole('button',{name:'Adjust plan',exact:true}).click();
+    await page.getByRole('button',{name:'Reviewers',exact:true}).click();
+    await page.getByRole('tab',{name:'Previous',exact:true}).click();
+    expect(await page.getByText('Synthetic previous task',{exact:true}).count()).toBe(1);
+    expect(await page.getByText('Planned',{exact:true}).count()).toBe(1);
+    expect(await page.locator('#planner-previous .planner-fit').textContent()).toContain('0 of 1 blocks done');
+    await page.getByRole('button',{name:'Restore this plan',exact:true}).click();
+    await page.getByText('Manual order',{exact:true}).waitFor();
+    expect(await page.getByRole('button',{name:'Both',exact:true}).getAttribute('aria-pressed')).toBe('true');
+    expect(await page.getByRole('checkbox',{name:'Managing Data with a Synthetic Database',exact:true}).isChecked()).toBe(false);
+    expect(await page.getByRole('checkbox',{name:/A long synthetic task/}).isChecked()).toBe(true);
+    await page.waitForFunction(()=>(window as unknown as {__calls:[string,{selection?:{order:string}}][]}).__calls.filter(([path])=>path.endsWith('/preview')).at(-1)?.[1].selection?.order==='manual');
+    const calls=await page.evaluate(()=>(window as unknown as {__calls:[string,{selection?:unknown}][]}).__calls);
+    expect(calls.filter(([path])=>path.endsWith('/preview')).at(-1)?.[1].selection).toEqual({order:'manual',items:[{kind:'task',id:'00000000-0000-4000-8000-000000000021'}]});
+    expect(errors).toEqual([]);
   }finally{await page.close();}
 },60_000);
 

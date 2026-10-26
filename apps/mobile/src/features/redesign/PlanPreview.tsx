@@ -1,4 +1,4 @@
-import { plannerShortTime, freeTimeDuration, plannerFit, plannerBlocks, PREVIOUS_PLAN_EMPTY, type PlannerBlock, type PreviousPlanView } from '@stay-focused/shared';
+import { plannerShortTime, freeTimeDuration, plannerFit, plannerBlocks, plannerToneKeys, plannerToneTarget, PREVIOUS_PLAN_EMPTY, type PlannerBlock, type PreviousPlanView } from '@stay-focused/shared';
 import { proposalTargetKey, type DeterministicStudyPlan, type PlanningCandidates } from '@stay-focused/shared/task-planning';
 import { Pressable, View } from 'react-native';
 import { Copy } from '../../design/primitives';
@@ -27,8 +27,8 @@ export function PlannerDot({ targets, target }: { targets: readonly string[]; ta
   const { colors } = useTheme();
   return <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors[planToneFor(targets, target)] }} />;
 }
-export function PlanFitCard({ plan, blocks, free }: { plan: DeterministicStudyPlan | null; blocks: readonly PlannerBlock[]; free: number }) {
-  const { colors } = useTheme(), fit = plannerFit(plan, blocks, free), targets = blocks.map(block => block.targetKey);
+export function PlanFitCard({ plan, blocks, free, candidates }: { plan: DeterministicStudyPlan | null; blocks: readonly PlannerBlock[]; free: number; candidates?: PlanningCandidates | null }) {
+  const { colors } = useTheme(), fit = plannerFit(plan, blocks, free), targets = plannerToneKeys(blocks, candidates?.courses);
   return <View testID="plan-fit" style={{ backgroundColor: colors.surfacePrimary, borderWidth: 1, borderColor: colors.separator, borderRadius: 18, paddingVertical: 16, paddingHorizontal: 18, gap: 10 }}>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
       <Copy style={{ fontSize: 16, fontWeight: '600' }}>{fit.headline}</Copy><Copy muted style={{ fontSize: 13, fontVariant: ['tabular-nums'] }}>{fit.ratio}</Copy>
@@ -40,13 +40,13 @@ export function PlanFitCard({ plan, blocks, free }: { plan: DeterministicStudyPl
   </View>;
 }
 export function PlanTimeline({ blocks, end, candidates, onOpen }: { blocks: readonly PlannerBlock[]; end: number; candidates?: PlanningCandidates | null; onOpen?: (block: PlannerBlock) => void }) {
-  const { colors } = useTheme(), targets = blocks.map(block => block.targetKey);
+  const { colors } = useTheme(), targets = plannerToneKeys(blocks, candidates?.courses);
   return <View style={{ gap: 8 }}>
     {blocks.map(block => <View key={block.key} style={{ flexDirection: 'row', gap: 12, alignItems: 'stretch' }}>
       <Copy muted style={{ width: 44, paddingTop: 14, textAlign: 'right', fontSize: 13, fontVariant: ['tabular-nums'] }}>{block.start}</Copy>
       <Pressable accessibilityRole="button" accessibilityLabel={`${block.kind === 'reviewer' ? 'Review: ' : ''}${block.title}`} disabled={!onOpen} onPress={() => onOpen?.(block)}
         style={{ flex: 1, minWidth: 0, minHeight: 80, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: colors.surfacePrimary, gap: 4 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><PlannerDot targets={targets} target={block.targetKey} /><Copy muted size="caption">{candidates?.courses.find(course => course.id === block.courseId)?.name.split('|')[0]?.trim() ?? block.savedItem?.course?.code ?? 'Personal'}</Copy></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><PlannerDot targets={targets} target={plannerToneTarget(block)} /><Copy muted size="caption">{candidates?.courses.find(course => course.id === block.courseId)?.name.split('|')[0]?.trim() ?? block.savedItem?.course?.code ?? 'Personal'}</Copy></View>
         <Copy style={{ fontSize: 15, fontWeight: '600', lineHeight: 20.25 }}>{block.title}</Copy>
         <Copy muted size="caption">{block.minutes} min · {block.kind === 'reviewer' ? 'Reviewer' : 'Task'}</Copy>
       </Pressable>

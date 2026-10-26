@@ -38,13 +38,13 @@ export function ClearDay({
       <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={{ width, height: width * 0.75, marginBottom: spacing[2] }}>
         <Svg width={width} height={width * 0.75} viewBox="0 0 160 120" accessible={false}>
           <Path d="M14 92h132" stroke={colors.separator} strokeWidth={2} strokeLinecap="round" fill="none" />
-          <Path d="M54 92a26 26 0 0 1 52 0" stroke={colors.amber} strokeWidth={3} strokeLinecap="round" fill="none" />
+          <Path d="M54 92a26 26 0 0 1 52 0" stroke={colors.textMuted} strokeWidth={3} strokeLinecap="round" fill="none" />
           <Rect x={62} y={70} width={36} height={30} rx={6} fill={colors.surfacePrimary} stroke={colors.textMuted} strokeWidth={2} />
           <Path d="M71 85l6 6 12-12" stroke={colors.textPrimary} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
         </Svg>
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: glow }]}>
           <Svg width={width} height={width * 0.75} viewBox="0 0 160 120" accessible={false}>
-            <G stroke={colors.amber} strokeWidth={2.5} strokeLinecap="round" fill="none">
+            <G stroke={colors.textMuted} strokeWidth={2.5} strokeLinecap="round" fill="none">
               <Path d="M80 52v-12" /><Path d="M57 61l-8-8" /><Path d="M103 61l8-8" /><Path d="M44 80H32" /><Path d="M116 80h12" />
             </G>
           </Svg>

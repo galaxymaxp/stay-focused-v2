@@ -94,3 +94,5 @@
 .planner-skeleton > .planner-primary { min-height: 52px; }
 @keyframes planner-sk { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
 @media (prefers-reduced-motion: reduce) { .planner-sk { animation: none; } }
+.today-v2 .cd-sun, .today-v2 .cd-rays { stroke: var(--muted); }
+.today-v2 .urgency, .today-v2 .schedule-row.overdue .meta, .today-v2 .agenda-row .urgent { color: var(--secondary); }

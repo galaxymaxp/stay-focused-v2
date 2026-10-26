@@ -1,10 +1,10 @@
 ﻿"use client";
-import { plannerShortTime, freeTimeDuration, plannerBlocks, plannerFit, PREVIOUS_PLAN_EMPTY, type PlannerBlock, type PreviousPlanView } from '@stay-focused/shared';
+import { plannerShortTime, freeTimeDuration, plannerBlocks, plannerToneKeys, plannerToneTarget, plannerFit, PREVIOUS_PLAN_EMPTY, type PlannerBlock, type PreviousPlanView } from '@stay-focused/shared';
 import type { DeterministicStudyPlan, PlanningCandidates } from '@stay-focused/shared/task-planning';
 import { planToneFor } from '../day-clock/timeline';
 
-export function PlanFitCard({ plan, blocks, free }: { plan: DeterministicStudyPlan | null; blocks: readonly PlannerBlock[]; free: number }) {
-  const fit = plannerFit(plan, blocks, free), targets = blocks.map(block => block.targetKey);
+export function PlanFitCard({ plan, blocks, free, candidates }: { plan: DeterministicStudyPlan | null; blocks: readonly PlannerBlock[]; free: number; candidates?: PlanningCandidates | null }) {
+  const fit = plannerFit(plan, blocks, free), targets = plannerToneKeys(blocks, candidates?.courses);
   return <section className="planner-fit" aria-label="Plan fit"><div className="planner-fit-heading"><strong>{fit.headline}</strong><span className="meta">{fit.ratio}</span></div>
     <div className="planner-fit-bar" role="img" aria-label={fit.ratio}>{fit.segments.map(segment => <span key={segment.key} data-testid="fit-segment" style={{ width: `${segment.fraction * 100}%`, background: `var(--${planToneFor(targets, segment.targetKey)})` }} />)}</div>
     <p className="meta">{fit.subline}</p></section>;
@@ -13,10 +13,10 @@ export function PlannerDot({ targets, target }: { targets: readonly string[]; ta
   return <span className="planner-dot" aria-hidden="true" style={{ background: `var(--${planToneFor(targets, target)})` }} />;
 }
 export function PlanTimeline({ blocks, end, candidates, onOpen }: { blocks: readonly PlannerBlock[]; end: number; candidates?: PlanningCandidates | null; onOpen?: (block: PlannerBlock) => void }) {
-  const targets = blocks.map(block => block.targetKey);
+  const targets = plannerToneKeys(blocks, candidates?.courses);
   return <div className="planner-timeline" aria-label="Plan timeline">{blocks.map(block => <div className="planner-block" key={block.key}><span className="planner-time">{block.start}</span>
     <button type="button" className="planner-block-card" onClick={() => onOpen?.(block)} disabled={!onOpen} aria-label={`${block.kind === 'reviewer' ? 'Review: ' : ''}${block.title}`}>
-      <span className="planner-block-course"><PlannerDot targets={targets} target={block.targetKey} />{candidates?.courses.find(course => course.id === block.courseId)?.name.split('|')[0]?.trim() ?? block.savedItem?.course?.code ?? 'Personal'}</span>
+      <span className="planner-block-course"><PlannerDot targets={targets} target={plannerToneTarget(block)} />{candidates?.courses.find(course => course.id === block.courseId)?.name.split('|')[0]?.trim() ?? block.savedItem?.course?.code ?? 'Personal'}</span>
       <strong>{block.title}</strong><span className="meta">{block.minutes} min · {block.kind === 'reviewer' ? 'Reviewer' : 'Task'}</span>
     </button></div>)}<div className="planner-block planner-end"><span className="planner-time">{plannerShortTime(end)}</span><span className="meta">Free time ends</span></div></div>;
 }
