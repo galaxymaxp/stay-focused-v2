@@ -6,6 +6,8 @@ import { reviewerDetail } from '../../services/localLibrary/localLibrary.testSup
 import { createGenerationIntent } from '../../services/generationRecovery';
 import { apiFoundVisual } from '../../services/externalVisuals.testSupport';
 
+vi.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
+
 vi.mock('../../auth/sessionStore', () => ({ sessionStore: { getItem: vi.fn(async () => null), setItem: vi.fn(async () => undefined) } }));
 
 const visuals=vi.hoisted(()=>({sections:{} as Record<string,import('../../services/externalVisuals').ExternalReferenceVisual>}));
@@ -24,7 +26,7 @@ vi.mock('./SourceFigures',()=>({
   SourceFigures:(props:{hasFigures:boolean;offline:boolean})=>props.hasFigures&&!props.offline?createElement('SourceFigures',props):null,
   useFigureAvailability:(_client:unknown,_id:unknown,offline:boolean)=>Object.assign(offline?new Set():figures.available,{online:!offline&&figures.online}),
 }));
-vi.mock('react-native', () => ({ Platform: { OS: 'android' }, View: 'View', Modal: 'Modal', Image:'Image', Linking:{openURL:vi.fn()}, Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
+vi.mock('react-native', () => ({ StyleSheet: { hairlineWidth: .5 }, Platform: { OS: 'android' }, View: 'View', Modal: 'Modal', Image:'Image', Linking:{openURL:vi.fn()}, Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator',
   Easing: { inOut: () => undefined, quad: undefined },
   Vibration: { vibrate: vi.fn() }, useWindowDimensions: () => ({ width: 360, height: 800 }),
   Animated: { View: 'AnimatedView', Value: class { setValue() {} stopAnimation() {} interpolate() { return 1; } },
@@ -130,7 +132,10 @@ describe('snapshot discovery for persisted reviewer headers', () => {
 });
 function nodes(type: string) { return rendered!.root.findAll(node => String(node.type) === type); }
 /** The four option tiles, in ASSIST_TYPES order. */
-function tiles() { return nodes('Pressable').filter(node => node.props.accessibilityState && 'busy' in node.props.accessibilityState); }
+function tiles() {
+  const sheet = nodes('Sheet').find(node => node.props.title === 'Study Assist');
+  return sheet?.findAll(node => String(node.type) === 'Pressable' && node.props.accessibilityState && 'busy' in node.props.accessibilityState) ?? [];
+}
 describe('Reviewer Quiz Matching capacity', () => {
   const source = { ...reviewer, sections: Array.from({ length: 2 }, (_, sectionIndex) => ({
     id: `section-${sectionIndex + 1}`, title: `Topic ${sectionIndex + 1}`,
@@ -154,9 +159,15 @@ describe('Reviewer Quiz Matching capacity', () => {
     expect(copy()).toContain('This reviewer supports up to 6 Matching questions.');
     expect(countControl().props.value).toBe('6');
     expect(countControl().props.segments).toEqual([{ value: '6', label: '6 max' }, { value: 'custom', label: 'Custom' }]);
-    vi.mocked(createGenerationIntent).mockResolvedValue({ key: 'test-intent' } as Awaited<ReturnType<typeof createGenerationIntent>>);
-    await act(async () => footer().props.onPress());
+    let resolveIntent!: (value: Awaited<ReturnType<typeof createGenerationIntent>>) => void;
+    vi.mocked(createGenerationIntent).mockReturnValueOnce(new Promise(resolve => { resolveIntent = resolve; }));
+    await act(async () => { void footer().props.onPress(); });
+    const pill = nodes('Pressable').find(node => node.props.accessibilityLabel === 'Generating quiz')!;
+    expect(pill.props.accessibilityState).toMatchObject({ busy: true, disabled: true });
+    expect(rendered!.root.findByProps({ testID: 'glass-pill-shell' }).props.style.height).toBe(34);
     expect(createGenerationIntent).toHaveBeenCalledWith('owner', expect.objectContaining({ body: expect.objectContaining({ questionCount: 6, questionTypes: ['matching'] }) }));
+    await act(async () => resolveIntent({ key: 'test-intent' } as Awaited<ReturnType<typeof createGenerationIntent>>));
+    expect(nodes('Pressable').find(node => node.props.accessibilityLabel === 'Generate quiz')!.props.accessibilityState.busy).toBe(false);
   });
   it('caps a custom count when Matching is selected', async () => {
     await open();

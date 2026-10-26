@@ -32,7 +32,6 @@ import { ExperienceApiError, experienceRequest } from "../../services/experience
 import { acceptGeneration, createGenerationIntent } from "../../services/generationRecovery";
 import { useQueueItems } from "../queue/useQueueItems";
 import { useGraceNavigation } from "./useGraceNavigation";
-import { GenerationLayout } from "./GenerationLayout";
 import { SyncStatus } from "../sync/SyncStatus";
 import { useCanvasSync } from "../sync/CanvasSyncProvider";
 import { available, capabilityNote, generateCourseDestination, generateCourseGroups, generateCourseStatus, matchesCourseQuery, materialTypes, moduleGroups } from "./presentation";

@@ -10,7 +10,9 @@ vi.mock('./SourcePageSnapshot', () => ({ SourcePageSnapshot: 'SourcePageSnapshot
 vi.mock('../../services/reviewerImages',()=>({useReviewerImages:()=>({data:null,refreshOnce:async()=>false})}));
 vi.mock('react-native-safe-area-context', () => ({ SafeAreaView: 'SafeAreaView' }));
 vi.mock('./ShareReviewerMenu', () => ({ ShareReviewerMenu: 'ShareReviewerMenu' }));
+vi.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
 vi.mock("react-native", () => ({
+  StyleSheet: { hairlineWidth: .5 },
   View: "View",
   Text: "Text",
   TextInput: "TextInput",

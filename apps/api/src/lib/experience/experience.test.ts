@@ -338,8 +338,8 @@ describe('Library ownership and persisted output', () => {
     ] });
     repo.materialReviewers = vi.fn(async () => new Map([[descriptor.id, 'artifact']]));
     repo.reviewerDetail = vi.fn(async () => ({ artifactId: 'artifact', payload, summary: {
-      id: 'artifact:artifact', type: 'reviewer', title: 'Cells', course: null, sourceId: null, sourceTitle: null,
-      activityId: null, createdAt: date, updatedAt: date, lastOpenedAt: null, status: 'completed', relatedArtifactIds: [],
+      id: 'artifact:artifact', type: 'reviewer' as const, title: 'Cells', course: null, sourceId: null, sourceTitle: null,
+      activityId: null, createdAt: date, updatedAt: date, lastOpenedAt: null, status: 'completed' as const, relatedArtifactIds: [],
     } }));
     repo.librarySummary = vi.fn(async () => null);
     repo.exactRows = async <T extends ExperienceTable>(table: T) => repo.rows(table, 'owner');
