@@ -1,0 +1,40 @@
+import { createElement } from 'react';
+import { act, create, type ReactTestRenderer } from 'react-test-renderer';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { GlassPill } from './GlassPill';
+const theme = vi.hoisted(() => ({ mode: 'dark', reducedMotion: false }));
+vi.mock('../design/theme', () => ({ useTheme: () => theme }));
+vi.mock('react-native', () => ({ ActivityIndicator: 'ActivityIndicator', Pressable: 'Pressable', Text: 'Text', View: 'View', StyleSheet: { hairlineWidth: .5 } }));
+vi.mock('expo-linear-gradient', () => ({ LinearGradient: 'LinearGradient' }));
+let tree: ReactTestRenderer | undefined;
+beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true); theme.mode = 'dark'; theme.reducedMotion = false; });
+afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; vi.unstubAllGlobals(); });
+it.each(['lg', 'md', 'sm'] as const)('uses only vector geometry with a clipped highlight and 44px target: %s', async size => {
+  const press = vi.fn(); await act(async () => { tree = create(createElement(GlassPill, { size, label: 'Plan', sub: '3 blocks ready', accessibilityLabel: 'Plan your free time', onPress: press })); });
+  const shell = tree!.root.findByProps({ testID: 'glass-pill-shell' }), height = size === 'lg' ? 52 : size === 'md' ? 46 : 34;
+  expect(shell.props.style).toMatchObject({ height, borderRadius: height / 2, overflow: 'hidden', borderWidth: 1 });
+  expect(tree!.root.findByProps({ testID: 'glass-pill-highlight' }).props.style).toMatchObject({ left: 12, right: 12, height: .5 });
+  expect(tree!.root.findAll(node => /^(GLView|Canvas|Image|BlurView|WebView)$/.test(String(node.type)))).toHaveLength(0);
+  const button = tree!.root.findByType('Pressable' as never);
+  expect(button.props.style({ pressed: false }).minHeight).toBe(44); expect(button.props.accessibilityLabel).toBe('Plan your free time');
+  await act(async () => button.props.onPress()); expect(press).toHaveBeenCalledOnce();
+  expect(button.props.style({ pressed: true }).transform).toEqual([{ scale: .98 }]);
+});
+it.each(['light', 'dark'])('uses the specified monochrome theme and busy state: %s', async mode => {
+  theme.mode = mode; const press = vi.fn(); await act(async () => { tree = create(createElement(GlassPill, { size: 'md', label: 'Generating quiz', busy: true, onPress: press })); });
+  const button = tree!.root.findByType('Pressable' as never);
+  expect(button.props.accessibilityState).toMatchObject({ busy: true, disabled: true });
+  expect(button.props.style({ pressed: true }).opacity).toBe(.75);
+  expect(tree!.root.findByType('ActivityIndicator' as never).props.color).toBe(mode === 'dark' ? '#f2efe8' : '#141415');
+  await act(async () => button.props.onPress()); expect(press).not.toHaveBeenCalled();
+  theme.reducedMotion = true;
+  await act(async () => tree!.update(createElement(GlassPill, { size: 'md', label: 'Generating quiz', busy: true })));
+  expect(tree!.root.findAllByType('ActivityIndicator' as never)).toHaveLength(0);
+  expect(tree!.root.findByProps({ testID: 'glass-pill-static-spinner' })).toBeTruthy();
+  expect(button.props.style({ pressed: true }).transform).toEqual([{ scale: 1 }]);
+});
+it('disables ordinary presses and preserves expanded semantics', async () => {
+  const press = vi.fn(); await act(async () => { tree = create(createElement(GlassPill, { size: 'lg', label: 'Plan', disabled: true, accessibilityExpanded: true, onPress: press })); });
+  const button = tree!.root.findByType('Pressable' as never); await act(async () => button.props.onPress());
+  expect(press).not.toHaveBeenCalled(); expect(button.props.accessibilityState).toMatchObject({ disabled: true, expanded: true });
+});

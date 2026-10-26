@@ -34,6 +34,7 @@
     "expo-gl": "~57.0.2",
     "expo-haptics": "~57.0.3",
     "expo-image-picker": "~57.0.20",
+    "expo-linear-gradient": "~57.0.2",
     "expo-linking": "~57.0.13",
     "expo-media-library": "~57.0.5",
     "expo-notifications": "~57.0.23",
