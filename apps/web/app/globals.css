@@ -2555,6 +2555,40 @@ details[open] > :not(summary) {
 
 /* TP2: navigation glass shell, flat opaque planning content. */
 .planning-control { position: relative; width: 100%; }
+
+/* Vector pill family. Highlights are inset and clipped by the rounded shell. */
+button.glass-pill {
+  position: relative; overflow: hidden; box-sizing: border-box; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  width: fit-content; height: 46px; min-height: 0; padding: 0 22px;
+  border-radius: 999px; border: 1px solid rgba(20,20,21,.12);
+  color: #141415; font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: .01em;
+  background: linear-gradient(180deg, rgba(255,255,255,.95), rgba(255,255,255,.6));
+  box-shadow: inset 0 1px 0 #fff, 0 6px 16px rgba(20,20,21,.08);
+  cursor: pointer; transition: border-color .15s, transform .1s;
+}
+[data-theme="dark"] button.glass-pill {
+  color: #f2efe8; border-color: rgba(255,255,255,.13);
+  background: linear-gradient(180deg, rgba(255,255,255,.075), rgba(255,255,255,.02));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 6px 18px rgba(0,0,0,.35);
+}
+button.glass-pill:hover:not(:disabled) { border-color: rgba(20,20,21,.22); }
+[data-theme="dark"] button.glass-pill:hover:not(:disabled) { border-color: rgba(255,255,255,.22); }
+button.glass-pill:active:not(:disabled) { transform: scale(.98); }
+button.glass-pill:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+button.glass-pill:disabled { opacity: .75; cursor: default; }
+button.glass-pill-lg { height: 52px; min-width: 232px; font-size: 16px; }
+button.glass-pill-sm { height: 34px; padding-inline: 14px; font-size: 13px; }
+.glass-pill-dot { width: 4px; height: 4px; border-radius: 50%; background: currentColor; opacity: .3; flex-shrink: 0; }
+.glass-pill-sub { font-size: 14px; font-weight: 400; color: #5d5a55; }
+[data-theme="dark"] .glass-pill-sub { color: #bdb9b1; }
+.glass-pill-spinner { flex-shrink: 0; animation: glass-pill-spin 1s linear infinite; }
+@keyframes glass-pill-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  button.glass-pill { transition: none; }
+  button.glass-pill:active:not(:disabled) { transform: none; }
+  .glass-pill-spinner { animation: none; }
+}
 .plan-action, .plan-action:hover, .plan-action:active {
   position: relative; isolation: isolate; display: flex; align-items: center; justify-content: center;
   width: 100%; height: 48px; min-height: 44px; padding: 0; overflow: hidden;
