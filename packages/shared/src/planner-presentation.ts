@@ -31,7 +31,7 @@ export function draftWithOverrides(data: PlanningCandidates, draft: PlanningDraf
 export function plannerBlocks(plan: DeterministicStudyPlan | null, candidates: PlanningCandidates | null = null, timeline: readonly TodayItem[] = []): readonly PlannerBlock[] {
   if (!plan) return timeline.filter(item => item.kind === 'study_session' && item.status === 'planned' && item.startAt && item.endAt)
     .sort((a, b) => Date.parse(a.startAt!) - Date.parse(b.startAt!)).map(item => ({
-      key: item.id, selectionKey: item.reviewer ? `reviewer:${item.reviewer.id}` : item.task ? `task:${item.task.id}` : '', targetKey: item.reviewer ? `reviewer:${item.reviewer.id}` : item.task ? `task:${item.task.id}` : item.id,
+      key: item.id, selectionKey: item.reviewer ? `reviewer:${item.reviewer.id.replace(/^artifact:/u, '')}` : item.task ? `task:${item.task.id}` : '', targetKey: item.reviewer ? `reviewer:${item.reviewer.id.replace(/^artifact:/u, '')}` : item.task ? `task:${item.task.id}` : item.id,
       title: item.title, kind: item.reviewer ? 'reviewer' : 'task', id: item.reviewer?.id ?? item.deepLinkTarget.id,
       courseId: item.course?.id ?? null, start: plannerShortTime(new Date(item.startAt!).getHours() * 60 + new Date(item.startAt!).getMinutes()),
       minutes: Math.round((Date.parse(item.endAt!) - Date.parse(item.startAt!)) / 60000), savedItem: item,

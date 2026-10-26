@@ -40,4 +40,5 @@ it('saved blocks use explicit work identities and leave legacy unknown targets u
   const saved = { id: 'session:one', kind: 'study_session', status: 'planned', title: 'Synthetic saved task', startAt: range.startsAt, endAt: range.endsAt, reviewer: undefined, task: { id: id(2) } } as import('./experience').TodayItem;
   expect(plannerBlocks(null, data, [saved])[0]?.selectionKey).toBe('task:' + id(2));
   expect(plannerBlocks(null, data, [{ ...saved, task: undefined }])[0]?.selectionKey).toBe('');
+  expect(plannerBlocks(null, data, [{ ...saved, task: undefined, reviewer: { id: 'artifact:' + id(4) } }])[0]?.selectionKey).toBe('reviewer:' + id(4));
 });
