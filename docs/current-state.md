@@ -1,3 +1,28 @@
+<!-- RR1b verification begin -->
+## RR1b TP2e verification: FAILED at STEP 1 (2026-10-26)
+
+Finite owner scope: verify TP2e at HEAD, record readiness supersessions and stop
+before FS12. Fresh shared focused tests pass 9/9 and mobile PlanButton3d 7/7;
+web Plan glass passes 17 and fails 9 (0 skips), exit 1. Every dark-mode
+pearl/gold/green case at 390/768/1280 fails the unchanged minimum-row-luminance
+threshold .01 (observed .00086193-.00144814). **33 passed / 9 failed / 0 skipped**
+in total. This is a numeric assertion failure, not a timeout.
+
+The mandatory unattended failure rule ends RR1b without product edits. Full
+suites, typecheck/lint/build/export and readiness dry run/tests are NOT RUN.
+No acceptance completion X or manifest supersessions were created; the backed-up
+manifest and all 14 historical status/progress records remain unchanged.
+QL1/QL1b require fresh X-ending proof because TP2e changes QL1's globals.css.
+Historical TP2d/QL1c PASS records below remain historical and do not certify TP2e.
+
+[Failure, exact commands/counts and retained captures](ai/acceptance/tp2e-plan-button-glass-pill.md).
+Next action: check-in queues a scoped TP2e gate fix, then fresh verification
+and readiness reconciliation. **Roadmap is not ready for FULLSEND.** Rollout
+and Device checks are NOT RUN owner steps; live/native state is UNVERIFIED
+(owner to confirm). No release/provider/database/env-file/push action occurred.
+Endpoint RR1b; do not start FS12 or another roadmap item in this run.
+<!-- RR1b verification end -->
+
 <!-- QL1 checkpoint begin -->
 ## QL1c Queue miniature: LOCAL PASS (2026-10-26)
 

@@ -11819,3 +11819,91 @@ Scheduler/provider state, native GL/Realme appearance and physical performance.
 No deploy, remote service/SQL, migration application, Scheduler/email action,
 env-file edit, push, OTA/EAS or device action occurred. RR1 endpoint is STOPPED;
 no further roadmap/release work was started.
+
+
+## RR1b TP2e verification: FAILED at STEP 1 (2026-10-26)
+
+Status: **FAILED** under unattended gate rule 5 and owner answer 5. Expected
+branch matches; tested HEAD b383cd79 contains owner-approved TP2e c8cfb180
+(11 source/test files) followed only by RR1 documentation. No product edit
+or failing product change was made by this run.
+
+FRESH focused shared: **9 passed / 0 failed / 0 skipped, 2 files**, exit 0;
+mobile PlanButton3d: **7 passed / 0 failed / 0 skipped, 1 file**, exit 0;
+web Plan glass: **17 passed / 9 failed / 0 skipped, 1 failed file**, exit 1.
+Total: **33 passed / 9 failed / 0 skipped**. Exact failing command:
+
+`npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/today/plan-glass.browser.test.ts`
+
+All nine dark pearl/gold/green cases at 390/768/1280 fail the unchanged
+minimum-row-luminance > .01 assertion (line 166), observed
+.0008619318695220024-.0014481439699167338. There are no timeout failures.
+Two earlier shared launcher attempts exited 1 before any test (0 tests each)
+because Windows backslash preload quoting lost separators; forward-slash
+quoting fixed the launcher. Both failed logs are retained. No assertion or
+deadline was changed, and the deterministic numeric failure was not retried.
+
+Full shared/mobile/web suites, typecheck/lint, direct API/web builds, offline
+Android export, root build: **NOT RUN, 0 full suites / 0 build gates** due to
+the mandatory stop. Readiness validator and readiness.test.js: **NOT RUN,
+0 runs / 0 tests**. FRESH working/staged diff hygiene **2/2 PASS**, exit 0,
+for the documentation checkpoint; an initial working diff also passed (3/3
+hygiene commands total). No CACHED result is promoted.
+
+[TP2e failure acceptance](acceptance/tp2e-plan-button-glass-pill.md) lists all
+11 changed paths and commands. Evidence under tmp/overnight/RR1b includes
+gates.json, receipts.jsonl, counts.json, failure-summary.json and all logs.
+Fresh Chromium captures: **31 PNGs / 18 metrics files / 27 rest-wave samples**
+under test-artifacts/TP2d; requested 390/1280 light/dark rest captures exist.
+Dark cases stop before their wave measurements. Browser evidence is not
+native/device acceptance. The 390 dark pearl rest image was inspected locally.
+
+STEP 0 done; STEP 1 partial/FAILED; STEP 2 completion, STEP 3 and STEP 4
+NOT RUN. QL1's source chain intersects TP2e at apps/web/app/globals.css, so
+QL1/QL1b need fresh X-ending proof, as authorized. **No completion X or
+supersession entries were created.** Manifest backup:
+readiness-evidence.json.bak-20261026-110051-pre-rr1b; original remains
+byte-identical, SHA-256 b744f47cfebc88ca2118d6d003e3e8bef3a6870799e6de59ea354ee2c612da12.
+All 14 original/prerequisite status/progress files are unchanged; all 23 owner
+untracked paths remain unchanged and already match the exact leftLocal pins.
+No runner state or other item's status/progress was edited.
+
+Evidence-write deviation: Sharp's native toFile bypassed the JavaScript fs
+redirect and overwrote three ignored historical composites under
+tmp/overnight/TP2d: pearl-comparison.png, gold-comparison.png and
+green-comparison.png. Their prior bytes were not snapshotted and cannot be
+restored from this run; they must no longer be cited as historical TP2d images.
+Fresh copies now reside under RR1b; evidence-write-deviation.json pins each
+affected path, timestamp and hash. A modification-time audit found no other
+changed files in TP2d's root (not a pre/post digest proof for raw captures).
+The status/progress/manifest/owner pins above remain unchanged. No supersession
+uses these images. This accidental scope deviation is recorded explicitly.
+
+Commit: scoped local documentation checkpoint titled
+`docs(today): record RR1b TP2e gate failure`, author
+galaxymaxp <omgraythekid@gmail.com>; exact hash in Git and RR1b.status/progress.
+Owned paths: TP2e acceptance, current-state.md, roadmap.md, current_sprint.md,
+and this handoff. No tmp/generated output, UI/, apps/mobile/.gitignore or
+supabase/.temp/ artifact is staged. Roadmap explicitly remains unready for release.
+
+UNVERIFIED (owner to confirm): live served revision, database/Scheduler/provider
+state, native GL/Realme presentation, other browsers/assistive technology and
+physical FPS/power. Validation used repo-local temp/cache, telemetry off,
+EXPO_NO_DOTENV=1 / EXPO_OFFLINE=1, env exclusion and loopback-only networking.
+No deploy, remote service/SQL/migration application, Scheduler/email, env-file
+edit, push, OTA/EAS, native build/install or device action occurred.
+
+**Owner steps remaining**:
+
+- Check-in queues the scoped TP2e gate fix, followed by fresh RR1b full gates,
+  committed acceptance and supersession reconciliation; no open decision is
+  requested by this run.
+- Rollout NOT RUN: skipped entirely; FS12 must rerun readiness after successful
+  repair/verification and at a stable runner boundary, before any release.
+- Device checks NOT RUN: skipped entirely; website/Realme Plan and Queue
+  appearance, Reduce Motion, native presentation and physical performance.
+- Confirm the UNVERIFIED live state separately. Vercel CLI is absent;
+  strongly recommend `npm i -g vercel` for future authorized env/deploy/log
+  tooling; installation NOT RUN.
+
+Endpoint RR1b FAILED. No FS12, release, FULLSEND or next roadmap task started.
