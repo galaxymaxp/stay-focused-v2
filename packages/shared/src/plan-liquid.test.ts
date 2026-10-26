@@ -10,6 +10,11 @@ it('builds the exact orb sheet in a weightless slab and preserves the TP2b orb f
   expect(program).not.toMatch(/\b(surface|filled|uSlosh)\b/);
   expect(createHash('sha256').update(orb.mesh.material.fragmentShader).digest('hex')).toBe('995158629143190bbfc6914d79a8bf45a1005378eb361d7978ceea98bae977e7');
   expect(slab.mesh.material.vertexShader).not.toContain('rippleHeight');
-  expect(program).toContain('x *= uHalfSize / uRadius;');
+  expect(program).toContain('x *= uLiquidScale;');
+  expect(program).toContain('x.xy = -x.xy;');
+  expect(program).not.toContain('x *= uHalfSize / uRadius;');
+  expect(program).not.toContain('exp(-closest * closest * 22.0)');
+  expect(program).toContain('vec3 litByLiquid');
+  expect(slab.uniforms.uLiquidScale.value.toArray()).toEqual([0.75, 0.32, 0.7]);
   orb.dispose(); slab.dispose();
 });

@@ -134,6 +134,40 @@ void main() {
 }`;
 
 // The sphere program is immutable; the slab changes containment and ray exit only.
+// The slab is a window onto one slice through the orb's liquid ball: its width spans the
+// liquid's diameter and its thin depth stands in for the ball's full depth, so the field
+// shows the orb's single soft fade (half a turn away from the orb's, so the two never mirror).
+// Dark glass is lit only by that liquid: walls, edges and reflections fade to near black
+// where it is absent. Light glass keeps its studio reflections.
+const SLAB_GLASS = `
+  vec3 exitP = (oc + rd * travel) / uHalfSize;
+  vec2 wallDist = 1.0 - abs(exitP.xy);
+  float sideX = 1.0 - smoothstep(0.0, 0.045, wallDist.x);
+  float sideY = 1.0 - smoothstep(0.0, 0.16, wallDist.y);
+  vec3 wallN = normalize(vec3(sign(exitP.x) * sideX, sign(exitP.y) * sideY, 0.0001));
+  float wall = max(sideX, sideY);
+  float wallSheet = smoothstep(0.3, 0.9, liquid(uSpin * (exitP * uLiquidScale * vec3(-1.0, -1.0, 1.0))));
+  vec3 litByLiquid = mix(uDeep, uBase, wallSheet) * wallSheet * 1.1 + uGlowColor * wallSheet * 0.25;
+  vec3 inner = mix(litByLiquid, studio(reflect(rd, -wallN)) + uGlowColor * 0.35, uLightMode);
+  float keySide = mix(1.0, 0.3 + 0.7 * smoothstep(-0.6, 0.8, dot(wallN.xy, normalize(vec2(0.6, 0.8)))), 1.0 - uLightMode);
+  float wallGain = mix(1.0, 1.9, uLightMode);
+  glow += (1.0 - cover * 0.5) * inner * wall * wallGain * keySide;
+  float backLip = (1.0 - smoothstep(0.0, 0.12, wallDist.y)) * step(0.0, exitP.y);
+  float liquidGlow = clamp(cover * 1.4, 0.0, 1.0);
+  vec3 color = glow + studio(reflect(-v, n)) * fresnel * mix(0.25 + 0.75 * liquidGlow, 1.0, uLightMode);
+  color += uGlowColor * backLip * 0.12 * (1.0 - cover);
+  cover = max(cover, wall * 0.35 * wallGain);
+  vec2 shadeP = exitP.xy * vec2(uHalfSize.y / uHalfSize.x * 2.2, 1.0);
+  float hollow = smoothstep(0.15, 1.05, length(shadeP));
+  float floorShade = smoothstep(0.35, -1.0, exitP.y);
+  float shade = (1.0 - uLightMode) * clamp(2.4 * (0.7 * hollow + 0.35 * floorShade), 0.0, 0.93);
+  color *= 1.0 - shade * (1.0 - 0.6 * cover);
+  float edge = (1.0 - facing) * pow(max(dot(reflect(-v, n), normalize(vec3(-0.35, 0.85, 0.4))), 0.0), 18.0);
+  edge *= mix(0.12 + 0.88 * clamp(max(liquidGlow, wallSheet), 0.0, 1.0), 1.0, uLightMode);
+  float edgeGain = mix(1.0, 0.7, uLightMode);
+  color += mix(uBase, vec3(0.85), uLightMode) * edge * edgeGain;
+  cover = max(cover, edge * 0.6 * edgeGain);
+`;
 // Reuse the orb packet in liquid coordinates, never in shell vertices.
 const SLAB_VERTEX = `varying vec3 vNormal;
 varying vec3 vWorldPosition;
@@ -146,7 +180,9 @@ void main() {
 const WAVE_PACKET = VERTEX.slice(0, VERTEX.indexOf('varying vec3'))
   + VERTEX.slice(VERTEX.indexOf('float rippleHeight'), VERTEX.indexOf('void main()'));
 const SLAB_FRAGMENT = FRAGMENT
-  .replace('uniform vec3 uCenter;', 'uniform vec3 uCenter;\nuniform vec3 uHalfSize;\nuniform float uCornerRadius;')
+  .replace('  glow += (1.0 - cover * 0.55) * uGlowColor * exp(-closest * closest * 22.0) * light * 0.8;\n', '')
+  .replace('  vec3 color = glow + studio(reflect(-v, n)) * fresnel;', SLAB_GLASS)
+  .replace('uniform vec3 uCenter;', 'uniform vec3 uCenter;\nuniform vec3 uHalfSize;\nuniform float uCornerRadius;\nuniform vec3 uLiquidScale;')
   .replace('void main() {', WAVE_PACKET + '\nvoid main() {')
   .replace('float travel = max(-b + sqrt(max(b * b - dot(oc, oc) + uRadius * uRadius, 0.0)), 0.0);', `
   vec3 exits = (sign(rd) * uHalfSize - oc) / (sign(rd) * max(abs(rd), vec3(0.00001)));
@@ -157,8 +193,12 @@ const SLAB_FRAGMENT = FRAGMENT
     float edge = length(max(abs(p) - (uHalfSize.xy - uCornerRadius), 0.0)) - uCornerRadius;
     float held = (1.0 - smoothstep(-0.035, 0.0, edge)) * (1.0 - smoothstep(0.85, 1.0, abs(x.z)));
     vec3 waveDirection = normalize(vec3(x.xy, 1.0));
-    x *= uHalfSize / uRadius;
+    x *= uLiquidScale;
+    x.xy = -x.xy;
     x += waveDirection * rippleHeight(waveDirection);`);
+
+/** Slab-normalized volume to orb liquid units: the held liquid ball spans about 0.75 radii. */
+export const ORB_SLAB_LIQUID_SCALE = { x: 0.75, y: 0.32, z: 0.7 } as const;
 
 export interface OrbSlabVolume {
   readonly halfSize: THREE.Vector3;
@@ -195,6 +235,7 @@ export function createOrbBody(geometry: THREE.BufferGeometry = new THREE.SphereG
     uWaves: { value: Array.from({ length: ORB_MAX_IMPULSES }, () => new THREE.Vector4(0, 0, 1, -1)) },
     uHalfSize: { value: slab?.halfSize.clone() ?? new THREE.Vector3(1, 1, 1) },
     uCornerRadius: { value: slab?.cornerRadius ?? 0 },
+    uLiquidScale: { value: new THREE.Vector3(ORB_SLAB_LIQUID_SCALE.x, ORB_SLAB_LIQUID_SCALE.y, ORB_SLAB_LIQUID_SCALE.z) },
   };
   const material = new THREE.ShaderMaterial({
     uniforms, vertexShader: slab ? SLAB_VERTEX : VERTEX, fragmentShader: slab ? SLAB_FRAGMENT : FRAGMENT,

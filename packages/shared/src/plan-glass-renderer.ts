@@ -17,10 +17,13 @@ export function planImpulse(impulses: readonly OrbImpulse[], x: number, y: numbe
     { at: now, direction: { x: nx / length, y: ny / length, z: 1 / length } }].slice(-ORB_MAX_IMPULSES);
 }
 
+/** The pill keeps its bevel highlights inside the button bounds. */
+export const PLAN_GLASS_FIT = 0.95;
+
 /** The bevel is included in the token radius and the requested outer bounds. */
 export function createPlanShell(width: number, height: number, radius: number) {
   const aspect = width / height;
-  const bevel = 0.075, depth = 0.12;
+  const bevel = 0.1, depth = 0.3;
   const w = aspect - 2 * bevel, h = 1 - 2 * bevel;
   const r = Math.max(0.001, Math.min(radius / height - bevel, h / 2, w / 2));
   const x = -w / 2, y = -h / 2;
@@ -33,7 +36,7 @@ export function createPlanShell(width: number, height: number, radius: number) {
   const geometry = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true,
     bevelThickness: bevel, bevelSize: bevel, bevelSegments: 6, steps: 1, curveSegments: 16 });
   geometry.translate(0, 0, -depth / 2);
-  return { geometry, halfSize: new THREE.Vector3(aspect / 2, 0.5, depth / 2 + bevel), cornerRadius: radius / height };
+  return { geometry, halfSize: new THREE.Vector3(aspect / 2, 0.5, depth / 2 + bevel), cornerRadius: Math.min(radius / height, 0.5) };
 }
 
 export interface PlanGlassFrame {
@@ -74,7 +77,7 @@ export function createPlanGlass(renderer: THREE.WebGLRenderer, atlas: THREE.Text
         body = createOrbBody(shell.geometry, shell);
         root.add(body.mesh);
         camera.aspect = frame.width / frame.height;
-        camera.zoom = 2 * (camera.position.z - shell.halfSize.z) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+        camera.zoom = 2 * (camera.position.z - shell.halfSize.z) * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * PLAN_GLASS_FIT;
         camera.position.y = 0;
         camera.lookAt(0, 0, 0); camera.updateProjectionMatrix(); camera.updateMatrixWorld();
         ambient.mesh.scale.set(frame.width / frame.height / 2, 0.25, 1);

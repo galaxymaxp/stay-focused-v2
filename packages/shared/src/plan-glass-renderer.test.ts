@@ -24,6 +24,11 @@ it.each([[358, 48, 12], [358, 52, 12], [300, 48, 8]])('creates a closed slab wit
   expect(box.max.y - box.min.y).toBeCloseTo(1, 4);
   expect(box.max.z - box.min.z).toBeGreaterThan(0.25);
   expect(shell.cornerRadius).toBe(radius / height);
+  const pill = createPlanShell(width, height, 999);
+  expect(pill.cornerRadius).toBe(0.5);
+  pill.geometry.computeBoundingBox();
+  expect(pill.geometry.boundingBox!.max.y - pill.geometry.boundingBox!.min.y).toBeCloseTo(1, 4);
+  pill.geometry.dispose();
   shell.geometry.dispose();
 });
 it('retains the orb impulse model, maps both press axes and bounds rapid taps without changing colour', () => {

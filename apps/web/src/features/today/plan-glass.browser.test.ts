@@ -325,15 +325,15 @@ it('withdraws GL pixels immediately on context loss and restores the original TP
   } finally { await page.close(); }
 }, 30_000);
 
-it('follows the responsive radius token even when the column width stays unchanged', async () => {
+it('keeps the pill radius (half its height) at every width, without resizing', async () => {
   const { page, errors } = await open(1280);
   try {
     await ready(page);
-    expect(await page.locator('.plan-action').evaluate(el => getComputedStyle(el).borderRadius)).toBe('8px');
-    expect(await page.evaluate(() => (window as unknown as ProbeWindow).__planLive().radius)).toBeCloseTo(8 / 48);
+    expect(await page.locator('.plan-action').evaluate(el => getComputedStyle(el).borderRadius)).toBe('24px');
+    expect(await page.evaluate(() => (window as unknown as ProbeWindow).__planLive().radius)).toBeCloseTo(24 / 48);
     const width = await page.locator('.plan-action').evaluate(el => el.clientWidth);
     await page.setViewportSize({ width: 760, height: 700 });
-    await page.waitForFunction(() => (window as unknown as ProbeWindow).__planLive().radius === 12 / 48);
+    await page.waitForFunction(() => (window as unknown as ProbeWindow).__planLive().radius === 24 / 48);
     expect(await page.locator('.plan-action').evaluate(el => el.clientWidth)).toBe(width);
     expect(errors).toEqual([]);
   } finally { await page.close(); }

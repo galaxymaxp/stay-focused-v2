@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import { View } from 'react-native';
 import * as THREE from 'three';
 import { createPlanGlassLoop, planImpulse, type PlanGlassFrame } from '@stay-focused/shared/plan-glass-renderer';
-import { radius } from '../../design/tokens';
+import { PLAN_PILL_RADIUS } from './planPill';
 import { threeContext } from '../generation-core/threeContext';
 import { loadGlassAtlas } from './glassAtlas';
 import type { OrbInteractionHandle } from '../generation-core/orbInteraction';
@@ -18,7 +18,7 @@ interface Props {
 const SCALE = 0.6;
 
 export function PlanGlassView({ width, mode, reducedMotion, live, interaction, handle, onReady, onFailure, onLoading }: Props) {
-  const runtime = useRef<PlanGlassFrame>({ width, height: 52, radius: radius.control, mode,
+  const runtime = useRef<PlanGlassFrame>({ width, height: 52, radius: PLAN_PILL_RADIUS, mode,
     reducedMotion, running: live, palette: () => interaction.state.current, light: dayOrbTones(720).position, glow: 0.9875, impulses: [] });
   runtime.current = { ...runtime.current, width, mode, reducedMotion, running: live, palette: () => interaction.state.current };
   const callbacks = useRef({ onReady, onFailure, onLoading }); callbacks.current = { onReady, onFailure, onLoading };

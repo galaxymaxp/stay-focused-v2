@@ -32,7 +32,7 @@ async function mount(open = vi.fn()) {
 }
 it('keeps a 52px accessible action, displays GL only after a complete frame and directs the wave toward the press', async () => {
   const open = await mount(); const shell = pressable().props.style;
-  expect(shell).toMatchObject({ height: 52, width: '100%', borderRadius: 12 });
+  expect(shell).toMatchObject({ height: 52, width: '100%', borderRadius: 26 });
   expect(pressable().props.accessibilityLabel).toBe('Plan your free time');
   expect(gl().props.interaction.state.current.colorIndex).toBe(0); expect(gl().parent!.props.style.opacity).toBe(0);
   gl().props.handle.current = { press: mocks.press };

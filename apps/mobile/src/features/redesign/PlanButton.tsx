@@ -4,7 +4,7 @@ import { Animated, AppState, Pressable } from 'react-native';
 import { useIsFocused } from 'expo-router/react-navigation';
 import { useTheme } from '../../design/theme';
 import { useOrbInteraction } from '../generation-core/orbInteraction';
-import { radius } from '../../design/tokens';
+import { PLAN_PILL_RADIUS } from './planPill';
 import { PlanButtonFallback } from './PlanButtonFallback';
 import { PlanGlassView, type PlanGlassHandle } from './PlanGlassView';
 
@@ -55,7 +55,7 @@ export function PlanButton({ onPress, disabled }: { onPress: () => void; disable
         }
         handle.current?.press(width && Number.isFinite(event.nativeEvent.locationX) ? event.nativeEvent.locationX / width * 2 - 1 : 0, Number.isFinite(event.nativeEvent.locationY) ? 1 - event.nativeEvent.locationY / 52 * 2 : 0);
         onPress();
-      }} style={{ height: 52, width: '100%', borderRadius: radius.control, overflow: 'hidden' }}>
+      }} style={{ height: 52, width: '100%', borderRadius: PLAN_PILL_RADIUS, overflow: 'hidden' }}>
       {width > 0 && <Animated.View pointerEvents="none" style={{ position: 'absolute', inset: 0, opacity: status === 'ready' ? 1 : 0 }}>
         <PlanGlassView width={width} mode={mode} reducedMotion={reducedMotion} live={live} interaction={interaction}
           handle={handle} onReady={ready} onFailure={fail} onLoading={startGate} />
