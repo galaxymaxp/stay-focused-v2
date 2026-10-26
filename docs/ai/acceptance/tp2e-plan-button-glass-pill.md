@@ -1,10 +1,11 @@
-# TP2e Plan glass pill: RR1b verification FAILED
+# TP2e Plan glass pill: RR1c verification FAILED
 
-Fresh local verification on 2026-10-26, branch `overnight/2026-10-15_feedback`,
-HEAD `b383cd79`; latest implementation `c8cfb180`. The later RR1 commit
-changes only documentation. **FAILED at STEP 1**, not release-ready.
-RR1b's unattended gate-failure rule and owner answer 5 require recording the
-failure and ending without product edits. No completion commit X was created.
+Local run 2026-10-26 on `overnight/2026-10-15_feedback`. Product implementation
+remains `c8cfb180`; the sole subsequent non-documentation change is the
+owner-authorized test commit **T = e52276f3**. **FAILED at STEP 1** under
+RR1c answer 7 and the unattended gate rule. The Plan contract correction passes,
+but full verification is incomplete and the roadmap is not release-ready.
+No completion commit X or supersession entry was created.
 
 ## Implementation inspected
 
@@ -24,121 +25,142 @@ TP2e's `git show --stat c8cfb180` lists exactly 11 files:
 | apps/web/app/globals.css | Uses 24px radius on the 48px web button. |
 | apps/web/src/features/today/plan-glass.browser.test.ts | Updates pill-radius assertions and test wording; retains the row-luminance assertion. |
 
-No application source, assertion, deadline, dependency or environment file was
-edited during RR1b. This report records verification of the accepted source;
-it does not certify TP2e from historical TP2d or QL1c gates.
+## RR1b failure and resolution
+
+RR1b (historical docs-only `4f06f193`) passed 33 tests and failed nine dark
+minimum-row-luminance assertions at the stale .01 floor. The owner approved
+TP2e's liquid-lit, near-black empty glass and explicitly authorized the one-file
+test correction. T keeps the light-mode `expect(sm.minRowLuminance).toBeGreaterThan(.01)`
+assertion unchanged. Dark mode requires finite minimum-row luminance > 0 and
+maximum-row luminance > **.05**. All step-fraction, hue-sample, hue-distance,
+error, silhouette, glyph, press, fallback and other assertions remain unchanged.
+No renderer/product code or deadline was changed.
+
+The pre-commit calibration passed **26/26**, including every dark rest/wave
+sample. RR1b supplies nine rest-only dark observations (it failed before wave
+capture); fresh RR1c supplies all **18 observations across nine dark cases and
+both waves**. The lowest observed maximum-row luminance across all 27 samples
+is **0.11052663233035252**; half is **0.05526331616517626**. The chosen **.05** floor
+is below that half-minimum. Post-T Plan verification separately passes 26/26.
+Complete observations are pinned locally in `luminance-calibration.json`;
+calibration captures are preserved separately from post-T captures.
+
+| Dark case | RR1b rest max | RR1c calibration rest max | RR1c calibration wave max |
+| --- | --- | --- | --- |
+| 1280-dark-gold | 0.11380908944399647 | 0.11380908944399647 | 0.11306921658160952 |
+| 1280-dark-green | 0.1115979013340506 | 0.1115979013340506 | 0.1107917987286249 |
+| 1280-dark-pearl | 0.13626019160175398 | 0.13626019160175398 | 0.13537237711522881 |
+| 390-dark-gold | 0.11354912442396285 | 0.11354912442396285 | 0.11273531399656607 |
+| 390-dark-green | 0.11127295201951852 | 0.11127295201951852 | 0.11052663233035252 |
+| 390-dark-pearl | 0.13599280021686005 | 0.13599280021686005 | 0.13504918406072014 |
+| 768-dark-gold | 0.11380908944399647 | 0.11380908944399647 | 0.11306921658160952 |
+| 768-dark-green | 0.1115979013340506 | 0.1115979013340506 | 0.1107917987286249 |
+| 768-dark-pearl | 0.13626019160175398 | 0.13626019160175398 | 0.13537237711522881 |
 
 ## Fresh results and exact commands
 
-All logs below are under `tmp/overnight/RR1b/gates/`; exact commands and exits
-are also in `tmp/overnight/RR1b/gates.json` and `receipts.jsonl`.
+Logs are under `tmp/overnight/RR1c/gates/`; `gates.json` has the required
+`[{name, command, exit, log}]` shape and retains the failure. `receipts.jsonl`
+records start/end times; `counts.json` and `failure-summary.json` record results.
+Calibration precedes T; every other application test below ran freshly at T.
 
-| Command | Evidence label and result |
+| Command | Result and log |
 | --- | --- |
-| npm run test --workspace @stay-focused/shared -- --maxWorkers=1 src/plan-glass-renderer.test.ts src/plan-liquid.test.ts src/orb-body-renderer.test.ts | FRESH PASS, 9 passed / 0 failed / 0 skipped, 2 files, exit 0; focused-shared-final.log. There is no standalone orb-body-renderer.test.ts; plan-liquid.test.ts exercises createOrbBody and pins the exact sphere fragment. |
-| npm run test --workspace @stay-focused/mobile -- --maxWorkers=1 src/features/redesign/PlanButton3d.test.ts | FRESH PASS, 7 passed / 0 failed / 0 skipped, 1 file, exit 0; focused-mobile.log. |
-| npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/today/plan-glass.browser.test.ts | FRESH FAIL, 17 passed / 9 failed / 0 skipped, 1 failed file, exit 1; focused-web.log. |
-| Shared / mobile / web full suites | NOT RUN, 0 full suites; mandatory stop on the focused TP2e failure. |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/today/plan-glass.browser.test.ts` | FRESH PASS, 26 passed / 0 failed / 0 skipped; 1 passing / 0 failing files; exit 0; calibration-web.log |
+| `npm run test --workspace @stay-focused/shared -- --maxWorkers=1 src/plan-glass-renderer.test.ts src/plan-liquid.test.ts src/orb-body-renderer.test.ts` | FRESH PASS, 9 passed / 0 failed / 0 skipped; 2 passing / 0 failing files; exit 0; focused-shared.log |
+| `npm run test --workspace @stay-focused/mobile -- --maxWorkers=1 src/features/redesign/PlanButton3d.test.ts` | FRESH PASS, 7 passed / 0 failed / 0 skipped; 1 passing / 0 failing files; exit 0; focused-mobile.log |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/today/plan-glass.browser.test.ts` | FRESH PASS, 26 passed / 0 failed / 0 skipped; 1 passing / 0 failing files; exit 0; focused-web.log |
+| `npm run test --workspace @stay-focused/shared -- --maxWorkers=1 src/orb-appearance.test.ts src/orb-ambient.test.ts` | FRESH PASS, 17 passed / 0 failed / 0 skipped; 2 passing / 0 failing files; exit 0; focused-orb-body.log |
+| `npm run test --workspace @stay-focused/shared -- --maxWorkers=1` | FRESH PASS, 900 passed / 0 failed / 0 skipped; 90 passing / 0 failing files; exit 0; shared.log |
+| `npm run test --workspace @stay-focused/mobile -- --maxWorkers=1` | FRESH PASS, 1732 passed / 0 failed / 0 skipped; 186 passing / 0 failing files; exit 0; mobile.log |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 --exclude **/*.browser.test.ts` | FRESH PASS, 544 passed / 0 failed / 0 skipped; 75 passing / 0 failing files; exit 0; web-unit.log |
+| `npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/components/course-options.browser.test.ts` | FRESH FAIL, 0 passed / 3 failed / 0 skipped; 0 passing / 1 failing files; exit 1; web-browser-01.log |
+| Remaining 12 web browser files | NOT RUN after mandatory stop; full web suite is incomplete. |
 | npm run typecheck -- --force | NOT RUN, 0 tasks. |
 | npm run lint -- --force | NOT RUN, 0 tasks. |
 | npm run build --workspace @stay-focused/api | NOT RUN, 0 builds. |
 | npm run build --workspace @stay-focused/web | NOT RUN, 0 builds. |
-| Offline Android JS/assets export | NOT RUN, 0 exports. |
+| npm run build --workspace @stay-focused/mobile -- --platform android --max-workers 1 --output-dir ../../tmp/overnight/RR1c/android-export | NOT RUN, 0 exports. |
 | npm run build -- --force --concurrency=1 --env-mode=loose | NOT RUN, 0 tasks. |
-| git diff --check / git diff --cached --check | FRESH PASS, 2/2 commands, exit 0, for the scoped documentation checkpoint; diff-final.log / cached-diff.log; initial working diff also passed (3/3 hygiene commands total). |
-| Readiness validator --before FS12 / node --test fullsend/readiness.test.js | NOT RUN, 0 validator runs / 0 readiness tests; STEP 1 gate failure precedes STEP 4. |
-| Workflow/provider/live suites | NOT APPLICABLE / NOT RUN; product behavior unchanged and remote calls prohibited. |
+| git diff --check / git diff --cached --check | FRESH PASS, 2/2 final documentation-checkpoint commands, exit 0; diff-final.log / cached-diff-final.log. T also had passing working/staged hygiene. |
+| Readiness CLI --before FS12 / node --test fullsend/readiness.test.js | NOT RUN, 0 runs / 0 tests; STEP 1 failed before STEP 4. |
+| API full / workflow / provider contract suites | NOT APPLICABLE to this test-only change; live flows NOT RUN. |
 
-Total executed test cases: **33 passed / 9 failed / 0 skipped**. Application
-checks: 2 passing commands and 1 failing command. Before the corrected shared
-run, two launches failed to load the preload because backslashes in the quoted
-Windows NODE_OPTIONS path were consumed. Each exited 1 with **0 tests run**;
-both logs (focused-shared.log and focused-shared-retry.log) are preserved.
-Forward-slash preload quoting corrected the launcher; no test was modified.
-No cached result is claimed. No browser timeout or timing flake occurred in
-this run. Low free memory (~199 MiB) was observed, but all nine failures are
-numeric assertion failures, not deadlines.
+Application totals: **3,261 passed / 3 failed / 0 skipped**, including 26
+pre-commit calibration passes. Post-T totals: **3,235 passed / 3 failed /
+0 skipped**. These executed-case totals include focused/full overlap; they
+are not a complete-web-suite PASS. Eight application commands pass; one fails.
+Full shared: **900/90 files**; full mobile: **1732/186 files**; web unit partition:
+**544/75 files**. Focused shared Plan: 9/2 files; additional orb regressions:
+17/2; mobile PlanButton3d: 7/1; Plan browser: 26/1. No standalone
+orb-body-renderer.test.ts exists; plan-liquid.test.ts exercises createOrbBody
+and pins the exact sphere fragment; orb-appearance/orb-ambient add coverage.
+No cached result is claimed and no failed attempt was discarded or retried.
 
-## Gate blocker
+## Gate blocker and evidence-write limitation
 
-Every dark-mode pearl/gold/green case at **390, 768 and 1280px** fails the
-unchanged `expect(sm.minRowLuminance).toBeGreaterThan(.01)` at
-`apps/web/src/features/today/plan-glass.browser.test.ts:166`.
-Observed dark minimum-row luminance ranges from **0.0008619318695220024** to
-**0.0014481439699167338**, below the required **0.01**. The 390px values are
-pearl .0014227378693412844, gold .0009354441131291228 and green
-.0008619318695220024. This assertion fails before the wave capture for each
-dark case. All nine light-mode pairs and the eight other test cases pass.
+Exact failing command:
+`npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/components/course-options.browser.test.ts`.
+It exits **1** with **0 passed / 3 failed / 0 skipped**, one failed file and
+**3 unhandled ENOENT errors**. All 320/768/1280 cases time out at their unchanged
+5000ms deadline (course-options.browser.test.ts:37).
 
-Fresh Chromium/SwiftShader evidence is retained under
-`tmp/overnight/RR1b/test-artifacts/TP2d/`: **31 PNGs, 18 paired-case metrics
-files, 27 rest/wave metric samples**. The PNG total includes 27 rest/wave
-captures, one actual-press image and three comparison composites; incomplete dark wave evidence
-is not claimed as passing. Requested 390/1280 light/dark rest captures exist.
-The 390 dark pearl capture was visually inspected locally. This is browser
-harness evidence, not physical-device or live-site acceptance.
+The temporary JavaScript filesystem redirect expects
+`tmp/overnight/RR1c/test-artifacts/LM1/web-options/1792986222213/entry.js`,
+which does not exist. esbuild's native writer instead creates the fresh ignored
+`tmp/overnight/LM1/web-options/1792986222213/entry.js`. Its existence and SHA-256
+are recorded in `esbuild-write-deviation.json`; a copy is retained under
+`RR1c/esbuild-failure/`. The server's redirected read throws ENOENT, so the
+browser never gets its script. This is an observed validation-tooling failure,
+not evidence of a product regression. It is not a timeout-only failure eligible
+for the prompt's isolated-retry allowance. The existing RR1b collector had not
+reached this test. RR1c answer 7 covers any fresh non-luminance gate failure,
+so the pipeline stops without repairing other tests, product code or collectors.
 
-TP2e intentionally introduced darker liquid-lit glass. RR1b cannot decide
-that this replaces an unchanged acceptance threshold, weaken the assertion,
-or repair product code. A separately scoped fix item must reconcile the
-implementation with the accepted contract and rerun the full fresh gates.
+Before any browser run, copied **14,900 TP2d files** into
+`tmp/overnight/RR1c/tp2d-backup/` and verified every SHA-256.
+After all browser runs, **0/14900 historical files changed** against
+those pins, including all three comparison composites. Calibration's native
+Sharp writes produced byte-identical composites; the later temporary preload
+also redirects Sharp.toFile into RR1c. No old composite was restored. The
+backed-up comparison images were already RR1b-overwritten images and must not
+be cited as original TP2d proof. `tp2d-before-hashes.json` and
+`historical-audit.json` retain the full audit.
 
-## Readiness evidence and scope
+## Scope and readiness
 
-STEP 0 confirms the correct branch, QL1c/TP2e PASS prerequisites and docs-only
-RR1 commit. QL1c's chain cannot use its old proof unchanged: TP2e alters
-`apps/web/app/globals.css`, which was also changed by the QL1 partial chain.
-The approved QL1/QL1b successors therefore need the fresh X-ending chain,
-as do TP2c and RR1. **No supersession entry was added** because the fresh gate
-failed before acceptance completion. STEP 2 completion, STEP 3 and STEP 4
-are NOT RUN. RR1b is FAILED, not the allowed ready self-reference outcome.
+STEP 0 is done; T is committed; STEP 1 is partial/FAILED. STEP 2 acceptance
+completion X, STEP 3 manifest additions and STEP 4 validator/tests are NOT RUN.
+QL1/QL1b still need an X-ending chain because TP2e changed their globals.css.
+No historical PASS is promoted to current TP2e release verification.
 
-The external manifest was backed up to
-`readiness-evidence.json.bak-20261026-110051-pre-rr1b` and remains byte-identical
-to that backup (SHA-256
-`b744f47cfebc88ca2118d6d003e3e8bef3a6870799e6de59ea354ee2c612da12`).
-All **14** prerequisite/original status/progress files remain byte-identical
-to their inventory pins; all **23** untracked owner artifacts remain unchanged
-and already match their exact leftLocal pins. No tracked change was waived.
-Local evidence: `step0-findings.json`, `counts.json`, `failure-summary.json`,
-`gates.json`, `receipts.jsonl` and the gate logs under RR1b.
+Manifest backup: `readiness-evidence.json.bak-20261026032823-pre-rr1c`.
+The manifest remains byte-identical, SHA-256
+`b744f47cfebc88ca2118d6d003e3e8bef3a6870799e6de59ea354ee2c612da12`. All **16** original/prerequisite status/progress files
+and **23** owner artifacts remain byte-identical; no tracked change was waived.
+Inventory, planned-but-unrun commands and failure evidence remain under RR1c.
+Prepared unused local scripts did not run STEP 2/3/4 or change the live queue,
+runner or manifest. No other item's status/progress was edited.
 
-Validation used repo-local TEMP/TMP/TMPDIR and npm/Turbo caches, telemetry off,
-EXPO_NO_DOTENV=1, EXPO_OFFLINE=1, env-file exclusion and a loopback-only Node
-network guard. JavaScript filesystem writes were redirected under RR1b;
-the native Sharp writer bypassed that redirect as documented below. No remote service, database, deployment,
-Scheduler/email, push, env-file edit, OTA/EAS, native build/install or device
-action occurred. No readiness test fixture was created outside the repo.
-
-## Evidence-write deviation
-
-Sharp's native `toFile` bypassed the JavaScript filesystem redirection and
-overwrote exactly these three ignored historical comparison composites:
-`tmp/overnight/TP2d/pearl-comparison.png`, `gold-comparison.png` and
-`green-comparison.png`. Their old bytes were not snapshotted and cannot be
-restored from this run. These originals must no longer be cited as historical
-TP2d imagery. The fresh images were copied into RR1b's capture folder and
-their paths, timestamps and SHA-256 hashes are recorded in
-`tmp/overnight/RR1b/evidence-write-deviation.json`. A modification-time audit
-found no other changed files in TP2d's root; prior raw capture byte digests were
-not collected, so this is not a pre/post hash proof for those raw captures.
-All 14 status/progress pins, manifest bytes and 23 owner artifact pins remain
-unchanged. No readiness supersession refers to these overwritten composites.
-This is an accidental evidence-write scope deviation, recorded without
-attempting to fabricate a restoration or historical PASS.
+Validation used repo-local TEMP/TMP/TMPDIR and caches, forward-slash preload
+paths, EXPO_NO_DOTENV=1, EXPO_OFFLINE=1, telemetry off, env-file exclusion and
+loopback-only Node/browser networking. No remote service, database/SQL,
+deployment, Scheduler/email, env-file edit, push, OTA/EAS or device action ran.
 
 ## Owner steps remaining
 
-- Check-in: queue the TP2e gate-fix item, then rerun RR1b's affected full suites,
-  required fresh gates, committed acceptance and supersession verification.
-- Rollout: **NOT RUN**, skipped entirely; FS12 FULLSEND must rerun readiness
-  after successful repair/acceptance and a stable runner boundary.
-- Device checks: **NOT RUN**, skipped entirely; website/Realme Plan and Queue
-  appearance, Reduce Motion, native presentation and physical performance.
-- Live revision/database/Scheduler/provider state, native GL, other real
-  browsers/assistive technology and physical performance are
+- Correct the temporary collector's native esbuild output/read-path mismatch,
+  then rerun the unfinished fresh gates at T, complete X and the five
+  supersessions, and run the required readiness validator/tests. No product
+  change or new owner decision is requested by this failure report.
+- Rollout **NOT RUN**, skipped entirely: FS12 FULLSEND after successful local
+  verification and readiness at a stable runner boundary.
+- Device checks **NOT RUN**, skipped entirely: website/Realme Plan and Queue
+  appearance in light/dark, Reduce Motion, native GL and physical performance.
+- Live served revision/database/Scheduler/provider state, native GL/Realme,
+  other browsers/assistive technology and physical FPS/power:
   **UNVERIFIED (owner to confirm)**.
 - Vercel CLI is absent. Strongly recommend `npm i -g vercel` for future
   separately authorized env/deploy/log tooling; installation NOT RUN.
 
-Endpoint: RR1b only. No FS12, release or FULLSEND work started.
+Endpoint: RR1c FAILED. No FS12, release, FULLSEND or next roadmap item started.

@@ -1,27 +1,36 @@
-<!-- RR1b verification begin -->
-## RR1b TP2e verification: FAILED at STEP 1 (2026-10-26)
+<!-- RR1c verification begin -->
+## RR1c TP2e verification: FAILED at STEP 1 (2026-10-26)
 
-Finite owner scope: verify TP2e at HEAD, record readiness supersessions and stop
-before FS12. Fresh shared focused tests pass 9/9 and mobile PlanButton3d 7/7;
-web Plan glass passes 17 and fails 9 (0 skips), exit 1. Every dark-mode
-pearl/gold/green case at 390/768/1280 fails the unchanged minimum-row-luminance
-threshold .01 (observed .00086193-.00144814). **33 passed / 9 failed / 0 skipped**
-in total. This is a numeric assertion failure, not a timeout.
+Finite owner scope: correct the stale dark Plan test, verify TP2e, record
+supersessions and stop before FS12. Test-only T **e52276f3** keeps every light
+and non-luminance assertion intact; dark minimum must be finite/>0 and peak
+must exceed .05 (lowest fresh peak .1105266). Calibration and post-T Plan
+browser runs each pass 26/26; product source remains c8cfb180.
 
-The mandatory unattended failure rule ends RR1b without product edits. Full
-suites, typecheck/lint/build/export and readiness dry run/tests are NOT RUN.
-No acceptance completion X or manifest supersessions were created; the backed-up
-manifest and all 14 historical status/progress records remain unchanged.
-QL1/QL1b require fresh X-ending proof because TP2e changes QL1's globals.css.
-Historical TP2d/QL1c PASS records below remain historical and do not certify TP2e.
+FRESH full shared **900/90 files**, mobile **1732/186 files**, web unit partition
+**544/75 files** PASS. Focused post-T Plan/shared/mobile/orb tests **59/59** PASS.
+The first full-web browser partition (course-options, 320/768/1280) fails
+**0 passed / 3 timeouts / 3 unhandled ENOENT errors / 0 skipped**: native
+esbuild wrote an ignored original LM1 path while the temporary collector read
+from the missing redirected RR1c path. This is validation-tooling evidence;
+no product regression is inferred. All executed cases, including calibration:
+**3,261 passed / 3 failed / 0 skipped**. No failed attempt is hidden or retried.
 
-[Failure, exact commands/counts and retained captures](ai/acceptance/tp2e-plan-button-glass-pill.md).
-Next action: check-in queues a scoped TP2e gate fix, then fresh verification
-and readiness reconciliation. **Roadmap is not ready for FULLSEND.** Rollout
-and Device checks are NOT RUN owner steps; live/native state is UNVERIFIED
-(owner to confirm). No release/provider/database/env-file/push action occurred.
-Endpoint RR1b; do not start FS12 or another roadmap item in this run.
-<!-- RR1b verification end -->
+The mandatory non-luminance gate stop leaves remaining browser files,
+typecheck/lint/build/export and readiness validator/tests **NOT RUN**.
+No completion X or manifest supersession was created; original manifest,
+16 historical status/progress files, 23 owner artifacts and all 14,900 backed-up
+TP2d file hashes remain unchanged. Full web verification is incomplete.
+**Roadmap is not ready for FULLSEND.**
+
+[Exact commands, counts, calibration and evidence](ai/acceptance/tp2e-plan-button-glass-pill.md).
+Next action: repair the temporary native esbuild evidence-path handling and
+rerun unfinished gates at T, then complete acceptance/supersessions/readiness.
+No open owner decision is requested. Rollout and Device checks are **NOT RUN**
+owner steps; live/native state is **UNVERIFIED (owner to confirm)**.
+No provider/database/deployment/env-file/push action occurred. Endpoint RR1c;
+do not start FS12, FULLSEND or another roadmap item in this run.
+<!-- RR1c verification end -->
 
 <!-- QL1 checkpoint begin -->
 ## QL1c Queue miniature: LOCAL PASS (2026-10-26)

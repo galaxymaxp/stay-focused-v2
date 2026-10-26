@@ -11907,3 +11907,102 @@ edit, push, OTA/EAS, native build/install or device action occurred.
   tooling; installation NOT RUN.
 
 Endpoint RR1b FAILED. No FS12, release, FULLSEND or next roadmap task started.
+
+
+## RR1c TP2e dark contract/readiness: FAILED at STEP 1 (2026-10-26)
+
+Status: **FAILED** under RR1c owner answer 7 and unattended gate rule 5.
+Expected branch matches: overnight/2026-10-15_feedback. Product implementation
+remains c8cfb180. The owner-authorized single product-test edit is committed as
+**e52276f3 test(today): match Plan glass dark luminance to TP2e liquid-lit design**,
+author galaxymaxp <omgraythekid@gmail.com>. It keeps the .01 light minimum and
+every other assertion; dark minimum is finite/>0 and peak must exceed .05.
+No renderer/product source, deadline, dependency or env file was changed.
+
+Dark calibration: RR1b retains nine rest-only values; fresh RR1c captures all
+nine cases at both waves (18 values). Minimum peak across all 27 observations
+**.11052663233035252**, half **.05526331616517626**; floor **.05** is below half.
+Pre-T calibration **26/26 PASS** and separate post-T Plan browser **26/26 PASS**.
+The [acceptance report](acceptance/tp2e-plan-button-glass-pill.md) records every
+observed value, the 11 TP2e paths and exact commands/results. Evidence remains
+under tmp/overnight/RR1c, including luminance-calibration.json, separate
+calibration-captures, gates.json, receipts.jsonl, counts.json and all gate logs.
+
+FRESH post-T focused tests: shared Plan **9/9** (2 files), orb appearance/ambient
+**17/17** (2), mobile PlanButton3d **7/7** (1), web Plan glass **26/26** (1).
+FRESH full shared **900 passed / 90 files**, full mobile **1732 / 186 files**,
+web unit partition **544 / 75 files**, all 0 failures/skips. The full web suite
+is incomplete. Exact failing command:
+
+`npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/components/course-options.browser.test.ts`
+
+FRESH exit **1**, **0 passed / 3 failed / 0 skipped**, one failed file,
+**3 unhandled ENOENT errors**. Each 320/768/1280 case times out at its unchanged
+5000ms deadline. Native esbuild wrote the fresh ignored
+`tmp/overnight/LM1/web-options/1792986222213/entry.js`; the temporary JavaScript
+filesystem redirect served the missing
+`tmp/overnight/RR1c/test-artifacts/LM1/web-options/1792986222213/entry.js`.
+Existence/hash proof and an archived bundle are in esbuild-write-deviation.json
+and RR1c/esbuild-failure. This establishes a validation-collector mismatch;
+it does not establish a product regression. It is not timeout-only evidence
+eligible for the isolated-retry exception. No retry or out-of-scope repair ran.
+
+Application totals, including pre-T calibration and focused/full overlaps:
+**3,261 passed / 3 failed / 0 skipped**, eight passing commands / one failing.
+Post-T totals: **3,235 passed / 3 failed / 0 skipped**. No CACHED result is used.
+Remaining 12 browser files, forced typecheck/lint, direct API/web builds,
+offline Android export and serial root build: **NOT RUN** after mandatory stop.
+Readiness CLI --before FS12 and readiness.test.js: **NOT RUN, 0 runs / 0 tests**.
+FRESH final working/staged documentation diff hygiene: **2/2 PASS**, exit 0
+(diff-final.log / cached-diff-final.log); T also had passing precommit hygiene.
+
+STEP 0 done; T done; STEP 1 partial/FAILED; STEP 2 completion X, STEP 3 manifest
+additions and STEP 4 dry run/tests NOT RUN. **No X or supersession was created.**
+Prepared unused tmp scripts did not perform later steps. QL1/QL1b still need
+fresh X-ending proof because TP2e changes globals.css. No historical PASS is
+promoted. Planning files are reconciled to the current failure and the roadmap
+remains unready for FULLSEND.
+
+Manifest backup: readiness-evidence.json.bak-20261026032823-pre-rr1c.
+Manifest remains byte-identical, SHA-256
+b744f47cfebc88ca2118d6d003e3e8bef3a6870799e6de59ea354ee2c612da12.
+All **16** original/prerequisite status/progress pins and **23** owner artifact
+pins remain unchanged. Before any browser run, copied and hash-verified all
+**14,900** TP2d files into RR1c/tp2d-backup. Final audit: **0 changed files**,
+including the three composites. Calibration Sharp output was byte-identical;
+post-T preload redirects Sharp.toFile too. The backup preserves the bytes as
+RR1c found them, including RR1b's already-overwritten composites; it does not
+restore or authenticate their original TP2d images. Full pins/audit are in
+tp2d-before-hashes.json and historical-audit.json. The native esbuild output
+uses a new timestamp directory and does not replace earlier LM1 evidence.
+
+Safe documentation checkpoint: `docs(today): record RR1c verification gate failure`,
+author galaxymaxp <omgraythekid@gmail.com>; exact hash is recorded in Git and
+RR1c.status/progress. Owned paths: TP2e acceptance, current-state.md, roadmap.md,
+current_sprint.md and this handoff. No tmp/generated output, UI/,
+apps/mobile/.gitignore or supabase/.temp artifact is staged. The passing T
+remains committed; failing collector/generated evidence remains local.
+
+UNVERIFIED (owner to confirm): live served revision, production database,
+Scheduler/provider state, native GL/Realme appearance, other browsers/assistive
+technology and physical FPS/power. Validation used repo-local TEMP/TMP/TMPDIR
+and caches, forward-slash preload paths, EXPO_NO_DOTENV=1 / EXPO_OFFLINE=1,
+telemetry off, env exclusion and loopback-only Node/browser networking.
+No deployment, remote service/SQL/migration application, Scheduler/email,
+env-file edit, push, OTA/EAS, native build/install or device action occurred.
+The live runner/queue and every other item's status/progress were untouched.
+
+**Owner steps remaining**:
+
+- Repair the temporary native esbuild output/read-path handling and rerun the
+  unfinished fresh gates at T; then complete X, all five supersessions and the
+  required readiness validator/tests. No new owner decision is requested.
+- Rollout **NOT RUN**, skipped entirely: FS12 FULLSEND after successful local
+  verification and readiness at a stable runner boundary.
+- Device checks **NOT RUN**, skipped entirely: website/Realme Plan and Queue
+  appearance in light/dark, Reduce Motion, native GL and physical performance.
+- Confirm the UNVERIFIED live/native state separately. Vercel CLI is absent;
+  strongly recommend `npm i -g vercel` for future authorized env/deploy/log
+  tooling; installation NOT RUN.
+
+Endpoint RR1c FAILED. No FS12, release, FULLSEND or next roadmap item started.
