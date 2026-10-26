@@ -174,7 +174,7 @@ async function data<T = Record<string, unknown>>(response: Response): Promise<T>
   return body.data as T;
 }
 type Session = { kind?: string; taskId?: string; taskTitle?: string; reviewerId?: string; reviewerTitle?: string; startsAt: string; durationMinutes: number };
-type Plan = { sessions: Session[]; mode?: string; candidates?: { tasks: number; reviewers: number }; unscheduledWork: unknown[] };
+type Plan = Pick<import('@stay-focused/shared/task-planning').DeterministicStudyPlan, 'planningTargets'> & { sessions: Session[]; mode?: string; candidates?: { tasks: number; reviewers: number }; unscheduledWork: unknown[] };
 const titles = (value: Plan) => value.sessions.map((session) => session.reviewerTitle ?? session.taskTitle);
 async function readSessions(user: string) {
   const response = await sessionsRoute.GET(new Request(`https://app.example/api/study-sessions?startsAt=${encodeURIComponent(range.startsAt)}&endsAt=${encodeURIComponent(range.endsAt)}&limit=200`, { headers: auth(user) }));
@@ -229,6 +229,8 @@ describe("TP1 plan content end to end", () => {
     const request = { ...plan('tasks'), selection: { order: 'manual', items: [{ kind: 'task', id: assignmentId }] } };
     const preview = await data<Plan>(await post('planner/preview', A, request));
     expect(titles(preview)).toEqual(['Synced work']);
+    expect(preview.planningTargets).toEqual([expect.objectContaining({ kind: 'task', selectionId: assignmentId, courseId: C1 })]);
+    expect(preview.planningTargets?.[0]?.id).toBe('taskId' in preview.sessions[0]! ? preview.sessions[0]!.taskId : undefined);
     expect(mocks.rpc.mock.calls.map(([name]) => name)).toEqual(['import_canvas_assignments_as_tasks_v1']);
     const next = await data<Plan>(await post('planner/preview', A, request)); expect(next).toEqual(preview);
     expect((await post('planner/apply', A, request)).status).toBe(200);

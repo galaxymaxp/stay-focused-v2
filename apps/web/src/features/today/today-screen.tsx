@@ -1,4 +1,5 @@
 "use client";
+import { defaultPlanningDraft, planningItemKey } from "@stay-focused/shared";
 import { useTodayPlan } from "./use-today-plan";
 import { freeTimeDuration } from "@stay-focused/shared";
 import { useQuietPlanner } from "../day-clock/use-quiet-planner";
@@ -12,7 +13,7 @@ import type {
 } from "@stay-focused/shared";
 import {
   proposalTargetKey,
-  type PlanningCandidates, type DeterministicStudyPlan,
+  type StudySessionView, type PlanningCandidates, type DeterministicStudyPlan,
 } from "@stay-focused/shared/task-planning";
 import { PlanningControl } from "./planning-sheet";
 import { todayPlanningMemory } from './planning-session';
@@ -121,6 +122,12 @@ export function TodayScreen() {
     timeline: today.data?.timeline ?? [], timelineReady: !!today.data, enabled: plannerReady, busy, previewing, preview,
     mode: planMode, selection: activePlan?.selection,
     load: request => api<PlanningCandidates>("/api/experience/planner/candidates", { method: "POST", body: request }),
+    remember: (mode, selection, candidates) => {
+      const draft = todayPlanningMemory.read(identity)?.draft ?? defaultPlanningDraft(candidates);
+      todayPlanningMemory.build(identity, { mode, selection, draft: { ...draft, mode, order: selection.order, courses: selection.courseIds ? 'select' : 'all', courseIds: selection.courseIds ?? candidates.courses.map(course => course.id),
+        ...(selection.items ? { itemOrder: selection.items.map(planningItemKey), checked: selection.items.map(planningItemKey) } : {}) } });
+      renderBuiltChoice(revision => revision + 1);
+    },
     queue: queuePreview, clear: clearPreview });
   const { start, end, change } = planner;
   async function apply() {
@@ -128,7 +135,8 @@ export function TodayScreen() {
     busyRef.current = true;
     setBusy(true);
     try {
-      await api("/api/experience/planner/replan", { method: "POST", body: previewRequest });
+      const result = await api<{ sessions: readonly StudySessionView[] }>("/api/experience/planner/replan", { method: "POST", body: previewRequest });
+      await planner.applied(result?.sessions);
       clearPreview();
       setNote("Saved. These blocks are on your Schedule.");
       clockWindow.reconcile();
@@ -266,9 +274,10 @@ export function TodayScreen() {
               disabled={busy || !plannerReady}
               proposed={proposed}
             />
-            <PlanningControl key={identity} request={planningRequest(date, start, end, "reviewers_tasks")} active={activePlan}
+            <PlanningControl key={identity} request={planningRequest(date, start, end, "reviewers_tasks")} active={activePlan} overrides={planner.overrides}
+              onItemCheck={(key, checked) => checked ? planner.putBack(key) : planner.remove(key)}
               disabled={busy || !plannerReady}
-              load={request => api<PlanningCandidates>("/api/experience/planner/candidates", { method: "POST", body: request })}
+              load={request => planner.candidates ? Promise.resolve(planner.candidates) : api<PlanningCandidates>("/api/experience/planner/candidates", { method: "POST", body: request })}
               onBuild={choice => {
                 todayPlanningMemory.build(identity, choice);
                 renderBuiltChoice(revision => revision + 1); setNote(null);

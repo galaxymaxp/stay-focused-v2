@@ -91,3 +91,22 @@ it('drops an older candidate read when range changes', async () => {
   await act(async () => finish({ ...fixture(), freeWindowMinutes: 999 }));
   expect(root().findAllByType('Copy' as never).some(node => node.props.children?.[0] === 999)).toBe(false);
 });
+it('per-item checks invoke remove/putBack without building, group selection stays scoped', async () => {
+  const check = vi.fn();
+  await act(async () => { tree = create(createElement(PlanningControl, { request: { planningRange: range, availability: [range] }, active: null, load: mocks.load, onBuild: mocks.build, onItemCheck: check })); });
+  await open(); await act(async () => named('Planning summary').props.onPress());
+  await act(async () => named('Task 1, 40 minutes').props.onPress());
+  expect(check).toHaveBeenLastCalledWith(`task:${id(11)}`, false);
+  await act(async () => named('Task 1, 40 minutes').props.onPress());
+  expect(check).toHaveBeenLastCalledWith(`task:${id(11)}`, true);
+  expect(mocks.build).not.toHaveBeenCalled();
+});
+it('persisted removed/skipped items start unchecked and stay excluded from Build', async () => {
+  await act(async () => { tree = create(createElement(PlanningControl, { request: { planningRange: range, availability: [range] }, active: null, load: mocks.load, onBuild: mocks.build,
+    overrides: { removed: [`task:${id(11)}`], skipped: [`reviewer:${id(22)}`] } })); });
+  await open(); await act(async () => named('Planning summary').props.onPress());
+  expect(named('Task 1, 40 minutes').props.accessibilityState.checked).toBe(false);
+  expect(named('Reviewer 2.pdf, 20 minutes').props.accessibilityState.checked).toBe(false);
+  await act(async () => action('Build plan').props.onPress());
+  expect(mocks.build.mock.calls[0]![0].selection.items).toEqual([{ kind: 'task', id: id(12) }]);
+});

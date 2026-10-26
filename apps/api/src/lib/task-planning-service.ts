@@ -74,8 +74,12 @@ export async function previewOwnedStudyPlan(
       .map(item => ({ id: item.id, title: item.title, courseId: item.courseId, estimatedMinutes: item.estimateMinutes }));
     const tasks = all.filter(item => item.kind === "task").map(item => ({ id: item.id, title: item.title, courseId: item.courseId,
       estimatedMinutes: item.estimateMinutes, dueAt: item.dueAt, priority: item.priority, createdAt: item.createdAt }));
-    return generateContentStudyPlan({ mode, tasks, reviewers, planningRange: request.planningRange, availability: request.availability,
+    const plan = generateContentStudyPlan({ mode, tasks, reviewers, planningRange: request.planningRange, availability: request.availability,
       selection: { ...selection, items: effectiveItems } });
+    const planningTargets = effectiveItems.map((item, index) => ({ ...item,
+      selectionId: chosen[index]!.canvasAssignmentId ?? chosen[index]!.id, courseId: chosen[index]!.courseId }))
+      .filter(item => item.kind === 'task' && (item.id !== item.selectionId || item.courseId !== null));
+    return { ...plan, ...(planningTargets.length ? { planningTargets } : {}) };
   }
   // An omitted mode is the original tasks-only plan. Reviewers mode never
   // touches task work, so it skips the Canvas import and estimate refresh.

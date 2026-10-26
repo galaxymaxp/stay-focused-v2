@@ -276,4 +276,5 @@ export { ORB_AMBIENT_PROFILES, type OrbVariant } from './orb-ambient';
 export { createQuietPreview } from "./quiet-preview";
 export * from './planning-sheet';
 export * from './plan-device-store';
+export * from './previous-plan';
 export * from './plan-block-marks';

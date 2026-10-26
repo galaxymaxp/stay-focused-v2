@@ -64,6 +64,7 @@ const mocks = vi.hoisted(() => ({
   sync: vi.fn(),
   params: {} as Record<string, string>,
   request: vi.fn(),
+  planningCandidates: vi.fn(),
   refresh: vi.fn(),
   createIntent: vi.fn(),
   acceptIntent: vi.fn(async () => ({ generationId: "job" })),
@@ -296,7 +297,8 @@ vi.mock("../../services/localLibrary/localArtifactDatabase", () => ({
   }),
 }));
 vi.mock("../../services/experienceApi", () => ({
-  experienceRequest: mocks.request,
+  experienceRequest: (client: unknown, path: string, options: { body?: { planningRange: unknown; availability: unknown } }) => path === '/api/experience/planner/candidates'
+    ? mocks.planningCandidates(client, path, options) : mocks.request(client, path, options),
   ExperienceApiError: class extends Error { constructor(readonly code: string, message: string) { super(message); } },
 }));
 vi.mock("../../services/generationRecovery", () => ({
@@ -322,6 +324,7 @@ beforeEach(() => {
   mocks.navigationListeners.clear();
   mocks.appListeners.clear();
   vi.clearAllMocks();
+  mocks.planningCandidates.mockImplementation(async (_client, _path, options) => ({ courses: [], personalItems: [], freeWindowMinutes: 120, planningRange: options.body.planningRange, availability: options.body.availability }));
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 });
 afterEach(async () => {
@@ -1756,7 +1759,7 @@ it('keeps the lock storage key and sends typed free time through the drag planni
   expect(mocks.storageWrite).toHaveBeenCalledWith(`sf.today.free-time.${localDate()}`, JSON.stringify({ start: 1320, end: 240 }));
   await act(async () => { vi.advanceTimersByTime(400); });
   const request = mocks.request.mock.calls.find(call => call[1] === '/api/experience/planner/preview');
-  expect(request?.[2].body).toEqual({ ...planningRequest(localDate(), 1320, 240, "reviewers_tasks"), selection: { order: "smart" } });
+  expect(request?.[2].body).toEqual({ ...planningRequest(localDate(), 1320, 240, "reviewers_tasks"), selection: { order: "smart", items: [] } });
 });
 vi.mock('../../services/useAppUpdate', () => ({
   useAppUpdate: () => ({ banner: false, unsupported: false, status: 'up-to-date', latest: null, lastCheckedAt: null }),
@@ -1766,7 +1769,8 @@ vi.mock('../../services/useAppUpdate', () => ({
 }));
 
 describe('TC2 real mobile clock gesture counters', () => {
-  const writes = () => mocks.storageWrite.mock.calls.filter(([key]) => key.startsWith('sf.today.free-time.'));
+  const writes = () => mocks.storageWrite.mock.calls.filter(([key]) => key.startsWith('sf.today.free-time.') && key !== 'sf.today.free-time.last');
+  const lastWrites = () => mocks.storageWrite.mock.calls.filter(([key]) => key === 'sf.today.free-time.last');
   const setup = async () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 9, 24, 12));
     mocks.data[`/api/today?date=${localDate()}&utcOffsetMinutes=${-new Date().getTimezoneOffset()}`] = todayFixture();
@@ -1774,7 +1778,8 @@ describe('TC2 real mobile clock gesture counters', () => {
     const root = await render(createElement(TodayScreen));
     await act(async () => root.findByType(ClockOptions).props.onCommit(600, 720));
     await act(async () => { vi.advanceTimersByTime(400); });
-    mocks.storageWrite.mockClear(); mocks.request.mockClear(); mocks.refresh.mockClear(); mocks.paths.length = 0;
+    expect(mocks.planningCandidates).toHaveBeenCalledTimes(1);
+    mocks.storageWrite.mockClear(); mocks.request.mockClear(); mocks.planningCandidates.mockClear(); mocks.refresh.mockClear(); mocks.paths.length = 0;
     return root;
   };
   it.each([['start', 600, 1], ['end', 720, 1], ['end', 720, 100], ['move', 660, 100]] as const)('%s drag at %i (%i ms/move): no IO, one save, one quiet preview', async (_kind, at, delay) => {
@@ -1788,7 +1793,7 @@ describe('TC2 real mobile clock gesture counters', () => {
     }
     expect(writes()).toHaveLength(0); expect(mocks.request).not.toHaveBeenCalled(); expect(mocks.sync).not.toHaveBeenCalled();
     await act(async () => ringTouch(root).props.onPanResponderRelease());
-    expect(writes()).toHaveLength(1); expect(mocks.request).not.toHaveBeenCalled();
+    expect(writes()).toHaveLength(1); expect(lastWrites()).toHaveLength(1); expect(mocks.planningCandidates).not.toHaveBeenCalled(); expect(mocks.request).not.toHaveBeenCalled();
     await act(async () => { vi.advanceTimersByTime(399); }); expect(mocks.request).not.toHaveBeenCalled();
     await act(async () => { vi.advanceTimersByTime(1); });
     expect(mocks.request).toHaveBeenCalledTimes(1); expect(mocks.request.mock.calls[0]![1]).toBe('/api/experience/planner/preview');
@@ -1812,10 +1817,10 @@ describe('TC2 real mobile clock gesture counters', () => {
       await act(async () => { vi.advanceTimersByTime(100); });
     }
     await act(async () => root.findByType(ClockOptions).props.onCommit(1320, 240));
-    expect(writes()).toHaveLength(4); expect(mocks.request).not.toHaveBeenCalled();
+    expect(writes()).toHaveLength(4); expect(lastWrites()).toHaveLength(4); expect(mocks.planningCandidates).not.toHaveBeenCalled(); expect(mocks.request).not.toHaveBeenCalled();
     await act(async () => { vi.advanceTimersByTime(400); });
     expect(mocks.request).toHaveBeenCalledTimes(1);
-    expect(mocks.request.mock.calls[0]![2].body).toEqual({ ...planningRequest(localDate(), 1320, 240, "reviewers_tasks"), selection: { order: "smart" } });
+    expect(mocks.request.mock.calls[0]![2].body).toEqual({ ...planningRequest(localDate(), 1320, 240, "reviewers_tasks"), selection: { order: "smart", items: [] } });
     expect(new Set(mocks.paths).size).toBe(1); expect(mocks.sync).not.toHaveBeenCalled(); expect(mocks.refresh).not.toHaveBeenCalled();
   });
 });

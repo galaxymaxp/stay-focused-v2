@@ -21,11 +21,11 @@ const stubs: Record<string, string> = {
       {kind:'task',id:id(n+10),title:n===1?'Cell diagram practice':'Chemistry lab report',courseId:id(n),estimateMinutes:n===1?80:70,openedWithin24h:false,dueAt:null,priority:'medium',createdAt:'2026-10-01T00:00:00.000Z'},
       {kind:'reviewer',id:id(n+20),title:n===1?'Cell biology reviewer.pdf':'Opened chemistry reviewer.pdf',courseId:id(n),estimateMinutes:20,openedWithin24h:n===2,dueAt:null,priority:'medium',createdAt:'2026-10-01T00:00:00.000Z',smartRank:n}
     ]}))};
-    function App(){const [choice,setChoice]=useState(null);const [range,setRange]=useState({start:540,end:660});
+    function App(){const [choice,setChoice]=useState(null);const [overrides,setOverrides]=useState({removed:[],skipped:[]});const [range,setRange]=useState({start:540,end:660});
       window.__choice=choice;window.__reads??=0;
       return createElement('main',{style:{width:'min(360px,calc(100% - 32px))',margin:'16px auto'}},
         createElement(DayRingClock,{date:'2026-10-25',timeline:[],...range,onCommit:(start,end)=>setRange({start,end}),onToggleLock:()=>{}}),
-        createElement(PlanningControl,{request:{planningRange:data.planningRange,availability:data.availability},active:choice,
+        createElement(PlanningControl,{request:{planningRange:data.planningRange,availability:data.availability},active:choice,overrides,onItemCheck:(key,checked)=>{window.__checks??=[];window.__checks.push([key,checked]);setOverrides(old=>({...old,removed:checked?old.removed.filter(value=>value!==key):[...old.removed,key]}))},
           load:async()=>{window.__reads++;return data},onBuild:value=>{setChoice(value)}}),
         choice?createElement(PlanPreview,{plan:planningDraftSummary(data,choice.draft).plan,from:540,to:660,busy:false,onApply:()=>{},onDiscard:()=>{}}):null);
     }
@@ -217,4 +217,21 @@ it('measures existing clock cadence with the button liquid paused and flowing',a
   writeFileSync(join(evidence,'button-clock-cadence.json'),JSON.stringify(samples,null,2));
   expect(errors).toEqual([]);
  }finally{await page.close()}
+},60_000);
+it('per-item uncheck/remove and check/putBack send exact keys without building or refetching', async () => {
+ const {page,errors}=await open(1280,'light','reduce');
+ try {
+  await page.getByRole('button',{name:'Plan your free time',exact:true}).click();
+  const panel=page.getByRole('dialog',{name:'Plan your free time',exact:true});
+  await panel.getByRole('button',{name:/3 items/}).click();
+  const check=panel.getByRole('checkbox',{name:'Cell diagram practice',exact:true});
+  await check.uncheck(); expect(await check.isChecked()).toBe(false);
+  await check.check(); expect(await check.isChecked()).toBe(true);
+  expect(await page.evaluate(()=>(window as unknown as {__checks:unknown[]}).__checks)).toEqual([
+    ['task:00000000-0000-4000-8000-000000000011',false], ['task:00000000-0000-4000-8000-000000000011',true]
+  ]);
+  expect(await page.evaluate(()=>(window as unknown as {__choice:unknown}).__choice)).toBeNull();
+  expect(await page.evaluate(()=>(window as unknown as {__reads:number}).__reads)).toBe(1);
+  expect(errors).toEqual([]);
+ } finally {await page.close()}
 },60_000);

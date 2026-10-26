@@ -1,5 +1,5 @@
-import { builtPlanningSelection, defaultPlanningDraft, movePlanningEntry, planningDraftSummary, planningItemKey, planningTitle,
-  resetPlanningOrder, scopedPlanningItems, togglePlanningItems, type PlanningDraft } from '@stay-focused/shared';
+import { builtPlanningSelection, defaultPlanningDraft, movePlanningEntry, planningDraftSummary, allPlanningItems, planningOverrideKey, planningItemKey, planningTitle,
+  resetPlanningOrder, scopedPlanningItems, togglePlanningItems, type PlanningDraft, type PlanOverrides } from '@stay-focused/shared';
 import { PLAN_EMPTY_COPY, type PlanMode, type PlanSelection, type PlanningCandidates, type StudyPlanningRequest } from '@stay-focused/shared/task-planning';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -10,32 +10,38 @@ import { PlanButton } from './PlanButton';
 import { useLibraryOrganizer } from './useLibraryOrganizer';
 
 export interface BuiltPlanningChoice { readonly mode: PlanMode; readonly selection: PlanSelection; readonly draft: PlanningDraft }
-export function PlanningControl({ request, active, load, onBuild, disabled }: {
+export function PlanningControl({ request, active, load, onBuild, disabled, overrides, onItemCheck }: {
   request: StudyPlanningRequest; active: BuiltPlanningChoice | null; load: (request: StudyPlanningRequest) => Promise<PlanningCandidates>;
-  onBuild: (choice: BuiltPlanningChoice) => void; disabled?: boolean;
+  onBuild: (choice: BuiltPlanningChoice) => void; disabled?: boolean; overrides?: PlanOverrides; onItemCheck?: (key: string, checked: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   return <>
     <PlanButton disabled={disabled} onPress={() => setOpen(true)} />
-    {open && <PlanningSheet request={request} active={active} load={load} onBuild={choice => { onBuild(choice); setOpen(false); }} onClose={() => setOpen(false)} />}
+    {open && <PlanningSheet overrides={overrides} onItemCheck={onItemCheck} request={request} active={active} load={load} onBuild={choice => { onBuild(choice); setOpen(false); }} onClose={() => setOpen(false)} />}
   </>;
 }
-export function PlanningSheet({ request, active, load, onBuild, onClose }: {
+export function PlanningSheet({ request, active, load, onBuild, onClose, overrides, onItemCheck }: {
   request: StudyPlanningRequest; active: BuiltPlanningChoice | null; load: (request: StudyPlanningRequest) => Promise<PlanningCandidates>;
-  onBuild: (choice: BuiltPlanningChoice) => void; onClose: () => void;
+  onBuild: (choice: BuiltPlanningChoice) => void; onClose: () => void; overrides?: PlanOverrides; onItemCheck?: (key: string, checked: boolean) => void;
 }) {
   const [data, setData] = useState<PlanningCandidates | null>(null), [draft, setDraft] = useState<PlanningDraft | null>(null);
   const [error, setError] = useState<string | null>(null), [expanded, setExpanded] = useState(false);
-  const latest = useRef({ active, load }); latest.current = { active, load };
+  const latest = useRef({ active, load, overrides }); latest.current = { active, load, overrides };
   const requestKey = JSON.stringify(request);
   useEffect(() => {
     let live = true; setData(null); setDraft(null); setError(null);
     void latest.current.load(JSON.parse(requestKey) as StudyPlanningRequest).then(value => {
-      if (live) { setData(value); setDraft(latest.current.active?.draft ?? defaultPlanningDraft(value)); }
+      if (live) { setData(value); setDraft(() => { const draft = latest.current.active?.draft ?? defaultPlanningDraft(value); const keys = new Set([...(latest.current.overrides?.removed ?? []), ...(latest.current.overrides?.skipped ?? [])]); for (const item of allPlanningItems(value)) if (keys.has(planningOverrideKey(item))) keys.add(planningItemKey(item)); return { ...draft, checked: draft.checked.filter(key => !keys.has(key)) }; }); }
     }).catch(() => { if (live) setError('Could not load planning items. Close and try again.'); });
     return () => { live = false; };
   }, [requestKey]);
   const { colors } = useTheme();
+  const excluded = JSON.stringify([...(overrides?.removed ?? []), ...(overrides?.skipped ?? [])]);
+  useEffect(() => {
+    const keys = new Set(JSON.parse(excluded) as string[]);
+    if (data) for (const item of allPlanningItems(data)) if (keys.has(planningOverrideKey(item))) keys.add(planningItemKey(item));
+    setDraft(old => old ? { ...old, checked: old.checked.filter(key => !keys.has(key)) } : old);
+  }, [excluded, data]);
   const summary = data && draft ? planningDraftSummary(data, draft) : null;
   const shown = data && draft ? scopedPlanningItems(data, draft) : [];
   const groups = draft?.groupOrder.map(id => ({ id, name: data?.courses.find(course => course.id === id)?.name ?? 'Personal', items: shown.filter(item => (item.courseId ?? 'personal') === id) })).filter(group => group.items.length) ?? [];
@@ -72,10 +78,10 @@ export function PlanningSheet({ request, active, load, onBuild, onClose }: {
       <Copy size="h3">Courses</Copy><SegmentedControl segments={[{ value: 'all' as const, label: 'All' }, { value: 'select' as const, label: 'Select' }]} value={draft.courses} onChange={courses => setDraft({ ...draft, courses })} />
       {draft.courses === 'select' && <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>{data.courses.map(course => <Pressable key={course.id} accessibilityRole="checkbox" accessibilityLabel={course.name} accessibilityState={{ checked: draft.courseIds.includes(course.id) }} aria-checked={draft.courseIds.includes(course.id)}
         onPress={() => setDraft({ ...draft, courseIds: draft.courseIds.includes(course.id) ? draft.courseIds.filter(id => id !== course.id) : [...draft.courseIds, course.id] })}
-        style={{ minHeight: 44, maxWidth: '100%', justifyContent: 'center', paddingHorizontal: spacing[3], borderRadius: radius.control, borderWidth: 1, borderColor: draft.courseIds.includes(course.id) ? colors.accent : colors.separator }}><Copy>{course.name}</Copy></Pressable>)}</View>}
+        style={{ minHeight: 44, maxWidth: '100%', justifyContent: 'center', paddingHorizontal: spacing[3], borderRadius: radius.control, borderWidth: 1, borderColor: draft.courseIds.includes(course.id) ? colors.textPrimary : colors.separator }}><Copy>{course.name}</Copy></Pressable>)}</View>}
       <Copy size="h3">Include</Copy><SegmentedControl segments={[{ value: 'reviewers' as const, label: 'Reviewers' }, { value: 'tasks' as const, label: 'Tasks' }, { value: 'reviewers_tasks' as const, label: 'Both' }]} value={draft.mode} onChange={mode => setDraft({ ...draft, mode })} />
       <Pressable accessibilityRole="button" accessibilityLabel="Planning summary" accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={{ minHeight: 44, justifyContent: 'center' }}>
-        <Copy color={summary.minutes > data.freeWindowMinutes ? colors.amber : colors.textSecondary}>{summary.count} items · ~{summary.minutes} min of {data.freeWindowMinutes} min free{summary.minutes > data.freeWindowMinutes ? ` · ~${summary.notFitMinutes} min won't fit` : ''}</Copy>
+        <Copy color={colors.textSecondary}>{summary.count} items · ~{summary.minutes} min of {data.freeWindowMinutes} min free{summary.minutes > data.freeWindowMinutes ? ` · ~${summary.notFitMinutes} min won't fit` : ''}</Copy>
       </Pressable>
       {!shown.length && <Copy accessibilityLiveRegion="polite">{draft.courses === 'select' ? 'Nothing to plan in these courses.' : PLAN_EMPTY_COPY[draft.mode]}</Copy>}
       {expanded && <>
@@ -91,7 +97,7 @@ export function PlanningSheet({ request, active, load, onBuild, onClose }: {
               </View>,
               ...group.items.map(item => <View key={planningItemKey(item)} onLayout={event => organizer.layouts.current.set(planningItemKey(item), event.nativeEvent.layout)} style={{ borderBottomWidth: 1, borderColor: colors.separator, paddingVertical: 4 }}>
                 <Pressable accessibilityRole="checkbox" accessibilityLabel={`${item.title}, ${item.estimateMinutes} minutes${item.openedWithin24h ? ', Opened today' : ''}`} accessibilityState={{ checked: draft.checked.includes(planningItemKey(item)) }} aria-checked={draft.checked.includes(planningItemKey(item))}
-                  {...actions(planningItemKey(item), itemKeys, false)} onPress={() => setDraft(togglePlanningItems(draft, [planningItemKey(item)]))} style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  {...actions(planningItemKey(item), itemKeys, false)} onPress={() => { const key = planningItemKey(item); onItemCheck?.(planningOverrideKey(item), !draft.checked.includes(key)); setDraft(togglePlanningItems(draft, [key])); }} style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <Copy>{draft.checked.includes(planningItemKey(item)) ? '☑' : '☐'}</Copy><ContentIcon kind={item.kind} small /><View style={{ flex: 1 }}><PlanningTitle title={item.title} />{item.openedWithin24h && <Copy muted size="caption">Opened today</Copy>}</View><Copy muted size="caption">{item.estimateMinutes}m</Copy>
                 </Pressable>
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>{moves(planningItemKey(item), itemKeys, false, item.title)}{dragHandle(planningItemKey(item), group.id, item.title)}</View>

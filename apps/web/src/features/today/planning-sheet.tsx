@@ -1,22 +1,22 @@
 "use client";
-import { builtPlanningSelection, defaultPlanningDraft, movePlanningEntry, planningDraftSummary, planningItemKey, planningTitle,
-  resetPlanningOrder, scopedPlanningItems, togglePlanningItems, type PlanningDraft } from '@stay-focused/shared';
+import { builtPlanningSelection, defaultPlanningDraft, movePlanningEntry, planningDraftSummary, allPlanningItems, planningOverrideKey, planningItemKey, planningTitle,
+  resetPlanningOrder, scopedPlanningItems, togglePlanningItems, type PlanningDraft, type PlanOverrides } from '@stay-focused/shared';
 import { PLAN_EMPTY_COPY, type PlanMode, type PlanSelection, type PlanningCandidates, type StudyPlanningRequest } from '@stay-focused/shared/task-planning';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { Icon } from '../../components/ui';
 import { PlanButton } from './plan-button';
 
 export interface BuiltPlanningChoice { readonly mode: PlanMode; readonly selection: PlanSelection; readonly draft: PlanningDraft }
-export function PlanningControl({ request, active, load, onBuild, disabled }: {
+export function PlanningControl({ request, active, load, onBuild, disabled, overrides, onItemCheck }: {
   request: StudyPlanningRequest; active: BuiltPlanningChoice | null; load: (request: StudyPlanningRequest) => Promise<PlanningCandidates>;
-  onBuild: (choice: BuiltPlanningChoice) => void; disabled?: boolean;
+  onBuild: (choice: BuiltPlanningChoice) => void; disabled?: boolean; overrides?: PlanOverrides; onItemCheck?: (key: string, checked: boolean) => void;
 }) {
   const [open, setOpen] = useState(false), [data, setData] = useState<PlanningCandidates | null>(null);
   const [draft, setDraft] = useState<PlanningDraft | null>(null), [expanded, setExpanded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null), panel = useRef<HTMLDivElement>(null);
   const [panelHeight, setPanelHeight] = useState(400);
-  const latest = useRef({ load, active }); latest.current = { load, active };
+  const latest = useRef({ load, active, overrides }); latest.current = { load, active, overrides };
   const requestKey = JSON.stringify(request);
   useEffect(() => {
     if (!open) return;
@@ -24,7 +24,7 @@ export function PlanningControl({ request, active, load, onBuild, disabled }: {
     setData(null); setDraft(null); setError(null);
     void latest.current.load(JSON.parse(requestKey) as StudyPlanningRequest).then(value => {
       if (!live) return;
-      setData(value); setDraft(latest.current.active?.draft ?? defaultPlanningDraft(value));
+      setData(value); setDraft(() => { const draft = latest.current.active?.draft ?? defaultPlanningDraft(value); const keys = new Set([...(latest.current.overrides?.removed ?? []), ...(latest.current.overrides?.skipped ?? [])]); for (const item of allPlanningItems(value)) if (keys.has(planningOverrideKey(item))) keys.add(planningItemKey(item)); return { ...draft, checked: draft.checked.filter(key => !keys.has(key)) }; });
     }).catch(() => { if (live) setError('Could not load planning items. Close and try again.'); });
     return () => { live = false; };
   }, [open, requestKey]);
@@ -46,6 +46,12 @@ export function PlanningControl({ request, active, load, onBuild, disabled }: {
     document.addEventListener('keydown', keydown);
     return () => { document.body.style.overflow = overflow; document.removeEventListener('keydown', keydown); window.removeEventListener('resize', fit); previous?.focus(); };
   }, [open]);
+  const excluded = JSON.stringify([...(overrides?.removed ?? []), ...(overrides?.skipped ?? [])]);
+  useEffect(() => {
+    const keys = new Set(JSON.parse(excluded) as string[]);
+    if (data) for (const item of allPlanningItems(data)) if (keys.has(planningOverrideKey(item))) keys.add(planningItemKey(item));
+    setDraft(old => old ? { ...old, checked: old.checked.filter(key => !keys.has(key)) } : old);
+  }, [excluded, data]);
   const summary = data && draft ? planningDraftSummary(data, draft) : null;
   const shown = data && draft ? scopedPlanningItems(data, draft) : [];
   const groups = draft?.groupOrder.map(id => ({ id, name: data?.courses.find(course => course.id === id)?.name ?? 'Personal', items: shown.filter(item => (item.courseId ?? 'personal') === id) })).filter(group => group.items.length) ?? [];
@@ -71,7 +77,7 @@ export function PlanningControl({ request, active, load, onBuild, disabled }: {
             {draft.courses === 'select' && <div className="plan-course-chips">{data.courses.map(course => <button type="button" key={course.id} aria-pressed={draft.courseIds.includes(course.id)} onClick={() => setDraft({ ...draft, courseIds: draft.courseIds.includes(course.id) ? draft.courseIds.filter(id => id !== course.id) : [...draft.courseIds, course.id] })}>{course.name}</button>)}</div>}
           </fieldset>
           <fieldset><legend>Include</legend><div className="plan-segments" role="group" aria-label="Include">{(['reviewers', 'tasks', 'reviewers_tasks'] as const).map(value => <button type="button" key={value} aria-pressed={draft.mode === value} onClick={() => setDraft({ ...draft, mode: value })}>{value === 'reviewers_tasks' ? 'Both' : value === 'reviewers' ? 'Reviewers' : 'Tasks'}</button>)}</div></fieldset>
-          <button type="button" className={`plan-summary${summary.minutes > data.freeWindowMinutes ? ' over-budget' : ''}`} aria-expanded={expanded} aria-controls="planning-items" onClick={() => setExpanded(!expanded)}>
+          <button type="button" className="plan-summary" aria-expanded={expanded} aria-controls="planning-items" onClick={() => setExpanded(!expanded)}>
             {summary.count} items · ~{summary.minutes} min of {data.freeWindowMinutes} min free{summary.minutes > data.freeWindowMinutes ? ` · ~${summary.notFitMinutes} min won't fit` : ''}<Icon name="chevron-down" />
           </button>
           {!shown.length && <p role="status">{draft.courses === 'select' ? 'Nothing to plan in these courses.' : PLAN_EMPTY_COPY[draft.mode]}</p>}
@@ -82,7 +88,7 @@ export function PlanningControl({ request, active, load, onBuild, disabled }: {
               return <section key={group.id} className="plan-course-group">
                 <div className="plan-group-header" {...drag(group.id, true)}><TriCheckbox label={`${group.name}, ${group.items.length} items`} checked={checked === keys.length ? true : checked ? 'mixed' : false} onChange={() => setDraft(togglePlanningItems(draft, keys))} /><strong>{group.name} · {group.items.length}</strong>{moves(group.id, groups.map(group => group.id), true, group.name)}</div>
                 {group.items.map(item => <div key={planningItemKey(item)} className="plan-item-row" {...drag(planningItemKey(item), false)}>
-                  <TriCheckbox label={item.title} checked={draft.checked.includes(planningItemKey(item))} onChange={() => setDraft(togglePlanningItems(draft, [planningItemKey(item)]))} />
+                  <TriCheckbox label={item.title} checked={draft.checked.includes(planningItemKey(item))} onChange={() => { const key = planningItemKey(item); onItemCheck?.(planningOverrideKey(item), !draft.checked.includes(key)); setDraft(togglePlanningItems(draft, [key])); }} />
                   <Icon name={item.kind === 'reviewer' ? 'book-open' : 'clipboard-list'} /><span className="grow" title={item.title}><PlanningTitle title={item.title} />{item.openedWithin24h && <small>Opened today</small>}</span><span className="meta">{item.estimateMinutes}m</span>
                   {moves(planningItemKey(item), keys, false, item.title)}
                 </div>)}

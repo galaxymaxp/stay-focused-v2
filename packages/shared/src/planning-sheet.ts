@@ -15,24 +15,32 @@ export function applyPlanOverrides(selection: PlanSelection, candidates: Plannin
   const excluded = new Set([...overrides.removed, ...overrides.skipped]);
   const items = selection.items ?? allPlanningItems(candidates).filter(item =>
     !selection.courseIds || (!!item.courseId && selection.courseIds.includes(item.courseId)));
-  return { ...selection, items: items.filter(item => !excluded.has(planningItemKey(item))).map(({ kind, id }) => ({ kind, id })) };
+  const aliases = new Map(allPlanningItems(candidates).map(item => [planningItemKey(item), item.canvasAssignmentId ? `task:${item.canvasAssignmentId}` : planningItemKey(item)]));
+  return { ...selection, items: items.filter(item => !excluded.has(planningItemKey(item)) && !excluded.has(aliases.get(planningItemKey(item)) ?? '')).map(({ kind, id }) => ({ kind, id })) };
 }
 export function takenOutItems(candidates: PlanningCandidates, overrides: PlanOverrides) {
   const items = allPlanningItems(candidates), skipped = new Set(overrides.skipped), removed = new Set(overrides.removed);
+  const has = (keys: Set<string>, item: PlanningCandidate) => keys.has(planningItemKey(item)) || keys.has(planningOverrideKey(item));
   return [
-    ...items.filter(item => skipped.has(planningItemKey(item))).map(item => ({ key: planningItemKey(item), item, reason: 'skipped' as const })),
-    ...items.filter(item => removed.has(planningItemKey(item)) && !skipped.has(planningItemKey(item))).map(item => ({ key: planningItemKey(item), item, reason: 'removed' as const })),
+    ...items.filter(item => has(skipped, item)).map(item => ({ key: planningOverrideKey(item), item, reason: 'skipped' as const })),
+    ...items.filter(item => has(removed, item) && !has(skipped, item)).map(item => ({ key: planningOverrideKey(item), item, reason: 'removed' as const })),
   ];
 }
 /** selection is local request metadata; legacy server responses need no new fields. */
 export function moveProposalUp(plan: DeterministicStudyPlan & { readonly selection?: PlanSelection }, index: number): PlanSelection {
-  const proposed = plan.sessions.map(session => isReviewerProposal(session)
-    ? { kind: 'reviewer' as const, id: session.reviewerId } : { kind: 'task' as const, id: session.taskId });
+  const proposed = plan.sessions.map(session => {
+    const kind = isReviewerProposal(session) ? 'reviewer' as const : 'task' as const;
+    const id = isReviewerProposal(session) ? session.reviewerId : session.taskId;
+    return { kind, id: plan.planningTargets?.find(target => target.kind === kind && target.id === id)?.selectionId ?? id };
+  });
   const items = [...new Map(proposed.map(item => [planningItemKey(item), item])).values()];
   if (Number.isInteger(index) && index > 0 && index < items.length) [items[index - 1], items[index]] = [items[index]!, items[index - 1]!];
   const seen = new Set(items.map(planningItemKey));
   const rest = plan.selection?.items ?? plan.notFit ?? [];
-  for (const item of rest) if (!seen.has(planningItemKey(item))) { items.push({ kind: item.kind, id: item.id }); seen.add(planningItemKey(item)); }
+  for (const item of rest) {
+    const target = { kind: item.kind, id: plan.planningTargets?.find(target => target.kind === item.kind && target.id === item.id)?.selectionId ?? item.id };
+    if (!seen.has(planningItemKey(target))) { items.push(target); seen.add(planningItemKey(target)); }
+  }
   return { order: 'manual', items, ...(plan.selection?.courseIds ? { courseIds: plan.selection.courseIds } : {}) };
 }
 export interface PlanSnapshot extends FreeTimeRange {
@@ -46,7 +54,7 @@ export function snapshotFromPlan(date: string, start: number, end: number, plan:
     const day = new Date(at.getFullYear(), at.getMonth(), at.getDate());
     const base = new Date(`${date}T00:00:00`);
     return { kind: isReviewerProposal(session) ? 'reviewer' : 'task', id: isReviewerProposal(session) ? session.reviewerId : session.taskId,
-      title: proposalTitle(session), courseId: isReviewerProposal(session) ? session.courseId : null,
+      title: proposalTitle(session), courseId: isReviewerProposal(session) ? session.courseId : plan.planningTargets?.find(target => target.kind === 'task' && target.id === session.taskId)?.courseId ?? null,
       startMinute: Math.round((day.getTime() - base.getTime()) / 86_400_000) * 1440 + at.getHours() * 60 + at.getMinutes(), minutes: session.durationMinutes };
   }) };
 }
@@ -62,6 +70,8 @@ export function splitCourseName(raw: string): { code: string; name: string } {
 }
 
 export const planningItemKey = (item: { kind: string; id: string }) => `${item.kind}:${item.id}`;
+/** Canvas exclusions follow the stable assignment alias across local admission. */
+export const planningOverrideKey = (item: PlanningCandidate) => item.canvasAssignmentId ? `task:${item.canvasAssignmentId}` : planningItemKey(item);
 export interface PlanningDraft {
   readonly courses: 'all' | 'select';
   readonly courseIds: readonly string[];

@@ -40,8 +40,9 @@ hooks, quiet hooks, planning-session modules, mobile planMode and sessionStore.
   owner:date, reset on reload/date/owner. Candidates currently load only when
   sheet opens. Default All/Both/smart excludes recently opened reviewers.
 - TodayItem has kind study_session, id, status planned/completed/skipped,
-  startAt/endAt, reviewer.id or task.id, course.id; it exposes enough to match
-  snapshot targets and start times. API plan proposals lack task courseId and
+  startAt/endAt, reviewer.id and course.id. Task target IDs are absent; exact
+  time/kind/title/course matching is the legacy status equivalent. Ambiguous
+  matches never claim completion. API plan proposals lack task courseId and
   original selection metadata: retain those locally from candidates/request.
 - Existing preview/apply uses planner preview/replan; apply reconciles Today.
   No override/action should add a Canvas sync or Library/Today refetch.
@@ -95,3 +96,59 @@ STEP 3 focused hooks FRESH PASS: web 7/7, mobile 7/7 (1 file each).
 Includes first-run exactly-once, last/saved/around priority, readiness guards,
 existing planned overlap suppression, override/kind payloads, release preview
 and stale candidate responses. Both Today screens now consume these adapters.
+
+## STEP 4 implementation and safe equivalents
+
+Both Today adapters expose skip/remove/putBack/moveUp, takenOut, previousPlan,
+restorePrevious and windowSource/welcome dismissal for PL2. Existing per-item
+checks invoke Remove/Put back; no new UI controls or redesign. Sheet color
+usages touched here are monochrome; existing clock renderers/gestures unchanged.
+
+Candidates are loaded once per owner/date visit. Clock releases recompute their
+availability locally and actions use the cached candidates: no sync, Library
+refetch or new candidate request. The sheet reuses the cached data as well.
+Apply writes a snapshot only after replan succeeds, using the actual saved
+session response (including its actual times), then reconciles as before.
+
+Canvas local admission changes assignment UUIDs into task UUIDs. A selection-only
+optional planningTargets mapping now carries task ID, stable selection alias and
+course ID where needed. No titles or provider data are added. Legacy omitted
+selection and ordinary personal-task/reviewer-only response shapes are unchanged;
+the existing exact legacy-equivalence assertion still passes. Exclusions use
+the stable assignment key and also recognize projected task keys. Move-up uses
+aliases without duplicating the same selected target. This necessary API/shared
+metadata is the closest safe equivalent to the prompt's assumed plan metadata.
+
+Previous-plan status uses exact session time/kind plus reviewer identity or task
+title/course because Today has no task target ID. Duplicate/ambiguous evidence
+never marks Done. Older snapshots show weekday/window and no today status.
+Restore clears exclusions for the explicitly restored targets and queues their
+manual selection in the current window. Targets no longer eligible remain
+subject to the existing safe not-found API denial; no ownership/validation is
+weakened. Split sessions deduplicate to the strict one-entry-per-target contract.
+
+FRESH focused final: shared helpers/status 17/17; mobile hooks/sheet/quiet 33/33;
+web hooks/quiet 25/25; mobile screens 102/102; actual Chromium sheet 9/9;
+API planning 29/29. No production/provider calls. Typechecks pass for shared,
+web and mobile; API and full gates follow in STEP 5.
+
+First failures retained under tmp/overnight/PL1/gates: step4-web-types and
+step4-mobile-types failed on union inference in persisted-session flatMap;
+explicit ProposedStudySession[] annotation repaired both. Initial mobile
+screens: 90 passed/12 failed (new candidate endpoint missing in legacy fixture);
+first fixture rerun retained the same counts because a CRLF replacement missed
+the fixture initializer. Corrected fixture: 101 passed/1 failed (one remaining
+implicit-selection expectation); final 102/102. Candidate reads are explicitly
+counted separately and TC2 asserts zero candidate reads during gestures/release,
+one date save plus one last-used save, one quiet preview, zero sync/refetch.
+API first attempt 28 passed/1 failed (metadata unnecessarily added to ordinary
+personal/reviewer selections); mapping narrowed to only tasks needing it, exact
+existing shape assertion preserved, rerun 29/29. First web lint had one new
+candidate-memo warning; fixed with useMemo, final root lint will verify.
+
+Reviewed React components/hooks with the installed React best-practices skill:
+stable memoized candidate data, owner/date cleanup, no new listeners/dependencies,
+existing controls/accessibility preserved. API typecheck first failed on the
+test-local Plan type missing optional metadata (2 errors); extended that type
+with the shared planningTargets contract, rerun FRESH PASS. Mobile first lint
+also found two duplicate-import warnings in Today; imports merged.

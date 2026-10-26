@@ -299,6 +299,8 @@ export interface DeterministicStudyPlan<S extends ProposedStudySession = Propose
   readonly candidates?: { readonly tasks: number; readonly reviewers: number };
   /** Only selection requests extend the legacy response. */
   readonly notFit?: readonly PlanNotFit[];
+  /** Selection-only identity mapping after local Canvas task admission. */
+  readonly planningTargets?: readonly { readonly kind: StudyBlockKind; readonly id: string; readonly selectionId: string; readonly courseId: string | null }[];
 }
 
 /** The decided empty-state copy when the chosen kind has nothing to plan. */
