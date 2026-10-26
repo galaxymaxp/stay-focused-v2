@@ -25,7 +25,7 @@ vi.mock("../components/snapshot-status", () => ({ SnapshotStatus: () => null }))
 vi.mock("../lib/canvas-refresh", () => ({ useCanvasRefresh: () => ({}), CanvasRefreshStatus: () => null }));
 vi.mock("./day-clock/DayRingClock", () => ({ DayRingClock: () => null }));
 vi.mock("./today/plan-preview", () => ({ PlanPreview: () => null }));
-vi.mock("./today/planning-sheet", () => ({ PlanningControl: "PlanningControl" }));
+vi.mock("./today/today-planner", () => ({ TodayPlanner: "TodayPlanner" }));
 vi.mock("./today/today-calendar", () => ({ TodayCalendar: () => null }));
 const clockAdjusting = vi.hoisted(() => ({ current: false }));
 vi.mock("./day-clock/use-today-clock-window", () => ({ useTodayClockWindow: () => ({
@@ -133,3 +133,4 @@ it("keeps a detail mark in memory if browser storage is denied", async () => {
   await act(async () => { prefs.read(first.id, false); }); await render();
   expect(todayLinks()).toHaveLength(1); expect(writes()).toHaveLength(2);
 });
+vi.mock("./today/plan-button", () => ({ PlanButton: "PlanButton" }));

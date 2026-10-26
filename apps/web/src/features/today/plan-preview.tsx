@@ -1,152 +1,34 @@
-"use client";
-import { freeTimeEnd, minuteInWindow, clockTimeLabel, planBlockMarks } from "@stay-focused/shared";
-import { useEffect, useRef, useState } from 'react';
-import {
-  isReviewerProposal,
-  PLAN_MODE_LABELS,
-  planEmptyMessage,
-  proposalTargetKey,
-  proposalTitle,
-  type DeterministicStudyPlan,
-} from "@stay-focused/shared/task-planning";
-import { Icon } from "../../components/ui";
-import {
-  formatFreeTime,
-  planTaskIds,
-  planToneFor,
-} from "../day-clock/timeline";
+﻿"use client";
+import { plannerShortTime, freeTimeDuration, plannerBlocks, plannerFit, PREVIOUS_PLAN_EMPTY, type PlannerBlock, type PreviousPlanView } from '@stay-focused/shared';
+import type { DeterministicStudyPlan, PlanningCandidates } from '@stay-focused/shared/task-planning';
+import { planToneFor } from '../day-clock/timeline';
 
-// Web port of apps/mobile/src/features/redesign/PlanPreview.tsx.
-
-function minuteOfDay(iso: string) {
-  const date = new Date(iso);
-  return date.getHours() * 60 + date.getMinutes();
+export function PlanFitCard({ plan, blocks, free }: { plan: DeterministicStudyPlan | null; blocks: readonly PlannerBlock[]; free: number }) {
+  const fit = plannerFit(plan, blocks, free), targets = blocks.map(block => block.targetKey);
+  return <section className="planner-fit" aria-label="Plan fit"><div className="planner-fit-heading"><strong>{fit.headline}</strong><span className="meta">{fit.ratio}</span></div>
+    <div className="planner-fit-bar" role="img" aria-label={fit.ratio}>{fit.segments.map(segment => <span key={segment.key} data-testid="fit-segment" style={{ width: `${segment.fraction * 100}%`, background: `var(--${planToneFor(targets, segment.targetKey)})` }} />)}</div>
+    <p className="meta">{fit.subline}</p></section>;
 }
-const hourLabel = clockTimeLabel;
-
-/**
- * The planner's proposal drawn to scale across the free window: one block per
- * session, colored per task or reviewer (matching the clock ring) with a small
- * kind icon, empty space left empty. Nothing changes until Save to schedule.
- */
-export function PlanPreview({
-  plan,
-  from,
-  to,
-  busy,
-  onApply,
-  onDiscard,
-}: {
-  plan: DeterministicStudyPlan;
-  from: number;
-  to: number;
-  busy: boolean;
-  onApply: () => void;
-  onDiscard: () => void;
-}) {
-  const until = freeTimeEnd(from, to);
-  const bar = useRef<HTMLDivElement>(null);
-  const [barWidth, setBarWidth] = useState(0);
-  useEffect(() => {
-    if (!bar.current) return;
-    const node = bar.current;
-    const observer = new ResizeObserver(() => setBarWidth(node.clientWidth));
-    observer.observe(node); setBarWidth(node.clientWidth);
-    return () => observer.disconnect();
-  }, []);
-  const span = Math.max(15, until - from);
-  const taskIds = planTaskIds(plan);
-  const empty = plan.sessions.length === 0 ? planEmptyMessage(plan) : null;
-  const kind = (session: DeterministicStudyPlan["sessions"][number]) => isReviewerProposal(session) ? "Review" : "Task";
-  const planned = plan.sessions.reduce((t, s) => t + s.durationMinutes, 0);
-  const unscheduled = plan.notFit?.reduce((sum, item) => sum + item.minutes, 0) ?? plan.unscheduledWork.reduce(
-    (t, item) => t + item.unscheduledMinutes,
-    0,
-  );
-  const hours = Array.from(
-    { length: Math.floor(until / 60) - Math.ceil(from / 60) + 1 },
-    (_, i) => (Math.ceil(from / 60) + i) * 60,
-  ).filter((m) => m > from && m < until);
-  return (
-    <section className="surface stack plan-preview" aria-label="Proposed plan">
-      <div className="row between">
-        <h3>Proposed plan</h3>
-        <span className="meta count-up">{formatFreeTime(planned)} planned</span>
-      </div>
-      <p className="meta">
-        {plan.mode ? `Plan with ${PLAN_MODE_LABELS[plan.mode]} · ` : ""}Not saved yet — save it to add these blocks to Schedule.
-      </p>
-      {empty && <p className="meta plan-empty" role="status">{empty}</p>}
-      <div className="row wrap">
-        <button className="primary" disabled={busy || plan.sessions.length === 0} onClick={onApply}>
-          Save to schedule
-        </button>
-        <button className="subtle" disabled={busy} onClick={onDiscard}>
-          Discard
-        </button>
-      </div>
-      <div
-        ref={bar}
-        className="plan-bar"
-        role="img"
-        aria-label={
-          plan.sessions.length
-            ? `Proposed plan: ${plan.sessions
-                .map(
-                  (s) =>
-                    `${kind(s)}: ${proposalTitle(s)} at ${hourLabel(minuteOfDay(s.startsAt))} for ${s.durationMinutes} minutes`,
-                )
-                .join("; ")}`
-            : "No sessions fit this window"
-        }
-      >
-        {hours.map((m) => (
-          <span
-            key={m}
-            className="plan-hour"
-            style={{ left: `${((m - from) / span) * 100}%` }}
-          />
-        ))}
-        {plan.sessions.map((session, index) => {
-          const start = minuteInWindow(minuteOfDay(session.startsAt), from);
-          const tone = planToneFor(taskIds, proposalTargetKey(session));
-          const late = session.scheduledAfterDeadline;
-          const marks = planBlockMarks({ shape: 'linear', length: Math.min(session.durationMinutes, until - start) / span * barWidth, thickness: 50 }, 0, 16);
-          return (
-            <span
-              key={session.proposalId}
-              className={`plan-block${late ? " late" : ""}`}
-              title={`${kind(session)}: ${proposalTitle(session)} · ${session.durationMinutes} min`}
-              style={{
-                left: `${(Math.max(0, start - from) / span) * 100}%`,
-                width: `${(Math.min(session.durationMinutes, until - start) / span) * 100}%`,
-                color: `var(--${tone})`,
-                background: `var(--${tone}-soft)`,
-                animationDelay: `${index * 45}ms`,
-              }}
-            >
-              <strong>
-                {marks.kind && <Icon name={isReviewerProposal(session) ? "book-open" : "clipboard-list"} />}
-                <span className="plan-block-title">{proposalTitle(session)}</span>
-              </strong>
-              <span>
-                {late ? "after due · " : ""}
-                {session.durationMinutes}m
-              </span>
-            </span>
-          );
-        })}
-      </div>
-      <div className="row between plan-ends">
-        <span className="meta">{hourLabel(from)}</span>
-        <span className="meta">{hourLabel(to)}</span>
-      </div>
-      {unscheduled > 0 && (
-        <p className="meta plan-unfit">
-          <span className="plan-unfit-swatch" aria-hidden="true" />
-          {formatFreeTime(unscheduled)} more didn&apos;t fit
-        </p>
-      )}
-    </section>
-  );
+export function PlannerDot({ targets, target }: { targets: readonly string[]; target: string }) {
+  return <span className="planner-dot" aria-hidden="true" style={{ background: `var(--${planToneFor(targets, target)})` }} />;
+}
+export function PlanTimeline({ blocks, end, candidates, onOpen }: { blocks: readonly PlannerBlock[]; end: number; candidates?: PlanningCandidates | null; onOpen?: (block: PlannerBlock) => void }) {
+  const targets = blocks.map(block => block.targetKey);
+  return <div className="planner-timeline" aria-label="Plan timeline">{blocks.map(block => <div className="planner-block" key={block.key}><span className="planner-time">{block.start}</span>
+    <button type="button" className="planner-block-card" onClick={() => onOpen?.(block)} disabled={!onOpen} aria-label={`${block.kind === 'reviewer' ? 'Review: ' : ''}${block.title}`}>
+      <span className="planner-block-course"><PlannerDot targets={targets} target={block.targetKey} />{candidates?.courses.find(course => course.id === block.courseId)?.name.split('|')[0]?.trim() ?? block.savedItem?.course?.code ?? 'Personal'}</span>
+      <strong>{block.title}</strong><span className="meta">{block.minutes} min · {block.kind === 'reviewer' ? 'Reviewer' : 'Task'}</span>
+    </button></div>)}<div className="planner-block planner-end"><span className="planner-time">{plannerShortTime(end)}</span><span className="meta">Free time ends</span></div></div>;
+}
+export function PreviousPlan({ previous, onRestore, disabled }: { previous: PreviousPlanView; onRestore: () => void; disabled?: boolean }) {
+  if (!previous) return <section className="planner-previous-empty"><strong>No previous plan yet</strong><p className="meta">{PREVIOUS_PLAN_EMPTY}</p></section>;
+  const done = previous.sessions.filter(session => session.status === 'Done').length;
+  return <div className="planner-proposal"><section className="planner-fit"><strong>{previous.summary}</strong>{previous.sessions.some(session => session.status !== null) && <p className="meta">{done} of {previous.sessions.length} blocks done.</p>}</section>
+    <div className="planner-timeline">{previous.sessions.map((session, index) => <div className="planner-block" key={`${session.kind}:${session.id}:${index}`}><span className="planner-time">{plannerShortTime(session.startMinute)}</span><div className="planner-block-card"><strong>{session.title}</strong><span className="meta">{session.status ?? `${session.minutes} min · ${session.kind === 'reviewer' ? 'Reviewer' : 'Task'}`}</span></div></div>)}</div>
+    <button type="button" className="planner-outline" disabled={disabled} onClick={onRestore}>Restore this plan</button></div>;
+}
+/** Standalone preview uses the same components as the inline Today planner. */
+export function PlanPreview({ plan, from, to, busy, onApply }: { plan: DeterministicStudyPlan; from: number; to: number; busy: boolean; onApply: () => void; onDiscard?: () => void }) {
+  const blocks = plannerBlocks(plan);
+  return <section className="planner-proposal" aria-label="Proposed plan"><PlanFitCard plan={plan} blocks={blocks} free={freeTimeDuration(from, to)} /><PlanTimeline blocks={blocks} end={to} /><button className="planner-primary" disabled={busy || !blocks.length} onClick={onApply}>Use this plan</button></section>;
 }

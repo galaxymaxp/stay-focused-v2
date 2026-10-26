@@ -10,7 +10,7 @@ import { ClockOptions } from "./clock-options";
 import { CLOCK } from "./dayClock";
 import { planModeStore } from "../../lib/plan-mode";
 import { arrangeToday } from "../../app-model/presentation";
-vi.mock("../today/planning-sheet", () => ({ PlanningControl: "PlanningControl" }));
+vi.mock("../today/today-planner", () => ({ TodayPlanner: "TodayPlanner" }));
 
 
 
@@ -80,10 +80,10 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => tree?.unmount()); tree = undefined; vi.useRealTimers(); vi.unstubAllGlobals(); planModeStore.reset(); });
 const tick = async (ms: number) => { await act(async () => { vi.advanceTimersByTime(ms); }); };
 const options = () => tree!.root.findByType(ClockOptions).props;
-const control = () => tree!.root.findByType("PlanningControl" as never);
+const control = () => tree!.root.findByType("TodayPlanner" as never);
 const choice = (mode: "reviewers" | "tasks" | "reviewers_tasks") => ({ mode, selection: { order: "manual", items: [{ kind: mode === "tasks" ? "task" : "reviewer", id: "selected" }] }, draft: { mode } });
 const previews = () => mocks.api.mock.calls.filter(([path]) => path === "/api/experience/planner/preview");
-const shown = () => tree!.root.findAllByType("PlanPreview" as never).map(node => (node.props as { plan: DeterministicStudyPlan }).plan);
+const shown = () => [control().props.plan].filter((plan): plan is DeterministicStudyPlan => !!plan);
 
 it("defaults to Both without menu radios and applies exactly the previewed selection", async () => {
   expect(options().planMode).toBeUndefined();
@@ -94,7 +94,7 @@ it("defaults to Both without menu radios and applies exactly the previewed selec
   expect(body.mode).toBe("reviewers_tasks");
   expect(body.selection).toEqual({ order: "smart", items: [{ kind: "task", id: "selected" }, { kind: "reviewer", id: "selected" }] });
   await act(async () => { await Promise.resolve(); });
-  const preview = tree!.root.findByType("PlanPreview" as never);
+  const preview = control();
   await act(async () => (preview.props as { onApply: () => void }).onApply());
   const apply = mocks.api.mock.calls.find(([path]) => path === "/api/experience/planner/replan")!;
   expect(apply[1].body).toEqual(body);
@@ -140,9 +140,7 @@ it("opens a reviewer block's saved reviewer and keeps task blocks on their sessi
   await act(async () => clock.props.onSegmentPress("session:task"));
   // The task block resolves to its activity as before.
   expect(mocks.push).toHaveBeenLastCalledWith("/tasks/task%3Aessay");
-  const labels = tree!.root.findAll(node => node.type === "button" && typeof node.props["aria-label"] === "string" && node.props["aria-label"].includes("Essay draft"))
-    .map(node => node.props["aria-label"] as string);
-  expect(labels.some(label => label.includes("Review: Essay draft"))).toBe(true);
+  expect(control().props.timeline[0].reviewer.id).toBe("artifact:reviewer-1");
 });
 it("keeps reviewer identities separate from same-title tasks in Today sections", () => {
   const otherReviewer = { ...reviewerBlock, id: "session:other-reviewer", reviewer: { id: "artifact:other" } };

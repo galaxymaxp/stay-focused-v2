@@ -1,4 +1,5 @@
 "use client";
+import "./planner.css";
 import { defaultPlanningDraft, planningItemKey } from "@stay-focused/shared";
 import { useTodayPlan } from "./use-today-plan";
 import { freeTimeDuration } from "@stay-focused/shared";
@@ -15,7 +16,8 @@ import {
   proposalTargetKey,
   type StudySessionView, type PlanningCandidates, type DeterministicStudyPlan,
 } from "@stay-focused/shared/task-planning";
-import { PlanningControl } from "./planning-sheet";
+import { TodayPlanner } from "./today-planner";
+import { PlanButton } from "./plan-button";
 import { todayPlanningMemory } from './planning-session';
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -50,10 +52,8 @@ import {
   freeTimeAround,
   planTaskIds,
   planToneFor,
-  planningRequest,
   timelineSegments,
 } from "../day-clock/timeline";
-import { PlanPreview } from "./plan-preview";
 import { TodayCalendar } from "./today-calendar";
 
 // Web counterpart of apps/mobile/src/features/redesign/TodayScreen.tsx: the
@@ -188,15 +188,16 @@ export function TodayScreen() {
   );
   const arranged = arrangeToday(
     {
-      next: today.data?.next ?? null,
-      later: today.data?.later ?? [],
+      next: today.data?.next?.kind === "study_session" ? null : today.data?.next ?? null,
+      later: (today.data?.later ?? []).filter(item => item.kind !== "study_session"),
       dueSoon: upcoming.slice(0, 3),
-      others: [...(today.data?.timeline ?? []), ...upcoming],
+      others: [...(today.data?.timeline ?? []).filter(item => item.kind !== "study_session"), ...upcoming],
     },
     prefs.pinned.today,
     prefs.hidden.today,
     date,
   );
+  const [adjustPlan, setAdjustPlan] = useState(false);
   const [showHidden, setShowHidden] = useState(false);
   const [lastHidden, setLastHidden] = useState<TodayItem | null>(null);
   const rowActions = (item: TodayItem) => {
@@ -274,15 +275,7 @@ export function TodayScreen() {
               disabled={busy || !plannerReady}
               proposed={proposed}
             />
-            <PlanningControl key={identity} request={planningRequest(date, start, end, "reviewers_tasks")} active={activePlan} overrides={planner.overrides}
-              onItemCheck={(key, checked) => checked ? planner.putBack(key) : planner.remove(key)}
-              disabled={busy || !plannerReady}
-              load={request => planner.candidates ? Promise.resolve(planner.candidates) : api<PlanningCandidates>("/api/experience/planner/candidates", { method: "POST", body: request })}
-              onBuild={choice => {
-                todayPlanningMemory.build(identity, choice);
-                renderBuiltChoice(revision => revision + 1); setNote(null);
-                planner.propose(choice.mode, choice.selection);
-              }} />
+            <PlanButton disabled={busy || !plannerReady} onPress={() => setAdjustPlan(value => !value)} />
             <p className="free-time-line">
               <span className="free-swatch" aria-hidden="true" />
               {formatFreeTime(freeTimeDuration(start, end))} free · {clockLabel(start)} – {clockLabel(end)}
@@ -296,28 +289,17 @@ export function TodayScreen() {
               <p className="meta center">Planning is not available right now.</p>
             )}
           </section>
-          {(busy || previewing) && !preview && (
-            <section className="surface plan-loading" aria-label="Planning">
-              <span className="plan-loading-bar short" />
-              <span className="plan-loading-bar" />
-            </section>
-          )}
-          {(note || previewNote || planner.candidateNote) && <Notice>{note || previewNote || planner.candidateNote}</Notice>}
-          {preview && (
-            <PlanPreview
-              plan={preview}
-              from={start}
-              to={end}
-              busy={busy}
-              onApply={() => void apply()}
-              onDiscard={() => {
-                          clearPreview();
-              }}
-            />
-          )}
         </div>
 
         <div className="stack today-work-column">
+          <TodayPlanner key={identity} candidates={planner.candidates} plan={preview} timeline={today.data?.timeline ?? []}
+            active={activePlan} overrides={planner.overrides} start={start} end={end} busy={busy || previewing}
+            adjust={adjustPlan} onToggleAdjust={() => setAdjustPlan(value => !value)}
+            onItemCheck={(key, checked) => checked ? planner.putBack(key) : planner.remove(key)}
+            onBuild={choice => { todayPlanningMemory.build(identity, choice); renderBuiltChoice(revision => revision + 1); setNote(null); planner.propose(choice.mode, choice.selection); }}
+            onApply={() => void apply()} previous={planner.previousPlan} onRestore={planner.restorePrevious}
+            onOpen={block => { if (block.savedItem) openItem(block.savedItem); else if (block.kind === "reviewer") router.push(`/library/${encodeURIComponent(block.id)}`); else router.push(`/tasks/${encodeURIComponent(activities.data?.items.find(item => item.taskId === block.id || item.id === block.id)?.id ?? block.id)}`); }} />
+          {(note || previewNote || planner.candidateNote) && <Notice>{note || previewNote || planner.candidateNote}</Notice>}
           {today.error && !today.data ? (
             <div>
               <Notice error>{today.error}</Notice>
@@ -328,7 +310,7 @@ export function TodayScreen() {
           ) : (
             <>
               <section className="stack">
-                <h2>Up Next</h2>
+                <h2>Tasks to do</h2>
                 {arranged.pinned.map((item) => row(item, { dominant: true }))}
                 {arranged.next
                   ? row(arranged.next, { dominant: true })
@@ -371,7 +353,7 @@ export function TodayScreen() {
                   ...(today.data?.current ? [today.data.current] : []),
                   ...(today.data?.urgent ?? []).filter((item) => item.dueAt && localDate(new Date(item.dueAt)) === date),
                   ...upcoming.filter((item) => item.dueAt && localDate(new Date(item.dueAt)) === date),
-                ])}
+                ]).filter(item => item.kind !== "study_session")}
                 onOpen={openItem}
               />
               {lastHidden && (
@@ -385,7 +367,7 @@ export function TodayScreen() {
               <div className="today-split">
                 <section className="stack">
                   <div className="row between">
-                    <h2>Later Today</h2>
+                    <h2>Later tasks</h2>
                     <Link href="/schedule">See schedule</Link>
                   </div>
                   {arranged.later.length ? (
@@ -572,8 +554,8 @@ function urgencyClass(urgency: Urgency) {
   return urgency === "overdue" || urgency === "today"
     ? "danger"
     : urgency === "tomorrow"
-      ? "orange"
+      ? ""
       : urgency === "week"
-        ? "amber"
+        ? ""
         : "";
 }

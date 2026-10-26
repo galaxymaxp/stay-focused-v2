@@ -14,6 +14,7 @@ export function plannerDuration(minutes: number): string {
   const whole = Math.round(minutes), hours = Math.floor(whole / 60), rest = whole % 60;
   return hours ? `${hours} h${rest ? ` ${rest} min` : ''}` : `${rest} min`;
 }
+export const plannerShortTime = (minute: number) => clockTimeLabel(minute).replace(/\s[AP]M$/u, '');
 export const plannerWindowLabel = (start: number, end: number) => `${clockTimeLabel(start)} – ${clockTimeLabel(end)} · ${plannerDuration(freeTimeDuration(start, end))} free`;
 export const PREVIOUS_PLAN_EMPTY = 'After tonight, your last plan shows here with what you finished, so you can restore it or compare it with the next proposal.';
 export const WELCOME_TITLE = 'We picked 8–10 PM to start';
@@ -32,7 +33,7 @@ export function plannerBlocks(plan: DeterministicStudyPlan | null, candidates: P
     .sort((a, b) => Date.parse(a.startAt!) - Date.parse(b.startAt!)).map(item => ({
       key: item.id, selectionKey: item.reviewer ? `reviewer:${item.reviewer.id}` : item.id, targetKey: item.reviewer ? `reviewer:${item.reviewer.id}` : item.id,
       title: item.title, kind: item.reviewer ? 'reviewer' : 'task', id: item.reviewer?.id ?? item.deepLinkTarget.id,
-      courseId: item.course?.id ?? null, start: clockTimeLabel(new Date(item.startAt!).getHours() * 60 + new Date(item.startAt!).getMinutes()),
+      courseId: item.course?.id ?? null, start: plannerShortTime(new Date(item.startAt!).getHours() * 60 + new Date(item.startAt!).getMinutes()),
       minutes: Math.round((Date.parse(item.endAt!) - Date.parse(item.startAt!)) / 60000), savedItem: item,
     }));
   const items = candidates ? allPlanningItems(candidates) : [];
@@ -44,7 +45,7 @@ export function plannerBlocks(plan: DeterministicStudyPlan | null, candidates: P
     const at = new Date(session.startsAt);
     return { key: session.proposalId, selectionKey: planningItemKey({ kind, id: target?.selectionId ?? candidate?.id ?? id }), targetKey: proposalTargetKey(session), title: proposalTitle(session), kind, id,
       courseId: isReviewerProposal(session) ? session.courseId : target?.courseId ?? candidate?.courseId ?? null,
-      start: clockTimeLabel(at.getHours() * 60 + at.getMinutes()), minutes: session.durationMinutes };
+      start: plannerShortTime(at.getHours() * 60 + at.getMinutes()), minutes: session.durationMinutes };
   });
 }
 export function plannerFit(plan: DeterministicStudyPlan | null, blocks: readonly PlannerBlock[], free: number) {

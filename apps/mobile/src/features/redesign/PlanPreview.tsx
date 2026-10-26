@@ -1,4 +1,4 @@
-import { clockTimeLabel, freeTimeDuration, plannerFit, plannerBlocks, PREVIOUS_PLAN_EMPTY, type PlannerBlock, type PreviousPlanView } from '@stay-focused/shared';
+import { plannerShortTime, freeTimeDuration, plannerFit, plannerBlocks, PREVIOUS_PLAN_EMPTY, type PlannerBlock, type PreviousPlanView } from '@stay-focused/shared';
 import { proposalTargetKey, type DeterministicStudyPlan, type PlanningCandidates } from '@stay-focused/shared/task-planning';
 import { Pressable, View } from 'react-native';
 import { Copy } from '../../design/primitives';
@@ -51,7 +51,7 @@ export function PlanTimeline({ blocks, end, candidates, onOpen }: { blocks: read
         <Copy muted size="caption">{block.minutes} min · {block.kind === 'reviewer' ? 'Reviewer' : 'Task'}</Copy>
       </Pressable>
     </View>)}
-    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}><Copy muted style={{ width: 44, textAlign: 'right', fontSize: 13 }}>{clockTimeLabel(end)}</Copy><Copy muted size="caption">Free time ends</Copy></View>
+    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}><Copy muted style={{ width: 44, textAlign: 'right', fontSize: 13 }}>{plannerShortTime(end)}</Copy><Copy muted size="caption">Free time ends</Copy></View>
   </View>;
 }
 export function PreviousPlan({ previous, onRestore, disabled }: { previous: PreviousPlanView; onRestore: () => void; disabled?: boolean }) {
@@ -60,7 +60,7 @@ export function PreviousPlan({ previous, onRestore, disabled }: { previous: Prev
   const done = previous.sessions.filter(session => session.status === 'Done').length;
   return <View style={{ gap: 20 }}>
     <View style={{ backgroundColor: colors.surfacePrimary, borderRadius: 18, paddingVertical: 16, paddingHorizontal: 18, gap: 6 }}><Copy style={{ fontSize: 16, fontWeight: '600' }}>{previous.summary}</Copy>{previous.sessions.some(session => session.status !== null) && <Copy muted style={{ fontSize: 13 }}>{done} of {previous.sessions.length} blocks done.</Copy>}</View>
-    {previous.sessions.map((session, index) => <View key={`${session.kind}:${session.id}:${index}`} style={{ flexDirection: 'row', gap: 12 }}><Copy muted style={{ width: 44, paddingTop: 14, textAlign: 'right', fontSize: 13 }}>{clockTimeLabel(session.startMinute)}</Copy><View style={{ flex: 1, backgroundColor: colors.surfacePrimary, borderRadius: 16, padding: 14, gap: 4 }}><Copy style={{ fontSize: 15, fontWeight: '600' }}>{session.title}</Copy><Copy muted size="caption">{session.status ?? `${session.minutes} min · ${session.kind === 'reviewer' ? 'Reviewer' : 'Task'}`}</Copy></View></View>)}
+    {previous.sessions.map((session, index) => <View key={`${session.kind}:${session.id}:${index}`} style={{ flexDirection: 'row', gap: 12 }}><Copy muted style={{ width: 44, paddingTop: 14, textAlign: 'right', fontSize: 13 }}>{plannerShortTime(session.startMinute)}</Copy><View style={{ flex: 1, backgroundColor: colors.surfacePrimary, borderRadius: 16, padding: 14, gap: 4 }}><Copy style={{ fontSize: 15, fontWeight: '600' }}>{session.title}</Copy><Copy muted size="caption">{session.status ?? `${session.minutes} min · ${session.kind === 'reviewer' ? 'Reviewer' : 'Task'}`}</Copy></View></View>)}
     <PlannerButton secondary disabled={disabled} onPress={onRestore}>Restore this plan</PlannerButton>
   </View>;
 }
