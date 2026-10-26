@@ -33,9 +33,9 @@ const plugin: Plugin = { name: 'pl2-local-only', enforce: 'pre', resolveId(sourc
   if(/(?:^|\/)lib\/canvas-refresh$/.test(source))return '\0pl2:refresh'; return null;
 }, load(id) { return id.startsWith('\0pl2:') ? stubs[id.slice(5)] : null; } };
 let server: Server, browser: Browser, origin: string, out: string;
-const evidence = resolve('../../tmp/overnight/PL2/browser');
+const evidence = resolve('../../tmp/overnight/PL3/browser');
 beforeAll(async () => {
-  mkdirSync(evidence,{recursive:true}); out=mkdtempSync(resolve('../../tmp/overnight/PL2-browser-'));
+  mkdirSync(evidence,{recursive:true}); out=mkdtempSync(resolve('../../tmp/overnight/PL3-browser-'));
   await build({ configFile:false,logLevel:'silent',root:resolve('.'),publicDir:false,plugins:[plugin],oxc:{jsx:{runtime:'automatic',development:false}},define:{'process.env.NODE_ENV':'"production"'},build:{outDir:out,emptyOutDir:true,minify:false,modulePreload:false,rollupOptions:{input:'pl2:entry',output:{format:'es',entryFileNames:'entry.js',chunkFileNames:'[name]-[hash].js'}}} });
   const css=readFileSync(resolve('app/globals.css'),'utf8')+'\n'+readFileSync(resolve('src/features/today/planner.css'),'utf8');
   server=createServer((request,response)=>{const path=new URL(request.url??'/','http://localhost').pathname;
@@ -46,8 +46,8 @@ beforeAll(async () => {
   browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 },120_000);
 afterAll(async()=>{await browser?.close();await new Promise<void>(yes=>server?server.close(()=>yes()):yes());if(out)rmSync(out,{recursive:true,force:true});});
-async function open(width=1280,theme='dark',query=''){
-  const page=await browser.newPage({viewport:{width,height:1000},reducedMotion:'reduce'});await page.route('**/*',route=>route.request().url().startsWith(origin)?route.continue():route.abort());
+async function open(width=1280,theme='dark',query='',touch=false){
+  const page=await browser.newPage({viewport:{width,height:1000},hasTouch:touch,reducedMotion:'reduce'});await page.route('**/*',route=>route.request().url().startsWith(origin)?route.continue():route.abort());
   await page.addInitScript(theme=>{document.addEventListener('DOMContentLoaded',()=>document.documentElement.dataset.theme=theme,{once:true});const Original=Date;Object.defineProperty(window,'Date',{value:new Proxy(Original,{construct(target,args){return args.length?Reflect.construct(target,args):new Original(2026,9,27,19,40)}})});Object.defineProperty(window.Date,'now',{value:()=>new Original(2026,9,27,19,40).getTime()});},theme);
   if(query.includes('previous')) await page.addInitScript(()=>localStorage.setItem('sf.today.last-plan',JSON.stringify({ownerId:'synthetic-owner',date:'2026-10-27',start:1200,end:1320,sessions:[{kind:'task',id:'00000000-0000-4000-8000-000000000021',title:'Synthetic previous task',courseId:'00000000-0000-4000-8000-000000000001',startMinute:1200,minutes:60}]})));
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/'+query);return{page,errors};
@@ -116,4 +116,46 @@ it('planner skeleton has exact rows and busy semantics, honors Reduce Motion and
     await page.screenshot({path:join(evidence,'skeleton-390-dark.png'),fullPage:true});expect(errors).toEqual([]);
   }finally{await page.close();}
   const cached=await open(1280,'light','?preview-loading');try{await cached.page.getByRole('button',{name:'Start now',exact:true}).waitFor();expect(await cached.page.locator('.planner-skeleton').count()).toBe(0);expect(await cached.page.getByRole('button',{name:'Use this plan',exact:true}).isDisabled()).toBe(true);expect(cached.errors).toEqual([]);}finally{await cached.page.close();}
+},60_000);
+
+it('block hover/focus actions move, skip and remove through local preview requests; Up next follows', async () => {
+  const {page,errors}=await open(); try {
+    await page.getByRole('button',{name:'Start now',exact:true}).waitFor();
+    const rows=page.locator('.planner-timeline > .planner-block:not(.planner-end)');
+    const title=(index:number)=>rows.nth(index).locator('strong').textContent();
+    const first=await title(0),second=await title(1);
+    const actions=rows.first().getByRole('group');
+    await page.mouse.move(0,0); expect(await actions.evaluate(el=>getComputedStyle(el).opacity)).toBe('0');
+    await rows.first().hover(); expect(await actions.evaluate(el=>getComputedStyle(el).opacity)).toBe('1');
+    expect(await actions.getByRole('button',{name:'Move up',exact:true}).isDisabled()).toBe(true);
+    const skip=actions.getByRole('button',{name:'Skip tonight',exact:true});
+    expect(await skip.getAttribute('title')).toBe('Skip tonight');
+    expect(await skip.evaluate(el=>({width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height,radius:getComputedStyle(el).borderRadius}))).toEqual({width:36,height:36,radius:'10px'});
+    await page.mouse.move(0,0); await skip.focus(); expect(await actions.evaluate(el=>getComputedStyle(el).opacity)).toBe('1');
+    await rows.nth(1).hover(); await rows.nth(1).getByRole('button',{name:'Move up',exact:true}).click();
+    await page.waitForFunction(second=>document.querySelector('.planner-next h3')?.textContent===second,second);
+    expect(await title(0)).toBe(second);expect(await title(1)).toBe(first);
+    const previews=async()=>page.evaluate(()=>(window as unknown as {__calls:[string,{selection?:{order:string;items:{kind:string;id:string}[]}}][]}).__calls.filter(([path])=>path.endsWith('/preview')));
+    expect((await previews()).at(-1)?.[1].selection?.order).toBe('manual');
+    const moved=(await previews()).at(-1)![1].selection!.items;
+    await rows.first().hover(); await rows.first().getByRole('button',{name:'Skip tonight',exact:true}).click();
+    await page.getByText('Skipped tonight \u00b7 returns next window',{exact:true}).waitFor();
+    await page.waitForFunction(second=>document.querySelector('.planner-next h3')?.textContent!==second,second);
+    await page.waitForFunction(id=>(window as unknown as {__calls:[string,{selection?:{items:{id:string}[]}}][]}).__calls.filter(([path])=>path.endsWith('/preview')).at(-1)?.[1].selection?.items.every(item=>item.id!==id),moved[0]!.id);
+    const removed=await title(0); await rows.first().hover(); await rows.first().getByRole('button',{name:'Remove',exact:true}).click();
+    await page.getByText('Removed from plan',{exact:true}).waitFor();
+    await page.waitForFunction(removed=>document.querySelector('.planner-next h3')?.textContent!==removed,removed);
+    const calls=await page.evaluate(()=>(window as unknown as {__calls:[string,unknown][]}).__calls);
+    expect(calls.filter(([path])=>path.endsWith('/candidates'))).toHaveLength(1);
+    expect(calls.every(([path])=>path.endsWith('/candidates')||path.endsWith('/preview'))).toBe(true);
+    expect(errors).toEqual([]);
+  } finally {await page.close();}
+},60_000);
+it('hover-none devices always show all block actions',async()=>{
+  const {page,errors}=await open(390,'dark','',true);try{
+    await page.getByRole('button',{name:'Start now',exact:true}).waitFor();
+    expect(await page.evaluate(()=>matchMedia('(hover: none)').matches)).toBe(true);
+    expect(await page.locator('.planner-block-actions').evaluateAll(els=>els.every(el=>getComputedStyle(el).opacity==='1'))).toBe(true);
+    expect(errors).toEqual([]);
+  }finally{await page.close();}
 },60_000);
