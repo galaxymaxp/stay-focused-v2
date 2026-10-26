@@ -1,135 +1,71 @@
-import { freeTimeEnd, minuteInWindow, clockTimeLabel, planBlockMarks } from "@stay-focused/shared";
-import { useState } from 'react';
-import { isReviewerProposal, planEmptyMessage, proposalTargetKey, proposalTitle, type DeterministicStudyPlan } from "@stay-focused/shared/task-planning";
-import { View } from "react-native";
+import { clockTimeLabel, freeTimeDuration, plannerFit, plannerBlocks, PREVIOUS_PLAN_EMPTY, type PlannerBlock, type PreviousPlanView } from '@stay-focused/shared';
+import { proposalTargetKey, type DeterministicStudyPlan, type PlanningCandidates } from '@stay-focused/shared/task-planning';
+import { Pressable, View } from 'react-native';
+import { Copy } from '../../design/primitives';
+import { useTheme } from '../../design/theme';
 
-import { Action, ContentIcon, Copy, Surface } from "../../design/primitives";
-import { useTheme, type ThemeColors } from "../../design/theme";
-import { radius, spacing } from "../../design/tokens";
-import { formatFreeTime } from "./DayRingClock";
-
-const TONES = ["blue", "violet", "green", "orange"] as const;
-
-/** One stable color per task, shared by the preview bar and the clock ring. */
+const TONES = ['blue', 'violet', 'green', 'orange'] as const;
+/** Existing ring palette and target assignment, unchanged. */
 export function planToneFor(taskIds: readonly string[], taskId: string): (typeof TONES)[number] {
   const index = taskIds.indexOf(taskId);
   return TONES[(index < 0 ? 0 : index) % TONES.length]!;
 }
-
-export function planTaskIds(plan: Pick<DeterministicStudyPlan, "sessions">): string[] {
+export function planTaskIds(plan: Pick<DeterministicStudyPlan, 'sessions'>): string[] {
   return [...new Set(plan.sessions.map(proposalTargetKey))];
 }
-
-function minuteOfDay(iso: string) {
-  const date = new Date(iso);
-  return date.getHours() * 60 + date.getMinutes();
-}
-
-const hourLabel = clockTimeLabel;
-
-/**
- * The planner's proposal drawn to scale across the free window, so the
- * student sees the shape of the evening at a glance: one block per session,
- * colored per task (matching the clock ring), empty space left empty. Work
- * that did not fit sits as a dashed block after the window. Nothing changes
- * until Apply.
- */
-export function PlanPreview({
-  plan,
-  from,
-  to,
-  busy,
-  onApply,
-  onDiscard,
-}: {
-  plan: DeterministicStudyPlan;
-  from: number;
-  to: number;
-  busy: boolean;
-  onApply: () => void;
-  onDiscard: () => void;
+export function PlannerButton({ children, onPress, disabled = false, secondary = false, label }: {
+  children: string; onPress: () => void; disabled?: boolean; secondary?: boolean; label?: string;
 }) {
   const { colors } = useTheme();
-  const until = freeTimeEnd(from, to);
-  const [barWidth, setBarWidth] = useState(0);
-  const span = Math.max(15, until - from);
-  const taskIds = planTaskIds(plan);
-  const planned = plan.sessions.reduce((total, session) => total + session.durationMinutes, 0);
-  const unscheduled = plan.notFit?.reduce((total, item) => total + item.minutes, 0) ?? plan.unscheduledWork.reduce((total, item) => total + item.unscheduledMinutes, 0);
-  const hours = Array.from({ length: Math.floor(until / 60) - Math.ceil(from / 60) + 1 }, (_, index) => (Math.ceil(from / 60) + index) * 60).filter((m) => m > from && m < until);
-  return (
-    <Surface style={{ gap: spacing[3] }}>
-      <View style={{ flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" }}>
-        <Copy size="h3">Proposed plan</Copy>
-        <Copy muted size="caption" style={{ fontVariant: ["tabular-nums"] }}>{formatFreeTime(planned)} planned</Copy>
-      </View>
-      {plan.sessions.length === 0 && planEmptyMessage(plan) ? <Copy muted>{planEmptyMessage(plan)}</Copy> : null}
-      <View
-        onLayout={event => setBarWidth(event.nativeEvent.layout.width)}
-        accessible
-        accessibilityLabel={
-          plan.sessions.length
-            ? `Proposed plan: ${plan.sessions.map((session) => `${isReviewerProposal(session) ? "Review" : "Task"}: ${proposalTitle(session)} at ${hourLabel(minuteOfDay(session.startsAt))} for ${session.durationMinutes} minutes`).join("; ")}`
-            : "No sessions fit this window"
-        }
-        style={{ height: 58, borderRadius: radius.control, backgroundColor: colors.surfaceSecondary }}
-      >
-        {hours.map((minutes) => (
-          <View key={minutes} style={{ position: "absolute", top: 0, bottom: 0, width: 1, left: `${((minutes - from) / span) * 100}%`, backgroundColor: colors.separator }} />
-        ))}
-        {plan.sessions.map((session) => {
-          const start = minuteInWindow(minuteOfDay(session.startsAt), from);
-          const tone = planToneFor(taskIds, proposalTargetKey(session));
-          const late = session.scheduledAfterDeadline;
-          const marks = planBlockMarks({ shape: 'linear', length: Math.min(session.durationMinutes, until - start) / span * barWidth, thickness: 50 }, 0, 34);
-          return (
-            <View
-              key={session.proposalId}
-              style={{
-                position: "absolute",
-                top: 4,
-                bottom: 4,
-                left: `${(Math.max(0, start - from) / span) * 100}%`,
-                width: `${(Math.min(session.durationMinutes, until - start) / span) * 100}%`,
-                paddingHorizontal: 6,
-                justifyContent: "center",
-                borderRadius: radius.control - 4,
-                backgroundColor: blockFill(colors, tone),
-                borderWidth: late ? 1.5 : 0,
-                borderColor: colors.danger,
-              }}
-            >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
-                {marks.kind && <ContentIcon kind={isReviewerProposal(session) ? "reviewer" : "task"} small />}
-                <Copy size="caption" numberOfLines={1} color={colors[tone]} style={{ fontWeight: "700", fontSize: 11, flex: 1 }}>{proposalTitle(session)}</Copy>
-              </View>
-              <Copy size="caption" numberOfLines={1} color={colors[tone]} style={{ fontSize: 10, opacity: 0.85, fontVariant: ["tabular-nums"] }}>
-                {late ? "after due · " : ""}{session.durationMinutes}m
-              </Copy>
-            </View>
-          );
-        })}
-      </View>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: -spacing[2] }}>
-        <Copy muted size="caption" style={{ fontVariant: ["tabular-nums"] }}>{hourLabel(from)}</Copy>
-        <Copy muted size="caption" style={{ fontVariant: ["tabular-nums"] }}>{hourLabel(to)}</Copy>
-      </View>
-      {unscheduled > 0 ? (
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing[2] }}>
-          <View style={{ width: 28, height: 14, borderRadius: 4, borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.textMuted }} />
-          <Copy muted size="caption" style={{ flex: 1 }} numberOfLines={1}>
-            {formatFreeTime(unscheduled)} more didn&apos;t fit
-          </Copy>
-        </View>
-      ) : null}
-      <View style={{ flexDirection: "row", gap: spacing[2] }}>
-        <View style={{ flex: 1 }}><Action secondary pill disabled={busy} onPress={onDiscard}>Discard</Action></View>
-        <View style={{ flex: 2 }}><Action pill disabled={busy || plan.sessions.length === 0} onPress={onApply}>Apply plan</Action></View>
-      </View>
-    </Surface>
-  );
+  return <Pressable accessibilityRole="button" accessibilityLabel={label ?? children} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
+    style={{ minHeight: 52, borderRadius: 999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, opacity: disabled ? 0.4 : 1,
+      backgroundColor: secondary ? 'transparent' : colors.textPrimary, borderWidth: secondary ? 1 : 0, borderColor: colors.separator }}>
+    <Copy color={secondary ? colors.textPrimary : colors.backgroundPrimary} style={{ fontSize: 16, fontWeight: '600' }}>{children}</Copy>
+  </Pressable>;
 }
-
-function blockFill(colors: ThemeColors, tone: (typeof TONES)[number]) {
-  return colors[`${tone}Soft`];
+export function PlannerDot({ targets, target }: { targets: readonly string[]; target: string }) {
+  const { colors } = useTheme();
+  return <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors[planToneFor(targets, target)] }} />;
+}
+export function PlanFitCard({ plan, blocks, free }: { plan: DeterministicStudyPlan | null; blocks: readonly PlannerBlock[]; free: number }) {
+  const { colors } = useTheme(), fit = plannerFit(plan, blocks, free), targets = blocks.map(block => block.targetKey);
+  return <View testID="plan-fit" style={{ backgroundColor: colors.surfacePrimary, borderWidth: 1, borderColor: colors.separator, borderRadius: 18, paddingVertical: 16, paddingHorizontal: 18, gap: 10 }}>
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+      <Copy style={{ fontSize: 16, fontWeight: '600' }}>{fit.headline}</Copy><Copy muted style={{ fontSize: 13, fontVariant: ['tabular-nums'] }}>{fit.ratio}</Copy>
+    </View>
+    <View accessible accessibilityLabel={fit.ratio} style={{ height: 6, borderRadius: 3, overflow: 'hidden', flexDirection: 'row', backgroundColor: colors.separator }}>
+      {fit.segments.map(segment => <View key={segment.key} testID="fit-segment" style={{ width: `${segment.fraction * 100}%`, height: 6, backgroundColor: colors[planToneFor(targets, segment.targetKey)], borderRightWidth: 2, borderColor: colors.surfacePrimary }} />)}
+    </View>
+    <Copy muted style={{ fontSize: 13, lineHeight: 19.5 }}>{fit.subline}</Copy>
+  </View>;
+}
+export function PlanTimeline({ blocks, end, candidates, onOpen }: { blocks: readonly PlannerBlock[]; end: number; candidates?: PlanningCandidates | null; onOpen?: (block: PlannerBlock) => void }) {
+  const { colors } = useTheme(), targets = blocks.map(block => block.targetKey);
+  return <View style={{ gap: 8 }}>
+    {blocks.map(block => <View key={block.key} style={{ flexDirection: 'row', gap: 12, alignItems: 'stretch' }}>
+      <Copy muted style={{ width: 44, paddingTop: 14, textAlign: 'right', fontSize: 13, fontVariant: ['tabular-nums'] }}>{block.start}</Copy>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${block.kind === 'reviewer' ? 'Review: ' : ''}${block.title}`} disabled={!onOpen} onPress={() => onOpen?.(block)}
+        style={{ flex: 1, minWidth: 0, minHeight: 80, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: colors.surfacePrimary, gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><PlannerDot targets={targets} target={block.targetKey} /><Copy muted size="caption">{candidates?.courses.find(course => course.id === block.courseId)?.name.split('|')[0]?.trim() ?? block.savedItem?.course?.code ?? 'Personal'}</Copy></View>
+        <Copy style={{ fontSize: 15, fontWeight: '600', lineHeight: 20.25 }}>{block.title}</Copy>
+        <Copy muted size="caption">{block.minutes} min · {block.kind === 'reviewer' ? 'Reviewer' : 'Task'}</Copy>
+      </Pressable>
+    </View>)}
+    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}><Copy muted style={{ width: 44, textAlign: 'right', fontSize: 13 }}>{clockTimeLabel(end)}</Copy><Copy muted size="caption">Free time ends</Copy></View>
+  </View>;
+}
+export function PreviousPlan({ previous, onRestore, disabled }: { previous: PreviousPlanView; onRestore: () => void; disabled?: boolean }) {
+  const { colors } = useTheme();
+  if (!previous) return <View style={{ borderRadius: 22, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.separator, paddingVertical: 40, paddingHorizontal: 24, gap: 8 }}><Copy style={{ fontSize: 16, fontWeight: '600', textAlign: 'center' }}>No previous plan yet</Copy><Copy muted style={{ fontSize: 14, lineHeight: 21, textAlign: 'center' }}>{PREVIOUS_PLAN_EMPTY}</Copy></View>;
+  const done = previous.sessions.filter(session => session.status === 'Done').length;
+  return <View style={{ gap: 20 }}>
+    <View style={{ backgroundColor: colors.surfacePrimary, borderRadius: 18, paddingVertical: 16, paddingHorizontal: 18, gap: 6 }}><Copy style={{ fontSize: 16, fontWeight: '600' }}>{previous.summary}</Copy>{previous.sessions.some(session => session.status !== null) && <Copy muted style={{ fontSize: 13 }}>{done} of {previous.sessions.length} blocks done.</Copy>}</View>
+    {previous.sessions.map((session, index) => <View key={`${session.kind}:${session.id}:${index}`} style={{ flexDirection: 'row', gap: 12 }}><Copy muted style={{ width: 44, paddingTop: 14, textAlign: 'right', fontSize: 13 }}>{clockTimeLabel(session.startMinute)}</Copy><View style={{ flex: 1, backgroundColor: colors.surfacePrimary, borderRadius: 16, padding: 14, gap: 4 }}><Copy style={{ fontSize: 15, fontWeight: '600' }}>{session.title}</Copy><Copy muted size="caption">{session.status ?? `${session.minutes} min · ${session.kind === 'reviewer' ? 'Reviewer' : 'Task'}`}</Copy></View></View>)}
+    <PlannerButton secondary disabled={disabled} onPress={onRestore}>Restore this plan</PlannerButton>
+  </View>;
+}
+/** Compatibility export for isolated preview consumers; Today hosts this content in the sheet. */
+export function PlanPreview({ plan, from, to, busy, onApply }: { plan: DeterministicStudyPlan; from: number; to: number; busy: boolean; onApply: () => void; onDiscard?: () => void }) {
+  const blocks = plannerBlocks(plan);
+  return <View style={{ gap: 20 }}><PlanFitCard plan={plan} blocks={blocks} free={freeTimeDuration(from, to)} /><PlanTimeline blocks={blocks} end={to} /><PlannerButton disabled={busy || !blocks.length} onPress={onApply}>Use this plan</PlannerButton></View>;
 }

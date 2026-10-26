@@ -537,6 +537,7 @@ export function Sheet({
   onScroll,
   scrollEnabled = true,
   dragEnabled = true,
+  renderHeader,
 }: {
   children: ReactNode;
   onClose: () => void;
@@ -554,6 +555,8 @@ export function Sheet({
   onScroll?: React.ComponentProps<typeof ScrollView>["onScroll"];
   scrollEnabled?: boolean;
   dragEnabled?: boolean;
+  /** Custom sheet header keeps the same animated dismissal and single scroll. */
+  renderHeader?: (close: () => void) => ReactNode;
 }) {
   const { colors, reducedMotion } = useTheme();
   const insets = useSafeAreaInsets();
@@ -624,13 +627,13 @@ export function Sheet({
           <View style={{ alignItems: "center", paddingTop: spacing[2], paddingBottom: spacing[1] }}>
             {dismissible ? <View style={{ width: 36, height: 5, borderRadius: 3, backgroundColor: colors.separator }} /> : null}
           </View>
-          <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: spacing[5], paddingRight: spacing[2], minHeight: hitTarget.min }}>
+          {renderHeader ? renderHeader(() => dismiss()) : <View style={{ flexDirection: "row", alignItems: "center", paddingLeft: spacing[5], paddingRight: spacing[2], minHeight: hitTarget.min }}>
             <View style={{ flex: 1, minWidth: 0 }}>
               {title ? <Copy size="h3" style={{ fontWeight: "600" }}>{title}</Copy> : null}
             </View>
             {titleMeta}
             {dismissible ? <DoneButton label={closeLabel} onPress={() => dismiss()} /> : null}
-          </View>
+          </View>}
           <ScrollView
             ref={scrollRef}
             style={{ flexShrink: 1 }}

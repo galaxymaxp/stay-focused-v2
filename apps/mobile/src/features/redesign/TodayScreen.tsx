@@ -21,7 +21,7 @@ import { haptic } from "../../design/haptics";
 import { ClearDay } from "../../design/ClearDay";
 import { courseAccent, courseIdentity } from "../../design/courseIdentity";
 
-import { Action, Copy, Notice, Page, RowLink, Surface, ContentIcon, SkeletonBlock, SkeletonCards } from "../../design/primitives";
+import { Action, Copy, Notice, Page, RowLink, Surface, ContentIcon, SkeletonCards } from "../../design/primitives";
 import { SwipeRow, animateNextLayout, swipeAccessibility, type SwipeAction } from "../../design/SwipeRow";
 import { useTheme } from "../../design/theme";
 import { spacing } from "../../design/tokens";
@@ -31,7 +31,7 @@ import { experienceRequest } from "../../services/experienceApi";
 import { dayOrbTouch } from "./DayOrb";
 import { DayRingClock } from "./DayRingClock";
 
-import { PlanPreview, planTaskIds, planToneFor } from "./PlanPreview";
+import { planTaskIds, planToneFor } from "./PlanPreview";
 import { TodayCalendar } from "./TodayCalendar";
 import {
   activityFor,
@@ -138,10 +138,10 @@ export function TodayScreen() {
     .filter((item) => item.dueAt && Date.parse(item.dueAt) - Date.now() < 7 * 86_400_000);
   const arranged = arrangeToday(
     {
-      next: today.data?.next ?? null,
-      later: today.data?.later ?? [],
+      next: today.data?.next?.kind === "study_session" ? null : today.data?.next ?? null,
+      later: (today.data?.later ?? []).filter(item => item.kind !== "study_session"),
       dueSoon: upcoming.slice(0, 3),
-      others: [...(today.data?.timeline ?? []), ...upcoming],
+      others: [...(today.data?.timeline ?? []).filter(item => item.kind !== "study_session"), ...upcoming],
     },
     prefs.pinned.today,
     prefs.hidden.today,
@@ -164,7 +164,7 @@ export function TodayScreen() {
       key: "pin",
       label: pinned ? "Unpin" : "Pin",
       icon: pinned ? PinOff : Pin,
-      tone: "accent",
+      tone: "neutral",
       onPress: () => glide(() => pin("today", item.id, !pinned)),
     }];
     const trailing: SwipeAction[] = [{
@@ -281,7 +281,7 @@ export function TodayScreen() {
             : []
         }
       />
-      <PlanningControl key={identity} request={planningRequest(date, start, end, "reviewers_tasks")} active={activePlan} overrides={planner.overrides}
+      <PlanningControl candidates={planner.candidates} plan={preview} timeline={today.data?.timeline ?? []} start={start} end={end} busy={busy || previewing} onApply={() => void apply()} onOpen={block => { if (block.savedItem) openItem(block.savedItem); else if (block.kind === "reviewer") router.push({ pathname: "/artifact", params: { id: block.id } }); else router.push({ pathname: "/activity", params: { id: activities.data?.items.find(item => item.taskId === block.id || item.id === block.id)?.id ?? block.id } }); }} previous={planner.previousPlan} onRestore={planner.restorePrevious} key={identity} request={planningRequest(date, start, end, "reviewers_tasks")} active={activePlan} overrides={planner.overrides}
               onItemCheck={(key, checked) => checked ? planner.putBack(key) : planner.remove(key)}
         disabled={busy || !available(capabilities.data?.planner)}
         load={request => planner.candidates ? Promise.resolve(planner.candidates) : experienceRequest<PlanningCandidates>(client, "/api/experience/planner/candidates", { method: "POST", body: request })}
@@ -290,20 +290,7 @@ export function TodayScreen() {
           renderBuiltChoice(revision => revision + 1); setNote(null);
           planner.propose(choice.mode, choice.selection);
         }} />
-      {(busy || previewing) && !preview ? <PlanPreviewLoading /> : null}
       {(note || previewNote || planner.candidateNote) && <Notice>{note || previewNote || planner.candidateNote}</Notice>}
-      {preview && (
-        <PlanPreview
-          plan={preview}
-          from={start}
-          to={end}
-          busy={busy}
-          onApply={() => void apply()}
-          onDiscard={() => {
-                  clearPreview();
-          }}
-        />
-      )}
       {today.error && !today.data ? (
         <Notice>{today.error}</Notice>
       ) : today.loading && !today.data ? (
@@ -311,7 +298,7 @@ export function TodayScreen() {
       ) : (
         <>
           <View style={{ gap: 8 }}>
-          <Copy size="h2">Up Next</Copy>
+          <Copy size="h2">Tasks to do</Copy>
           {arranged.pinned.map((item) => (
             <SwipeCard key={item.id} fill={colors.backgroundPrimary}>
               {swipeItem(item, { dominant: true, fill: colors.backgroundPrimary })}
@@ -330,7 +317,7 @@ export function TodayScreen() {
             </Surface>
           ) : null}
           </View>
-          <TodayTimeline items={todaySchedule([...(today.data?.overdue ?? []), ...(today.data?.timeline ?? []), ...(today.data?.current ? [today.data.current] : []), ...upcoming.filter(item => item.dueAt && localDate(new Date(item.dueAt)) === date)])} onOpen={openItem} />
+          <TodayTimeline items={todaySchedule([...(today.data?.overdue ?? []), ...(today.data?.timeline ?? []), ...(today.data?.current ? [today.data.current] : []), ...upcoming.filter(item => item.dueAt && localDate(new Date(item.dueAt)) === date)]).filter(item => item.kind !== "study_session")} onOpen={openItem} />
           {lastHidden ? (
             <View accessibilityLiveRegion="polite" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Copy muted size="caption" style={{ flex: 1 }} numberOfLines={1}>{`“${lastHidden.title}” is hidden for today.`}</Copy>
@@ -339,7 +326,7 @@ export function TodayScreen() {
           ) : null}
           <View style={{ gap: 8 }}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-          <Copy size="h2">Later Today</Copy>
+          <Copy size="h2">Later tasks</Copy>
           <Action secondary onPress={() => setExpanded(!expanded)}>{expanded ? "Close schedule" : "See schedule"}</Action>
           </View>
           {arranged.later.length ? (
@@ -481,7 +468,7 @@ function TodayTimeline({ items, onOpen }: { items: readonly TodayItem[]; onOpen:
         const state = scheduleState(item);
         const showNow = !nowShown && (state === "current" || state === "upcoming");
         if (showNow) nowShown = true;
-        const tint = state === "overdue" ? colors.danger : state === "current" ? colors.success : state === "completed" ? colors.textMuted : item.course ? courseAccent(courseIdentity(item.course), mode).fg : colors.accent;
+        const tint = state === "overdue" ? colors.danger : state === "current" ? colors.success : state === "completed" ? colors.textMuted : item.course ? courseAccent(courseIdentity(item.course), mode).fg : colors.textPrimary;
         const label = state === "overdue" ? "Overdue" : state === "current" ? "Now" : state === "completed" ? "Done" : item.startAt ? timeLabel(item.startAt) : item.dueAt ? timeLabel(item.dueAt) : "Anytime";
         return <View key={item.id}>
           {showNow ? <Copy size="caption" color={colors.success} style={{ textAlign: "center", fontWeight: "700", paddingVertical: 8 }}>──── NOW ────</Copy> : null}
@@ -538,8 +525,8 @@ function TodayRow({
     >
       {pinned ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Pin size={11} color={colors.accent} strokeWidth={2} style={{ transform: [{ rotate: "35deg" }] }} />
-          <Copy size="caption" color={colors.accent} style={{ fontWeight: "600" }}>Pinned</Copy>
+          <Pin size={11} color={colors.textPrimary} strokeWidth={2} style={{ transform: [{ rotate: "35deg" }] }} />
+          <Copy size="caption" color={colors.textPrimary} style={{ fontWeight: "600" }}>Pinned</Copy>
           <Copy muted size="caption">{`· ${course}`}</Copy>
         </View>
       ) : (
@@ -558,26 +545,16 @@ function TodayRow({
   return <Surface>{row}</Surface>;
 }
 
-/** Placeholder while the planner answers: the preview's shape, shimmering. */
-function PlanPreviewLoading() {
-  return (
-    <Surface style={{ gap: 12 }}>
-      <SkeletonBlock width="36%" height={14} />
-      <SkeletonBlock width="100%" height={58} radius={12} />
-    </Surface>
-  );
-}
-
 /** Only the date/time line carries urgency, so the list stays calm. */
 function urgencyColor(colors: ReturnType<typeof useTheme>["colors"], urgency: Urgency) {
   switch (urgency) {
     case "overdue":
     case "today":
-      return colors.danger;
+      return colors.textSecondary;
     case "tomorrow":
-      return colors.orange;
+      return colors.textSecondary;
     case "week":
-      return colors.amber;
+      return colors.textSecondary;
     default:
       return colors.textSecondary;
   }

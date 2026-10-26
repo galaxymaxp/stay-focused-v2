@@ -73,7 +73,7 @@ it('defaults to both, previews each mode and applies exactly the preview request
   for (const mode of ['reviewers', 'tasks', 'reviewers_tasks'] as const) {
     await choose(mode); await tick(); expect(previews().at(-1)![2].body.mode).toBe(mode);
   }
-  await act(async () => tree!.root.findByType('PlanPreview' as never).props.onApply());
+  await act(async () => control().props.onApply());
   expect(mocks.request.mock.calls.find(([, path]) => path === '/api/experience/planner/replan')![2].body).toEqual(previews().at(-1)![2].body);
 });
 it('drops late mode, range, date and owner responses', async () => {
@@ -82,7 +82,7 @@ it('drops late mode, range, date and owner responses', async () => {
   await act(async () => clock().props.onCommit(600, 780)); await tick();
   await choose('reviewers'); mocks.request.mockResolvedValue(plan('latest')); await tick();
   await act(async () => finish(plan('old-mode')));
-  expect(tree!.root.findByType('PlanPreview' as never).props.plan.planningRange.startsAt).toBe('latest');
+  expect(control().props.plan.planningRange.startsAt).toBe('latest');
   for (const change of ['range', 'date', 'owner']) {
     mocks.request.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
     await act(async () => clock().props.onCommit(600, 780)); await tick();
@@ -91,14 +91,14 @@ it('drops late mode, range, date and owner responses', async () => {
       else { if (change === 'date') mocks.date = '2026-10-25'; else mocks.owner = 'other'; tree!.update(createElement(TodayScreen)); }
     });
     await act(async () => finish(plan(`old-${change}`)));
-    expect(tree!.root.findAllByType('PlanPreview' as never)).toHaveLength(0);
+    expect(control().props.plan).toBeNull();
     if (change === 'range') await tick();
   }
 });
 it('opens the saved reviewer even when a task has the same title and course', async () => {
   await act(async () => clock().props.onSegmentPress(reviewer.id));
   expect(mocks.push).toHaveBeenCalledWith({ pathname: '/artifact', params: { id: 'artifact:reviewer' } });
-  expect(tree!.root.findAll(node => String(node.type) === 'ContentIcon' && node.props.kind === 'reviewer').length).toBeGreaterThan(0);
+  expect(control().props.timeline[0].reviewer.id).toBe('artifact:reviewer');
 });
 it('ignores stored modes and clock release keeps the active selection', async () => {
   await act(async () => planModeStore.apply('tasks')); await tick(); expect(previews()).toHaveLength(0);
