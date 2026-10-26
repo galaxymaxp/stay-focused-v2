@@ -1,5 +1,5 @@
 "use client";
-import { allPlanningItems, reorderProposal, moveProposalUp, planningItemKey, planningOverrideKey, previousPlanData, restoreSelectionFromSnapshot, snapshotFromPlan, takenOutItems, applyPlanOverrides, builtPlanningSelection, defaultPlanningDraft, planningSelectionHash, resolveFreeWindow,
+import { allPlanningItems, orderPlanningSelection, plannerBlocks, reorderProposal, moveProposalUp, planningItemKey, planningOverrideKey, previousPlanData, restoreSelectionFromSnapshot, snapshotFromPlan, takenOutItems, applyPlanOverrides, builtPlanningSelection, defaultPlanningDraft, planningSelectionHash, resolveFreeWindow,
   freeTimeDuration, freeTimePlanningRange, localMinuteIso, type PlanDeviceState, type PlanOverrides, type FreeTimeRange, type TodayItem } from '@stay-focused/shared';
 import type { PlanMode, PlanSelection, PlanningCandidates, StudyPlanningRequest, DeterministicStudyPlan, StudySessionView, ProposedStudySession } from '@stay-focused/shared/task-planning';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -134,12 +134,20 @@ export function useTodayPlan(input: Input) {
     live.current.clear(); latestQueue.current(activeChoice.current.mode, selected, next);
   }
   function moveUp(index: number) {
-    if (!input.preview || !candidates) return;
-    propose(activeChoice.current.mode, moveProposalUp({ ...input.preview, selection: activeChoice.current.selection }, index));
+    if (!candidates || index <= 0) return;
+    if (input.preview) propose(activeChoice.current.mode, moveProposalUp({ ...input.preview, selection: activeChoice.current.selection }, index));
+    else {
+      const keys = plannerBlocks(null, candidates, input.timeline).map(block => block.selectionKey);
+      if (!keys[index] || !keys[index - 1]) return;
+      [keys[index - 1], keys[index]] = [keys[index]!, keys[index - 1]!];
+      reorder(keys);
+    }
   }
   function reorder(keys: readonly string[]) {
-    if (!input.preview || !candidates) return;
-    propose(activeChoice.current.mode, reorderProposal({ ...input.preview, selection: activeChoice.current.selection }, keys.map(canonical)));
+    if (!candidates || keys.some(key => !key)) return;
+    const selected = input.preview ? reorderProposal({ ...input.preview, selection: activeChoice.current.selection }, keys.map(canonical)) :
+      orderPlanningSelection(applyPlanOverrides(activeChoice.current.selection, candidates, activeOverrides.current), candidates, keys);
+    propose(activeChoice.current.mode, selected);
   }
   async function applied(sessions?: readonly StudySessionView[]) {
     if (!input.preview) return;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyPlanOverrides, reorderProposal, FIRST_RUN_WINDOW, moveProposalUp, resolveFreeWindow, restoreSelectionFromSnapshot, snapshotFromPlan, splitCourseName, takenOutItems } from './planning-sheet';
+import { applyPlanOverrides, orderPlanningSelection, reorderProposal, FIRST_RUN_WINDOW, moveProposalUp, resolveFreeWindow, restoreSelectionFromSnapshot, snapshotFromPlan, splitCourseName, takenOutItems } from './planning-sheet';
 import { generateContentStudyPlan, type PlanningCandidates } from './task-planning';
 import { localMinuteIso } from './free-time';
 
@@ -60,4 +60,10 @@ it('cleans piped all-caps course names and preserves non-piped names', () => {
   expect(splitCourseName('C | Section | THE ART OF DESIGN IN THE WORLD FOR ALL TO SEE')).toEqual({ code: 'C', name: 'The Art of Design in the World for All to See' });
   expect(splitCourseName('C | Already Mixed Case')).toEqual({ code: 'C', name: 'Already Mixed Case' });
   expect(splitCourseName('Plain Course')).toEqual({ code: 'Plain Course', name: '' });
+});
+
+it('saved cross-course order normalizes Canvas aliases and preserves unchecked exclusions and remaining work', () => {
+  const data = { ...candidates, courses: [{ ...candidates.courses[0]!, items: candidates.courses[0]!.items.map(item => item.id === '1' ? { ...item, canvasAssignmentId: 'canonical' } : item) }] };
+  const selected = applyPlanOverrides({ order: 'smart' }, data, { removed: ['task:3'], skipped: [] });
+  expect(orderPlanningSelection(selected, data, ['task:4', 'task:canonical'])).toEqual({ order: 'manual', items: [{ kind: 'task', id: '4' }, { kind: 'task', id: '1' }, { kind: 'reviewer', id: '2' }] });
 });

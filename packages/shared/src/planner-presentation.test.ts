@@ -35,3 +35,9 @@ it('Canvas aliases resolve back to the candidate check key for every split block
   expect(plannerBlocks(aliased, data).map(block => block.selectionKey)).toEqual(plan.sessions.map(() => `task:${id(2)}`));
   expect(plannerBlocks(aliased, data).every(block => block.courseId === id(1))).toBe(true);
 });
+
+it('saved blocks use explicit work identities and leave legacy unknown targets unavailable for actions', () => {
+  const saved = { id: 'session:one', kind: 'study_session', status: 'planned', title: 'Synthetic saved task', startAt: range.startsAt, endAt: range.endsAt, reviewer: undefined, task: { id: id(2) } } as import('./experience').TodayItem;
+  expect(plannerBlocks(null, data, [saved])[0]?.selectionKey).toBe('task:' + id(2));
+  expect(plannerBlocks(null, data, [{ ...saved, task: undefined }])[0]?.selectionKey).toBe('');
+});

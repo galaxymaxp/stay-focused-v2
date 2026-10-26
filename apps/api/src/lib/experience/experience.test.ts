@@ -110,6 +110,7 @@ describe('Today and activity composition', () => {
     expect(result.current?.id).toBe('session:session');
     expect(result.next?.id).toBe('session:session');
     expect(result.timeline[0]?.estimatedMinutes).toBe(60);
+    expect(result.timeline[0]?.task).toEqual({ id: 'task' });
     expect(result.overdue.map(i => i.id)).toEqual(['canvas:assignment']);
     expect(result.plannerState).toEqual({ status: 'current', lastPlannedAt: plan.created_at, needsTaskImport: true });
   });

@@ -156,7 +156,7 @@ export function composeToday(input: {
     const task = tasks.find(t => t.id === s.task_id);
     const activity = byTask.get(s.task_id!);
     return { id: `session:${s.id}`, kind: 'study_session', title: activity?.title ?? task?.title ?? 'Study session', course: activity?.course ?? null, startAt: s.starts_at, endAt: s.ends_at, dueAt: activity?.dueAt ?? task?.due_at ?? null,
-      estimatedMinutes: Math.round((Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60_000), estimateSource: task?.estimate_source ?? null, priority: task?.priority ?? 'medium', status: s.status === 'planned' && (activity?.status === 'submitted' || activity?.status === 'completed' || task?.status === 'completed') ? activity?.status === 'submitted' ? 'submitted' : 'completed' : s.status, source: activity?.source ?? 'local', deepLinkTarget: { surface: 'study_session', id: s.id } };
+      estimatedMinutes: Math.round((Date.parse(s.ends_at) - Date.parse(s.starts_at)) / 60_000), estimateSource: task?.estimate_source ?? null, priority: task?.priority ?? 'medium', status: s.status === 'planned' && (activity?.status === 'submitted' || activity?.status === 'completed' || task?.status === 'completed') ? activity?.status === 'submitted' ? 'submitted' : 'completed' : s.status, source: activity?.source ?? 'local', deepLinkTarget: { surface: 'study_session', id: s.id }, task: { id: s.task_id! } };
   }).concat(reviewerItems).sort((a, b) => Date.parse(a.startAt!) - Date.parse(b.startAt!) || a.id.localeCompare(b.id));
   const active = (item: TodayItem) => !['completed', 'submitted', 'skipped'].includes(item.status);
   const todayTasks = activityItems.filter(i => i.dueAt && Date.parse(i.dueAt) >= start && Date.parse(i.dueAt) < end);

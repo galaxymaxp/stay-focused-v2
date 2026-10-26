@@ -157,3 +157,11 @@ it('timeline drop reorders manually and keeps candidate reads cached', async () 
   expect(vi.mocked(input.queue).mock.lastCall![0].selection).toEqual({ order: 'manual', items: [{ kind: 'reviewer', id: id(2) }, { kind: 'task', id: id(1) }] });
   expect(input.queue).toHaveBeenCalledTimes(1); expect(input.load).toHaveBeenCalledTimes(1);
 });
+
+it('saved timeline Move up uses explicit work identities and queues a manual preview without reads', async () => {
+  const timeline = proposal().sessions.map((session,n) => ({ id: 'session:' + n, kind: 'study_session', title: 'Saved ' + n, course: null, startAt: session.startsAt, endAt: session.endsAt, dueAt: null, estimatedMinutes: session.durationMinutes, estimateSource: null, priority: 'medium', status: 'planned', source: 'local', deepLinkTarget: { surface: 'study_session', id: String(n) }, ...(n ? { reviewer: { id: id(2) } } : { task: { id: id(1) } }) }) as TodayItem);
+  input = { ...input, preview: null, timeline }; await render();
+  await act(async () => current.moveUp(1));
+  expect(vi.mocked(input.queue).mock.lastCall![0].selection).toEqual({ order: 'manual', items: [{ kind: 'reviewer', id: id(2) }, { kind: 'task', id: id(1) }] });
+  expect(input.queue).toHaveBeenCalledTimes(1); expect(input.load).toHaveBeenCalledTimes(1);
+});

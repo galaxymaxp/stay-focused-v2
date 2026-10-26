@@ -46,12 +46,12 @@ export function PlanTimeline({ blocks, end, candidates, onOpen, onSkip, onRemove
   const { colors, reducedMotion } = useTheme(), targets = plannerToneKeys(blocks, candidates?.courses);
   return <View ref={organizer?.listRef} {...organizer?.panHandlers} onTouchEnd={organizer?.touchEnd} onTouchCancel={organizer?.touchCancel} style={{ gap: 8 }}>
     {blocks.map((block, index) => {
-      const actions = onSkip && onRemove && onMoveUp ? [
+      const actions = block.selectionKey && onSkip && onRemove && onMoveUp ? [
         { key: 'skip', label: 'Skip tonight', icon: EyeOff, tone: 'neutral' as const, onPress: () => onSkip(block.selectionKey) },
         { key: 'remove', label: 'Remove', icon: X, tone: 'neutral' as const, onPress: () => onRemove(block) },
         ...(index ? [{ key: 'moveUp', label: 'Move up', icon: X, tone: 'neutral' as const, onPress: () => onMoveUp(index) }] : []),
       ] : [];
-      const card = <Pressable accessibilityRole="button" accessibilityLabel={`${block.kind === 'reviewer' ? 'Review: ' : ''}${block.title}`} disabled={!onOpen && !actions.length} {...swipeAccessibility(actions)} delayLongPress={350} onTouchStart={organizer?.touchStart} onLongPress={organizer ? () => organizer.hold(block.key) : undefined} onPress={() => { if (organizer) organizer.tap(block.key, () => onOpen?.(block)); else onOpen?.(block); }}
+      const card = <Pressable accessibilityRole="button" accessibilityLabel={`${block.kind === 'reviewer' ? 'Review: ' : ''}${block.title}`} disabled={!onOpen && !actions.length} {...swipeAccessibility(actions)} delayLongPress={350} onTouchStart={organizer?.touchStart} onLongPress={organizer && block.selectionKey ? () => organizer.hold(block.key) : undefined} onPress={() => { if (organizer) organizer.tap(block.key, () => onOpen?.(block)); else onOpen?.(block); }}
         style={{ flex: 1, minWidth: 0, minHeight: 80, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: colors.surfacePrimary, borderWidth: organizer?.dragging === block.key ? 1 : 0, borderColor: 'rgba(255,255,255,0.12)', gap: 4 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><PlannerDot targets={targets} target={plannerToneTarget(block)} /><Copy muted size="caption">{candidates?.courses.find(course => course.id === block.courseId)?.name.split('|')[0]?.trim() ?? block.savedItem?.course?.code ?? 'Personal'}</Copy></View>
         <Copy style={{ fontSize: 15, fontWeight: '600', lineHeight: 20.25 }}>{block.title}</Copy>

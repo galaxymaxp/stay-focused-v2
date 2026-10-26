@@ -78,3 +78,18 @@ Device checks **NOT RUN**, skipped entirely: Realme swipe feel, native
 accessibility, gesture arbitration, Reduce Motion and visual/performance checks.
 Other real browsers/assistive technology and native presentation remain
 **UNVERIFIED (owner to confirm)**.
+
+## Implementation checkpoint
+
+- STEP 1: `1d70e50c`, web hover/focus/hover-none actions and exact SVG sizes.
+- STEP 2: `ddc8b981`, planner SwipeRow variant and pinned five-second Undo.
+- STEP 3: `7e08db36`, 350ms single-item organizer drag and manual selection.
+- Review repair: saved task blocks previously exposed session IDs only. Add an
+  optional explicit task identity in the existing Today mapper (no new query,
+  persistence or migration), use it for exclusions/order, and support saved
+  timeline Move up. Legacy cached task blocks without explicit identity disable
+  unsupported actions instead of guessing from titles or sending session IDs.
+- Safe equivalents: reuse established PanResponder SwipeRow and organizer, so
+  no gesture-handler/draggable-flatlist dependency is added. Undo keeps the
+  specified 52px bar and increases its button from the mockup's 36px to a 44px
+  touch target. Web timeline intentionally uses Move up only.

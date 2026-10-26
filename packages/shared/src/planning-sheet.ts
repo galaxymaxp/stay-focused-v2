@@ -54,6 +54,14 @@ export function reorderProposal(plan: DeterministicStudyPlan & { readonly select
   const ranks = new Map([...new Set(keys.map(canonical))].map((key, index) => [key, index]));
   return { ...selection, items: [...(selection.items ?? [])].sort((a, b) => (ranks.get(planningItemKey(a)) ?? Infinity) - (ranks.get(planningItemKey(b)) ?? Infinity)) };
 }
+/** Saved blocks already carry explicit work identities on current API responses.
+ * Legacy snapshots without those identities remain readable, never guessed. */
+export function orderPlanningSelection(selection: PlanSelection, data: PlanningCandidates, keys: readonly string[]): PlanSelection {
+  const items = allPlanningItems(data);
+  const canonical = (key: string) => { const item = items.find(item => planningItemKey(item) === key || planningOverrideKey(item) === key); return item ? planningOverrideKey(item) : key; };
+  const ranks = new Map([...new Set(keys.map(canonical))].map((key, index) => [key, index]));
+  return { ...selection, order: 'manual', items: [...(selection.items ?? [])].sort((a, b) => (ranks.get(canonical(planningItemKey(a))) ?? Infinity) - (ranks.get(canonical(planningItemKey(b))) ?? Infinity)) };
+}
 export interface PlanSnapshot extends FreeTimeRange {
   readonly date: string;
   readonly sessions: readonly { readonly kind: 'task' | 'reviewer'; readonly id: string; readonly title: string;
