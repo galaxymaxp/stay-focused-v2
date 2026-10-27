@@ -94,7 +94,9 @@ describe('SP2 Library SQL projections', () => {
     const detail = await legacy.getLibraryArtifact(owner, `artifact:${id(1000)}`);
     local.reset();
     expect(normalize(await current.getLibraryArtifact(owner, `artifact:${id(1000)}`))).toEqual(normalize(detail));
-    expect(local.reads).toHaveLength(2); expect(local.bytes).toBeLessThan(82_000);
+    // PL4 includes linked quiz IDs in the reviewer response for the Quiz action.
+    expect(local.reads).toEqual(['experience_reviewer_summaries_v1', 'generated_artifact_versions', 'quizzes']);
+    expect(local.bytes).toBeLessThan(82_000);
     console.log('SP2 reviewer', JSON.stringify({ reads: local.reads.length, dbJsonBytes: local.bytes, requests: 1 }));
     local.reset();
     await current.getCourseLearningWorkspace(owner, id(1));
