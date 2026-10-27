@@ -1,3 +1,24 @@
+<!-- RR3 inventory stop begin -->
+## RR3 shipped-main merge: STOPPED at STEP 0 (2026-10-27)
+
+Approved endpoint: local merge of exact shipped main `000e5557`, fresh RR2b
+gate list, readiness records and docs/commits; no rollout or device checks.
+Initial branch/HEAD `overnight/2026-10-15_feedback` / `c469a534` and clean
+tracked tree match. FRESH required `--before FS15` readiness exits 1,
+`ready=false`: **Target FULLSEND is not in the queue**. Queue ends at RR3.
+Unattended STOP rules prohibit continuing past this validator blocker.
+
+STEP 0 partial; STEP 1 merge, STEP 2's 28 gates and STEP 3 readiness closeout
+NOT RUN. Main ancestry exits 1; PL1-PL4/RR2b code unchanged. Only stop docs
+are committed. Do not treat RR2b's historical gates as fresh RR3 verification.
+Owner steps remaining: reconcile queue boundary and honest FS14 pin/clone
+abort representation, then rerun RR3 from STEP 0. FS15 rollout/device checks
+NOT RUN, not queued here. Live production/database/Scheduler/provider/native
+state UNVERIFIED (owner to confirm); no network, release, env edit or push.
+FS14 clone and unrelated owner files preserved.
+[Acceptance](acceptance/rr3-merge-shipped-main-20261027.md).
+<!-- RR3 inventory stop end -->
+
 <!-- RR2b verification begin -->
 ## RR2b Today planner verification: LOCAL PASS (2026-10-27)
 

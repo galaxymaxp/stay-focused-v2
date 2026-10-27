@@ -1,3 +1,20 @@
+<!-- RR3 inventory stop begin -->
+## RR3 shipped-main merge: STOPPED at STEP 0 (2026-10-27)
+
+Finite scope: merge local shipped main `000e5557`, preserve PL1-PL4/RR2b,
+run 28 fresh gates, reconcile readiness, and stop before any release.
+FRESH mandatory `--before FS15` readiness exits 1: **Target FULLSEND is not
+in the queue**. The queue ends at RR3. No merge or STEP 2 gate ran; main
+is not yet an ancestor. RR2b's historical local PASS does not close RR3.
+
+Owner steps remaining: reconcile the FS15 queue boundary and FS14's honest
+pin/clone abort representation, then rerun RR3 from STEP 0. Owner FS15 rollout
+and device checks NOT RUN; nothing queued here. Live production/database/
+Scheduler/provider/native state UNVERIFIED (owner to confirm). No network,
+release action, env-file edit or push; FS14 clone untouched.
+[Acceptance](ai/acceptance/rr3-merge-shipped-main-20261027.md).
+<!-- RR3 inventory stop end -->
+
 <!-- RR2b verification begin -->
 ## RR2b Today planner verification: LOCAL PASS (2026-10-27)
 
