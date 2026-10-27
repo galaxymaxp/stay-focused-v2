@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { generateContentStudyPlan, generateDeterministicStudyPlan, selectReviewerCandidates, validateStudyPlanningRequest, type PlannerTask, type PlanningCandidates } from './task-planning';
-import { createPlanningSessionMemory, builtPlanningSelection, defaultPlanningDraft, movePlanningEntry, planningDraftSummary, planningTitle, resetPlanningOrder, scopedPlanningItems, togglePlanningItems } from './planning-sheet';
+import { createPlanningSessionMemory, builtPlanningSelection, defaultPlanningDraft, movePlanningEntry, planningCourseGroups, planningDraftSummary, planningTitle, resetPlanningOrder, scopedPlanningItems, togglePlanningCourse, togglePlanningItems } from './planning-sheet';
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const range = { startsAt: '2026-10-25T00:00:00.000Z', endsAt: '2026-10-26T00:00:00.000Z' };
 const free = [{ startsAt: '2026-10-25T09:00:00.000Z', endsAt: '2026-10-25T11:00:00.000Z' }];
@@ -41,6 +41,14 @@ describe('TP2 selection contract and sheet model', () => {
     expect(selected.every(item => mode === 'reviewers_tasks' || item.kind === (mode === 'tasks' ? 'task' : 'reviewer'))).toBe(true);
     expect(scopedPlanningItems(data, { ...draft, courseIds: [] })).toEqual([]);
     expect(scopedPlanningItems(data, { ...draft, courseIds: [id(11), id(12)], mode: 'reviewers_tasks' })).toHaveLength(4);
+  });
+  it('Courses list keeps unchecked courses listed and re-including all returns to all', () => {
+    const draft = defaultPlanningDraft(data), off = togglePlanningCourse(data, draft, id(12));
+    expect(off).toMatchObject({ courses: 'select', courseIds: [id(11)] });
+    expect(planningCourseGroups(data, off).map(group => [group.id, group.included])).toEqual([[id(11), true], [id(12), false]]);
+    expect(builtPlanningSelection(data, off).items?.every(item => item.kind === 'reviewer' || item.id === id(1))).toBe(true);
+    expect(togglePlanningCourse(data, off, id(12))).toMatchObject({ courses: 'all', courseIds: [id(11), id(12)] });
+    expect(planningCourseGroups(data, { ...draft, mode: 'reviewers' }).map(group => group.id)).toEqual([id(11)]);
   });
   it('honors manual order without the split and excludes later work after exhaustion', () => {
     const plan = generateContentStudyPlan({ ...input, selection: { order: 'manual', items: [

@@ -61,11 +61,14 @@ it.each([[1280,'light'],[1280,'dark'],[390,'light'],[390,'dark']] as const)('Tod
     expect(await page.locator('.planner-fit').textContent()).toContain('120 / 120 min');expect(await page.locator('[data-testid="fit-segment"]').count()).toBe(4);
     const first=page.locator('.planner-block-card').first();await first.click();const opened=await page.evaluate(()=>(window as unknown as {__opened:string}).__opened);await page.getByRole('button',{name:'Start now',exact:true}).click();expect(await page.evaluate(()=>(window as unknown as {__opened:string}).__opened)).toBe(opened);
     expect(await page.locator('#planner-adjust').count()).toBe(0);await page.getByRole('button',{name:'Plan your free time',exact:true}).click();await page.locator('#planner-adjust').waitFor();
-    expect(await page.getByRole('button',{name:'CC17 smart order'}).getAttribute('aria-expanded')).toBe('true');expect(await page.getByText('Mobile Application Design and Development',{exact:true}).count()).toBe(1);
+    expect(await page.getByRole('button',{name:'CC17 smart order'}).getAttribute('aria-expanded')).toBe('true');expect(await page.getByText('· Mobile Application Design and Development',{exact:true}).count()).toBe(1);
+    const include=await page.locator('.planner-include').boundingBox(),courses=await page.locator('.planner-order').boundingBox();expect(include!.y+include!.height).toBeLessThanOrEqual(courses!.y+1);expect(await page.getByRole('heading',{name:'Courses',exact:true}).count()).toBe(1);expect(await page.getByText('Smart order',{exact:true}).count()).toBe(0);
+    const card=await page.locator('.today-clock-card').boundingBox(),pill=await page.getByRole('button',{name:'Plan your free time',exact:true}).boundingBox();expect(Math.abs((pill!.x+pill!.width/2)-(card!.x+card!.width/2))).toBeLessThan(1);
+    const course=page.getByRole('checkbox',{name:'Include C2',exact:true});await course.uncheck();expect(await page.getByRole('button',{name:'C2 smart order'}).isDisabled()).toBe(true);expect(await page.getByText('Not included',{exact:true}).count()).toBe(1);await course.check();expect(await page.getByText('Not included',{exact:true}).count()).toBe(0);
     const check=page.getByRole('checkbox',{name:'Managing Data with a Synthetic Database',exact:true});await check.uncheck();await page.getByText('Removed from plan',{exact:true}).waitFor();expect(await check.isChecked()).toBe(false);
     await page.getByRole('button',{name:'Put back Managing Data with a Synthetic Database',exact:true}).click();expect(await check.isChecked()).toBe(true);expect(await page.locator('.planner-tray').count()).toBe(0);
     await page.getByRole('button',{name:'CC17 smart order'}).click();expect(await check.count()).toBe(0);await page.getByRole('button',{name:'CC17 smart order'}).click();
-    await page.getByRole('button',{name:/Reorder A long synthetic task/}).focus();await page.keyboard.press('ArrowUp');await page.getByText('Manual order',{exact:true}).waitFor();
+    await page.getByRole('button',{name:/Reorder A long synthetic task/}).focus();await page.keyboard.press('ArrowUp');await page.getByText(/^Manual order ·/).waitFor();
     expect(await page.evaluate(()=>(window as unknown as {__calls:[string,unknown][]}).__calls.filter(([path])=>path.endsWith('/candidates')).length)).toBe(1);
     await page.waitForFunction(()=>!document.querySelector('.planner-side .planner-primary')?.hasAttribute('disabled'));
     await page.screenshot({path:join(evidence,`today-${width}-${theme}.png`),fullPage:true});
@@ -83,7 +86,7 @@ it('Previous shows the persisted summary and status; restoring replaces edited s
     expect(await page.getByText('Planned',{exact:true}).count()).toBe(1);
     expect(await page.locator('#planner-previous .planner-fit').textContent()).toContain('0 of 1 blocks done');
     await page.getByRole('button',{name:'Restore this plan',exact:true}).click();
-    await page.getByText('Manual order',{exact:true}).waitFor();
+    await page.getByText(/^Manual order ·/).waitFor();
     expect(await page.getByRole('button',{name:'Both',exact:true}).getAttribute('aria-pressed')).toBe('true');
     expect(await page.getByRole('checkbox',{name:'Managing Data with a Synthetic Database',exact:true}).isChecked()).toBe(false);
     expect(await page.getByRole('checkbox',{name:/A long synthetic task/}).isChecked()).toBe(true);

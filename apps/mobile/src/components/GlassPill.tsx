@@ -11,10 +11,12 @@ export interface GlassPillProps {
   onPress?: () => void;
   accessibilityLabel?: string;
   accessibilityExpanded?: boolean;
+  /** Placement inside a column parent; Plan centers under the clock. */
+  align?: 'flex-start' | 'center';
 }
 
 /** Vector shell and clipped native gradient; the outer hit target is >=44px. */
-export function GlassPill({ label, sub, size, busy = false, disabled = false, onPress, accessibilityLabel, accessibilityExpanded }: GlassPillProps) {
+export function GlassPill({ label, sub, size, busy = false, disabled = false, onPress, accessibilityLabel, accessibilityExpanded, align = 'flex-start' }: GlassPillProps) {
   const { mode, reducedMotion } = useTheme();
   const dark = mode === 'dark', blocked = disabled || busy;
   const height = size === 'lg' ? 52 : size === 'md' ? 46 : 34;
@@ -22,7 +24,7 @@ export function GlassPill({ label, sub, size, busy = false, disabled = false, on
   return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel ?? [label, sub].filter(Boolean).join(', ')}
     accessibilityState={{ disabled: blocked, busy, expanded: accessibilityExpanded }} disabled={blocked}
     onPress={() => { if (!blocked) onPress?.(); }}
-    style={({ pressed }) => ({ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', borderRadius: height / 2,
+    style={({ pressed }) => ({ alignSelf: align, minHeight: 44, justifyContent: 'center', borderRadius: height / 2,
       opacity: blocked ? .75 : 1, transform: [{ scale: pressed && !blocked && !reducedMotion ? .98 : 1 }],
       shadowColor: dark ? '#000000' : '#141415', shadowOffset: { width: 0, height: 6 },
       shadowOpacity: dark ? .35 : .08, shadowRadius: dark ? 18 : 16, elevation: dark ? 4 : 2 })}>

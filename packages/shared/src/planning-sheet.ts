@@ -138,6 +138,19 @@ export function togglePlanningItems(draft: PlanningDraft, keys: readonly string[
   for (const key of keys) { if (remove) checked.delete(key); else checked.add(key); }
   return { ...draft, checked: [...checked] };
 }
+/** One ordered Courses list: unchecked courses stay listed so they can be re-included; empty courses are omitted. */
+export function planningCourseGroups(data: PlanningCandidates, draft: PlanningDraft) {
+  const shown = scopedPlanningItems(data, { ...draft, courses: 'all' });
+  return draft.groupOrder.map(id => ({ id, ...splitCourseName(data.courses.find(course => course.id === id)?.name ?? 'Personal'),
+    included: draft.courses === 'all' || draft.courseIds.includes(id), items: shown.filter(item => (item.courseId ?? 'personal') === id) }))
+    .filter(group => group.items.length);
+}
+/** Re-including every course returns to 'all' so personal items come back too. */
+export function togglePlanningCourse(data: PlanningCandidates, draft: PlanningDraft, courseId: string): PlanningDraft {
+  const all = data.courses.map(course => course.id), selected = draft.courses === 'all' ? all : draft.courseIds;
+  const courseIds = selected.includes(courseId) ? selected.filter(id => id !== courseId) : [...selected, courseId];
+  return all.every(id => courseIds.includes(id)) ? { ...draft, courses: 'all', courseIds: all } : { ...draft, courses: 'select', courseIds };
+}
 /** Same visible-item move semantics as Library; reject cross-course row drops. */
 export function movePlanningEntry(data: PlanningCandidates, draft: PlanningDraft, from: string, to: string, group = false): PlanningDraft {
   const items = allPlanningItems(data);

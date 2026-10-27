@@ -42,12 +42,14 @@ it('keeps the Plan action mounted while the clock is adjusting', async () => {
   expect(root().findAllByType('PlanButton' as never)).toHaveLength(1);
   expect(root().findByType('PlanButton' as never).props.adjusting).toBe(true);
 });
-it('course list uses splitCourseName, no chips; selecting none disables apply and Include previews without reads', async () => {
-  await mount(); await act(async () => named('Courses').props.onPress());
-  expect(text()).toContain('Mobile Application Design and Development'); expect(text()).toContain('2 items');
-  for (const name of fixture().courses.map(course => course.name)) await act(async () => named(name).props.onPress());
+it('one Courses list under Include uses splitCourseName; unchecking keeps the course listed, none disables apply, Include previews without reads', async () => {
+  await mount();
+  expect(text()).toContain('Mobile Application Design and Development'); expect(text()).not.toContain('Smart order\n');
+  expect(root().findAll(node => node.props.accessibilityLabel === 'Courses')).toHaveLength(0);
+  for (const code of ['CC17', 'Chemistry']) await act(async () => named(`Include ${code}`).props.onPress());
+  expect(named('Include CC17').props.accessibilityState.checked).toBe(false); expect(named('CC17 smart order').props.disabled).toBe(true);
   expect(named('Use this plan').props.disabled).toBe(true); expect(text()).toContain('Pick at least one course');
-  await act(async () => named('Chemistry').props.onPress());
+  await act(async () => named('Include Chemistry').props.onPress());
   for (const mode of ['reviewers', 'tasks', 'reviewers_tasks']) await act(async () => control(1).props.onChange(mode));
   expect(mocks.build.mock.calls.at(-1)![0].selection.courseIds).toEqual([id(2)]); expect(mocks.load).toHaveBeenCalledTimes(1);
 });
