@@ -1,5 +1,52 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff — FULLSEND (20261027-1410)
+
+What changed: shipped PL1 automatic proposals/local exclusions/previous plans,
+PL2/PL2b planner sheet and desktop timeline/adjustment UI, PL3 block actions and
+Undo/reorder, PL4 vector GlassPill controls; retained shipped-main merge and
+RR2b/RR3b history. Corrected one obsolete API read assertion; bumped native
+mobile version for expo-linear-gradient. Endpoint FS15 only.
+
+Verification (exact counts): FRESH shared 476, Canvas 75, OCR 27, engine 606,
+API 2523 plus 3 existing live skips, mobile 1768, web 715 = 6190 passed,
+0 failed. Provider 20/20, Doctor 21/21 twice; forced typecheck/lint/serial build
+8/8 each, 0 cached; 7 existing warnings. CI 40463715784 and 40466134915 SUCCESS.
+Initial Doctor syntax failure, API 2522/1/3 then focused 5/5 and full 2523+3,
+and EAS self-copy EINVAL before job creation are preserved in acceptance.
+
+Deployments (IDs, SHAs): source 05110ae26cb0d4b9ba2d358ef595d150bd457c31;
+previous main 000e55574f5f617bebd2832e592dfc23f8449dd2;
+application main 443c2bdd9fa68d88f4d49c5fb06e93f73db24f13;
+native-version main d6ff1c4d23ae5e776d720e47c1de5ff3f2eda1f9.
+No migration. Worker generation-worker-00037-99h / worker:443c2bdd,
+Cloud Build 5c7f152d-b1ce-403e-af4c-efa4b8353b2f, Ready/100%.
+Initial API dpl_GtwUyZXHKU6gMamZRD6QYsd7Cjfp; current API
+dpl_DG2cY8dUJLCKzGLY8WjgwYWtU3jM at d6ff1c4d; website
+dpl_G3aknTf6AcLFXhNV5q7FqcSNJm3f at 443c2bdd.
+APK EAS 91d40b40-2de3-4158-a5fc-15012d3cea57 FINISHED, installed on Realme
+with adb install -r Success: actual versionName 2.5.0/code9/runtime 2.5.0-sdk57.
+[Public release v2.5.0+9](https://github.com/galaxymaxp/stay-focused-releases/releases/tag/v2.5.0%2B9);
+public asset SHA-256 matches the downloaded/installed APK. No OTA.
+
+Live checks: API/website proxy health HTTP 200, Today/download HTTP 200,
+API latest-release 2.5.0/code9/runtime2.5.0-sdk57, bounded error scans 0.
+Signed-in desktop at 1440px: layout/proposal, Previous empty state and inline
+adjustment panel PASS 3/3; original window size/panel restored. Device install
+and installed version PASS; process running, bounded AndroidRuntime fatal 0.
+Five planner/Library device UI checks and retained session/data NOT RUN behind
+keyguard/pocket mistouch overlay; no UI acceptance is inferred from logs.
+
+Next steps: owner unlocks/repositions Realme for retained-session/data and
+five listed UI checks; broader gestures, themes/Reduce Motion and accessibility.
+Blockers: no publication blocker or pending deployment; keyguard blocks device UI.
+Risks: physical/native visual, gesture, accessibility and performance behavior
+remain unverified; initial failures retained, zero paid generations/settings
+changes. Source UI/.gitignore/Supabase temp artifacts left local, not shipped;
+only final source github/main fetch/ancestor observation, no source merge.
+[Exact readiness JSON, suite receipts and release evidence](acceptance/fullsend-20261027-1410.md).
+
+
 ## Handoff — FULLSEND (20261026-0024)
 
 What changed: shipped current WEB-A3 saved-draft/copy repairs and WEB-A4 readiness,

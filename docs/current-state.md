@@ -1,3 +1,43 @@
+<!-- FS15 release begin -->
+## FS15 FULLSEND 20261027-1410: PASS for publication (2026-10-27)
+
+Today planner PL1-PL4/PL2b and RR2b/RR3b are shipped. Source pin
+`05110ae2`, previous main `000e5557`, application release `443c2bdd`,
+native version/main `d6ff1c4d`. Main includes shipped-main merge history;
+FS13/FS14 remain recorded pre-release aborts. Scope ends at the FS15 handoff.
+
+FRESH FS15 suites: shared 476, Canvas 75, OCR 27, engine 606, API 2523 plus
+3 existing live skips, mobile 1768, web 715 = **6190 passed / 0 failed**.
+Provider 20/20; Doctor 21/21, repeated after bump; forced typecheck/lint/serial
+root build each 8/8 tasks, 0 cached. Both application/native-version CI runs
+40463715784/40466134915 SUCCESS. Seven existing lint warnings remain. Initial
+Doctor syntax/API assertion/EAS archive-temp failures and repairs are retained.
+
+No migrations. Worker `generation-worker-00037-99h` / `worker:443c2bdd`
+is Ready/100%. API production `dpl_DG2cY8dUJLCKzGLY8WjgwYWtU3jM`
+serves `d6ff1c4d`; website `dpl_G3aknTf6AcLFXhNV5q7FqcSNJm3f`
+serves application `443c2bdd`. API and website proxy health HTTP 200;
+bounded error scans 0. Signed-in desktop planner layout/Previous/adjust PASS.
+
+Native `expo-linear-gradient` requires APK: EAS build
+`91d40b40-2de3-4158-a5fc-15012d3cea57` FINISHED. Actual APK metadata and
+Realme install verified **2.5.0 / code 9 / runtime 2.5.0-sdk57**; signed
+`adb install -r` Success, no uninstall/data clearing. Public
+[v2.5.0+9](https://github.com/galaxymaxp/stay-focused-releases/releases/tag/v2.5.0%2B9)
+is live; GitHub asset digest matches installed APK, API metadata current.
+No OTA, paid generation, credential change or email activation.
+
+**Owner UI follow-up:** retained-session/data and five planner/Library device
+checks NOT RUN behind Realme keyguard/pocket mistouch prevention. App process
+runs; bounded AndroidRuntime fatal scan 0. Broader native gesture/accessibility,
+light-dark/Reduce Motion and performance remain unverified. No deployment,
+migration, installation or APK publication is pending. Source owner artifacts
+stay local; no source merge/checkout or tracked edit. Historical local-only
+entries below retain their original scope and are superseded for rollout by FS15.
+
+[Exact release evidence and saved readiness JSON](ai/acceptance/fullsend-20261027-1410.md).
+<!-- FS15 release end -->
+
 <!-- RR3b merge verification begin -->
 ## RR3b shipped-main merge: LOCAL PASS (2026-10-27)
 
