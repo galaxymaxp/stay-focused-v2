@@ -13050,3 +13050,86 @@ authorized owner FS15 fullsend, not queued here. Device checks **NOT RUN**,
 skipped entirely: fresh-install proposal, Realme swipe/reorder, vector pill
 placements/sharpness, gradient availability, accessibility, Reduce Motion,
 appearance/performance. Endpoint RR3 STOPPED; no fullsend or other task started.
+
+## RR3b shipped-main merge: LOCAL PASS (2026-10-27)
+
+Status: **PASS for the finite unattended local scope** on
+`overnight/2026-10-15_feedback`. Exact shipped main `000e5557` is now an
+ancestor via `bc72baf617edff8288dd13ee0949829973673376`. PL1-PL4/RR2b planner product code is unchanged.
+Four expected conflicts: keep obsolete planning-sheet.browser.test.ts deleted;
+retain both histories in the three planning files, with this newer RR3b state
+superseding the RR3 stop. Shipped versions/fixes retained: 2.4.0/code 8/runtime
+2.4.0-sdk57, notification/Expo patches, browser timing/concurrency and fixture
+portability. No version bump and no additional repair commit needed.
+
+Verification at merge commit, **FRESH 28/28 gates PASS**:
+shared **476 passed / 0 failed / 0 skipped**, mobile **1768 passed / 0 failed /
+0 skipped**, web unit **573 passed / 0 failed / 0 skipped**, all 13 Chromium
+partitions **142 passed / 0 failed / 0 skipped**. Distinct total **2959 passed /
+0 failed / 0 skipped**; focused overlaps **211 passed / 0 failed / 0 skipped**;
+effective source executions **3170 passed / 0 failed / 0 skipped**.
+Six affected gates were repeated after offline dependency alignment: earlier
+mobile receipts add 1898 passing cases, for actual source executions
+**5068 passed / 0 failed / 0 skipped** and 34 total gate commands. All earlier
+passing receipts/logs are retained. A repo-local cache with 12 changed package
+archives aligned installed versions exactly to the merged lockfile; no tracked
+manifest or lockfile changed, install scripts disabled, no network. Readiness
+regression **29 passed / 0 failed / 0 skipped**, run byte-identically under
+repo-local tmp to confine fixture cleanup. Initial receipt parsing expected
+TAP; counts were normalized from the unchanged Node spec log, without a rerun. No gate failed first attempt, flaky retry
+or skip. One generated helper syntax check failed on a literal newline and
+was corrected before execution; helper-attempts.json retains it. Typecheck/lint/serial root build each **8/8 tasks, 0 cached**; API/web
+builds, offline Android export and both diff checks PASS, exit 0. Existing
+lint warnings, zero errors; generated Next declaration bytes restored.
+
+Readiness manifest backed up as `readiness-evidence.json.bak-20261027054230122-pre-rr3b`.
+Added FS14 abortedReleases entry and RR3 supersession; extended RR1b/RR1c
+only for imported mobile/package.json changes, appending merge/docs commits,
+RR3b statusId and fresh evidence. PL2/RR2 remain valid and unchanged.
+Original ids/status/progress hashes and notes preserved. RR3 proof prepends
+actual imported e8b44dd2 implementation, because validator diff-tree lists
+no implementation paths for ordinary merge commits; this matches RR2b's
+implementation-anchor equivalent without fabricating a fix commit.
+FS14 historical fact (not RR3b activity): release pin branch release/fullsend-20261027-1110 pushed and a local fresh clone created; merge unresolved; no migration, main push, deploy, worker or OTA.
+Its noReleaseActions flag follows the owner's definition of live release steps;
+original FS14 status/progress/answer bytes are pinned. FS14 clone untouched.
+
+Live readiness uses no --before. Pre-status readiness-after.json records only
+`Runner has unresolved in-progress work: RR3b`, exit 1/ready=false, the
+allowed self-reference. After PASS pinning, readiness-terminal.json records
+the active-worker guard `Another task worker is active: RR3b`; live queue,
+runner and validator/tests are unchanged. The separately labelled idle-copy
+readiness-proof.json verifies every task proof, real terminal status and FS14
+abort with **ready=true, exit 0**. It is supplemental proof, not a live readiness
+PASS; the owner must repeat actual readiness after this worker terminates.
+This documented equivalent preserves the worker guard; no readiness result
+is relabelled. All **366 historical status/progress files and 23 owner artifacts**
+are hash-audited unchanged. No tmp or unrelated owner path is staged.
+
+Commits (author galaxymaxp <omgraythekid@gmail.com>):
+
+- `bc72baf617edff8288dd13ee0949829973673376` merge: retain shipped main 000e5557 before next fullsend
+- `eb0e6041dfc2be2ac3282d4208bc68d972478d4a` docs(release): record shipped-main merge before fullsend
+- This handoff's docs-only commit: `docs(release): hand off RR3b readiness records`;
+  its exact hash is listed in RR3b.status before final status digest pinning.
+
+[Acceptance](acceptance/rr3b-merge-shipped-main-20261027.md).
+Evidence: `tmp/overnight/RR3b/gates.json`, `gates/`, `counts.json`,
+`readiness-after.json`, `readiness-terminal.json`, `readiness-proof.json`,
+`record-changes.json`, `final-audit.json`, RR3b.status and RR3b.progress.
+All evidence stays local; only scoped merge/docs are committed.
+
+**UNVERIFIED (owner to confirm)**: live deployed revision, database,
+Scheduler/provider state, native presentation/Realme performance and other
+real browsers/assistive technology. No remote service/SQL, migration application,
+Scheduler/email, env-file edit, fetch, push, deployment, OTA/EAS or device action.
+
+**Owner steps remaining**: repeat stable-boundary readiness without --before,
+then the next owner fullsend (id chosen by Fely), pinning final source HEAD;
+main already is an ancestor and no source/main merge remains. Nothing queued
+or started here. Rollout **NOT RUN**, skipped entirely. Device checks **NOT RUN**,
+skipped entirely: fresh-install 8-10 PM proposal, Realme swipe/reorder feel,
+vector pill sharpness/placements, native gradient availability, accessibility,
+Reduce Motion, appearance/performance. Vercel CLI absent; strongly recommend
+`npm i -g vercel` for future authorized env/deploy/log work; installation NOT RUN.
+Endpoint RR3b only; no other item or fullsend begun.
