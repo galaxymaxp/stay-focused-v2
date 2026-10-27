@@ -12394,3 +12394,103 @@ pill sharpness/placement, native gradient support, accessibility, Reduce Motion,
 appearance and performance. Vercel CLI is absent; strongly recommend
 `npm i -g vercel` for future authorized env/deploy/log work; installation NOT RUN.
 Endpoint this failed RR2 only; FS14 and other work are not started.
+
+
+## RR2b fresh Today planner readiness: LOCAL PASS (2026-10-27)
+
+Status: **PASS for the finite unattended local scope**, superseding RR2's
+historical gate failure in 00616076/825279a5. Tested HEAD
+825279a573fa271b1345a4d648a73739dec676ce on
+`overnight/2026-10-15_feedback`; product code remains PL4 `5ce526a5`.
+No product or assertion edit. Endpoint RR2b only; FS14 was not started.
+
+FRESH full shared **476 passed / 0 failed / 0 skipped**, mobile **1768 passed /
+0 failed / 0 skipped**, web unit **573 passed / 0 failed / 0 skipped** and
+all 13 Chromium partitions **142 passed / 0 failed / 0 skipped**:
+**2959 passed / 0 failed / 0 skipped** distinct source cases.
+FRESH focused shared/mobile/web/orb: **51/130/13/17**, 211 overlapping cases.
+All executions including focused overlaps and the two extra orb runs:
+**3184 passed / 0 failed / 0 skipped**. No fresh failing attempt or skip.
+Readiness regression: **FRESH 29 passed / 0 failed / 0 skipped**, exit 0.
+The receipt-normalization helper first exited 1 on a circular JSON reference;
+cloning its receipt array fixed it without changing any gate/log/product file.
+
+Gate counts: **28/28 mandatory gates PASS**, 30 executed gate commands, all
+exit 0. Forced typecheck/lint/serial root build each **8/8 tasks, 0 cached**;
+seven existing lint warnings, zero errors. Direct API/web builds and offline
+Android export each **1 passed / 0 failed / 0 skipped**. Working/staged diff
+checks FRESH PASS. Normal repository configs and paths, serial one-worker
+suites; root build uses established OS CPU affinity 1. Generated Next
+declarations restored to pre-gate bytes. No filesystem/module redirection.
+
+The corrected owner retry rule was applied first: the unchanged complete
+orb-load file passed all three isolated runs, **7 passed / 0 failed / 0 skipped**
+each, exit 0: **flaky-order, passed alone 3/3**. Logs under
+`tmp/overnight/RR2b/gates/web-browser-03-alone-{1,2,3}.log`;
+every exit/count/log is retained in gates.json's web-browser-03 attempts
+and attempts.json. RR2's historical 6 passed / 1 failed / 0 skipped remains
+unchanged and is not relabelled as a fresh RR2b pass.
+
+Readiness records: backed up `fullsend/readiness-evidence.json` to
+`readiness-evidence.json.bak-20261027035455094-pre-rr2`. Added PL2 and RR2 supersessions,
+extended only RR1b/RR1c successors for PL4's D13 vector Plan pill, and added
+FS13's no-release-actions record. All four successors use RR2b's real status,
+X2 acceptance, 28 required gates and all 30 pinned logs; X2 remains their
+last commit. Original status/progress pins and unrelated entries are intact.
+The existing FS13 result answer already proves STEP 0/no push, clone,
+migration, deployment or OTA; it was pinned as-is and not rewritten.
+
+Two explicit equivalents preserve real evidence: the removed PlanGlass and
+standalone sheet browser files map to current GlassPill/Today planner tests;
+RR2's requested three successor commits are all documentation, so its record
+prepends existing implementation/test commit 23d71f3d before
+00616076, 825279a5 and X2 to satisfy unchanged proof() implementation rules.
+Readiness validator/tests were never edited. Byte-identical readiness tests
+and dependencies run under repo-local tmp so fixture cleanup stays in-repo.
+
+The unchanged queue lists RR2b after FS14. Since statusId successors must
+occur inside the before-FS14 scope, the requested statusId: RR2b cannot pass.
+All four successors use supported commit-based proof (statusId omitted),
+explicit statusEvidenceId: RR2b metadata and the real RR2b PASS status digest
+in both statusSha256 and a mandatory evidence entry. This keeps actual
+status bytes hash-checked without changing the queue or weakening proof().
+
+Readiness JSON: `tmp/overnight/RR2b/readiness-before.json` and
+`readiness-after.json` both record FRESH live CLI exit 1, ready=false,
+with ONLY `Runner has unresolved in-progress work: RR2b`, checked before
+the terminal status exists, using the prompt's explicit exception. The live
+runner remains running until this invocation ends. To preserve that worker
+guard, the live runner/queue were not modified. Separately labelled
+`readiness-proof.json` is FRESH exit 0, ready=true for the byte-identical
+queue/manifest/evidence with only the copied runner idle: all four repaired
+resolutions verify, FS13 is ABORTED_BEFORE_RELEASE and all other items pass.
+This supplemental proof is **not a live readiness PASS**. FS14 must rerun the
+actual validator at its own stable boundary. Final status pins include X2
+and this handoff's docs-only commit; final proof/audit follow without source edits.
+
+Commits (author galaxymaxp <omgraythekid@gmail.com>, no trailers):
+
+- `3a3f236e495a7e94029f826cf57b704b91d61485` docs(release): verify Today planner redesign at HEAD
+- This handoff: `docs(release): record RR2b readiness supersessions`;
+  exact hash listed in `tmp/overnight/RR2b.status` before final status pinning.
+
+Evidence: [acceptance](acceptance/rr2-release-readiness-20261027.md);
+ignored `tmp/overnight/RR2b/gates.json`, `attempts.json`, `counts.json`,
+`readiness-receipts.jsonl`, `record-changes.json` and `final-audit.json`.
+All 360 historical status/progress files and 23 owner artifacts are hash-checked
+unchanged. Only scoped docs are committed; UI/, apps/mobile/.gitignore,
+supabase/.temp/ and tmp/ stay local.
+
+**UNVERIFIED (owner to confirm)**: live deployed revision/FS12 production,
+database, Scheduler/provider state, native presentation and Realme performance,
+other real browsers and assistive technology. No remote service call/SQL,
+migration application, deployment, Scheduler/email, env-file edit, push,
+OTA/EAS or device action occurred.
+
+**Owner steps remaining**: **FS14**, including actual stable-boundary readiness
+and its separately authorized rollout/release. Rollout **NOT RUN**, skipped
+entirely. Device checks **NOT RUN**, skipped entirely: fresh-install 8-10 PM
+proposal, Realme swipe/reorder feel, vector pill sharpness/placements, native
+gradient availability, accessibility, Reduce Motion, appearance/performance.
+Vercel CLI is absent; strongly recommend `npm i -g vercel` for future
+authorized env/deploy/log work; installation NOT RUN in this local-only item.
