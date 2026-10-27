@@ -1,3 +1,32 @@
+<!-- RR3b merge verification begin -->
+## RR3b shipped-main merge: LOCAL PASS (2026-10-27)
+
+Shipped main `000e5557` is an ancestor via merge `bc72baf6`.
+PL1-PL4/RR2b Today planner product code is preserved; obsolete planning-sheet
+suite remains deleted, both documentation histories and shipped fixes retained.
+Mobile stays 2.4.0/code 8/runtime 2.4.0-sdk57. No version bump or release.
+This record supersedes RR3's historical STEP 0 stop and FS14 merge blocker.
+
+FRESH **28/28 gates PASS**: shared 476, mobile 1768, web unit 573, Chromium
+142 = **2959 passed / 0 failed / 0 skipped** distinct cases; focused 211/211.
+Typecheck/lint/serial root build each **8/8 tasks, 0 cached**; direct API/web
+builds, offline Android export and diff checks PASS. Readiness regression
+**29 passed / 0 failed / 0 skipped**. No failed gate attempt or flaky retry; six affected gates repeated after
+offline dependency alignment, with original passing receipts retained.
+FS14 abort and RR3 supersession pinned; RR1b/RR1c proofs extended for imported
+mobile dependency fixes. Historical records and 23 owner artifacts preserved.
+
+Ready for owner fullsend after the worker ends and stable-boundary readiness
+is rerun with no --before. Live active-worker self-reference remains expected;
+supplemental idle-copy proof is ready=true with real PASS evidence, not a live
+ready=true claim. Main already is an ancestor, so no source/main merge remains.
+Endpoint RR3b only; next fullsend id is Fely's, not queued or started here.
+Rollout/device checks **NOT RUN**, skipped entirely; live production/database/
+Scheduler/provider/native state **UNVERIFIED (owner to confirm)**. No network,
+remote service/SQL, env-file edit, deployment, fetch, push, OTA/EAS or device action.
+[Acceptance and exact evidence](acceptance/rr3b-merge-shipped-main-20261027.md).
+<!-- RR3b merge verification end -->
+
 <!-- RR3 inventory stop begin -->
 ## RR3 shipped-main merge: STOPPED at STEP 0 (2026-10-27)
 
