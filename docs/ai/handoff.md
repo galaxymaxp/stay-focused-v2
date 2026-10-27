@@ -1,5 +1,500 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff — FULLSEND (20261026-0024)
+
+What changed: shipped current WEB-A3 saved-draft/copy repairs and WEB-A4 readiness,
+TP2 selected planning/sheet/marks, TP2d liquid/color/waves, TP2e glass pill,
+QL1c cached Queue scene stills; retained shipped main and readiness history.
+
+Verification (exact counts): FRESH shared 450/45, Canvas 75, OCR 27, engine 606,
+API 2517 + 3 existing live skips, mobile 1732/186, web 707/88: 6114 passed;
+provider 20/20, Doctor 21/21; forced typecheck/lint/build 8/8 each, 0 cached,
+7 existing warnings. CI 40291658540 SUCCESS at 61239d3, focused repair 8/8.
+Original API/web/build/CI/upload/OTA first attempts retained in acceptance.
+
+Deployments (IDs, SHAs): source 37ce7307; previous main 2e01a62; merge 735505c;
+application main 61239d3e2586bb245cc56adfa3a8d70baf96e4aa. Worker
+generation-worker-00036-gw2 / worker:61239d3, Cloud Build 01f57112-0703-4eba-9004-f00d23f1b6d9;
+API dpl_45Zx7NpbAav51pa3uqmmJJy5RBbZ; website dpl_4V3zknzsNYB9i6QmGrQAjTVpYNb2;
+OTA group decdf143-eb7e-4d40-9c62-9ff27ce72730 / Android 01a1778c-a72d-7a63-8c9d-059037a5897f, runtime 2.4.0-sdk57.
+No migration; no native change/APK required.
+
+Live checks: API/website health 200 at 61239d3, Today 200 and Plan asset match;
+worker Ready/100%, bounded error scans zero. FRESH PASS: Realme DownloadComplete/NEW_UPDATE_LOADED for 01a1778c, followed by a cold launch reporting no newer update; visual UI NOT RUN behind keyguard.
+Six physical Plan/Queue checks and desktop UI NOT RUN (keyguard/no browser).
+
+Next steps: owner unlocks Realme for Plan/Queue light-dark/Reduce Motion and
+sheet modes/selection/order; repeat signed-in desktop website checks.
+Blockers: none for publication; keyguard/browser access blocks UI acceptance.
+Risks: broader native GL/performance/accessibility UNVERIFIED; retained test
+resource flakes and interrupted exports; zero paid generations/settings changes.
+Source local artifacts left local; only final github/main fetch, no source merge.
+[Exact readiness JSON, first attempts and release evidence](acceptance/fullsend-20261026-0024.md).
+
+## Handoff — FULLSEND (20261025-0127)
+
+FULLSEND 20261025-0127: **PASS for publication; Realme OTA fetch PASS; on-device
+and signed-in UI checks NOT RUN (phone locked, no signed-in browser).**
+
+Source pin `d2a45bb2d0137dfe1ff8f7b4def473ad7fb67d57`; previous main
+`c3985bf1d874a87d38859463f180a41d7d45f3a5`; main `30f378bd7af6cf6a21eab52434714cacc9956e20`
+(release CI 40118380043 SUCCESS). Ships QN1 Queue failure cards, LM1 mobile
+long-press course options, TC2 quiet Today clock and TP1 Today "Plan with"
+Reviewers / Tasks / Reviewers & tasks.
+
+Fresh release gates: shared 394, canvas 75, ocr 27, engine eval exit 0,
+API 2,508 + 3 existing live skips, mobile 1,703, web 648 (one first-run
+study-export timeout, then full rerun clean), provider 20/20, Doctor 21/21;
+forced typecheck/lint/build 8/8 each, 0 cached; 7 existing lint warnings.
+Migration `20261024000100_today_plan_content.sql` applied; 100 matched, 0 pending;
+catalog grants/RLS/constraints verified. Worker `generation-worker-00035-glg`
+(worker:30f378b) 100%. API dpl_2mZw71F6SWRXrNDycmmM5uqvdoGx and website
+dpl_9TXVQsj277oXEgeG4NPBirMhrrQ2 READY, health at 30f378bd, no runtime errors.
+OTA group 59a1fd2e-9ddd-4b6e-b4bb-bd9744d203af (Android 01a16f1b, runtime 2.4.0-sdk57)
+downloaded and launched on the Realme.
+
+Pending owner checks: the three plan modes on the Realme and signed-in website.
+[Release evidence](acceptance/fullsend-20261025-0127.md).
+
+What changed: QN1, LM1, TC2 and TP1 shipped; TP1 migration applied.
+Verification (exact counts): shared 394, canvas 75, ocr 27, engine exit 0, API 2,508 + 3 skips, mobile 1,703, web 648 (rerun after one timeout), provider 20/20, Doctor 21/21; typecheck/lint/build 8/8, 0 cached; CI 40118380043 SUCCESS.
+Deployments (IDs, SHAs): main 30f378bd; worker generation-worker-00035-glg (worker:30f378b, build aa20e1a5); API dpl_2mZw71F6SWRXrNDycmmM5uqvdoGx; website dpl_9TXVQsj277oXEgeG4NPBirMhrrQ2; OTA group 59a1fd2e-9ddd-4b6e-b4bb-bd9744d203af / Android 01a16f1b-a797-75c4-bc08-f1f655e9c54e.
+Live checks: API/website health PASS; planner-preferences safe 401 PASS; Realme OTA fetch+launch PASS; Realme and signed-in website plan modes NOT RUN.
+Next steps: owner checks three plan modes on Realme and website; WEB-A2 to WEB-A4 website verification.
+Blockers: none for publication.
+Risks: web study-export test timed out once under full-suite load.
+
+## Handoff — FULLSEND (20261024-1357)
+
+FULLSEND 20261024-1357: **PASS for publication; 6/6 bounded device checks PASS; broader matrices NOT RUN.**
+
+Source pin `5f6acd275207541bad9a41f314df96e71856a043`; previous main `f626aa8159ed3875d5e1ff39d4bc6f610102811f`.
+Fresh application gates and release CI pass at `6fe6af8b9c449a19459c2e610afb69e30cdee9c6`;
+native version commit/main `80a6b4df3327683e9ae0733a54092f5e8d832d23` (version CI 40071906102: FRESH SUCCESS).
+Ships Library read coalescing, opt-in privacy-safe measurements, reviewer key reuse,
+Queue/course menus, bounded card feedback and light-theme muted-text contrast.
+PBR-LP1/AS1 are measurement/no-change reports; no APK-size or physical speedup claim.
+RT1/EV1 original statuses remain historical; the pixel correction is evidence repair,
+not a claimed native resume-text fix. Saved TC2/TP1 and unrelated holds are unchanged.
+
+FRESH source workspace suites **5,769 passed / 0 failed / 3 existing live skips**;
+provider 20/20, capture verifier 5/5 and APK publisher 27/27. Forced root
+typecheck/lint/serial build each 8/8 tasks, 0 cached; six existing lint warnings.
+No migrations. Worker `generation-worker-00034-x2f` Ready/100%, startup errors 0.
+API dpl_4KJctNQURVt4LsHbur3eSWsZfqYW; website dpl_HBDxPr6VrjKHE9V9LgoWSa5L482h READY.
+APK build 76bda74e-ddd9-4f2f-ba09-c327c6bb9d57: 2.4.0/code8/runtime 2.4.0-sdk57; adb install -r SUCCESS on connected Realme RMX3151; existing signed-in account and saved Library/course/reviewer data retained.
+Public release: https://github.com/galaxymaxp/stay-focused-releases/releases/tag/v2.4.0%2B8. No OTA; the Doctor-required notifications
+patch changed a native dependency, so a new runtime/APK was required.
+
+Desktop production UI: NOT RUN (no connected browser surface); HTTP and proxy
+checks PASS. Device outcomes, failed first Doctor/CLI attempts, exact commits,
+readiness JSON and remaining limits are in the release acceptance report.
+
+Pending: none for publication.
+
+What changed: Library/read/render, Queue/course menus, card feedback and contrast; native dependency/runtime alignment.
+Verification (exact counts): FRESH 5,769 workspace passes +3 existing live skips, provider20/20, verifier5/5, publisher27/27; forced root gates8/8 each,0 cached.
+Deployments (IDs, SHAs): dpl_4KJctNQURVt4LsHbur3eSWsZfqYW, dpl_HBDxPr6VrjKHE9V9LgoWSa5L482h, generation-worker-00034-x2f, EAS76bda74e-ddd9-4f2f-ba09-c327c6bb9d57; application main 80a6b4df3327683e9ae0733a54092f5e8d832d23.
+Live checks: 6/6 bounded device checks PASS; broader matrices NOT RUN; individual results and limits in acceptance.
+Next steps: Owner may run broader font-scale, assistive-technology, populated Queue and full performance/physical matrices; desktop production UI remains NOT RUN.
+Blockers: none for publication.
+Risks: bounded physical proof, no performance/complete historical acceptance claim.
+
+[Full acceptance](acceptance/fullsend-20261024-1357.md).
+
+
+## Handoff — FULLSEND (20261022-1719)
+
+What changed:
+Shipped two orb fixes from source 245380ea (release/fullsend-20261022-1719) by
+normal merge acf9481 over previous main babcb0bc. 90383ef2: web and mobile orb
+stays empty while loading and fades in from its first complete frame; the
+static poster is only a failure/Reduce Motion state. 245380ea: mobile Today orb
+rebuilds on a replacement GL context after Settings or another screen covers
+Today, instead of staying on the poster until a cold restart.
+
+Verification (exact counts):
+FRESH at acf9481: npm ci 1,591; Doctor 21/21; typecheck/lint 8/8, 0 cached, six
+existing warnings; build first attempt FAILED (Windows file-read error in Metro on
+untouched generationRecovery.ts), forced rerun 8/8, 0 cached. Shared 353/36,
+Canvas 75/1, OCR 27/3, engine 606/0, API 2452 + 3 skips/213, mobile 1645/172, web
+575/76, provider 20/20, diff check PASS. CI 39757286388 SUCCESS.
+
+Deployments (IDs, SHAs):
+Migrations and worker: NOT APPLICABLE (no paths changed). API Git deploy READY at
+acf9481; proxied health reports acf9481. Website dpl_Bt6ivQjFbkva3MykeVznrq6fegmJ
+READY, alias stay-focused-ten.vercel.app. OTA group 5c027739-bb01-4532-8108-12c1f46a8ac4,
+Android update 01a16304-432c-703e-838e-c4ea04e4b3d9, runtime 2.3.0-sdk57.
+
+Live checks:
+PASS: Realme About shows 2.3.0 (7) · update 01a16304. Settings round trips with
+Light, Dark and Automatic each return to a live GLView orb, no "Orb unavailable".
+NOT RUN: deployed-website desktop visual check; deployment 5xx scans.
+
+Next steps:
+FS7 open items (native resume text redraw; authenticated web visuals). OX3/OX4
+backlog under Owner Pause. Source checkout b25-3-3-work stays on
+overnight/2026-10-15_feedback and does not yet contain this release's docs.
+
+[Full record](acceptance/fullsend-20261022-1719.md).
+
+## Handoff — FULLSEND (20261022-1512)
+
+What changed:
+Shipped OX1's padded SVG poster repair and OX2P's shared light-glass refinement
+from source 2670285815e47885fb8220c9596b91daa61dde84; previous main
+28174c76cf7b2696d24e33656f428ee6bf4b92dc retained by normal merge 83f9474603ed45488c75d7028dad170f79374263.
+Only documentation conflicts; both entries retained. Existing native/Expo/test
+release repairs retained. Owner artifacts are left local, not shipped.
+
+Verification (exact counts):
+FRESH Doctor 21/21; root forced typecheck/lint/build 8/8 each, 0 cached; six
+existing lint warnings. Shared 353/36 source tests/files, Canvas 75/1, OCR 27/3,
+engine 606, API 2452 pass+3 existing live skips/213 files, mobile 1643/172,
+web 575/76, provider 20/20. Root build API 37/37, web 23/23, Android/iOS HBC and
+web exports. Complete CI 39741781659 SUCCESS at 83f9474603ed45488c75d7028dad170f79374263; counts match.
+Diff hygiene FRESH PASS. Final docs-only full-suite reruns NOT APPLICABLE.
+The prescribed Doctor --cwd form failed; positional project path passed.
+No suite retry, flake, new skip, assertion weakening or paid generation.
+
+Deployments (IDs, SHAs):
+Migrations: none. Cloud Build d51b0164-095c-411b-b033-2596d4ad6ade SUCCESS; image asia-northeast1-docker.pkg.dev/stay-focus-492811/generation/worker:83f9474;
+digest sha256:86fc0314f5358ac9923704b984ce2eb35a0edeb434e734a7f139050f0a7a8dc2; revision generation-worker-00033-7sv Ready, 100% traffic.
+Authenticated worker health HTTP 200/ok; startup ERROR count 0; dispatch configuration PASS.
+API dpl_F16grTGjt5Be1pV3HhzHpSDGrYoo READY via Git at 83f9474603ed45488c75d7028dad170f79374263:
+https://stay-focused-v2-prototype-j1hkedk2e-galaxymaxps-projects.vercel.app.
+Website dpl_292JfCBzE1J4F21wqXUaJ5ziwQ3v READY via one production CLI upload at 83f9474603ed45488c75d7028dad170f79374263:
+https://stay-focused-92csqprd6-galaxymaxps-projects.vercel.app; alias https://stay-focused-ten.vercel.app.
+Stable API and website/proxy HTTP 200/ok, commit equals application main.
+Deployment-scoped API and website 5xx request queries returned 0 records,
+with no excluded intervals. No rollback or repeated deployment.
+OTA group bc0231d4-8b5c-4ded-bbb8-0c543e5e9970, Android update 01a162a3-6a63-7318-9a64-4b40789569a1, preview channel/branch,
+runtime 2.3.0-sdk57, message fullsend 20261022-1512, source 83f9474603ed45488c75d7028dad170f79374263.
+Manifest: https://u.expo.dev/update/01a162a3-6a63-7318-9a64-4b40789569a1.
+Realme About confirms Version 2.3.0 (7) · update 01a162a3;
+installed APK manifest confirms runtime 2.3.0-sdk57 and preview channel.
+No native build, APK install, public APK release or signing operation was required.
+
+Live checks:
+FRESH Realme bounded smoke 5 PASS / 1 FAIL: light/dark Today complete poster and
+readable clock, light/dark standalone Generation complete orb, and complete
+orb at a 54.9-second follow-up PASS. Three route cycles finish complete, but
+first background/resume capture loses native text while orb stays visible: FAIL.
+Text recovers by the follow-up. This resembles previously recorded FS5 native
+redraw symptoms; cause and duration remain unverified. Physical acceptance PARTIAL.
+Automatic theme restored and selected=true verified; palette, Wi-Fi, airplane
+mode, Reduced Motion and other preferences unchanged. Left Today/asleep.
+Desktop 1440px public sign-in and proxy health PASS, zero page errors/5xx.
+Authenticated deployed web visual checks NOT RUN: no fresh-browser session.
+
+Next steps:
+Investigate the native text redraw after resume, then recheck that flow on the
+Realme. Complete authenticated deployed web orb acceptance and the broader
+palette/Reduced Motion/performance matrix separately. No deployment pending.
+
+Blockers:
+No release deployment blocker. Authenticated browser session unavailable for
+protected visual checks; no interactive login attempted.
+
+Documentation repair: the first release-docs commit c9cb867 introduced
+duplicated historical handoff text and mixed line endings in a formatting pass.
+Its staged diff check failed, but the native command chain continued to commit
+and push. The normal follow-up restores the original 83f9474 handoff history
+exactly plus this single FS7 entry. No remote history or application code was
+rewritten. Final diff and staged checks are FRESH PASS; no full application
+suite rerun is applicable to this documentation-only correction.
+
+Risks:
+Release shipping PASS through STEP 6 is separate from STEP 7 physical acceptance
+PARTIAL. Bounded screenshots do not establish every transient frame, all five
+palettes, Reduced Motion or native GPU/battery performance. No new generation
+was submitted; standalone /generation was opened without id/intent/start and
+remained unsubmitted. Historical statuses remain intact. Final documentation
+SHA, post-push observation and source-ref ancestry are recorded in the external
+FS7 result/status, because a commit cannot embed its own SHA.
+
+<details>
+<summary>FS7 persistent readiness validator JSON (copied exactly as data)</summary>
+
+```json
+{
+  "ready": true,
+  "head": "2670285815e47885fb8220c9596b91daa61dde84",
+  "baseline": "FS5",
+  "beforeId": "FS7",
+  "runner": {
+    "state": "running",
+    "item": "FS7"
+  },
+  "items": [
+    {
+      "id": "OX1",
+      "originalState": "STOPPED",
+      "result": "VERIFIED_SUPERSESSION",
+      "evidence": {
+        "commits": [
+          "bcef04777aa56cd6c1e6eba4fdd7c004851dcc95",
+          "39ff73620e91714f077a664aafaf888dc94b527c",
+          "1140c73764e19edf054fd5ce131a707697301524",
+          "2670285815e47885fb8220c9596b91daa61dde84"
+        ],
+        "acceptance": "docs/ai/acceptance/ox1-realme-physical-debug.md",
+        "passingGates": 9
+      },
+      "successor": "OX2P"
+    },
+    {
+      "id": "OX2",
+      "originalState": null,
+      "result": "VERIFIED_SUPERSESSION",
+      "evidence": {
+        "commits": [
+          "39ff73620e91714f077a664aafaf888dc94b527c",
+          "1140c73764e19edf054fd5ce131a707697301524",
+          "2670285815e47885fb8220c9596b91daa61dde84"
+        ],
+        "acceptance": "docs/ai/acceptance/ox2p-light-glass-follow-up.md",
+        "passingGates": 11
+      },
+      "successor": "OX2P"
+    },
+    {
+      "id": "OX2P",
+      "originalState": "PASS",
+      "result": "PASS"
+    },
+    {
+      "id": "FS6",
+      "originalState": "STOPPED",
+      "result": "ABORTED_BEFORE_RELEASE"
+    }
+  ],
+  "leftLocal": [
+    "UI/README.md",
+    "UI/screenshots/dark/01-generate.png",
+    "UI/screenshots/dark/02-today.png",
+    "UI/screenshots/dark/03-tasks.png",
+    "UI/screenshots/dark/04-library.png",
+    "UI/screenshots/dark/05-task-course.png",
+    "UI/screenshots/dark/06-library-course.png",
+    "UI/screenshots/dark/07-reviewers-list.png",
+    "UI/screenshots/dark/08-reviewer.png",
+    "UI/screenshots/dark/09-other-source.png",
+    "UI/screenshots/dark/10-queue.png",
+    "UI/screenshots/light/01-generate.png",
+    "UI/screenshots/light/02-today.png",
+    "UI/screenshots/light/03-tasks.png",
+    "UI/screenshots/light/04-library.png",
+    "UI/screenshots/light/05-task-course.png",
+    "UI/screenshots/light/06-library-course.png",
+    "UI/screenshots/light/07-reviewers-list.png",
+    "UI/screenshots/light/08-reviewer.png",
+    "UI/screenshots/light/09-other-source.png",
+    "UI/screenshots/light/10-queue.png",
+    "apps/mobile/.gitignore",
+    "supabase/.temp/cli-latest"
+  ],
+  "blockers": []
+}
+```
+
+</details>
+
+## Handoff — FULLSEND (20261021-2245)
+
+What changed:
+Shipped OT1/OG1/OL1/RS1/TB1/LP2 from source70c415d13ef75c2e334fc6d544edfdc35d34e5ff;
+previous maine71dd2aaf836751f3b694eb60b2b2274d2c484b0 retained by normal
+merge56170ac. Tested application/test maine8b44dd242a2e8a3340d8287bf6b2f4f57ac0a52.
+Fresh clone; source UI/, apps/mobile/.gitignore, supabase/.temp/ left local,
+not shipped. Expo patches43038b9, web workers64cc1e7, native0536abf,
+publisher fixture9df3602, preview Node24e62e31c, causal browser probee8b44dd.
+
+Verification (exact counts):
+FRESH forced root typecheck/lint/build8/8 each,0 cached; six existing warnings.
+Shared348/36 source cases/files, Canvas75/1, OCR27/3, engine606,
+API2452 pass+3 existing live skips/213 files, mobile1633/171, web569/75,
+contract20/20, publisher27/27; Doctor21/21. API/web37/37 and23/23 pages,
+Android/iOS/web exports. Complete CI39637163181 SUCCESS. Failed first
+Doctor/web/browser CI39634165945/publisher/EAS attempts and repairs
+are recorded in the acceptance report; no assertions/deadlines weakened or
+tests newly skipped. Docs-only application reruns NOT APPLICABLE; final diff
+and staged hygiene FRESH PASS. Final docs SHA/CI in external FS5 result/status.
+
+Deployments (IDs, SHAs):
+Migrations none. Worker Cloud Build56025bca-0794-42dd-9506-79b1c9c6b42a SUCCESS,
+asia-northeast1-docker.pkg.dev/stay-focus-492811/generation/worker:64cc1e7,
+digest7d973fd7cd6b9fa2d1d7daeddaa549cd252a2e0b2a5e681c9f6db7e2ada982aa;
+generation-worker-00032-gbv Ready/100%, health200/startup errors0; dispatch set.
+Website dpl_2yGbZmy658n1QJW8Fgjw6c9YgYiQ production64cc1e7,
+https://stay-focused-1p3sqgzh2-galaxymaxps-projects.vercel.app,
+alias https://stay-focused-ten.vercel.app. API dpl_CK6u8TsPnGnKi2bFqbYvTBVQewsB
+productione8b44dd, https://stay-focused-v2-prototype-4trdwmfbc-galaxymaxps-projects.vercel.app.
+Direct/proxied health200 reports exacte8b44dd; website200. Initial complete
+10-minute error/fatal/5xx scans0, follow-up API20-minute scans0.
+First EASd6242c5b failed before Gradle; targeted preview Node24.16.0 pin;
+single rebuilda26aa1fe-623e-49e5-95fb-0c2caa1f86ea FINISHED frome62e31c.
+Realme adb install-r SUCCESS,2.3.0/code7/runtime2.3.0-sdk57, built-in update;
+verified package/runtime/signature, matching installed APK hash
+0910d589b42c02c04f032dff7362da69258cdd081c5be1c2dc83798452cc12e6.
+Public https://github.com/galaxymaxp/stay-focused-releases/releases/tag/v2.3.0%2B7;
+canonical APK132024227bytes, exact digest. First publisher timed out creating
+empty draft; completed its same draft after inspection/asset verification.
+No asset/release overwrite/deletion, third build, credential change, uninstall,
+data clear or OTA. Completed release actions were not repeated on resume.
+
+Live checks:
+FRESH4 PASS/2 FAIL on installed2.3.0/code7. PASS limited smoke: Today light
+body/dark time, restrained standalone glow, Generate scroll endpoints, profile/
+Settings legal links and Back. FAIL OL1/TB1: return/post-tab captures lose
+header/body/tab text; some Today captures show square poster/background.
+Native composition versus adb capture cause remains UNVERIFIED; mirrors prior
+FS4 symptom but no causal regression claim. Full palette/theme parity, active
+state/motion/performance and frame-by-frame jitter NOT RUN. Desktop UI NOT RUN:
+empty browser inventory/IAB unavailable. Zero generations/start/retry/clear
+or manual sync. Automatic restored, palette unchanged; phone Today/Asleep.
+Private captures remain ignored in .local/fullsend-20261021-2245.
+
+Next steps:
+Investigate native redraw/capture behavior and complete broader physical
+acceptance. Final docs push, main-ref refresh and observations in external result.
+
+Blockers:
+None for shipped release; no owner deployment pending. Desktop UI unavailable.
+
+Risks:
+Release PASS through STEP6 coexists with PARTIAL device visual acceptance;
+two smoke failures remain open. Details: docs/ai/acceptance/fullsend-20261021-2245.md.
+
+## Handoff ? FULLSEND (20261020-2101)
+
+What changed:
+Published OP2/GV1 from pinned source 32206c1656453975b4c989f7d59a0b1726730c8c;
+previous shipped main 913b11877f29206b3deee41c2cb4e453f1c5a64b; final application
+main f0736bfa20ff545264624940db4dfc42b2a33265. OP2 9e17fd4d/1d3c5cfc,
+GV1 8b37b5ae/32206c16. Fresh clone, normal merge 5143e3e preserving earlier
+main fixes and both documentation entries; normal main push. Test/CI-only
+fixes 1f099db (portable fixture/Chromium order) and f0736bf (explicit gesture
+time/one-worker web CI). Original UI/, apps/mobile/.gitignore, supabase/.temp/
+left local, not shipped. Author/committer galaxymaxp, no trailers.
+
+Verification (exact counts):
+FRESH local and final Linux CI gates: forced typecheck/lint/build 8/8 each,
+0 cached; six existing lint warnings. Shared 335/34 source files (historical
+670/68 included compiled duplicates), Canvas 75/1, OCR 27/3, engine 606, API
+2452 pass + 3 intentional live skips/213 files, mobile 1600/169, web 540/72,
+provider contract 20/20 fake clients. API/web pages 37/37 and 23/23; native
+and web exports. Doctor 21/21, npm ci 1593 packages. Repo-local temp; generated
+Next declarations restored. Full CI 39438782653 SUCCESS on final app SHA.
+First mobile timeout and first web timeouts/hook-blocked cases, full passing
+reruns, and failed CI 39435814818 / 39436913399 are retained. Post-fix focused
+native browser 6/6 and web browser 23/23 plus respective typecheck/lint pass.
+No assertions/deadlines weakened or tests removed/newly skipped. Final docs-only
+checks: diff/staged hygiene FRESH; application suites NOT APPLICABLE to docs alone.
+
+Deployments (IDs, SHAs):
+Migrations: none. Worker Cloud Build 7632e00a-2be6-4ed1-ad27-492a0adbdacf SUCCESS;
+asia-northeast1-docker.pkg.dev/stay-focus-492811/generation/worker:f0736bf,
+digest sha256:3545a74e1a4b2acb9fff5071b92d619c93971bc9ead682504ab12cf04ffc11ba;
+generation-worker-00031-kns Ready/100%; dispatch succeeds; startup errors zero.
+Upload 2047 tracked files only, generated/private artifacts excluded.
+API dpl_8Y2xj9EFsVBQb6JvCpdKM4pTBtd4 READY/production at f0736bf;
+https://stay-focused-v2-prototype-6v4t5rn0b-galaxymaxps-projects.vercel.app.
+Website dpl_DopMzVTAgzTdMMo7YgC4236H7yNf READY/production at f0736bf;
+https://stay-focused-ge3gtn2d1-galaxymaxps-projects.vercel.app, aliased to
+stay-focused-ten.vercel.app. Verified metadata SHAs, root/direct/proxied health
+200/ok, API commit matches main. API 20-minute/web five-minute error/fatal and
+5xx scans zero, no pagination/excluded intervals. Existing login, explicit
+verified project, clean source checkout; no settings change or rollback.
+OTA group 44243e11-cb14-4390-b56c-0755e317144b; Android update
+01a159c7-b0d4-7f4c-8ae4-4f513969d26a; preview/runtime 2.2.0-sdk57 from f0736bf.
+Installed manifest proves channel/runtime; Realme About proves 2.2.0 (6),
+update 01a159c7 after relaunches. No native change, APK build/install/public
+release NOT APPLICABLE. Final docs SHA and resulting automatic API/CI are in
+external result/status after commit.
+
+Live checks:
+FRESH 5 PASS / 1 FAIL. PASS: initial Today clock/body/backdrop; Queue safety
+and open/close; confirmation visually fits portrait; full details/Done/return;
+Generate picker scroll. FAIL: blank regions outside the orb in post-tap
+captures 11/12; navigation redraw restores normal Today. Five-tap palette
+cycle returns pearl. Cause native composition versus ADB capture is unverified.
+Initial clipping diagnosis is withdrawn: pixel close-up shows the full details
+control despite UIAutomator's underreported bound; accessibility discrepancy
+remains open. Desktop UI NOT RUN: IAB unavailable. Zero paid generations;
+no start/retry/clear/sync submitted. Original timeout 1800000 ms unchanged,
+settings preserved, phone returned Today and Asleep. Neutral ignored evidence
+under .local/fullsend-20261020-2101. Initial Python helper/asleep captures failed;
+Node capture plus ordinary wake/swipe-only keyguard dismissal resolved access.
+
+Next steps:
+Investigate captured blank regions and actual native display/compositor behavior;
+verify accessibility bounds and remaining desktop, active generation, landscape,
+enlarged-text, Reduced Motion, wave/gesture and performance variants.
+
+Blockers:
+Browser unavailable. No release migration/deployment/mobile operation pending.
+
+Risks:
+SHIPPED with physical acceptance PARTIAL, not full OP2/GV1 acceptance. No
+credential/signing rotation, destructive SQL, email activation, purchase,
+force-push, uninstall or app data clear. Owner Pause and later scopes retained.
+Source checkout fetch/ancestry is recorded externally; no source integration.
+
+[Full acceptance](acceptance/fullsend-20261020-2101.md).
+
+## Handoff — FULLSEND (20261020-0604)
+
+What changed:
+Published UC1/UC2/UC3, LG1, GB1, GS1, RV3, IV1, AN1b, OF1b, OR3b, OR4, WGP2, LP1, GL1, WA1, WX1 and OA1 from pinned 202f8c3f7e7b012136acf3708a7e044a561be827; previous main 384173c0e936bd3709f021842f3be2a2e79743e1; application main b6645ed4cc8d27c86af2ccc5e1a830e1e4d8074e. Release-only merge 436dc36 and docs cleanup b6645ed retain both histories. All work used a fresh clone; source untracked files and separate showcase-only commit remain left local, not shipped.
+
+Verification (exact counts):
+FRESH PASS: npm ci 1593, Doctor 21/21, forced typecheck/lint/build 8/8 each and 0 cached; shared 330/34 source files, Canvas 75/1, OCR 27/3, engine 606, API 2452 passed/3 intentional skips/213 files, mobile 1581/166, web 524/72, provider 20, publisher 27. Builds API 37/37 pages, web 23/23 and Android/iOS/web exports. Six existing warnings. First mobile five-second timeout and four web test plus one teardown timeout retained; focused mobile 10/10 and full two-worker reruns pass. No weakened/skipped tests. GitHub CI 39339336556 SUCCESS repeats counts and fresh forced gates. Diff hygiene pass; generated declarations restored.
+
+Deployments (IDs, SHAs):
+Only additive migration 20261018000301_profile_preferences.sql applied to xfdbwfqtorelmurncyql before main; exact-set dry run, post-list 99 matching/0 pending and RLS/grants/trigger catalog checks pass. Worker build 6c1d040c-5573-4bb0-9f7a-2b7c79f0dbaa SUCCESS; image worker:b6645ed, digest sha256:343d6551c1cc50f4169bc24af1188d60f4b235ce910b3ce8fd2ae276b1691bcc, revision generation-worker-00030-c2q Ready/100%, dispatch configured. API dpl_FTJbc451LXaRmGadBioS7bQ6qqno and website dpl_9R9BSaNwPUP3hmT856fFjpEpVTQS READY at b6645ed4cc8d27c86af2ccc5e1a830e1e4d8074e; stable production aliases healthy. OTA group 8274c431-7189-42cb-bb36-7fe546e06ea7 / Android 01a1567c-cc55-7bbf-bdf1-7c3ccc2380f0 runs on Realme, native 2.2.0/code6/runtime2.2.0-sdk57. No APK path or public native release applies. Final documentation commit and automatic follow-up deployment IDs are recorded externally after this commit.
+
+Live checks:
+Six FRESH bounded PASS: Today orb/clock render; exact About OTA/native metadata and manual up-to-date result; correct native download share URL (dismissed, not sent); Privacy and Terms screens; Generate search hides/reappears on down/up scroll; reviewer Original selected with Simplify/Explain simply/Expound controls. Direct/proxied health 200 matching application SHA, public root/download/privacy/terms 200, unauthenticated preferences401, release metadata200/version2.2.0. Worker initial ERROR query zero; API/web bounded error/fatal and 5xx scans zero, no excluded intervals. Desktop browser UI NOT RUN (no surfaces/IAB unavailable). Zero paid generations; no quiz answers or settings changes. Swipe-only keyguard dismissed using standard command; failed timeout write unchanged at1800000, device returned asleep. Transient list navigation was resolved from fresh button bounds.
+
+Next steps:
+No required FS3 publication remains. Desktop UI and broader feature/visual/performance acceptance remain separate. UC2 showcase-only push/PR is left local outside this repository; OA2/later roadmap scopes are not resumed. Final source fetch/ancestry and final commit are in the external result. [Full evidence](acceptance/fullsend-20261020-0604.md).
+
+Blockers:
+Desktop browser unavailable. Required migrations, worker, API, website and mobile publication have no pending owner/Claude action.
+
+Risks:
+Six quick checks do not close full feature acceptance, offline/reconnect flows, recovery email, cross-device sync, image gestures, physical reference parity or GPU/power measurements. Initial load flakes and exploratory failures are retained. CLI link's automatically created local environment file was removed without reading values; no persistent credential, project-setting change or email activation was performed. Original owner work, source content and later scopes remain preserved.
+
+## Handoff — FULLSEND (2026-10-19)
+
+What changed:
+Shipped the finite FS2 release from pinned source 7506d51cde323caf036c6bc930512739a94613cb; tested application main is e11779a46f46513035f4cdacae55286bd337e5cf. The only release repair is e11779a, which makes the offline-image database restart test create its own repository-local temporary parent. The original b25-3-3-work checkout was preserved; all release work used this fresh clone.
+
+Verification (exact counts):
+FRESH PASS: npm ci (1,488 packages), Expo Doctor 21/21; forced root typecheck, lint and build each 8/8 tasks, 0 cached. Shared 282/282 across 27 source files; Canvas 75/75 (1 file), OCR 27/27 (3), engine 606/606, API 2,397 passed and 3 intentional live skips (209 files, two workers), mobile 1,481/1,481 (154), web 353/353 (54), provider contract 20/20 (fake clients only). API/web builds produced 35/35 and 19/19 pages; Android/iOS/web exports passed. Six existing lint warnings remain. Diff hygiene passed; Next-generated declarations were restored. GitHub release quality run 39150200346 SUCCESS repeats these counts, including forced gates with 0 cached tasks. First failures and tool retries are retained in the acceptance report.
+
+Deployments (IDs, SHAs):
+Supabase xfdbwfqtorelmurncyql: applied only 20261018000100_failed_generation_retry.sql, 20261018000200_material_descriptions.sql and 20261018000300_profile_avatars.sql before main. Exact-set dry run passed; post-list has 98 matching versions, zero unmatched. RLS, owner policies, eight service-only RPCs and private avatar bucket metadata verified.
+Worker build 29123816-84a5-4fbf-99eb-3b0957cd481d SUCCESS; image asia-northeast1-docker.pkg.dev/stay-focus-492811/generation/worker:e11779a, digest sha256:7d64c5be35043c5c00a99952fe8aa3f7eb4986a49a6e861c162090d917d0ddb4; generation-worker-00029-br6 Ready, 100% traffic, dispatch configuration successful, initial ERROR query zero entries.
+API Git status reference 43oQUjybjvenibMU5v2D4Ljsxpo2 / GitHub deployment 7158236365 SUCCESS at e11779a; https://stay-focused-v2-prototype-6x4psutxk-galaxymaxps-projects.vercel.app. Direct health and website API proxy return 200/status ok/commit e11779a; valid overnight Today override returns expected unauthenticated 401.
+Website production dpl_6dq21qJz4UPLx4pxCMXdyCKgYGEk READY at e11779a; stay-focused-ten.vercel.app alias assignment verified and HTTP 200. Existing connector rebuilt the source for production after CLI authentication failed; preview dpl_G9UfZLk46o4iNNnJQtB9piBvXcUD was not promoted. Previous READY dpl_EgAH83B3iJFhkHT5fWiN6PBHe5MN retained; no rollback.
+Android preview OTA group 946136b5-2716-4e87-b1ba-b254f101fa4f, update 01a15020-2f92-74b9-8c2b-63c146cc77ed, runtime 2.2.0-sdk57, Git e11779a. Two Realme relaunches completed; new clock/quiz UI and image checks prove the OTA is running. Phone versionName 2.2.0/code 6; owner session retained. APK path NOT APPLICABLE because there was no native diff.
+
+Live checks:
+FRESH PASS: TC1b typed 10 PM–4 AM fields and midnight ring; OR1b visible halo; IF1 Image saved / Saved to Stay Focused; IF2 external image visibly loads and viewer remains open; QZ1 question-number jump to question 2 and back to 1; PF1 provider photo. Original free time restored to 2 AM–4 AM (00 minutes), clock lock left false, no plan applied and no quiz answers submitted. Zero paid generations.
+NOT RUN: after-midnight session blocks (preview had no fitting sessions), previous-date current-plan ownership (required prior overnight plan baseline not established), MD1b description display (new cache has 0 ready/0 total entries), desktop Today/WGP1 UI (browser inventory empty; IAB creation explicitly unavailable).
+
+Next steps:
+Finish the listed live checks with an eligible overnight plan, an existing ready material description and an available browser. Any broad description backfill remains a separate owner decision. FS2 ends here; no later queued product slice was started. Final documentation commit and any subsequent automatic API deployment are recorded in the external overnight result/status, avoiding a self-referential commit hash.
+
+Blockers:
+API runtime log scan remains BLOCKED: installed Vercel CLI 64.5.0 rejects its saved token, and the existing connector returns 404 for this API project/deployment. Website publication was recovered through the connector and its bounded error/fatal scan returned zero groups. No new authentication completed, credentials created/rotated, project settings changed or email delivery enabled.
+
+Risks:
+The named NOT RUN checks and inaccessible API runtime logs remain unverified; passing local/CI tests do not replace those observations. A source-figure viewer changed state between early captures; a stale-coordinate attempt opened Study Assist, was dismissed without submission, then exact live UI bounds produced a successful save. No cause for that transient state change is claimed. Device captures and validation logs remain ignored in .local/fullsend-20261019; no private academic content, credentials or generated outputs enter the commit.
+
+
 ## Handoff — FULLSEND (2026-10-18)
 
 What changed:

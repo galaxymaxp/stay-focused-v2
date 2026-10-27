@@ -2,9 +2,9 @@
   "expo": {
     "name": "Stay Focused V2",
     "slug": "stay-focused-v2",
-    "version": "2.2.0",
+    "version": "2.4.0",
     "icon": "./assets/branding/app-icon.png",
-    "runtimeVersion": "2.2.0-sdk57",
+    "runtimeVersion": "2.4.0-sdk57",
     "orientation": "portrait",
     "scheme": "stayfocused",
     "ios": {
@@ -14,8 +14,8 @@
     "android": {
       "googleServicesFile": "./google-services.json",
       "package": "com.galaxymaxp.stayfocusedv2",
-      "versionCode": 6,
-      "runtimeVersion": "2.2.0-sdk57",
+      "versionCode": 8,
+      "runtimeVersion": "2.4.0-sdk57",
       "adaptiveIcon": {
         "foregroundImage": "./assets/branding/orb-adaptive-foreground.png",
         "monochromeImage": "./assets/branding/orb-monochrome.png",
