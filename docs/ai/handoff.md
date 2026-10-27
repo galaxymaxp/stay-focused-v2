@@ -1,5 +1,24 @@
 # Stay Focused V2 - Local Agent Handoff
 
+## Handoff — FULLSEND (20261027-1625)
+
+What changed: owner Today/Schedule layout feedback, done directly in Claude
+Code at `c8b3b914`: Plan pill centered (web + mobile), planner Include moved
+above a single ordered **Courses** list with per-course checkboxes (shared
+`planningCourseGroups` / `togglePlanningCourse`), Schedule accent stripe and
+today outline removed.
+Verification: typecheck/lint 8/8 forced; shared 477, web 715, mobile 1768,
+API 2523 + 3 skips, 0 failed.
+Deployments: API `dpl_FnwwmQSpKKPGobeLayxaT3bt53bs`, website
+`dpl_CagnHrsGEJ77CRfHPbKTYPdEtuAE`, OTA `01a17c82-31bd-7078-ace2-f73f87e3ee5e`
+(runtime 2.5.0-sdk57) loaded on Realme. No migration/worker/APK.
+Next steps for autopilot: resume the frozen scope in `current_sprint.md`; FS16
+adds no new scope. Treat the planner layout as owner-decided (do not restore
+the separate Courses picker or "Smart order" heading). Backlog candidates: the
+duplicate "Updated just now" on web Schedule; literal `?` chevrons in mobile
+PlanningSheet.
+Blockers: none. Risks: live signed-in desktop and Realme visual UI NOT RUN.
+
 ## Handoff — FULLSEND (20261027-1410)
 
 What changed: shipped PL1 automatic proposals/local exclusions/previous plans,

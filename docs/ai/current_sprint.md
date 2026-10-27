@@ -1,3 +1,51 @@
+<!-- FS16 release begin -->
+## FS16 FULLSEND 20261027-1625: PASS for publication (2026-10-27)
+
+Owner feedback batch shipped from Claude Code (not an autopilot task), on top
+of FS15 main `7b5118cc`. Application commit `c8b3b914`
+(`fix(today): center Plan pill, merge planner Courses, flatten Schedule cards`):
+
+- Today clock: the Plan GlassPill is centered under the clock. Web: the
+  fit-content pill was left-pinned by the stretch column
+  (`.today-clock-card > .glass-pill { align-self: center }`). Mobile:
+  `GlassPill` gained `align` (default `flex-start`, so Generate/Tasks/Library
+  are unchanged); `PlanButton` passes `center`.
+- Planner settings (web `today-planner.tsx`, mobile `PlanningSheet.tsx`):
+  Include segment moved to the top; the separate Courses picker is gone. The
+  ordered list is now titled **Courses** (Smart/Manual order is a caption) and
+  each course heading has an `Include <code>` checkbox. New shared helpers in
+  `packages/shared/src/planning-sheet.ts`: `planningCourseGroups` (unchecked
+  courses stay listed, empty courses omitted) and `togglePlanningCourse`
+  (re-including every course returns to `courses: 'all'`). Personal group has
+  no course checkbox.
+- Schedule (web): removed the 3px left accent on blocks and the accent
+  border/inset bar on today's column; today now uses `--elevated` background.
+  Mobile Schedule had no accent stripe.
+
+FRESH gates at `c8b3b914`: forced typecheck 8/8 and lint 8/8 (0 cached, 7
+existing warnings); shared 477, web 715 (incl. planner Chromium 10/10 with new
+Include-above-Courses, course uncheck/re-check and centered-pill asserts),
+mobile 1768, API 2523 + 3 existing live skips. Canvas/OCR/engine/build not rerun
+(untouched).
+
+Deployments: no migration, no worker change. API `dpl_FnwwmQSpKKPGobeLayxaT3bt53bs`
+READY, health commit `c8b3b914`. Website production `dpl_CagnHrsGEJ77CRfHPbKTYPdEtuAE`
+(CLI from clean main worktree; a duplicate identical `dpl_3GoD36x38R3CnQwiA9LbzUr9agHJ`
+was also created) on https://stay-focused-ten.vercel.app, `/today` 200, served
+CSS contains all three fixes. OTA group `4b58dc62-dfa7-4d3c-aff0-bf634bf58a6e`,
+Android update `01a17c82-31bd-7078-ace2-f73f87e3ee5e`, channel preview, runtime
+`2.5.0-sdk57`; no native change, no APK. Realme DownloadComplete +
+NEW_UPDATE_LOADED, next cold launch NoUpdatesAvailable, crash buffer 0.
+
+NOT RUN: signed-in live desktop UI and Realme visual UI (keyguard). Commit
+`c8b3b914` carries a Co-Authored-By trailer against owner policy; left as-is
+because removing it needs a main force-push.
+
+Noted, not fixed (candidate backlog): Schedule web shows "Updated just now"
+twice under Canvas Sync now; mobile PlanningSheet collapsed-state chevron and
+Taken out chevron render a literal `?` (pre-existing glyph).
+<!-- FS16 release end -->
+
 <!-- FS15 release begin -->
 ## FS15 FULLSEND 20261027-1410: PASS for publication (2026-10-27)
 
