@@ -1,3 +1,20 @@
+<!-- RR2 verification failure begin -->
+## RR2 release verification: FAILED (2026-10-27)
+
+Fresh verification at PL4 HEAD `5ce526a5` stopped at STEP 1:
+web-browser-03 orb-load request ordering **6 passed / 1 failed / 0 skipped**
+(atlas index 4, chunk index 3; assertion failure, not timeout). No retry or
+product edit is permitted by RR2. Overall gates: **9 passed / 1 failed /
+18 NOT RUN**; test executions including focused overlaps **3051 passed /
+1 failed / 0 skipped**. Forced tasks/builds and readiness closeout NOT RUN.
+
+PL1–PL4 prior local acceptance remains historical; RR2 does not certify release
+readiness. PL2/RR1b/RR1c/FS13 readiness records are unchanged. **FS14 blocked**
+pending a scoped repair and fresh verification. Rollout/device checks NOT RUN;
+live production/native state UNVERIFIED (owner to confirm). No remote call,
+SQL, env-file edit, deployment or push. [Failure evidence](acceptance/rr2-release-readiness-20261027.md).
+<!-- RR2 verification failure end -->
+
 <!-- PL4 vector GlassPill begin -->
 ## PL4 vector GlassPill: LOCAL PASS (2026-10-27)
 
