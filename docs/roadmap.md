@@ -1,3 +1,24 @@
+<!-- RR2b verification begin -->
+## RR2b Today planner verification: LOCAL PASS (2026-10-27)
+
+This RR2b result supersedes the historical RR2 failure below.
+PL1-PL4 implementation is freshly verified at HEAD `825279a5`.
+RR2b changes documentation and local readiness records only. FRESH shared/mobile/web:
+**2959 passed / 0 failed / 0 skipped**; focused rechecks 211/211.
+All 28 gates pass; forced typecheck/lint/serial root build each **8/8 tasks,
+0 cached**. Direct API/web builds and offline Android export pass.
+PL2/RR2 supersessions, RR1b/RR1c extension for PL4 D13, and FS13 aborted-release
+proof use RR2b's pinned acceptance/gates. Historical terminal records stay intact.
+
+Today planner redesign PL1–PL4 is ready for FS14's stable-boundary readiness
+check and separately scoped release. The active RR2b runner self-reference is
+the prompt's permitted exception, not a live ready=true claim. Rollout/device
+checks are **NOT RUN** owner/FS14 steps; live production/database/Scheduler/
+provider and physical/native state **UNVERIFIED (owner to confirm)**.
+No remote call, SQL, deployment, env-file change or push. Endpoint RR2b only.
+[Acceptance and exact evidence](ai/acceptance/rr2-release-readiness-20261027.md).
+<!-- RR2b verification end -->
+
 <!-- RR2 verification failure begin -->
 ## RR2 release verification: FAILED (2026-10-27)
 
