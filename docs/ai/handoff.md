@@ -12323,3 +12323,74 @@ c45c7da4 feat(ui): GlassPill on Generate, Tasks and Library
 Final docs commit follows; exact hash in Git and PL4.status/progress.
 Vercel CLI remains absent. Strongly recommend `npm i -g vercel` for future
 owner-authorized env/deploy/log work; installation NOT RUN in this code-only run.
+
+
+## RR2 fresh release verification: FAILED (2026-10-27)
+
+Status: **FAILED**, mandatory STEP 1 non-timeout stop. Tested code HEAD
+`5ce526a570e1e5459177e4a9afafd359162f74f3`, branch
+`overnight/2026-10-15_feedback`. Product code and the live readiness manifest
+remain unchanged; PL1–PL4 historical acceptance is preserved. FS14 is blocked.
+
+FRESH failing command (exit 1):
+
+```text
+npm run test --workspace @stay-focused/web -- --maxWorkers=1 src/features/day-clock/orb-load.browser.test.ts
+```
+
+`web-browser-03`: **6 passed / 1 failed / 0 skipped**. The light/Slow 4G
+cold-reload-route case failed its request-order assertion at orb-load.browser.test.ts:112:
+atlas index 4, split chunk index 3; expected 4 to be less than 3. This is
+not a timeout. RR2 permits only timeout-only browser reruns, so no retry,
+product repair or assertion waiver was performed. First attempt/log retained:
+`tmp/overnight/RR2/gates/web-browser-03.log`.
+
+FRESH completed suites: focused shared **51/51**, mobile **130/130**, web
+Chromium **13/13**, orb **17/17**; full shared **476/476**, mobile
+**1768/1768**, web unit **573/573**; browser-01 **3/3**, browser-02
+**14/14**, browser-03 **6/7**. No skipped cases.
+All executions including overlapping focused tests: **3051 passed / 1 failed /
+0 skipped**. Incomplete nonfocused partitions: **2840 passed / 1 failed /
+0 skipped**. This is not full-browser acceptance.
+
+Gate counts: **9 passed / 1 failed / 18 NOT RUN** of 28 planned. Remaining
+browser partitions, forced typecheck/lint, API/web builds, offline Android
+export and forced root build are NOT RUN at the required stop. Cached-task
+counts NOT RUN; no new 0-cached claim. Readiness regression tests, X2 completion
+and STEP 3 manifest work are NOT RUN. Separate failure-doc hygiene checks
+`git diff --check` and `git diff --cached --check` are FRESH PASS, exit 0.
+
+Readiness JSON: `tmp/overnight/RR2/readiness-before.json` is FRESH exit 1,
+ready=false with only `Runner has unresolved in-progress work: RR2` before
+queue inspection. After JSON/proof validation NOT RUN after the gate failure;
+the live runner, queue and validator/test sources were never changed. No PL2
+resolution, RR1b/RR1c extension, FS13 abort record, external answer or manifest
+backup was written. All 358 other historical status/progress files and 23
+owner artifact pins remain identical; generated-restored.json is [].
+Normal configurations, serial --maxWorkers=1, repo-local caches/temp, offline
+flags and a network-only loopback guard were used. Command substitutions for
+deleted planner/PlanGlass tests are recorded in acceptance/deviations.
+
+Commits (galaxymaxp <omgraythekid@gmail.com>, no trailers):
+
+- `00616076` docs(release): record RR2 verification gate failure
+- This handoff's docs-only commit: `docs(release): hand off RR2 gate failure`;
+  exact hash is listed with the first commit in `tmp/overnight/RR2.status`.
+
+[Failure acceptance](acceptance/rr2-release-readiness-20261027.md); exact gate
+commands/results, attempts and counts are under ignored `tmp/overnight/RR2/`.
+No tmp output or unrelated owner path is staged.
+
+**UNVERIFIED (owner to confirm)**: live FS12/served revision, database,
+Scheduler/provider state, native presentation/physical performance and other
+real browsers/assistive technology. No remote service/SQL, migration,
+deployment, Scheduler/email, env-file edit, Git push, OTA/EAS or device action.
+
+**Owner steps remaining**: scoped repair of the atlas/chunk assertion, rerun
+RR2 verification and finish readiness records before **FS14**. Rollout
+**NOT RUN**, skipped entirely: FS14/owner release. Device checks **NOT RUN**,
+skipped entirely: fresh-install 8–10 PM proposal, Realme swipe/reorder feel,
+pill sharpness/placement, native gradient support, accessibility, Reduce Motion,
+appearance and performance. Vercel CLI is absent; strongly recommend
+`npm i -g vercel` for future authorized env/deploy/log work; installation NOT RUN.
+Endpoint this failed RR2 only; FS14 and other work are not started.
